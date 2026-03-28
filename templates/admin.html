@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>VK Publisher — Админка</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #0f0f13;
+    color: #e8e8f0;
+    min-height: 100vh;
+    padding: 0 0 40px;
+  }
+  header {
+    background: #1a1a24;
+    border-bottom: 1px solid #2a2a38;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .header-left { display: flex; align-items: center; gap: 10px; }
+  .header-icon {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, #4a7cf7, #6f4af7);
+    border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  h1 { font-size: 17px; font-weight: 600; color: #fff; }
+  .logout {
+    font-size: 13px;
+    color: #666;
+    text-decoration: none;
+    padding: 6px 12px;
+    border: 1px solid #2a2a38;
+    border-radius: 8px;
+  }
+  .logout:active { background: #2a2a38; }
+
+  .container { padding: 20px; max-width: 640px; margin: 0 auto; }
+
+  .status-card {
+    background: #1a1a24;
+    border: 1px solid #2a2a38;
+    border-radius: 14px;
+    padding: 16px 18px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .status-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .status-dot.ok { background: #3ecf8e; box-shadow: 0 0 8px #3ecf8e88; }
+  .status-dot.idle { background: #666; }
+  .status-dot.running { background: #f5a623; box-shadow: 0 0 8px #f5a62388; animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:.4 } }
+  .status-info { flex: 1; }
+  .status-title { font-size: 14px; font-weight: 600; color: #fff; }
+  .status-sub { font-size: 12px; color: #666; margin-top: 2px; }
+
+  section {
+    background: #1a1a24;
+    border: 1px solid #2a2a38;
+    border-radius: 14px;
+    padding: 18px;
+    margin-bottom: 16px;
+  }
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .section-title { font-size: 15px; font-weight: 600; color: #fff; }
+  .badge {
+    font-size: 11px;
+    color: #4a7cf7;
+    background: rgba(74,124,247,.15);
+    border-radius: 6px;
+    padding: 3px 8px;
+    font-weight: 500;
+  }
+  .hint {
+    font-size: 12px;
+    color: #555;
+    margin-bottom: 12px;
+    line-height: 1.5;
+  }
+  textarea {
+    width: 100%;
+    background: #0f0f13;
+    border: 1px solid #2a2a38;
+    border-radius: 10px;
+    padding: 14px;
+    font-size: 14px;
+    color: #e8e8f0;
+    line-height: 1.6;
+    resize: vertical;
+    outline: none;
+    min-height: 280px;
+    font-family: inherit;
+    transition: border-color .2s;
+  }
+  textarea:focus { border-color: #4a7cf7; }
+  .count { font-size: 11px; color: #444; text-align: right; margin-top: 6px; }
+
+  .flash {
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 14px;
+    margin-bottom: 16px;
+    font-weight: 500;
+  }
+  .flash.success {
+    background: rgba(62,207,142,.12);
+    border: 1px solid rgba(62,207,142,.3);
+    color: #3ecf8e;
+  }
+  .flash.error {
+    background: rgba(255,80,80,.12);
+    border: 1px solid rgba(255,80,80,.3);
+    color: #ff6060;
+  }
+
+  .actions { display: flex; gap: 10px; margin-top: 6px; }
+  .btn-save {
+    flex: 1;
+    background: linear-gradient(135deg, #4a7cf7, #6f4af7);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 14px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-save:active { opacity: .85; }
+  .btn-test {
+    background: transparent;
+    color: #4a7cf7;
+    border: 1px solid #4a7cf7;
+    border-radius: 10px;
+    padding: 14px 18px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .btn-test:active { background: rgba(74,124,247,.12); }
+  .schedule-row {
+    display: flex;
+    gap: 10px;
+  }
+  .schedule-item {
+    flex: 1;
+    background: #0f0f13;
+    border: 1px solid #2a2a38;
+    border-radius: 10px;
+    padding: 12px;
+    text-align: center;
+  }
+  .schedule-time { font-size: 22px; font-weight: 700; color: #fff; letter-spacing: 1px; }
+  .schedule-label { font-size: 11px; color: #555; margin-top: 3px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="header-left">
+    <div class="header-icon">🎬</div>
+    <h1>VK Publisher</h1>
+  </div>
+  <a href="/logout" class="logout">Выйти</a>
+</header>
+
+<div class="container">
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <div class="flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <div class="status-card">
+    {% if status.running %}
+    <div class="status-dot running"></div>
+    {% elif status.last_ok %}
+    <div class="status-dot ok"></div>
+    {% else %}
+    <div class="status-dot idle"></div>
+    {% endif %}
+    <div class="status-info">
+      <div class="status-title">
+        {% if status.running %}
+          Генерация видео...
+        {% elif status.last_ok %}
+          Последняя история опубликована
+        {% else %}
+          Ожидание расписания
+        {% endif %}
+      </div>
+      <div class="status-sub">
+        {% if status.last_published %}
+          {{ status.last_published }}
+        {% else %}
+          Публикаций ещё не было
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <section>
+    <div class="section-header">
+      <div class="section-title">Расписание</div>
+    </div>
+    <div class="schedule-row">
+      <div class="schedule-item">
+        <div class="schedule-time">04:00</div>
+        <div class="schedule-label">Генерация (UTC)</div>
+      </div>
+      <div class="schedule-item">
+        <div class="schedule-time">~07:00</div>
+        <div class="schedule-label">Публикация</div>
+      </div>
+    </div>
+  </section>
+
+  <form method="post" action="/save">
+    <section>
+      <div class="section-header">
+        <div class="section-title">Сценарии для видео</div>
+        <span class="badge" id="cnt">{{ scenarios|length }} сценариев</span>
+      </div>
+      <div class="hint">Каждая строка — отдельный сценарий. Система случайно выбирает один при каждой публикации.</div>
+      <textarea name="metaprompt" id="ta" spellcheck="true">{{ metaprompt }}</textarea>
+      <div class="count" id="charcount"></div>
+    </section>
+    <div class="actions">
+      <button type="submit" class="btn-save">Сохранить</button>
+    </div>
+  </form>
+</div>
+
+<script>
+const ta = document.getElementById('ta');
+const cnt = document.getElementById('cnt');
+const cc = document.getElementById('charcount');
+
+function update() {
+  const lines = ta.value.split('\n').filter(l => l.trim().length > 0);
+  cnt.textContent = lines.length + ' сценариев';
+  cc.textContent = ta.value.length + ' символов';
+}
+
+ta.addEventListener('input', update);
+update();
+</script>
+</body>
+</html>
