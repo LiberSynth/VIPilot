@@ -271,7 +271,17 @@ def logout():
     return redirect(url_for('login'))
 
 
+_scheduler_started = False
+
+def start_scheduler():
+    global _scheduler_started
+    if not _scheduler_started:
+        _scheduler_started = True
+        t = threading.Thread(target=scheduler_loop, daemon=True)
+        t.start()
+
+
+start_scheduler()
+
 if __name__ == '__main__':
-    t = threading.Thread(target=scheduler_loop, daemon=True)
-    t.start()
     flask_app.run(host='0.0.0.0', port=5000, debug=False)
