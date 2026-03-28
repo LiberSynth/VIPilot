@@ -220,15 +220,15 @@
 
   <section>
     <div class="section-header">
-      <div class="section-title">Расписание</div>
+      <div class="section-title">Расписание (UTC)</div>
     </div>
     <div class="schedule-row">
       <div class="schedule-item">
-        <div class="schedule-time">04:00</div>
-        <div class="schedule-label">Генерация (UTC)</div>
+        <div class="schedule-time">{{ generate_time }}</div>
+        <div class="schedule-label">Генерация</div>
       </div>
       <div class="schedule-item">
-        <div class="schedule-time">~07:00</div>
+        <div class="schedule-time">{{ publish_time }}</div>
         <div class="schedule-label">Публикация</div>
       </div>
     </div>
@@ -237,10 +237,17 @@
   <form method="post" action="/save">
     <section>
       <div class="section-header">
+        <div class="section-title">Время публикации (UTC)</div>
+      </div>
+      <div class="hint">Видео будет опубликовано в это время. Генерация запустится автоматически за 2 часа до публикации.</div>
+      <input type="time" name="publish_time" value="{{ publish_time }}" style="width:100%;padding:14px 16px;background:#0f0f13;border:1px solid #2a2a38;border-radius:12px;color:#fff;font-size:20px;font-family:inherit;box-sizing:border-box;appearance:none;-webkit-appearance:none;">
+    </section>
+    <section>
+      <div class="section-header">
         <div class="section-title">Мета-промпт</div>
         <span class="badge" id="cnt"></span>
       </div>
-      <div class="hint">Опишите стиль, тему и характер видео. AI будет каждый раз генерировать новый уникальный сюжет на основе этого описания.</div>
+      <div class="hint">Опишите стиль, тему и характер видео. Каждый раз будет генерироваться новый уникальный сюжет.</div>
       <textarea name="metaprompt" id="ta" spellcheck="true" style="min-height:180px;">{{ metaprompt }}</textarea>
       <div class="count" id="charcount"></div>
     </section>

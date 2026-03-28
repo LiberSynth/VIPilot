@@ -1,4 +1,5 @@
 import os
+import json
 import time
 import random
 import threading
@@ -20,8 +21,29 @@ FAL_HEADERS = {'Authorization': f'Key {FAL_KEY}', 'Content-Type': 'application/j
 VIDEO_PATH = '/tmp/story_raw.mp4'
 VIDEO_VK_PATH = '/tmp/story_vk.mp4'
 METAPROMPT_PATH = 'config/metaprompt.txt'
+SETTINGS_PATH = 'config/settings.json'
 
-GENERATE_HOUR = 4
+
+def load_settings():
+    try:
+        with open(SETTINGS_PATH, encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return {'publish_time': '06:00'}
+
+
+def save_settings(data):
+    os.makedirs('config', exist_ok=True)
+    with open(SETTINGS_PATH, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False)
+
+
+def parse_hhmm(s):
+    try:
+        h, m = s.strip().split(':')
+        return int(h) % 24, int(m) % 60
+    except Exception:
+        return 6, 0
 
 app_state = {
     'running': False,
@@ -304,9 +326,12 @@ def scheduler_loop():
     last_date = None
     next_retry_after = 0
 
-    print(f'[{now()}] Публикатор запущен. Генерация в {GENERATE_HOUR:02d}:00 UTC.')
-
     while True:
+        settings = load_settings()
+        pub_h, pub_m = parse_hhmm(settings.get('publish_time', '06:00'))
+        gen_h = (pub_h - 2) % 24
+        gen_m = pub_m
+
         now_dt = datetime.now(timezone.utc)
         today = now_dt.date()
 
@@ -315,15 +340,20 @@ def scheduler_loop():
             published_today = False
             last_date = today
             next_retry_after = 0
+            print(f'[{now()}] Новый день. Генерация в {gen_h:02d}:{gen_m:02d} UTC, публикация в {pub_h:02d}:{pub_m:02d} UTC.')
 
-        if now_dt.hour >= GENERATE_HOUR and not generated_today and time.time() >= next_retry_after:
+        now_minutes = now_dt.hour * 60 + now_dt.minute
+        gen_minutes = gen_h * 60 + gen_m
+        pub_minutes = pub_h * 60 + pub_m
+
+        if now_minutes >= gen_minutes and not generated_today and time.time() >= next_retry_after:
             print(f'[{now()}] Запускаю генерацию видео...')
             generated_today = generate_video()
             if not generated_today:
                 next_retry_after = time.time() + 1800
                 print(f'[{now()}] Следующая попытка через 30 минут')
 
-        if generated_today and not published_today:
+        if generated_today and not published_today and now_minutes >= pub_minutes:
             published_today = publish_story()
 
         time.sleep(30)
@@ -361,8 +391,13 @@ def admin():
             metaprompt = f.read().strip()
     except Exception:
         metaprompt = ''
+    settings = load_settings()
+    pub_h, pub_m = parse_hhmm(settings.get('publish_time', '06:00'))
+    gen_h = (pub_h - 2) % 24
     return render_template('admin.html',
                            metaprompt=metaprompt,
+                           publish_time=f'{pub_h:02d}:{pub_m:02d}',
+                           generate_time=f'{gen_h:02d}:{pub_m:02d}',
                            status=app_state)
 
 
@@ -377,7 +412,15 @@ def save():
     os.makedirs('config', exist_ok=True)
     with open(METAPROMPT_PATH, 'w', encoding='utf-8') as f:
         f.write(metaprompt + '\n')
-    flash('Мета-промпт сохранён', 'success')
+
+    pub_time = request.form.get('publish_time', '').strip()
+    if pub_time:
+        h, m = parse_hhmm(pub_time)
+        settings = load_settings()
+        settings['publish_time'] = f'{h:02d}:{m:02d}'
+        save_settings(settings)
+
+    flash('Настройки сохранены', 'success')
     return redirect(url_for('admin'))
 
 
