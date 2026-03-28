@@ -320,6 +320,52 @@ def publish_story():
         return False
 
 
+def publish_to_wall():
+    print(f'[{now()}] Публикую видео на стену сообщества...')
+    try:
+        save_resp = requests.post('https://api.vk.com/method/video.save', data={
+            'group_id': GROUP_ID,
+            'name': 'Строительство и ремонт',
+            'description': '',
+            'wallpost': 0,
+            'access_token': VK_TOKEN,
+            'v': '5.131',
+        }, timeout=15).json()
+
+        if 'error' in save_resp:
+            print(f'[{now()}] Ошибка video.save: {save_resp["error"]}')
+            return False
+
+        upload_url = save_resp['response']['upload_url']
+        video_id = save_resp['response']['video_id']
+        owner_id = save_resp['response']['owner_id']
+        print(f'[{now()}] video.save OK, загружаю файл...')
+
+        with open(VIDEO_VK_PATH, 'rb') as f:
+            up = requests.post(upload_url, files={'video_file': f}, timeout=300)
+        up.raise_for_status()
+        print(f'[{now()}] Видео загружено. Публикую пост...')
+
+        post_resp = requests.post('https://api.vk.com/method/wall.post', data={
+            'owner_id': -GROUP_ID,
+            'from_group': 1,
+            'attachments': f'video{owner_id}_{video_id}',
+            'access_token': VK_TOKEN,
+            'v': '5.131',
+        }, timeout=15).json()
+
+        if 'response' in post_resp:
+            post_id = post_resp['response']['post_id']
+            print(f'[{now()}] ✓ Видео опубликовано на стене! post_id: {post_id}')
+            return True
+        else:
+            print(f'[{now()}] Ошибка wall.post: {post_resp}')
+            return False
+    except Exception as e:
+        print(f'[{now()}] Исключение при публикации на стену: {e}')
+        return False
+
+
 def scheduler_loop():
     generated_today = False
     published_today = False
@@ -354,7 +400,9 @@ def scheduler_loop():
                 print(f'[{now()}] Следующая попытка через 30 минут')
 
         if generated_today and not published_today and now_minutes >= pub_minutes:
-            published_today = publish_story()
+            story_ok = publish_story()
+            wall_ok = publish_to_wall()
+            published_today = story_ok or wall_ok
 
         time.sleep(30)
 
