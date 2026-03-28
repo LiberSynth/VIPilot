@@ -27,7 +27,6 @@ app_state = {
     'running': False,
     'last_published': None,
     'last_ok': False,
-    'last_prompt': None,
 }
 
 SUBJECTS = [
@@ -147,7 +146,6 @@ def generate_prompt():
     scene = f'{subject} {transform}, {setting}.'
     full_prompt = f'{scene} {style}'
 
-    app_state['last_prompt'] = scene
     print(f'[{now()}] Сюжет: {scene[:100]}')
     return full_prompt
 

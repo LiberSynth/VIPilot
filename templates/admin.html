@@ -234,18 +234,6 @@
     </div>
   </section>
 
-  {% if status.last_prompt %}
-  <section>
-    <div class="section-header">
-      <div class="section-title">Последний сгенерированный сюжет</div>
-      <span class="badge">AI</span>
-    </div>
-    <div style="background:#0f0f13;border:1px solid #2a2a38;border-radius:10px;padding:14px;font-size:14px;color:#aaa;line-height:1.6;">
-      {{ status.last_prompt }}
-    </div>
-  </section>
-  {% endif %}
-
   <form method="post" action="/save">
     <section>
       <div class="section-header">
