@@ -150,16 +150,41 @@ def publish_story():
     try:
         r = requests.post('https://api.vk.com/method/stories.getVideoUploadServer', data={
             'group_id': GROUP_ID, 'add_to_news': 1, 'access_token': VK_TOKEN, 'v': '5.131'
-        }, timeout=10)
-        upload_url = r.json()['response']['upload_url']
+        }, timeout=15)
+        r.raise_for_status()
+        server_data = r.json()
+        if 'error' in server_data:
+            print(f'[{now()}] Ошибка getVideoUploadServer: {server_data["error"]}')
+            return False
+        upload_url = server_data['response']['upload_url']
+        print(f'[{now()}] Upload URL получен')
 
-        with open(VIDEO_VK_PATH, 'rb') as f:
-            up = requests.post(upload_url, files={'video_file': f}, timeout=300)
+        for attempt in range(3):
+            try:
+                with open(VIDEO_VK_PATH, 'rb') as f:
+                    up = requests.post(upload_url, files={'video_file': f}, timeout=300)
+                up.raise_for_status()
+                if not up.text.strip():
+                    print(f'[{now()}] Пустой ответ от CDN, попытка {attempt+1}/3')
+                    time.sleep(5)
+                    continue
+                up_data = up.json()
+                if 'response' not in up_data:
+                    print(f'[{now()}] Неожиданный ответ CDN: {up.text[:200]}')
+                    return False
+                upload_result = up_data['response']['upload_result']
+                break
+            except Exception as e:
+                print(f'[{now()}] Ошибка загрузки видео (попытка {attempt+1}/3): {e}')
+                time.sleep(5)
+        else:
+            print(f'[{now()}] Все попытки загрузки провалились')
+            return False
 
-        upload_result = up.json()['response']['upload_result']
+        print(f'[{now()}] Видео загружено, сохраняю историю...')
         save = requests.post('https://api.vk.com/method/stories.save', data={
             'upload_results': upload_result, 'access_token': VK_TOKEN, 'v': '5.131'
-        }, timeout=10).json()
+        }, timeout=15).json()
 
         if 'response' in save:
             story_id = save['response']['items'][0]['id']
@@ -169,7 +194,7 @@ def publish_story():
             app_state['last_ok'] = True
             return True
         else:
-            print(f'[{now()}] Ошибка публикации: {save}')
+            print(f'[{now()}] Ошибка stories.save: {save}')
             return False
     except Exception as e:
         print(f'[{now()}] Исключение при публикации: {e}')
