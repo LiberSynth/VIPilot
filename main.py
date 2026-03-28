@@ -23,34 +23,133 @@ METAPROMPT_PATH = 'config/metaprompt.txt'
 
 GENERATE_HOUR = 4
 
-STYLE_SUFFIXES = [
-    'вертикальное видео, кинематографическая съёмка, тёплый свет, 4K качество',
-    'вертикальный формат, сюрреализм, яркие цвета, высокое качество',
-    'вертикальное видео, магический реализм, красивое освещение',
-    'вертикальный кадр, художественная съёмка, насыщенные цвета',
-]
-
 app_state = {
     'running': False,
     'last_published': None,
     'last_ok': False,
+    'last_prompt': None,
 }
 
+SUBJECTS = [
+    'Стая рыб выпрыгивает из реки',
+    'Снежинки падают с неба',
+    'Осенние листья кружатся в воздухе',
+    'Волны океана накатывают на берег',
+    'Молнии бьют в землю',
+    'Пузырьки поднимаются со дна озера',
+    'Стая птиц летит над полем',
+    'Бабочки порхают над цветами',
+    'Капли дождя падают в лужу',
+    'Льдинки тают на солнце',
+    'Лепестки роз кружатся по ветру',
+    'Искры вылетают из костра',
+    'Муравьи несут крошки по тропинке',
+    'Пчёлы роятся над ульем',
+    'Листья берёзы падают в реку',
+    'Семена одуванчика летят по ветру',
+    'Огонь в камине догорает',
+    'Дым поднимается спиралью вверх',
+    'Снежный ком катится с горы',
+    'Мыльные пузыри поднимаются в воздух',
+    'Стая скворцов кружится в небе',
+    'Кленовые вертолётики падают с дерева',
+    'Горная лавина несётся вниз',
+    'Звёзды падают с ночного неба',
+    'Лавовый поток течёт по горе',
+]
 
-def load_scenarios():
+TRANSFORMATIONS = [
+    'и превращаются в {material}, из которых {builds}',
+    'и на лету трансформируются в {material} — {builds} словно сам собой',
+    'и вдруг застывают, превращаясь в {material}, и {builds}',
+    'и, коснувшись земли, становятся {material}, из которых {builds}',
+    'и складываются в {material} — из них {builds}',
+    'и рассыпаются {material}ом, который сам собой {builds}',
+    'и в замедленной съёмке превращаются в {material}, {builds}',
+    'и взрываются облаком {material}, из которого {builds}',
+]
+
+MATERIALS = [
+    'кирпичи',
+    'деревянные доски',
+    'керамическую плитку',
+    'стеклянные блоки',
+    'бетонные панели',
+    'черепицу',
+    'мраморные плиты',
+    'металлические балки',
+    'рулоны утеплителя',
+    'брёвна',
+    'гранитный щебень',
+    'листы фанеры',
+    'рулоны рубероида',
+    'арматурные прутья',
+    'сайдинг',
+]
+
+BUILDS = [
+    'вырастает красивый коттедж',
+    'складывается уютный деревянный дом',
+    'появляется кирпичный особняк',
+    'строится загородный дом',
+    'возникает терраса с видом на лес',
+    'строится забор вокруг сада',
+    'появляется крыша над головой',
+    'складывается камин в гостиной',
+    'вырастает стена дома',
+    'строится дорожка к дому',
+    'появляется веранда',
+    'складывается гараж',
+    'вырастает баня',
+    'строится беседка в саду',
+]
+
+SETTINGS = [
+    'на фоне заката над лесом',
+    'в осеннем лесу',
+    'у тихой реки на рассвете',
+    'в заснеженном поле',
+    'в летнем саду',
+    'на берегу озера',
+    'среди зелёных холмов',
+    'в хвойном лесу',
+    'на фоне грозового неба',
+    'в золотой час заката',
+]
+
+STYLES = [
+    'Кинематографическая съёмка, тёплый свет, 4K, вертикальное видео 9:16.',
+    'Магический реализм, яркие насыщенные цвета, вертикальный формат 9:16.',
+    'Художественная съёмка, мягкое освещение, сюрреализм, вертикальное видео 9:16.',
+    'Визуальный аттракцион, замедленная съёмка, кинематограф, 9:16.',
+    'Эпичная широкоугольная съёмка, золотой закат, вертикальный формат 9:16.',
+]
+
+
+def load_metaprompt():
     try:
         with open(METAPROMPT_PATH, encoding='utf-8') as f:
-            lines = [l.strip() for l in f.read().splitlines() if l.strip()]
-        return lines if lines else ['Строительная каска катится по улице, из неё вырастает кирпичный дом']
+            text = f.read().strip()
+        return text if text else ''
     except Exception:
-        return ['Строительная каска катится по улице, из неё вырастает кирпичный дом']
+        return ''
 
 
 def generate_prompt():
-    scenarios = load_scenarios()
-    base = random.choice(scenarios)
-    style = random.choice(STYLE_SUFFIXES)
-    return f"{base}. {style}."
+    subject = random.choice(SUBJECTS)
+    transform_template = random.choice(TRANSFORMATIONS)
+    material = random.choice(MATERIALS)
+    build = random.choice(BUILDS)
+    setting = random.choice(SETTINGS)
+    style = random.choice(STYLES)
+
+    transform = transform_template.format(material=material, builds=build)
+    scene = f'{subject} {transform}, {setting}.'
+    full_prompt = f'{scene} {style}'
+
+    app_state['last_prompt'] = scene
+    print(f'[{now()}] Сюжет: {scene[:100]}')
+    return full_prompt
 
 
 def now():
@@ -261,13 +360,11 @@ def admin():
         return redirect(url_for('login'))
     try:
         with open(METAPROMPT_PATH, encoding='utf-8') as f:
-            metaprompt = f.read()
+            metaprompt = f.read().strip()
     except Exception:
         metaprompt = ''
-    scenarios = [l.strip() for l in metaprompt.splitlines() if l.strip()]
     return render_template('admin.html',
                            metaprompt=metaprompt,
-                           scenarios=scenarios,
                            status=app_state)
 
 
@@ -277,16 +374,12 @@ def save():
         return redirect(url_for('login'))
     metaprompt = request.form.get('metaprompt', '').strip()
     if not metaprompt:
-        flash('Нельзя сохранить пустой список сценариев', 'error')
-        return redirect(url_for('admin'))
-    lines = [l.strip() for l in metaprompt.splitlines() if l.strip()]
-    if len(lines) == 0:
-        flash('Добавьте хотя бы один сценарий', 'error')
+        flash('Мета-промпт не может быть пустым', 'error')
         return redirect(url_for('admin'))
     os.makedirs('config', exist_ok=True)
     with open(METAPROMPT_PATH, 'w', encoding='utf-8') as f:
-        f.write('\n'.join(lines) + '\n')
-    flash(f'Сохранено {len(lines)} сценариев', 'success')
+        f.write(metaprompt + '\n')
+    flash('Мета-промпт сохранён', 'success')
     return redirect(url_for('admin'))
 
 

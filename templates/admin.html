@@ -234,14 +234,26 @@
     </div>
   </section>
 
+  {% if status.last_prompt %}
+  <section>
+    <div class="section-header">
+      <div class="section-title">Последний сгенерированный сюжет</div>
+      <span class="badge">AI</span>
+    </div>
+    <div style="background:#0f0f13;border:1px solid #2a2a38;border-radius:10px;padding:14px;font-size:14px;color:#aaa;line-height:1.6;">
+      {{ status.last_prompt }}
+    </div>
+  </section>
+  {% endif %}
+
   <form method="post" action="/save">
     <section>
       <div class="section-header">
-        <div class="section-title">Сценарии для видео</div>
-        <span class="badge" id="cnt">{{ scenarios|length }} сценариев</span>
+        <div class="section-title">Мета-промпт</div>
+        <span class="badge" id="cnt"></span>
       </div>
-      <div class="hint">Каждая строка — отдельный сценарий. Система случайно выбирает один при каждой публикации.</div>
-      <textarea name="metaprompt" id="ta" spellcheck="true">{{ metaprompt }}</textarea>
+      <div class="hint">Опишите стиль, тему и характер видео. AI будет каждый раз генерировать новый уникальный сюжет на основе этого описания.</div>
+      <textarea name="metaprompt" id="ta" spellcheck="true" style="min-height:180px;">{{ metaprompt }}</textarea>
       <div class="count" id="charcount"></div>
     </section>
     <div class="actions">
@@ -256,8 +268,6 @@ const cnt = document.getElementById('cnt');
 const cc = document.getElementById('charcount');
 
 function update() {
-  const lines = ta.value.split('\n').filter(l => l.trim().length > 0);
-  cnt.textContent = lines.length + ' сценариев';
   cc.textContent = ta.value.length + ' символов';
 }
 
