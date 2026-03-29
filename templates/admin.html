@@ -364,6 +364,33 @@
         </div>
       </div>
 
+      <div class="card">
+        <div class="card-title">Публикация в ВКонтакте</div>
+        <div class="hint">Хотя бы одна опция должна быть включена.</div>
+        <div class="toggle-row" style="margin-top:10px">
+          <div>
+            <div class="toggle-label">Публиковать историю</div>
+          </div>
+          <label class="toggle-wrap">
+            <input type="hidden" name="vk_publish_story" id="vk_story_hidden" value="{{ '1' if vk_publish_story else '0' }}">
+            <input type="checkbox" id="vk_story_check" {% if vk_publish_story %}checked{% endif %}
+                   onchange="onVkToggle(this, 'vk_wall_check', 'vk_story_hidden', 'vk_wall_hidden')">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        <div class="toggle-row" style="margin-top:10px">
+          <div>
+            <div class="toggle-label">Публиковать на стену</div>
+          </div>
+          <label class="toggle-wrap">
+            <input type="hidden" name="vk_publish_wall" id="vk_wall_hidden" value="{{ '1' if vk_publish_wall else '0' }}">
+            <input type="checkbox" id="vk_wall_check" {% if vk_publish_wall %}checked{% endif %}
+                   onchange="onVkToggle(this, 'vk_story_check', 'vk_wall_hidden', 'vk_story_hidden')">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+      </div>
+
       <!-- Служебные поля — скрытые дубликаты для корректной отправки формы -->
       <input type="hidden" name="notify_email" id="h_notify_email" value="{{ notify_email }}">
       <input type="hidden" name="notify_phone" id="h_notify_phone" value="{{ notify_phone }}">
@@ -390,6 +417,8 @@
       <input type="hidden" name="metaprompt" id="h_metaprompt" value="">
       <input type="hidden" name="publish_time" id="h_publish_time" value="{{ publish_time_msk }}">
       <input type="hidden" name="lead_time_mins" id="h_lead_time_mins" value="{{ lead_time_mins }}">
+      <input type="hidden" name="vk_publish_story" id="h_vk_story" value="{{ '1' if vk_publish_story else '0' }}">
+      <input type="hidden" name="vk_publish_wall" id="h_vk_wall" value="{{ '1' if vk_publish_wall else '0' }}">
 
       <div class="card emulation-card">
         <div class="toggle-row">
@@ -479,7 +508,23 @@ if (ta && hMeta) {
   ta.addEventListener('input', () => { hMeta.value = ta.value; });
 }
 
+// Логика переключателей ВК — хотя бы один должен быть включён
+// changedChk — чекбокс который только что изменился
+// otherId — id другого чекбокса
+// selfHidId — id скрытого поля для этого чекбокса
+// otherHidId — id скрытого поля для другого чекбокса
+function onVkToggle(changedChk, otherId, selfHidId, otherHidId) {
+  const otherChk = document.getElementById(otherId);
+  if (!changedChk.checked && !otherChk.checked) {
+    changedChk.checked = true; // не даём выключить последний
+  }
+  document.getElementById(selfHidId).value  = changedChk.checked ? '1' : '0';
+  document.getElementById(otherHidId).value = otherChk.checked  ? '1' : '0';
+  if (checkDirtyPipeline) checkDirtyPipeline();
+}
+
 // Трекинг изменений — форма Пайплайн
+var checkDirtyPipeline;
 (function() {
   const saveBtn = document.getElementById('save-btn');
   if (!saveBtn) return;
@@ -488,13 +533,19 @@ if (ta && hMeta) {
     document.querySelector('#settings-form input[name="lead_time_mins"]'),
     ta,
   ].filter(Boolean);
+  const storyChk = document.getElementById('vk_story_check');
+  const wallChk  = document.getElementById('vk_wall_check');
   const initial = {};
   fields.forEach(f => { initial[f.name] = f.value; });
-  function checkDirty() {
-    saveBtn.disabled = !fields.some(f => f.value !== initial[f.name]);
-  }
-  fields.forEach(f => f.addEventListener('input', checkDirty));
-  fields.forEach(f => f.addEventListener('change', checkDirty));
+  const initStory = storyChk ? storyChk.checked : true;
+  const initWall  = wallChk  ? wallChk.checked  : true;
+  checkDirtyPipeline = function() {
+    const fieldsDirty = fields.some(f => f.value !== initial[f.name]);
+    const vkDirty = (storyChk && storyChk.checked !== initStory) || (wallChk && wallChk.checked !== initWall);
+    saveBtn.disabled = !(fieldsDirty || vkDirty);
+  };
+  fields.forEach(f => f.addEventListener('input', checkDirtyPipeline));
+  fields.forEach(f => f.addEventListener('change', checkDirtyPipeline));
 })();
 
 // Трекинг изменений — форма Служебные

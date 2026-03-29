@@ -103,7 +103,9 @@ def init_db():
                         ('publish_time', '03:00'),
                         ('lead_time_mins', '120'),
                         ('notify_email', ''),
-                        ('notify_phone', '')
+                        ('notify_phone', ''),
+                        ('vk_publish_story', '1'),
+                        ('vk_publish_wall', '1')
                     ON CONFLICT (key) DO NOTHING
                 ''')
                 cur.execute('''
@@ -442,7 +444,6 @@ def generate_video():
                 log_msg('[ЭМУЛЯЦИЯ] В базе нет видео — добавьте ID запросов fal.ai через панель', 'error')
                 return False
             log_msg('[ЭМУЛЯЦИЯ] Видео выбрано, скачиваю...')
-            url = url + '_BROKEN_TEST'  # TEST FAILURE
             return download_and_transcode(url)
         finally:
             app_state['running'] = False
@@ -696,8 +697,10 @@ def run_full_cycle():
     gen_ok = generate_video()
     pub_ok = False
     if gen_ok:
-        story_ok = publish_story()
-        wall_ok = publish_to_wall()
+        do_story = db_get('vk_publish_story', '1') == '1'
+        do_wall  = db_get('vk_publish_wall',  '1') == '1'
+        story_ok = publish_story()    if do_story else False
+        wall_ok  = publish_to_wall() if do_wall  else False
         pub_ok = story_ok or wall_ok
     success = pub_ok if gen_ok else False
     entries = list(app_state['current_cycle']['entries']) if app_state['current_cycle'] else []
@@ -756,8 +759,10 @@ def scheduler_loop():
             mins_past_pub = (now_mins_fresh - pub_mins) % 1440
             if mins_past_pub < 720:
                 start_cycle()
-                story_ok = publish_story()
-                wall_ok = publish_to_wall()
+                do_story = db_get('vk_publish_story', '1') == '1'
+                do_wall  = db_get('vk_publish_wall',  '1') == '1'
+                story_ok = publish_story()    if do_story else False
+                wall_ok  = publish_to_wall() if do_wall  else False
                 published_today = story_ok or wall_ok
                 end_cycle(published_today)
 
@@ -806,6 +811,8 @@ def admin():
     emulation_mode = db_get('emulation_mode', '0') == '1'
     notify_email = db_get('notify_email', '')
     notify_phone = db_get('notify_phone', '')
+    vk_publish_story = db_get('vk_publish_story', '1') == '1'
+    vk_publish_wall  = db_get('vk_publish_wall',  '1') == '1'
 
     return render_template('admin.html',
                            metaprompt=metaprompt,
@@ -816,6 +823,8 @@ def admin():
                            emulation_mode=emulation_mode,
                            notify_email=notify_email,
                            notify_phone=notify_phone,
+                           vk_publish_story=vk_publish_story,
+                           vk_publish_wall=vk_publish_wall,
                            status=app_state)
 
 
@@ -848,6 +857,14 @@ def save():
 
     db_set('notify_email', request.form.get('notify_email', '').strip())
     db_set('notify_phone', request.form.get('notify_phone', '').strip())
+
+    vk_story_raw = request.form.get('vk_publish_story', '0')
+    vk_wall_raw  = request.form.get('vk_publish_wall',  '0')
+    # хотя бы одно должно быть включено
+    if vk_story_raw != '1' and vk_wall_raw != '1':
+        vk_story_raw = '1'
+    db_set('vk_publish_story', '1' if vk_story_raw == '1' else '0')
+    db_set('vk_publish_wall',  '1' if vk_wall_raw  == '1' else '0')
 
     active_tab = request.form.get('active_tab', 'pipeline')
     flash('Настройки сохранены', 'success')
