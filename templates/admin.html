@@ -290,8 +290,9 @@
     <a href="/logout" class="logout">Выйти</a>
   </div>
   <div class="tabs">
-    <button class="tab-btn active" onclick="switchTab('settings', this)">Настройки</button>
-    <button class="tab-btn" onclick="switchTab('log', this)">История</button>
+    <button class="tab-btn active" onclick="switchTab('pipeline', this)">Пайплайн</button>
+    <button class="tab-btn" onclick="switchTab('service', this)">Служебные</button>
+    <button class="tab-btn" onclick="switchTab('log', this)">Лог</button>
   </div>
 </header>
 
@@ -303,8 +304,8 @@
     {% endfor %}
   {% endwith %}
 
-  <!-- ══ НАСТРОЙКИ ══ -->
-  <div id="panel-settings" class="tab-panel active">
+  <!-- ══ ПАЙПЛАЙН ══ -->
+  <div id="panel-pipeline" class="tab-panel active">
 
     <div class="status-card">
       {% if status.running %}
@@ -340,7 +341,7 @@
       </div>
     </div>
 
-    <form method="post" action="/save">
+    <form method="post" action="/save" id="settings-form">
       <div class="card">
         <div class="card-title">Мета-промпт</div>
         <div class="hint">Стиль, тема и характер видео. Каждый день генерируется новый уникальный сюжет.</div>
@@ -363,27 +364,31 @@
         </div>
       </div>
 
-      <div class="card">
-        <div class="card-title">Уведомление о сбое</div>
-        <div class="hint">При ошибке генерации или публикации придёт уведомление. Для работы нужно задать переменные окружения: SMTP_HOST, SMTP_USER, SMTP_PASS для email; SMSC_LOGIN, SMSC_PASS для SMS.</div>
-        <div style="margin-top:14px">
-          <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block">Email</label>
-          <input type="email" name="notify_email" value="{{ notify_email }}" placeholder="admin@example.com" style="width:100%;box-sizing:border-box">
-        </div>
-        <div style="margin-top:12px">
-          <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block">SMS (номер в формате 79161234567)</label>
-          <input type="tel" name="notify_phone" id="notify_phone" value="{{ notify_phone }}" placeholder="79161234567" style="width:100%;box-sizing:border-box">
-        </div>
-      </div>
+      <!-- Служебные поля — скрытые дубликаты для корректной отправки формы -->
+      <input type="hidden" name="notify_email" id="h_notify_email" value="{{ notify_email }}">
+      <input type="hidden" name="notify_phone" id="h_notify_phone" value="{{ notify_phone }}">
+      <input type="hidden" name="history_days" id="h_history_days" value="{{ history_days }}">
+      <input type="hidden" name="emulation_mode" id="h_emulation_mode" value="{{ '1' if emulation_mode else '0' }}">
 
-      <div class="card">
-        <div class="card-title">Детальный лог хранить</div>
-        <div class="hint">После указанного срока подробные записи цикла удаляются. Краткая сводка (промпт, время генерации и публикации) остаётся навсегда.</div>
-        <div class="lead-row">
-          <input type="number" name="history_days" value="{{ history_days }}" min="1" max="365" step="1">
-          <span class="lead-unit">дней</span>
-        </div>
-      </div>
+      <button type="submit" class="btn-primary" id="save-btn" disabled>Сохранить настройки</button>
+    </form>
+
+    <form method="post" action="/run-now">
+      <button type="submit" class="btn-secondary" {% if status.running %}disabled{% endif %}>
+        {% if status.running %}Генерация идёт...{% else %}Запустить сейчас{% endif %}
+      </button>
+    </form>
+
+  </div>
+
+  <!-- ══ СЛУЖЕБНЫЕ ══ -->
+  <div id="panel-service" class="tab-panel">
+
+    <form method="post" action="/save">
+      <!-- Пайплайн-поля — скрытые дубликаты -->
+      <input type="hidden" name="metaprompt" id="h_metaprompt" value="">
+      <input type="hidden" name="publish_time" id="h_publish_time" value="{{ publish_time_msk }}">
+      <input type="hidden" name="lead_time_mins" id="h_lead_time_mins" value="{{ lead_time_mins }}">
 
       <div class="card emulation-card">
         <div class="toggle-row">
@@ -397,19 +402,38 @@
           <label class="toggle-wrap">
             <input type="hidden" name="emulation_mode" id="emulation_hidden" value="{{ '1' if emulation_mode else '0' }}">
             <input type="checkbox" id="emulation_check" {% if emulation_mode %}checked{% endif %}
-                   onchange="document.getElementById('emulation_hidden').value = this.checked ? '1' : '0'">
+                   onchange="document.getElementById('emulation_hidden').value = this.checked ? '1' : '0'; document.getElementById('h_emulation_mode').value = this.checked ? '1' : '0'">
             <span class="toggle-track"></span>
           </label>
         </div>
       </div>
 
-      <button type="submit" class="btn-primary" id="save-btn" disabled>Сохранить настройки</button>
-    </form>
+      <div class="card">
+        <div class="card-title">Уведомление о сбое</div>
+        <div class="hint">При ошибке генерации или публикации придёт уведомление. Для работы нужно задать переменные окружения: SMTP_HOST, SMTP_USER, SMTP_PASS для email; SMSC_LOGIN, SMSC_PASS для SMS.</div>
+        <div style="margin-top:14px">
+          <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block">Email</label>
+          <input type="email" name="notify_email" id="notify_email" value="{{ notify_email }}" placeholder="admin@example.com"
+                 oninput="document.getElementById('h_notify_email').value = this.value">
+        </div>
+        <div style="margin-top:12px">
+          <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block">SMS (номер в формате 79161234567)</label>
+          <input type="tel" name="notify_phone" id="notify_phone" value="{{ notify_phone }}" placeholder="79161234567"
+                 oninput="document.getElementById('h_notify_phone').value = this.value">
+        </div>
+      </div>
 
-    <form method="post" action="/run-now">
-      <button type="submit" class="btn-secondary" {% if status.running %}disabled{% endif %}>
-        {% if status.running %}Генерация идёт...{% else %}Запустить сейчас{% endif %}
-      </button>
+      <div class="card">
+        <div class="card-title">Детальный лог хранить</div>
+        <div class="hint">После указанного срока подробные записи цикла удаляются. Краткая сводка (промпт, время генерации и публикации) остаётся навсегда.</div>
+        <div class="lead-row">
+          <input type="number" name="history_days" id="history_days" value="{{ history_days }}" min="1" max="365" step="1"
+                 oninput="document.getElementById('h_history_days').value = this.value">
+          <span class="lead-unit">дней</span>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-primary" id="save-btn-service" disabled>Сохранить настройки</button>
     </form>
 
   </div>
@@ -436,30 +460,49 @@ const cc = document.getElementById('charcount');
 function updateCount() { if (ta && cc) cc.textContent = ta.value.length + ' символов'; }
 if (ta) { ta.addEventListener('input', updateCount); updateCount(); }
 
+// Синхронизация textarea метапромпта в скрытое поле формы Служебных
+const hMeta = document.getElementById('h_metaprompt');
+if (ta && hMeta) {
+  hMeta.value = ta.value;
+  ta.addEventListener('input', () => { hMeta.value = ta.value; });
+}
+
+// Трекинг изменений — форма Пайплайн
 (function() {
   const saveBtn = document.getElementById('save-btn');
   if (!saveBtn) return;
-
   const fields = [
-    document.querySelector('input[name="publish_time"]'),
-    document.querySelector('input[name="lead_time_mins"]'),
-    document.querySelector('input[name="history_days"]'),
-    document.querySelector('input[name="notify_email"]'),
-    document.querySelector('input[name="notify_phone"]'),
+    document.querySelector('#settings-form input[name="publish_time"]'),
+    document.querySelector('#settings-form input[name="lead_time_mins"]'),
     ta,
   ].filter(Boolean);
-  const emulCheck = document.getElementById('emulation_check');
-
   const initial = {};
   fields.forEach(f => { initial[f.name] = f.value; });
-  if (emulCheck) initial['emulation_mode'] = emulCheck.checked;
-
   function checkDirty() {
-    const dirty = fields.some(f => f.value !== initial[f.name])
-      || (emulCheck ? emulCheck.checked !== initial['emulation_mode'] : false);
+    saveBtn.disabled = !fields.some(f => f.value !== initial[f.name]);
+  }
+  fields.forEach(f => f.addEventListener('input', checkDirty));
+  fields.forEach(f => f.addEventListener('change', checkDirty));
+})();
+
+// Трекинг изменений — форма Служебные
+(function() {
+  const saveBtn = document.getElementById('save-btn-service');
+  if (!saveBtn) return;
+  const fields = [
+    document.getElementById('notify_email'),
+    document.getElementById('notify_phone'),
+    document.getElementById('history_days'),
+  ].filter(Boolean);
+  const emulCheck = document.getElementById('emulation_check');
+  const initial = {};
+  fields.forEach(f => { initial[f.id] = f.value; });
+  if (emulCheck) initial['emulation_check'] = emulCheck.checked;
+  function checkDirty() {
+    const dirty = fields.some(f => f.value !== initial[f.id])
+      || (emulCheck ? emulCheck.checked !== initial['emulation_check'] : false);
     saveBtn.disabled = !dirty;
   }
-
   fields.forEach(f => f.addEventListener('input', checkDirty));
   fields.forEach(f => f.addEventListener('change', checkDirty));
   if (emulCheck) emulCheck.addEventListener('change', checkDirty);
