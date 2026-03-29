@@ -114,13 +114,6 @@ def init_db():
                         summary JSONB NOT NULL DEFAULT '{}'
                     )
                 ''')
-                cur.execute('''
-                    CREATE TABLE IF NOT EXISTS video_urls (
-                        id SERIAL PRIMARY KEY,
-                        url TEXT NOT NULL,
-                        created_at FLOAT NOT NULL
-                    )
-                ''')
             conn.commit()
         print('[DB] Инициализация выполнена')
     except Exception as e:
