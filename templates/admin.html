@@ -47,10 +47,7 @@
   }
   .logout:active { background: #2a2a38; }
 
-  .tabs {
-    display: flex;
-    gap: 0;
-  }
+  .tabs { display: flex; }
   .tab-btn {
     flex: 1;
     padding: 10px 0;
@@ -62,17 +59,12 @@
     border: none;
     border-bottom: 2px solid transparent;
     cursor: pointer;
-    transition: color .2s, border-color .2s;
-    letter-spacing: .01em;
+    transition: color .15s, border-color .15s;
   }
-  .tab-btn.active {
-    color: #4a7cf7;
-    border-bottom-color: #4a7cf7;
-  }
+  .tab-btn.active { color: #4a7cf7; border-bottom-color: #4a7cf7; }
   .tab-btn:active { opacity: .7; }
 
   .container { padding: 18px 16px; max-width: 640px; margin: 0 auto; }
-
   .tab-panel { display: none; }
   .tab-panel.active { display: block; }
 
@@ -87,9 +79,7 @@
     gap: 12px;
   }
   .status-dot {
-    width: 9px; height: 9px;
-    border-radius: 50%;
-    flex-shrink: 0;
+    width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
   }
   .status-dot.ok { background: #3ecf8e; box-shadow: 0 0 8px #3ecf8e88; }
   .status-dot.idle { background: #444; }
@@ -107,13 +97,20 @@
     margin-bottom: 12px;
   }
   .card-title {
-    font-size: 13px;
+    font-size: 11px;
     font-weight: 600;
-    color: #888;
+    color: #666;
     text-transform: uppercase;
-    letter-spacing: .06em;
+    letter-spacing: .07em;
     margin-bottom: 12px;
   }
+  .card-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .card-row:last-child { margin-bottom: 0; }
 
   .schedule-row { display: flex; gap: 10px; }
   .schedule-item {
@@ -124,10 +121,30 @@
     padding: 12px;
     text-align: center;
   }
-  .schedule-time { font-size: 24px; font-weight: 700; color: #fff; letter-spacing: 1.5px; font-variant-numeric: tabular-nums; }
+  .schedule-time { font-size: 26px; font-weight: 700; color: #fff; letter-spacing: 2px; font-variant-numeric: tabular-nums; }
   .schedule-label { font-size: 11px; color: #555; margin-top: 4px; }
 
+  .tz-badge {
+    font-size: 10px;
+    color: #4a7cf7;
+    background: rgba(74,124,247,.12);
+    border-radius: 5px;
+    padding: 2px 6px;
+    font-weight: 600;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+
   .hint { font-size: 12px; color: #555; margin-bottom: 10px; line-height: 1.55; }
+
+  .field-label {
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 7px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
 
   input[type="time"] {
     width: 100%;
@@ -146,6 +163,29 @@
     letter-spacing: 2px;
   }
   input[type="time"]:focus { border-color: #4a7cf7; }
+
+  .lead-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  input[type="number"] {
+    flex: 1;
+    padding: 14px 16px;
+    background: #0f0f13;
+    border: 1px solid #2a2a38;
+    border-radius: 11px;
+    color: #fff;
+    font-size: 22px;
+    font-family: inherit;
+    font-variant-numeric: tabular-nums;
+    outline: none;
+    transition: border-color .2s;
+    -moz-appearance: textfield;
+  }
+  input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
+  input[type="number"]:focus { border-color: #4a7cf7; }
+  .lead-unit { font-size: 14px; color: #555; white-space: nowrap; }
 
   textarea {
     width: 100%;
@@ -188,7 +228,6 @@
     transition: opacity .15s;
   }
   .btn-primary:active { opacity: .8; }
-  .btn-primary:disabled { opacity: .4; cursor: default; }
 
   .btn-secondary {
     width: 100%;
@@ -206,14 +245,6 @@
   .btn-secondary:active { background: rgba(74,124,247,.1); }
   .btn-secondary:disabled { opacity: .4; cursor: default; }
 
-  .divider { height: 1px; background: #1e1e2e; margin: 16px 0; }
-
-  .log-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 10px;
-  }
   .log-badge {
     font-size: 11px;
     padding: 3px 9px;
@@ -221,14 +252,10 @@
     font-weight: 600;
     background: rgba(74,124,247,.12);
     color: #4a7cf7;
-    transition: background .3s, color .3s;
+    transition: all .3s;
   }
-  .log-badge.running {
-    background: rgba(245,166,35,.12);
-    color: #f5a623;
-  }
+  .log-badge.running { background: rgba(245,166,35,.12); color: #f5a623; }
 
-  .prompt-label { font-size: 11px; color: #444; margin-bottom: 6px; }
   .prompt-box {
     background: #0f0f13;
     border: 1px solid #1e1e2e;
@@ -238,7 +265,7 @@
     color: #7070a0;
     line-height: 1.6;
     font-style: italic;
-    margin-bottom: 12px;
+    margin-top: 10px;
   }
 
   .log-box {
@@ -246,7 +273,7 @@
     border: 1px solid #151520;
     border-radius: 12px;
     padding: 10px;
-    max-height: 400px;
+    max-height: 420px;
     overflow-y: auto;
     font-family: 'SF Mono', 'Fira Code', monospace;
     font-size: 12px;
@@ -308,14 +335,14 @@
     </div>
 
     <div class="card">
-      <div class="card-title">Расписание (UTC)</div>
+      <div class="card-title">Расписание <span class="tz-badge">МСК</span></div>
       <div class="schedule-row">
         <div class="schedule-item">
-          <div class="schedule-time">{{ generate_time }}</div>
+          <div class="schedule-time">{{ generate_time_msk }}</div>
           <div class="schedule-label">Генерация</div>
         </div>
         <div class="schedule-item">
-          <div class="schedule-time">{{ publish_time }}</div>
+          <div class="schedule-time">{{ publish_time_msk }}</div>
           <div class="schedule-label">Публикация</div>
         </div>
       </div>
@@ -323,9 +350,18 @@
 
     <form method="post" action="/save">
       <div class="card">
-        <div class="card-title">Время публикации (UTC)</div>
-        <div class="hint">Генерация запустится автоматически за 2 часа до публикации.</div>
-        <input type="time" name="publish_time" value="{{ publish_time }}">
+        <div class="card-title">Время публикации <span class="tz-badge">МСК</span></div>
+        <div class="hint">Видео публикуется в это время по Москве. Хранится и рассчитывается в UTC.</div>
+        <input type="time" name="publish_time" value="{{ publish_time_msk }}">
+      </div>
+
+      <div class="card">
+        <div class="card-title">Время упреждения генерации</div>
+        <div class="hint">За сколько минут до публикации запускать генерацию видео. Если до публикации осталось меньше — генерация стартует немедленно.</div>
+        <div class="lead-row">
+          <input type="number" name="lead_time_mins" value="{{ lead_time_mins }}" min="10" max="1440" step="10">
+          <span class="lead-unit">минут</span>
+        </div>
       </div>
 
       <div class="card">
@@ -349,11 +385,11 @@
   <div id="panel-log" class="tab-panel">
 
     <div class="card">
-      <div class="log-header">
-        <div class="card-title" style="margin-bottom:0;">Последний промпт</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div class="card-title" style="margin-bottom:0;">Текущий сюжет</div>
         <span class="log-badge" id="log-badge">ожидание</span>
       </div>
-      <div id="prompt-wrap" style="display:none;margin-top:10px;">
+      <div id="prompt-wrap" style="display:none;">
         <div class="prompt-box" id="current-prompt"></div>
       </div>
     </div>
@@ -380,7 +416,7 @@ function switchTab(name, btn) {
 
 const ta = document.getElementById('ta');
 const cc = document.getElementById('charcount');
-function updateCount() { cc.textContent = ta ? ta.value.length + ' символов' : ''; }
+function updateCount() { if (ta && cc) cc.textContent = ta.value.length + ' символов'; }
 if (ta) { ta.addEventListener('input', updateCount); updateCount(); }
 
 const logBox = document.getElementById('log-box');
@@ -398,9 +434,7 @@ function scrollLogToBottom() {
 }
 
 function levelClass(l) {
-  if (l === 'error') return 'error';
-  if (l === 'ok') return 'ok';
-  return '';
+  return l === 'error' ? 'error' : l === 'ok' ? 'ok' : '';
 }
 
 async function refreshLog() {

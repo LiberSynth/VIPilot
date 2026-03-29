@@ -7,7 +7,7 @@ import subprocess
 import psycopg2
 import psycopg2.extras
 from collections import deque
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 
 FAL_KEY = os.environ['FAL_API_KEY']
@@ -22,6 +22,8 @@ FAL_HEADERS = {'Authorization': f'Key {FAL_KEY}', 'Content-Type': 'application/j
 
 VIDEO_PATH = '/tmp/story_raw.mp4'
 VIDEO_VK_PATH = '/tmp/story_vk.mp4'
+
+MSK_OFFSET = timedelta(hours=3)
 
 
 def get_db():
@@ -61,6 +63,23 @@ def parse_hhmm(s):
         return 6, 0
 
 
+def parse_lead_mins(s):
+    try:
+        return max(10, min(1440, int(s)))
+    except Exception:
+        return 120
+
+
+def to_msk(h, m):
+    total = (h * 60 + m + 180) % 1440
+    return total // 60, total % 60
+
+
+def to_utc_from_msk(h, m):
+    total = (h * 60 + m - 180) % 1440
+    return total // 60, total % 60
+
+
 def init_db():
     try:
         with get_db() as conn:
@@ -74,7 +93,8 @@ def init_db():
                 cur.execute('''
                     INSERT INTO settings (key, value) VALUES
                         ('metaprompt', 'Залипательное на тему ремонта, коттеджного строительства и продажи стройматериалов. Сюжет подбирай случайным образом. Неожиданный, вплоть до абсурдного, удивляющий, умеренно шокирующий, при этом красивый. Например: река, рыбки выпрыгивают из воды, они превращаются в стройматериалы, река исчезает и из них получается дом.'),
-                        ('publish_time', '06:00')
+                        ('publish_time', '03:00'),
+                        ('lead_time_mins', '120')
                     ON CONFLICT (key) DO NOTHING
                 ''')
             conn.commit()
@@ -195,10 +215,6 @@ STYLES = [
 
 def load_metaprompt():
     return db_get('metaprompt', 'Залипательное на тему строительства и ремонта.')
-
-
-def now():
-    return datetime.now(timezone.utc).strftime('%d.%m.%Y %H:%M:%S UTC')
 
 
 def generate_prompt():
@@ -355,7 +371,8 @@ def publish_story():
 
         if 'response' in save:
             story_id = save['response']['items'][0]['id']
-            ts = datetime.now(timezone.utc).strftime('%d.%m.%Y в %H:%M UTC')
+            msk = datetime.now(timezone.utc) + MSK_OFFSET
+            ts = msk.strftime('%d.%m.%Y в %H:%M МСК')
             log_msg(f'✓ История опубликована! ID: {story_id}')
             app_state['last_published'] = ts
             app_state['last_ok'] = True
@@ -421,35 +438,52 @@ def scheduler_loop():
     next_retry_after = 0
 
     while True:
-        pub_h, pub_m = parse_hhmm(db_get('publish_time', '06:00'))
-        gen_h = (pub_h - 2) % 24
-        gen_m = pub_m
+        pub_h, pub_m = parse_hhmm(db_get('publish_time', '03:00'))
+        lead_mins = parse_lead_mins(db_get('lead_time_mins', '120'))
 
-        now_dt = datetime.now(timezone.utc)
-        today = now_dt.date()
+        gen_total = (pub_h * 60 + pub_m - lead_mins) % 1440
+        gen_h = gen_total // 60
+        gen_m = gen_total % 60
+
+        now_utc = datetime.now(timezone.utc)
+        today = now_utc.date()
 
         if today != last_date:
             generated_today = False
             published_today = False
             last_date = today
             next_retry_after = 0
-            log_msg(f'Новый день. Генерация в {gen_h:02d}:{gen_m:02d} UTC, публикация в {pub_h:02d}:{pub_m:02d} UTC.')
+            pub_h_msk, pub_m_msk = to_msk(pub_h, pub_m)
+            gen_h_msk, gen_m_msk = to_msk(gen_h, gen_m)
+            log_msg(
+                f'Новый день. Генерация в {gen_h_msk:02d}:{gen_m_msk:02d} МСК, '
+                f'публикация в {pub_h_msk:02d}:{pub_m_msk:02d} МСК '
+                f'(упреждение {lead_mins} мин).'
+            )
 
-        now_minutes = now_dt.hour * 60 + now_dt.minute
-        gen_minutes = gen_h * 60 + gen_m
-        pub_minutes = pub_h * 60 + pub_m
+        now_mins = now_utc.hour * 60 + now_utc.minute
+        pub_mins = pub_h * 60 + pub_m
 
-        if now_minutes >= gen_minutes and not generated_today and time.time() >= next_retry_after:
+        # Нужно ли стартовать генерацию прямо сейчас?
+        # Да, если до публикации осталось меньше, чем lead_time
+        mins_to_pub = (pub_mins - now_mins) % 1440
+        should_generate = mins_to_pub <= lead_mins
+
+        if should_generate and not generated_today and not app_state['running'] and time.time() >= next_retry_after:
             log_msg('Запускаю генерацию видео...')
             generated_today = generate_video()
             if not generated_today:
                 next_retry_after = time.time() + 1800
                 log_msg('Генерация не удалась. Следующая попытка через 30 минут.', 'error')
 
-        if generated_today and not published_today and now_minutes >= pub_minutes:
-            story_ok = publish_story()
-            wall_ok = publish_to_wall()
-            published_today = story_ok or wall_ok
+        if generated_today and not published_today:
+            # Публикуем если время публикации наступило (или уже прошло — генерация опоздала)
+            now_mins_fresh = datetime.now(timezone.utc).hour * 60 + datetime.now(timezone.utc).minute
+            mins_past_pub = (now_mins_fresh - pub_mins) % 1440
+            if mins_past_pub < 720:  # мы в течение 12ч после времени публикации
+                story_ok = publish_story()
+                wall_ok = publish_to_wall()
+                published_today = story_ok or wall_ok
 
         time.sleep(30)
 
@@ -482,12 +516,21 @@ def admin():
     if not session.get('auth'):
         return redirect(url_for('login'))
     metaprompt = db_get('metaprompt', '')
-    pub_h, pub_m = parse_hhmm(db_get('publish_time', '06:00'))
-    gen_h = (pub_h - 2) % 24
+    pub_h_utc, pub_m_utc = parse_hhmm(db_get('publish_time', '03:00'))
+    lead_mins = parse_lead_mins(db_get('lead_time_mins', '120'))
+
+    gen_total = (pub_h_utc * 60 + pub_m_utc - lead_mins) % 1440
+    gen_h_utc = gen_total // 60
+    gen_m_utc = gen_total % 60
+
+    pub_h_msk, pub_m_msk = to_msk(pub_h_utc, pub_m_utc)
+    gen_h_msk, gen_m_msk = to_msk(gen_h_utc, gen_m_utc)
+
     return render_template('admin.html',
                            metaprompt=metaprompt,
-                           publish_time=f'{pub_h:02d}:{pub_m:02d}',
-                           generate_time=f'{gen_h:02d}:{pub_m:02d}',
+                           publish_time_msk=f'{pub_h_msk:02d}:{pub_m_msk:02d}',
+                           generate_time_msk=f'{gen_h_msk:02d}:{gen_m_msk:02d}',
+                           lead_time_mins=lead_mins,
                            status=app_state)
 
 
@@ -501,10 +544,15 @@ def save():
         return redirect(url_for('admin'))
     db_set('metaprompt', metaprompt)
 
-    pub_time = request.form.get('publish_time', '').strip()
-    if pub_time:
-        h, m = parse_hhmm(pub_time)
-        db_set('publish_time', f'{h:02d}:{m:02d}')
+    pub_time_msk = request.form.get('publish_time', '').strip()
+    if pub_time_msk:
+        h_msk, m_msk = parse_hhmm(pub_time_msk)
+        h_utc, m_utc = to_utc_from_msk(h_msk, m_msk)
+        db_set('publish_time', f'{h_utc:02d}:{m_utc:02d}')
+
+    lead_raw = request.form.get('lead_time_mins', '').strip()
+    if lead_raw:
+        db_set('lead_time_mins', str(parse_lead_mins(lead_raw)))
 
     flash('Настройки сохранены', 'success')
     return redirect(url_for('admin'))
