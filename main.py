@@ -684,12 +684,10 @@ def send_failure_sms(message):
         print(f'[NOTIFY] Ошибка отправки SMS: {e}')
 
 
-def notify_failure(reason):
+def notify_failure(reason, log_entries=None):
     msg = f'Сбой {msk_ts()}: {reason}'
     log_msg(f'[УВЕДОМЛЕНИЕ] Отправляю уведомление о сбое: {reason}')
-    cycle = app_state.get('current_cycle') or (app_state['cycles'][0] if app_state['cycles'] else None)
-    entries = cycle.get('entries', []) if cycle else []
-    send_failure_email(msg, log_entries=entries)
+    send_failure_email(msg, log_entries=log_entries or [])
     send_failure_sms(msg)
 
 
@@ -702,10 +700,11 @@ def run_full_cycle():
         wall_ok = publish_to_wall()
         pub_ok = story_ok or wall_ok
     success = pub_ok if gen_ok else False
+    entries = list(app_state['current_cycle']['entries']) if app_state['current_cycle'] else []
     end_cycle(success)
     if not success:
         reason = 'ошибка генерации видео' if not gen_ok else 'ошибка публикации в VK'
-        notify_failure(reason)
+        notify_failure(reason, log_entries=entries)
     return gen_ok, pub_ok
 
 
@@ -896,8 +895,9 @@ def run_now():
         try:
             run_full_cycle()
         except Exception as e:
+            entries = list(app_state['current_cycle']['entries']) if app_state['current_cycle'] else []
             log_msg(f'Критическая ошибка цикла: {e}', 'error')
-            notify_failure(f'необработанное исключение: {e}')
+            notify_failure(f'необработанное исключение: {e}', log_entries=entries)
 
     t = threading.Thread(target=run, daemon=True)
     t.start()
