@@ -677,11 +677,11 @@ def send_failure_sms(message):
         }, timeout=10)
         data = r.json()
         if data.get('error_code'):
-            print(f'[NOTIFY] SMSC ошибка: {data}')
+            log_msg(f'[УВЕДОМЛЕНИЕ] SMSC ошибка: {data}', 'error')
         else:
-            print(f'[NOTIFY] SMS отправлено на {phone}')
+            log_msg(f'[УВЕДОМЛЕНИЕ] SMS отправлено на {phone}')
     except Exception as e:
-        print(f'[NOTIFY] Ошибка отправки SMS: {e}')
+        log_msg(f'[УВЕДОМЛЕНИЕ] Ошибка отправки SMS: {e}', 'error')
 
 
 def notify_failure(reason, log_entries=None):
