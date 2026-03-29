@@ -825,27 +825,6 @@ def run_now():
     return redirect(url_for('admin'))
 
 
-@flask_app.route('/import-video-ids', methods=['POST'])
-def import_video_ids():
-    if not session.get('auth'):
-        return redirect(url_for('login'))
-    raw = request.form.get('request_ids', '')
-    ids = [s.strip() for s in raw.replace(',', '\n').splitlines() if s.strip()]
-    saved, failed = 0, 0
-    for rid in ids:
-        url = fal_request_id_to_url(rid)
-        if url:
-            db_save_video_url(url)
-            saved += 1
-        else:
-            failed += 1
-    msg = f'Сохранено видео: {saved}'
-    if failed:
-        msg += f', не найдено: {failed}'
-    flash(msg, 'success' if saved else 'error')
-    return redirect(url_for('admin'))
-
-
 @flask_app.route('/logout')
 def logout():
     session.clear()
