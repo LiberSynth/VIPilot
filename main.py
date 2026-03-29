@@ -355,37 +355,32 @@ def is_emulation():
     return db_get('emulation_mode', '0') == '1'
 
 
-def db_save_video_url(url):
+def fal_list_video_urls():
     try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    'INSERT INTO video_urls (url, created_at) VALUES (%s, %s)',
-                    (url, time.time())
-                )
-                cur.execute('SELECT COUNT(*) FROM video_urls')
-                count = cur.fetchone()[0]
-                if count > 20:
-                    cur.execute(
-                        'DELETE FROM video_urls WHERE id IN '
-                        '(SELECT id FROM video_urls ORDER BY created_at ASC LIMIT %s)',
-                        (count - 20,)
-                    )
-            conn.commit()
+        from datetime import datetime, timezone, timedelta
+        start = (datetime.now(timezone.utc) - timedelta(days=90)).strftime('%Y-%m-%dT%H:%M:%SZ')
+        r = requests.get(
+            'https://api.fal.ai/v1/serverless/requests/by-endpoint',
+            headers={'Authorization': f'Key {FAL_KEY}'},
+            params={
+                'endpoint_id': FAL_MODEL,
+                'status': 'success',
+                'expand': 'payloads',
+                'limit': 100,
+                'start': start,
+            },
+            timeout=15
+        )
+        r.raise_for_status()
+        urls = []
+        for item in r.json().get('items', []):
+            video_url = (item.get('json_output') or {}).get('video', {}).get('url')
+            if video_url:
+                urls.append(video_url)
+        return urls
     except Exception as e:
-        print(f'[DB] Ошибка сохранения URL видео: {e}')
-
-
-def db_get_random_video_url():
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute('SELECT url FROM video_urls ORDER BY RANDOM() LIMIT 1')
-                row = cur.fetchone()
-                return row[0] if row else None
-    except Exception as e:
-        print(f'[DB] Ошибка получения URL видео: {e}')
-        return None
+        log_msg(f'[ЭМУЛЯЦИЯ] Ошибка получения списка с fal.ai: {e}', 'error')
+        return []
 
 
 def transcode_video():
@@ -418,12 +413,13 @@ def generate_video():
 
     if is_emulation():
         try:
-            log_msg('[ЭМУЛЯЦИЯ] Пропускаю генерацию, беру случайное видео из базы...')
-            url = db_get_random_video_url()
-            if not url:
-                log_msg('[ЭМУЛЯЦИЯ] В базе нет сохранённых URL — сначала запустите хотя бы один обычный цикл', 'error')
+            log_msg('[ЭМУЛЯЦИЯ] Запрашиваю список готовых видео с fal.ai...')
+            urls = fal_list_video_urls()
+            if not urls:
+                log_msg('[ЭМУЛЯЦИЯ] Нет готовых видео на fal.ai за последние 90 дней', 'error')
                 return False
-            log_msg(f'[ЭМУЛЯЦИЯ] URL выбран: {url[:60]}...')
+            url = random.choice(urls)
+            log_msg(f'[ЭМУЛЯЦИЯ] Выбрано случайное видео из {len(urls)} доступных')
             return download_and_transcode(url)
         finally:
             app_state['running'] = False
@@ -502,10 +498,7 @@ def download_and_transcode(video_url):
     if not ok:
         return False
 
-    result = transcode_video()
-    if result and not is_emulation():
-        db_save_video_url(video_url)
-    return result
+    return transcode_video()
 
 
 def publish_story():
