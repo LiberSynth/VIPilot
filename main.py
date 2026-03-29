@@ -651,9 +651,9 @@ def send_failure_email(message):
             s.starttls()
             s.login(smtp_user, smtp_pass)
             s.send_message(msg)
-        print(f'[NOTIFY] Email отправлен на {to_addr}')
+        log_msg(f'[УВЕДОМЛЕНИЕ] Email отправлен на {to_addr}')
     except Exception as e:
-        print(f'[NOTIFY] Ошибка отправки email: {e}')
+        log_msg(f'[УВЕДОМЛЕНИЕ] Ошибка отправки email: {e}', 'error')
 
 
 def send_failure_sms(message):
@@ -682,6 +682,7 @@ def send_failure_sms(message):
 
 def notify_failure(reason):
     msg = f'Сбой {msk_ts()}: {reason}'
+    log_msg(f'[УВЕДОМЛЕНИЕ] Отправляю уведомление о сбое: {reason}')
     send_failure_email(msg)
     send_failure_sms(msg)
 
@@ -886,7 +887,11 @@ def run_now():
         return redirect(url_for('admin'))
 
     def run():
-        run_full_cycle()
+        try:
+            run_full_cycle()
+        except Exception as e:
+            log_msg(f'Критическая ошибка цикла: {e}', 'error')
+            notify_failure(f'необработанное исключение: {e}')
 
     t = threading.Thread(target=run, daemon=True)
     t.start()
