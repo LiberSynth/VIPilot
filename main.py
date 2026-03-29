@@ -15,9 +15,9 @@ VK_TOKEN = os.environ['VK_USER_TOKEN']
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin')
 GROUP_ID = 236929597
 
-FAL_MODEL = 'fal-ai/minimax/video-01'
+FAL_MODEL = 'fal-ai/fast-svd-lcm/text-to-video'
 FAL_SUBMIT_URL = f'https://queue.fal.run/{FAL_MODEL}'
-FAL_STATUS_BASE = 'https://queue.fal.run/fal-ai/minimax/requests'
+FAL_STATUS_BASE = 'https://queue.fal.run/fal-ai/fast-svd-lcm/requests'
 FAL_HEADERS = {'Authorization': f'Key {FAL_KEY}', 'Content-Type': 'application/json'}
 
 VIDEO_PATH = '/tmp/story_raw.mp4'
@@ -476,9 +476,11 @@ def generate_video():
 
     try:
         resp = requests.post(FAL_SUBMIT_URL, headers=FAL_HEADERS, json={
-            'prompt': prompt,
-            'duration': 6,
-            'aspect_ratio': '9:16',
+            'input': {
+                'prompt': prompt,
+                'duration': 6,
+                'image_size': {'width': 1080, 'height': 1920},
+            }
         }, timeout=30)
         data = resp.json()
 
