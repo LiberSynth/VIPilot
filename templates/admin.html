@@ -553,6 +553,8 @@ var checkDirtyPipeline;
   };
   fields.forEach(f => f.addEventListener('input', checkDirtyPipeline));
   fields.forEach(f => f.addEventListener('change', checkDirtyPipeline));
+  const form = document.getElementById('settings-form');
+  if (form) form.addEventListener('submit', function() { saveBtn.disabled = true; });
 })();
 
 // Трекинг изменений — форма Служебные
@@ -576,6 +578,8 @@ var checkDirtyPipeline;
   fields.forEach(f => f.addEventListener('input', checkDirty));
   fields.forEach(f => f.addEventListener('change', checkDirty));
   if (emulCheck) emulCheck.addEventListener('change', checkDirty);
+  const form = saveBtn.closest('form');
+  if (form) form.addEventListener('submit', function() { saveBtn.disabled = true; });
 })();
 
 function levelClass(l) {
