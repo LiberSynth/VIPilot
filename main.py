@@ -1,10 +1,11 @@
 import os
-import json
 import time
 import random
 import threading
 import requests
 import subprocess
+import psycopg2
+import psycopg2.extras
 from datetime import datetime, timezone
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 
@@ -20,22 +21,35 @@ FAL_HEADERS = {'Authorization': f'Key {FAL_KEY}', 'Content-Type': 'application/j
 
 VIDEO_PATH = '/tmp/story_raw.mp4'
 VIDEO_VK_PATH = '/tmp/story_vk.mp4'
-METAPROMPT_PATH = 'config/metaprompt.txt'
-SETTINGS_PATH = 'config/settings.json'
 
 
-def load_settings():
+def get_db():
+    return psycopg2.connect(os.environ['DATABASE_URL'])
+
+
+def db_get(key, default=''):
     try:
-        with open(SETTINGS_PATH, encoding='utf-8') as f:
-            return json.load(f)
-    except Exception:
-        return {'publish_time': '06:00'}
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute('SELECT value FROM settings WHERE key = %s', (key,))
+                row = cur.fetchone()
+                return row[0] if row else default
+    except Exception as e:
+        print(f'[DB] Ошибка чтения {key}: {e}')
+        return default
 
 
-def save_settings(data):
-    os.makedirs('config', exist_ok=True)
-    with open(SETTINGS_PATH, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False)
+def db_set(key, value):
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute('''
+                    INSERT INTO settings (key, value) VALUES (%s, %s)
+                    ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+                ''', (key, value))
+            conn.commit()
+    except Exception as e:
+        print(f'[DB] Ошибка записи {key}: {e}')
 
 
 def parse_hhmm(s):
@@ -148,12 +162,7 @@ STYLES = [
 
 
 def load_metaprompt():
-    try:
-        with open(METAPROMPT_PATH, encoding='utf-8') as f:
-            text = f.read().strip()
-        return text if text else ''
-    except Exception:
-        return ''
+    return db_get('metaprompt', 'Залипательное на тему строительства и ремонта.')
 
 
 def generate_prompt():
@@ -373,8 +382,7 @@ def scheduler_loop():
     next_retry_after = 0
 
     while True:
-        settings = load_settings()
-        pub_h, pub_m = parse_hhmm(settings.get('publish_time', '06:00'))
+        pub_h, pub_m = parse_hhmm(db_get('publish_time', '06:00'))
         gen_h = (pub_h - 2) % 24
         gen_m = pub_m
 
@@ -434,13 +442,8 @@ def login():
 def admin():
     if not session.get('auth'):
         return redirect(url_for('login'))
-    try:
-        with open(METAPROMPT_PATH, encoding='utf-8') as f:
-            metaprompt = f.read().strip()
-    except Exception:
-        metaprompt = ''
-    settings = load_settings()
-    pub_h, pub_m = parse_hhmm(settings.get('publish_time', '06:00'))
+    metaprompt = db_get('metaprompt', '')
+    pub_h, pub_m = parse_hhmm(db_get('publish_time', '06:00'))
     gen_h = (pub_h - 2) % 24
     return render_template('admin.html',
                            metaprompt=metaprompt,
@@ -457,16 +460,12 @@ def save():
     if not metaprompt:
         flash('Мета-промпт не может быть пустым', 'error')
         return redirect(url_for('admin'))
-    os.makedirs('config', exist_ok=True)
-    with open(METAPROMPT_PATH, 'w', encoding='utf-8') as f:
-        f.write(metaprompt + '\n')
+    db_set('metaprompt', metaprompt)
 
     pub_time = request.form.get('publish_time', '').strip()
     if pub_time:
         h, m = parse_hhmm(pub_time)
-        settings = load_settings()
-        settings['publish_time'] = f'{h:02d}:{m:02d}'
-        save_settings(settings)
+        db_set('publish_time', f'{h:02d}:{m:02d}')
 
     flash('Настройки сохранены', 'success')
     return redirect(url_for('admin'))
