@@ -231,11 +231,11 @@ def end_cycle(ok):
 
 
 def log_msg(msg, level='info'):
-    ts = datetime.now(timezone.utc).strftime('%d.%m %H:%M:%S')
+    ts = (datetime.now(timezone.utc) + MSK_OFFSET).strftime('%d.%m %H:%M:%S')
     entry = {'ts': ts, 'msg': msg, 'level': level}
     if app_state['current_cycle'] is not None:
         app_state['current_cycle']['entries'].append(entry)
-    print(f'[{ts} UTC] {msg}')
+    print(f'[{ts} МСК] {msg}')
 
 
 SUBJECTS = [
