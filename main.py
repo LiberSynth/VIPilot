@@ -493,6 +493,26 @@ def save():
     return redirect(url_for('admin'))
 
 
+@flask_app.route('/run-now', methods=['POST'])
+def run_now():
+    if not session.get('auth'):
+        return redirect(url_for('login'))
+    if app_state['running']:
+        flash('Генерация уже запущена', 'error')
+        return redirect(url_for('admin'))
+
+    def run():
+        ok = generate_video()
+        if ok:
+            publish_story()
+            publish_to_wall()
+
+    t = threading.Thread(target=run, daemon=True)
+    t.start()
+    flash('Цикл запущен — смотрите логи', 'success')
+    return redirect(url_for('admin'))
+
+
 @flask_app.route('/logout')
 def logout():
     session.clear()

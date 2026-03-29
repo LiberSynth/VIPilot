@@ -255,6 +255,12 @@
       <button type="submit" class="btn-save">Сохранить</button>
     </div>
   </form>
+
+  <form method="post" action="/run-now" style="margin-top:6px;">
+    <button type="submit" class="btn-test" style="width:100%;" {% if status.running %}disabled{% endif %}>
+      {% if status.running %}Генерация идёт...{% else %}Запустить сейчас{% endif %}
+    </button>
+  </form>
 </div>
 
 <script>
