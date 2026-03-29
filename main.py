@@ -631,7 +631,7 @@ def publish_to_wall():
         return False
 
 
-def send_failure_email(message):
+def send_failure_email(message, log_entries=None):
     import smtplib
     from email.mime.text import MIMEText
     to_addr = db_get('notify_email', '').strip()
@@ -643,7 +643,11 @@ def send_failure_email(message):
     smtp_port = int(os.environ.get('SMTP_PORT', '587'))
     smtp_from = os.environ.get('SMTP_FROM', smtp_user)
     try:
-        msg = MIMEText(message, 'plain', 'utf-8')
+        body = message
+        if log_entries:
+            lines = '\n'.join(f"[{e['ts']}] {e['msg']}" for e in log_entries)
+            body += f'\n\n--- Подробный лог ---\n{lines}'
+        msg = MIMEText(body, 'plain', 'utf-8')
         msg['Subject'] = 'VK Publisher: сбой в пайплайне'
         msg['From'] = smtp_from
         msg['To'] = to_addr
@@ -683,7 +687,9 @@ def send_failure_sms(message):
 def notify_failure(reason):
     msg = f'Сбой {msk_ts()}: {reason}'
     log_msg(f'[УВЕДОМЛЕНИЕ] Отправляю уведомление о сбое: {reason}')
-    send_failure_email(msg)
+    cycle = app_state.get('current_cycle') or (app_state['cycles'][0] if app_state['cycles'] else None)
+    entries = cycle.get('entries', []) if cycle else []
+    send_failure_email(msg, log_entries=entries)
     send_failure_sms(msg)
 
 
