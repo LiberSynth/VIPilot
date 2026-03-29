@@ -402,6 +402,7 @@
       <input type="hidden" name="notify_email" id="h_notify_email" value="{{ notify_email }}">
       <input type="hidden" name="notify_phone" id="h_notify_phone" value="{{ notify_phone }}">
       <input type="hidden" name="history_days" id="h_history_days" value="{{ history_days }}">
+      <input type="hidden" name="short_log_days" id="h_short_log_days" value="{{ short_log_days }}">
       <input type="hidden" name="emulation_mode" id="h_emulation_mode" value="{{ '1' if emulation_mode else '0' }}">
 
       <button type="submit" class="btn-primary" id="save-btn" disabled>Сохранить настройки</button>
@@ -447,7 +448,7 @@
 
       <div class="card">
         <div class="card-title">Уведомление о сбое</div>
-        <div class="hint">При ошибке генерации или публикации придёт уведомление.</div>
+        <div class="hint">При ошибке генерации или публикации придёт уведомление на указанный емайл или номер.</div>
         <div style="margin-top:14px">
           <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block">Email</label>
           <input type="email" name="notify_email" id="notify_email" value="{{ notify_email }}" placeholder="admin@example.com"
@@ -461,8 +462,18 @@
       </div>
 
       <div class="card">
+        <div class="card-title">Краткий лог хранить</div>
+        <div class="hint">После указанного срока записи цикла полностью удаляются из базы.</div>
+        <div class="lead-row">
+          <input type="number" name="short_log_days" id="short_log_days" value="{{ short_log_days }}" min="1" max="3650" step="1"
+                 oninput="document.getElementById('h_short_log_days').value = this.value">
+          <span class="lead-unit">дней</span>
+        </div>
+      </div>
+
+      <div class="card">
         <div class="card-title">Детальный лог хранить</div>
-        <div class="hint">После указанного срока подробные записи цикла удаляются. Краткая сводка (промпт, время генерации и публикации) остаётся навсегда.</div>
+        <div class="hint">После указанного срока подробные записи цикла удаляются. Краткая сводка остаётся до срока краткого лога.</div>
         <div class="lead-row">
           <input type="number" name="history_days" id="history_days" value="{{ history_days }}" min="1" max="365" step="1"
                  oninput="document.getElementById('h_history_days').value = this.value">
@@ -564,6 +575,7 @@ var checkDirtyPipeline;
   const fields = [
     document.getElementById('notify_email'),
     document.getElementById('notify_phone'),
+    document.getElementById('short_log_days'),
     document.getElementById('history_days'),
   ].filter(Boolean);
   const emulCheck = document.getElementById('emulation_check');

@@ -77,6 +77,13 @@ def parse_history_days(s):
         return 7
 
 
+def parse_short_log_days(s):
+    try:
+        return max(1, min(3650, int(s)))
+    except Exception:
+        return 365
+
+
 def to_msk(h, m):
     total = (h * 60 + m + 180) % 1440
     return total // 60, total % 60
@@ -194,6 +201,24 @@ def db_trim_cycles(keep=20):
         print(f'[DB] Ошибка обрезки циклов: {e}')
 
 
+def db_trim_cycles_by_age():
+    days = parse_short_log_days(db_get('short_log_days', '365'))
+    cutoff = time.time() - days * 86400
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute('DELETE FROM cycles WHERE started_ts < %s', (cutoff,))
+            conn.commit()
+    except Exception as e:
+        print(f'[DB] Ошибка очистки краткого лога: {e}')
+    to_remove = [c for c in app_state['cycles'] if c.get('started_ts', 0) < cutoff]
+    for c in to_remove:
+        try:
+            app_state['cycles'].remove(c)
+        except ValueError:
+            pass
+
+
 app_state = {
     'running': False,
     'last_published': None,
@@ -230,6 +255,7 @@ def end_cycle(ok):
     app_state['current_cycle'] = None
     db_save_cycle(completed)
     db_trim_cycles(keep=20)
+    db_trim_cycles_by_age()
 
 
 def log_msg(msg, level='info'):
@@ -815,6 +841,7 @@ def admin():
     gen_h_msk, gen_m_msk = to_msk(gen_h_utc, gen_m_utc)
 
     history_days = parse_history_days(db_get('history_days', '7'))
+    short_log_days = parse_short_log_days(db_get('short_log_days', '365'))
     emulation_mode = db_get('emulation_mode', '0') == '1'
     notify_email = db_get('notify_email', '')
     notify_phone = db_get('notify_phone', '')
@@ -827,6 +854,7 @@ def admin():
                            generate_time_msk=f'{gen_h_msk:02d}:{gen_m_msk:02d}',
                            lead_time_mins=lead_mins,
                            history_days=history_days,
+                           short_log_days=short_log_days,
                            emulation_mode=emulation_mode,
                            notify_email=notify_email,
                            notify_phone=notify_phone,
@@ -858,6 +886,10 @@ def save():
     history_raw = request.form.get('history_days', '').strip()
     if history_raw:
         db_set('history_days', str(parse_history_days(history_raw)))
+
+    short_log_raw = request.form.get('short_log_days', '').strip()
+    if short_log_raw:
+        db_set('short_log_days', str(parse_short_log_days(short_log_raw)))
 
     emulation_raw = request.form.get('emulation_mode', '0')
     db_set('emulation_mode', '1' if emulation_raw == '1' else '0')
