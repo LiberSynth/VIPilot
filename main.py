@@ -373,26 +373,21 @@ def transcode_video():
 
 
 def create_test_video():
-    log_msg('[ЭМУЛЯЦИЯ] Создаю цветную заглушку 9:16...')
+    log_msg('[ЭМУЛЯЦИЯ] Создаю тестовый паттерн 9:16...')
     result = subprocess.run([
         'ffmpeg',
-        '-f', 'lavfi', '-i', 'color=c=0x1a1a4a:size=1080x1920:rate=30',
-        '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo',
+        '-f', 'lavfi', '-i', 'testsrc2=size=1080x1920:rate=30',
         '-t', '6',
-        '-c:v', 'libx264', '-profile:v', 'baseline', '-preset', 'ultrafast', '-crf', '26',
+        '-c:v', 'libx264', '-profile:v', 'high', '-preset', 'fast', '-crf', '20',
         '-pix_fmt', 'yuv420p',
-        '-c:a', 'aac', '-b:a', '96k',
-        '-movflags', '+faststart',
-        VIDEO_VK_PATH, '-y'
+        VIDEO_PATH, '-y'
     ], capture_output=True, timeout=60)
     if result.returncode != 0:
         err = result.stderr.decode(errors='replace')[-400:]
-        log_msg(f'ffmpeg ошибка (заглушка): {err}', 'error')
+        log_msg(f'ffmpeg ошибка (тест-паттерн): {err}', 'error')
         return False
-    log_msg('[ЭМУЛЯЦИЯ] Тестовое видео готово')
-    if app_state['current_cycle'] is not None:
-        app_state['current_cycle']['summary']['generated_at'] = msk_ts()
-    return True
+    log_msg('[ЭМУЛЯЦИЯ] Паттерн создан, транскодирую...')
+    return transcode_video()
 
 
 def generate_video():
