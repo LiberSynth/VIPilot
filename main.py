@@ -632,7 +632,7 @@ def publish_to_wall():
         return False
 
 
-def send_failure_email(message, log_entries=None):
+def send_failure_email(message, log_entries=None, partial=False):
     import smtplib
     from email.mime.text import MIMEText
     to_addr = db_get('notify_email', '').strip()
@@ -640,16 +640,18 @@ def send_failure_email(message, log_entries=None):
     smtp_user = os.environ.get('SMTP_USER', '').strip()
     smtp_pass = os.environ.get('SMTP_PASSWORD', '').strip()
     if not all([to_addr, smtp_host, smtp_user, smtp_pass]):
+        log_msg('[УВЕДОМЛЕНИЕ] Email не отправлен: не заданы SMTP-настройки или адрес', 'warn')
         return
     smtp_port = int(os.environ.get('SMTP_PORT', '587'))
     smtp_from = os.environ.get('SMTP_FROM', smtp_user)
+    subject_prefix = 'Частично' if partial else 'Сбой'
     try:
         body = message
         if log_entries:
             lines = '\n'.join(f"[{e['ts']}] {e['msg']}" for e in log_entries)
             body += f'\n\n--- Подробный лог ---\n{lines}'
         msg = MIMEText(body, 'plain', 'utf-8')
-        msg['Subject'] = 'VK Publisher: сбой в пайплайне'
+        msg['Subject'] = f'VK Publisher: {subject_prefix.lower()} в пайплайне'
         msg['From'] = smtp_from
         msg['To'] = to_addr
         with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as s:
@@ -688,8 +690,8 @@ def send_failure_sms(message):
 def notify_failure(reason, log_entries=None, partial=False):
     prefix = 'Частично' if partial else 'Сбой'
     msg = f'{prefix} {msk_ts()}: {reason}'
-    log_msg(f'[УВЕДОМЛЕНИЕ] Отправляю уведомление о сбое: {reason}')
-    send_failure_email(msg, log_entries=log_entries or [])
+    log_msg(f'[УВЕДОМЛЕНИЕ] Отправляю уведомление [{prefix}]: {reason}')
+    send_failure_email(msg, log_entries=log_entries or [], partial=partial)
     send_failure_sms(msg)
 
 
