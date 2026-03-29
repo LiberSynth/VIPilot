@@ -38,7 +38,7 @@
   }
   h1 { font-size: 16px; font-weight: 700; color: #fff; }
   .logout {
-    font-size: 12px; color: #555; text-decoration: none;
+    font-size: 12px; color: #888; text-decoration: none;
     padding: 5px 10px; border: 1px solid #2a2a38; border-radius: 7px;
   }
   .logout:active { background: #2a2a38; }
@@ -46,7 +46,7 @@
   .tabs { display: flex; }
   .tab-btn {
     flex: 1; padding: 10px 0; text-align: center;
-    font-size: 14px; font-weight: 500; color: #555;
+    font-size: 14px; font-weight: 500; color: #888;
     background: none; border: none;
     border-bottom: 2px solid transparent;
     cursor: pointer; transition: color .15s, border-color .15s;
@@ -70,14 +70,14 @@
   @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.35} }
   .status-info { flex: 1; min-width: 0; }
   .status-title { font-size: 14px; font-weight: 600; color: #fff; }
-  .status-sub { font-size: 11px; color: #555; margin-top: 2px; }
+  .status-sub { font-size: 11px; color: #888; margin-top: 2px; }
 
   .card {
     background: #1a1a24; border: 1px solid #2a2a38;
     border-radius: 14px; padding: 16px; margin-bottom: 12px;
   }
   .card-title {
-    font-size: 11px; font-weight: 600; color: #666;
+    font-size: 11px; font-weight: 600; color: #8888a8;
     text-transform: uppercase; letter-spacing: .07em; margin-bottom: 12px;
   }
 
@@ -87,14 +87,14 @@
     border-radius: 10px; padding: 12px; text-align: center;
   }
   .schedule-time { font-size: 26px; font-weight: 700; color: #fff; letter-spacing: 2px; font-variant-numeric: tabular-nums; }
-  .schedule-label { font-size: 11px; color: #555; margin-top: 4px; }
+  .schedule-label { font-size: 11px; color: #888; margin-top: 4px; }
 
   .tz-badge {
     font-size: 10px; color: #4a7cf7;
     background: rgba(74,124,247,.12); border-radius: 5px;
     padding: 2px 6px; font-weight: 600; margin-left: 6px; vertical-align: middle;
   }
-  .hint { font-size: 12px; color: #555; margin-bottom: 10px; line-height: 1.55; }
+  .hint { font-size: 12px; color: #888; margin-bottom: 10px; line-height: 1.55; }
 
   input[type="time"] {
     width: 100%; padding: 14px 16px;
@@ -115,7 +115,7 @@
   }
   input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
   input[type="number"]:focus { border-color: #4a7cf7; }
-  .lead-unit { font-size: 14px; color: #555; white-space: nowrap; }
+  .lead-unit { font-size: 14px; color: #888; white-space: nowrap; }
 
   textarea {
     width: 100%; background: #0f0f13; border: 1px solid #2a2a38;
@@ -124,7 +124,7 @@
     font-family: inherit; transition: border-color .2s;
   }
   textarea:focus { border-color: #4a7cf7; }
-  .char-count { font-size: 11px; color: #3a3a50; text-align: right; margin-top: 6px; }
+  .char-count { font-size: 11px; color: #666; text-align: right; margin-top: 6px; }
 
   .flash {
     border-radius: 10px; padding: 12px 14px;
@@ -181,7 +181,7 @@
 
   .cycle-meta { flex: 1; min-width: 0; }
   .cycle-started { font-size: 13px; font-weight: 600; color: #e0e0f0; }
-  .cycle-subtitle { font-size: 11px; color: #555; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cycle-subtitle { font-size: 11px; color: #888; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
   .cycle-summary-block {
     margin: 0 12px 10px;
@@ -190,13 +190,13 @@
     border-radius: 10px;
     padding: 10px 12px;
   }
-  .cs-row { display: flex; gap: 8px; padding: 3px 0; border-bottom: 1px solid #181820; }
+  .cs-row { display: flex; gap: 8px; padding: 4px 0; border-bottom: 1px solid #1e1e2c; }
   .cs-row:last-child { border-bottom: none; }
-  .cs-label { font-size: 11px; color: #555; flex-shrink: 0; min-width: 100px; padding-top: 1px; }
-  .cs-val { font-size: 12px; color: #9090b8; line-height: 1.55; word-break: break-word; }
+  .cs-label { font-size: 11px; color: #8888a8; flex-shrink: 0; min-width: 100px; padding-top: 1px; }
+  .cs-val { font-size: 12px; color: #c0c0d8; line-height: 1.55; word-break: break-word; }
 
   .cycle-arrow {
-    font-size: 12px; color: #444; flex-shrink: 0;
+    font-size: 12px; color: #666; flex-shrink: 0;
     transition: transform .2s;
   }
   .cycle-card.open .cycle-arrow { transform: rotate(180deg); }
@@ -229,13 +229,13 @@
   }
   .log-entry { display: flex; gap: 8px; padding: 1px 0; border-bottom: 1px solid #0e0e16; }
   .log-entry:last-child { border-bottom: none; }
-  .log-ts { color: #3a3a55; flex-shrink: 0; }
-  .log-msg { color: #b0b0c8; word-break: break-word; }
+  .log-ts { color: #6a6a90; flex-shrink: 0; }
+  .log-msg { color: #c8c8e0; word-break: break-word; }
   .log-msg.error { color: #ff6060; }
   .log-msg.ok    { color: #4fc87a; }
 
   .log-empty-cycles {
-    text-align: center; color: #2a2a40;
+    text-align: center; color: #555570;
     padding: 40px 0; font-size: 14px;
   }
 </style>
