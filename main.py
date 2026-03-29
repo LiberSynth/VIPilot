@@ -105,6 +105,13 @@ def init_db():
                     ON CONFLICT (key) DO NOTHING
                 ''')
                 cur.execute('''
+                    CREATE TABLE IF NOT EXISTS video_urls (
+                        id SERIAL PRIMARY KEY,
+                        url TEXT NOT NULL UNIQUE,
+                        created_at FLOAT NOT NULL
+                    )
+                ''')
+                cur.execute('''
                     CREATE TABLE IF NOT EXISTS cycles (
                         id SERIAL PRIMARY KEY,
                         started TEXT NOT NULL,
@@ -348,33 +355,53 @@ def is_emulation():
     return db_get('emulation_mode', '0') == '1'
 
 
-def fal_list_video_urls():
-    fal_admin_key = os.environ.get('FAL_ADMIN_KEY', FAL_KEY)
+def db_save_video_url(url):
     try:
-        from datetime import datetime, timezone, timedelta
-        start = (datetime.now(timezone.utc) - timedelta(days=90)).strftime('%Y-%m-%dT%H:%M:%SZ')
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute('SELECT 1 FROM video_urls WHERE url = %s', (url,))
+                if cur.fetchone():
+                    return
+                cur.execute(
+                    'INSERT INTO video_urls (url, created_at) VALUES (%s, %s)',
+                    (url, time.time())
+                )
+                cur.execute('SELECT COUNT(*) FROM video_urls')
+                count = cur.fetchone()[0]
+                if count > 50:
+                    cur.execute(
+                        'DELETE FROM video_urls WHERE id IN '
+                        '(SELECT id FROM video_urls ORDER BY created_at ASC LIMIT %s)',
+                        (count - 50,)
+                    )
+            conn.commit()
+    except Exception as e:
+        print(f'[DB] Ошибка сохранения URL видео: {e}')
+
+
+def db_get_random_video_url():
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute('SELECT url FROM video_urls ORDER BY RANDOM() LIMIT 1')
+                row = cur.fetchone()
+                return row[0] if row else None
+    except Exception as e:
+        print(f'[DB] Ошибка получения URL видео: {e}')
+        return None
+
+
+def fal_request_id_to_url(request_id):
+    try:
         r = requests.get(
-            'https://api.fal.ai/v1/serverless/requests/by-endpoint',
-            headers={'Authorization': f'Key {fal_admin_key}'},
-            params={
-                'endpoint_id': FAL_MODEL,
-                'status': 'success',
-                'expand': 'payloads',
-                'limit': 100,
-                'start': start,
-            },
-            timeout=15
+            f'{FAL_STATUS_BASE}/{request_id}',
+            headers={'Authorization': f'Key {FAL_KEY}'},
+            timeout=10
         )
         r.raise_for_status()
-        urls = []
-        for item in r.json().get('items', []):
-            video_url = (item.get('json_output') or {}).get('video', {}).get('url')
-            if video_url:
-                urls.append(video_url)
-        return urls
+        return r.json().get('video', {}).get('url')
     except Exception as e:
-        log_msg(f'[ЭМУЛЯЦИЯ] Ошибка получения списка с fal.ai: {e}', 'error')
-        return []
+        return None
 
 
 def transcode_video():
@@ -407,13 +434,12 @@ def generate_video():
 
     if is_emulation():
         try:
-            log_msg('[ЭМУЛЯЦИЯ] Запрашиваю список готовых видео с fal.ai...')
-            urls = fal_list_video_urls()
-            if not urls:
-                log_msg('[ЭМУЛЯЦИЯ] Нет доступных видео на fal.ai', 'error')
+            log_msg('[ЭМУЛЯЦИЯ] Пропускаю генерацию, беру случайное видео из базы...')
+            url = db_get_random_video_url()
+            if not url:
+                log_msg('[ЭМУЛЯЦИЯ] В базе нет видео — добавьте ID запросов fal.ai через панель', 'error')
                 return False
-            url = random.choice(urls)
-            log_msg(f'[ЭМУЛЯЦИЯ] Выбрано случайное видео из {len(urls)} доступных')
+            log_msg('[ЭМУЛЯЦИЯ] Видео выбрано, скачиваю...')
             return download_and_transcode(url)
         finally:
             app_state['running'] = False
@@ -492,7 +518,10 @@ def download_and_transcode(video_url):
     if not ok:
         return False
 
-    return transcode_video()
+    result = transcode_video()
+    if result and not is_emulation():
+        db_save_video_url(video_url)
+    return result
 
 
 def publish_story():
@@ -793,6 +822,27 @@ def run_now():
     t = threading.Thread(target=run, daemon=True)
     t.start()
     flash('Цикл запущен — смотрите логи', 'success')
+    return redirect(url_for('admin'))
+
+
+@flask_app.route('/import-video-ids', methods=['POST'])
+def import_video_ids():
+    if not session.get('auth'):
+        return redirect(url_for('login'))
+    raw = request.form.get('request_ids', '')
+    ids = [s.strip() for s in raw.replace(',', '\n').splitlines() if s.strip()]
+    saved, failed = 0, 0
+    for rid in ids:
+        url = fal_request_id_to_url(rid)
+        if url:
+            db_save_video_url(url)
+            saved += 1
+        else:
+            failed += 1
+    msg = f'Сохранено видео: {saved}'
+    if failed:
+        msg += f', не найдено: {failed}'
+    flash(msg, 'success' if saved else 'error')
     return redirect(url_for('admin'))
 
 
