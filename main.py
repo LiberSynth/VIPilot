@@ -59,6 +59,28 @@ def parse_hhmm(s):
     except Exception:
         return 6, 0
 
+
+def init_db():
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute('''
+                    CREATE TABLE IF NOT EXISTS settings (
+                        key VARCHAR(100) PRIMARY KEY,
+                        value TEXT NOT NULL
+                    )
+                ''')
+                cur.execute('''
+                    INSERT INTO settings (key, value) VALUES
+                        ('metaprompt', 'Залипательное на тему ремонта, коттеджного строительства и продажи стройматериалов. Сюжет подбирай случайным образом. Неожиданный, вплоть до абсурдного, удивляющий, умеренно шокирующий, при этом красивый. Например: река, рыбки выпрыгивают из воды, они превращаются в стройматериалы, река исчезает и из них получается дом.'),
+                        ('publish_time', '06:00')
+                    ON CONFLICT (key) DO NOTHING
+                ''')
+            conn.commit()
+        print('[DB] Инициализация выполнена')
+    except Exception as e:
+        print(f'[DB] Ошибка инициализации: {e}')
+
 app_state = {
     'running': False,
     'last_published': None,
