@@ -171,6 +171,34 @@
   }
   .schedule-time { font-size: 22px; font-weight: 700; color: #fff; letter-spacing: 1px; }
   .schedule-label { font-size: 11px; color: #555; margin-top: 3px; }
+  .log-box {
+    background: #07070a;
+    border: 1px solid #1e1e2e;
+    border-radius: 12px;
+    padding: 12px;
+    max-height: 280px;
+    overflow-y: auto;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 12px;
+    line-height: 1.7;
+  }
+  .log-entry { display: flex; gap: 8px; padding: 2px 0; border-bottom: 1px solid #111; }
+  .log-entry:last-child { border-bottom: none; }
+  .log-ts { color: #444; flex-shrink: 0; }
+  .log-msg { color: #c8c8d8; word-break: break-word; }
+  .log-msg.error { color: #ff6060; }
+  .log-msg.ok { color: #4fc87a; }
+  .log-empty { color: #333; text-align: center; padding: 20px 0; }
+  .prompt-box {
+    background: #0f0f13;
+    border: 1px solid #2a2a38;
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 13px;
+    color: #9090b0;
+    line-height: 1.6;
+    font-style: italic;
+  }
 </style>
 </head>
 <body>
@@ -234,6 +262,20 @@
     </div>
   </section>
 
+  <section>
+    <div class="section-header">
+      <div class="section-title">Лог</div>
+      <span class="badge" id="log-status">—</span>
+    </div>
+    <div id="prompt-wrap" style="margin-bottom:10px;display:none;">
+      <div style="font-size:11px;color:#555;margin-bottom:4px;">Текущий промпт</div>
+      <div class="prompt-box" id="current-prompt"></div>
+    </div>
+    <div class="log-box" id="log-box">
+      <div class="log-empty">Нет записей</div>
+    </div>
+  </section>
+
   <form method="post" action="/save">
     <section>
       <div class="section-header">
@@ -271,9 +313,46 @@ const cc = document.getElementById('charcount');
 function update() {
   cc.textContent = ta.value.length + ' символов';
 }
-
 ta.addEventListener('input', update);
 update();
+
+const logBox = document.getElementById('log-box');
+const logStatus = document.getElementById('log-status');
+const promptWrap = document.getElementById('prompt-wrap');
+const currentPromptEl = document.getElementById('current-prompt');
+
+function levelClass(level) {
+  if (level === 'error') return 'error';
+  if (level === 'ok') return 'ok';
+  return '';
+}
+
+async function refreshLog() {
+  try {
+    const r = await fetch('/log-data');
+    const data = await r.json();
+
+    logStatus.textContent = data.running ? 'Генерация...' : 'Ожидание';
+    logStatus.style.background = data.running ? 'rgba(255,180,0,.15)' : '';
+    logStatus.style.color = data.running ? '#ffb400' : '';
+
+    if (data.current_prompt) {
+      promptWrap.style.display = '';
+      currentPromptEl.textContent = data.current_prompt;
+    }
+
+    if (!data.log || data.log.length === 0) {
+      logBox.innerHTML = '<div class="log-empty">Нет записей</div>';
+    } else {
+      logBox.innerHTML = data.log.map(e =>
+        `<div class="log-entry"><span class="log-ts">${e.ts}</span><span class="log-msg ${levelClass(e.level)}">${e.msg}</span></div>`
+      ).join('');
+    }
+  } catch(e) {}
+}
+
+refreshLog();
+setInterval(refreshLog, 4000);
 </script>
 </body>
 </html>

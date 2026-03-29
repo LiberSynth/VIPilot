@@ -6,8 +6,9 @@ import requests
 import subprocess
 import psycopg2
 import psycopg2.extras
+from collections import deque
 from datetime import datetime, timezone
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 
 FAL_KEY = os.environ['FAL_API_KEY']
 VK_TOKEN = os.environ['VK_USER_TOKEN']
@@ -85,7 +86,16 @@ app_state = {
     'running': False,
     'last_published': None,
     'last_ok': False,
+    'current_prompt': None,
+    'log': deque(maxlen=80),
 }
+
+
+def log_msg(msg, level='info'):
+    ts = datetime.now(timezone.utc).strftime('%d.%m %H:%M:%S')
+    entry = {'ts': ts, 'msg': msg, 'level': level}
+    app_state['log'].appendleft(entry)
+    print(f'[{ts} UTC] {msg}')
 
 SUBJECTS = [
     'Стая рыб выпрыгивает из реки',
@@ -187,6 +197,10 @@ def load_metaprompt():
     return db_get('metaprompt', 'Залипательное на тему строительства и ремонта.')
 
 
+def now():
+    return datetime.now(timezone.utc).strftime('%d.%m.%Y %H:%M:%S UTC')
+
+
 def generate_prompt():
     subject = random.choice(SUBJECTS)
     transform_template = random.choice(TRANSFORMATIONS)
@@ -199,17 +213,13 @@ def generate_prompt():
     scene = f'{subject} {transform}, {setting}.'
     full_prompt = f'{scene} {style}'
 
-    print(f'[{now()}] Сюжет: {scene[:100]}')
+    app_state['current_prompt'] = scene
+    log_msg(f'Сюжет: {scene}')
     return full_prompt
-
-
-def now():
-    return datetime.now(timezone.utc).strftime('%d.%m.%Y %H:%M:%S UTC')
 
 
 def generate_video():
     prompt = generate_prompt()
-    print(f'[{now()}] Промпт: {prompt[:100]}...')
     app_state['running'] = True
 
     try:
@@ -221,19 +231,19 @@ def generate_video():
         data = resp.json()
 
         if 'request_id' not in data:
-            print(f'[{now()}] Ошибка запроса: {data}')
+            log_msg(f'Ошибка запроса к fal.ai: {data}', 'error')
             return False
 
         request_id = data['request_id']
         status_url = data['status_url']
-        print(f'[{now()}] Генерация запущена. ID: {request_id}')
+        log_msg(f'Генерация запущена. ID: {request_id}')
 
         for attempt in range(240):
             time.sleep(30)
             try:
                 s = requests.get(status_url, headers={'Authorization': f'Key {FAL_KEY}'}, timeout=10).json()
                 status = s.get('status')
-                print(f'[{now()}] Статус [{attempt+1}]: {status}')
+                log_msg(f'Статус [{attempt+1}]: {status}')
 
                 if status == 'COMPLETED':
                     result = requests.get(
@@ -243,24 +253,24 @@ def generate_video():
                     ).json()
                     video_url = result.get('video', {}).get('url')
                     if not video_url:
-                        print(f'[{now()}] Нет URL видео: {result}')
+                        log_msg(f'Нет URL видео в ответе: {result}', 'error')
                         return False
                     return download_and_transcode(video_url)
 
                 elif status == 'FAILED':
-                    print(f'[{now()}] Генерация провалилась: {s}')
+                    log_msg(f'Генерация провалилась: {s}', 'error')
                     return False
             except Exception as e:
-                print(f'[{now()}] Ошибка опроса: {e}')
+                log_msg(f'Ошибка опроса статуса: {e}', 'error')
 
-        print(f'[{now()}] Таймаут генерации')
+        log_msg('Таймаут генерации (2 часа)', 'error')
         return False
     finally:
         app_state['running'] = False
 
 
 def download_and_transcode(video_url):
-    print(f'[{now()}] Скачиваю видео: {video_url[:80]}...')
+    log_msg('Скачиваю видео...')
     ok = False
     for attempt in range(3):
         try:
@@ -271,18 +281,18 @@ def download_and_transcode(video_url):
                         f.write(chunk)
                 size = os.path.getsize(VIDEO_PATH)
                 if size > 10000:
-                    print(f'[{now()}] Видео скачано: {round(size/1024/1024, 1)} МБ')
+                    log_msg(f'Видео скачано: {round(size/1024/1024, 1)} МБ')
                     ok = True
                     break
             else:
-                print(f'[{now()}] HTTP {r.status_code}, попытка {attempt+1}/3')
+                log_msg(f'HTTP {r.status_code} при скачивании, попытка {attempt+1}/3', 'error')
         except Exception as e:
-            print(f'[{now()}] Ошибка скачивания (попытка {attempt+1}/3): {e}')
+            log_msg(f'Ошибка скачивания (попытка {attempt+1}/3): {e}', 'error')
         time.sleep(10)
     if not ok:
         return False
 
-    print(f'[{now()}] Транскодирую...')
+    log_msg('Транскодирую в H.264...')
     subprocess.run([
         'ffmpeg', '-i', VIDEO_PATH,
         '-c:v', 'libx264', '-profile:v', 'high', '-preset', 'fast', '-crf', '23',
@@ -291,12 +301,12 @@ def download_and_transcode(video_url):
         '-movflags', '+faststart',
         VIDEO_VK_PATH, '-y'
     ], capture_output=True, timeout=120)
-    print(f'[{now()}] Транскодирование завершено')
+    log_msg('Транскодирование завершено')
     return True
 
 
 def publish_story():
-    print(f'[{now()}] Публикую историю в VK...')
+    log_msg('Публикую историю в VK...')
     try:
         r = requests.post('https://api.vk.com/method/stories.getVideoUploadServer', data={
             'group_id': GROUP_ID, 'add_to_news': 1, 'access_token': VK_TOKEN, 'v': '5.131'
@@ -304,10 +314,10 @@ def publish_story():
         r.raise_for_status()
         server_data = r.json()
         if 'error' in server_data:
-            print(f'[{now()}] Ошибка getVideoUploadServer: {server_data["error"]}')
+            log_msg(f'Ошибка getVideoUploadServer: {server_data["error"]}', 'error')
             return False
         upload_url = server_data['response']['upload_url']
-        print(f'[{now()}] Upload URL получен')
+        log_msg('Upload URL получен, загружаю...')
 
         for attempt in range(3):
             try:
@@ -315,23 +325,23 @@ def publish_story():
                     up = requests.post(upload_url, files={'video_file': f}, timeout=300)
                 up.raise_for_status()
                 if not up.text.strip():
-                    print(f'[{now()}] Пустой ответ от CDN, попытка {attempt+1}/3')
+                    log_msg(f'Пустой ответ от CDN, попытка {attempt+1}/3', 'error')
                     time.sleep(5)
                     continue
                 up_data = up.json()
                 if 'response' not in up_data:
-                    print(f'[{now()}] Неожиданный ответ CDN: {up.text[:200]}')
+                    log_msg(f'Неожиданный ответ CDN: {up.text[:200]}', 'error')
                     return False
                 upload_result = up_data['response']['upload_result']
                 break
             except Exception as e:
-                print(f'[{now()}] Ошибка загрузки видео (попытка {attempt+1}/3): {e}')
+                log_msg(f'Ошибка загрузки видео (попытка {attempt+1}/3): {e}', 'error')
                 time.sleep(5)
         else:
-            print(f'[{now()}] Все попытки загрузки провалились')
+            log_msg('Все попытки загрузки провалились', 'error')
             return False
 
-        print(f'[{now()}] Видео загружено, сохраняю историю...')
+        log_msg('Видео загружено, сохраняю историю...')
         save = requests.post('https://api.vk.com/method/stories.save', data={
             'upload_results': upload_result, 'access_token': VK_TOKEN, 'v': '5.131'
         }, timeout=15).json()
@@ -339,20 +349,20 @@ def publish_story():
         if 'response' in save:
             story_id = save['response']['items'][0]['id']
             ts = datetime.now(timezone.utc).strftime('%d.%m.%Y в %H:%M UTC')
-            print(f'[{now()}] ✓ История опубликована! ID: {story_id}')
+            log_msg(f'✓ История опубликована! ID: {story_id}')
             app_state['last_published'] = ts
             app_state['last_ok'] = True
             return True
         else:
-            print(f'[{now()}] Ошибка stories.save: {save}')
+            log_msg(f'Ошибка stories.save: {save}', 'error')
             return False
     except Exception as e:
-        print(f'[{now()}] Исключение при публикации: {e}')
+        log_msg(f'Исключение при публикации истории: {e}', 'error')
         return False
 
 
 def publish_to_wall():
-    print(f'[{now()}] Публикую видео на стену сообщества...')
+    log_msg('Публикую видео на стену сообщества...')
     try:
         save_resp = requests.post('https://api.vk.com/method/video.save', data={
             'group_id': GROUP_ID,
@@ -364,18 +374,18 @@ def publish_to_wall():
         }, timeout=15).json()
 
         if 'error' in save_resp:
-            print(f'[{now()}] Ошибка video.save: {save_resp["error"]}')
+            log_msg(f'Ошибка video.save: {save_resp["error"]}', 'error')
             return False
 
         upload_url = save_resp['response']['upload_url']
         video_id = save_resp['response']['video_id']
         owner_id = save_resp['response']['owner_id']
-        print(f'[{now()}] video.save OK, загружаю файл...')
+        log_msg('video.save OK, загружаю файл...')
 
         with open(VIDEO_VK_PATH, 'rb') as f:
             up = requests.post(upload_url, files={'video_file': f}, timeout=300)
         up.raise_for_status()
-        print(f'[{now()}] Видео загружено. Публикую пост...')
+        log_msg('Видео загружено. Публикую пост...')
 
         post_resp = requests.post('https://api.vk.com/method/wall.post', data={
             'owner_id': -GROUP_ID,
@@ -387,13 +397,13 @@ def publish_to_wall():
 
         if 'response' in post_resp:
             post_id = post_resp['response']['post_id']
-            print(f'[{now()}] ✓ Видео опубликовано на стене! post_id: {post_id}')
+            log_msg(f'✓ Видео опубликовано на стене! post_id: {post_id}')
             return True
         else:
-            print(f'[{now()}] Ошибка wall.post: {post_resp}')
+            log_msg(f'Ошибка wall.post: {post_resp}', 'error')
             return False
     except Exception as e:
-        print(f'[{now()}] Исключение при публикации на стену: {e}')
+        log_msg(f'Исключение при публикации на стену: {e}', 'error')
         return False
 
 
@@ -416,18 +426,18 @@ def scheduler_loop():
             published_today = False
             last_date = today
             next_retry_after = 0
-            print(f'[{now()}] Новый день. Генерация в {gen_h:02d}:{gen_m:02d} UTC, публикация в {pub_h:02d}:{pub_m:02d} UTC.')
+            log_msg(f'Новый день. Генерация в {gen_h:02d}:{gen_m:02d} UTC, публикация в {pub_h:02d}:{pub_m:02d} UTC.')
 
         now_minutes = now_dt.hour * 60 + now_dt.minute
         gen_minutes = gen_h * 60 + gen_m
         pub_minutes = pub_h * 60 + pub_m
 
         if now_minutes >= gen_minutes and not generated_today and time.time() >= next_retry_after:
-            print(f'[{now()}] Запускаю генерацию видео...')
+            log_msg('Запускаю генерацию видео...')
             generated_today = generate_video()
             if not generated_today:
                 next_retry_after = time.time() + 1800
-                print(f'[{now()}] Следующая попытка через 30 минут')
+                log_msg('Генерация не удалась. Следующая попытка через 30 минут.', 'error')
 
         if generated_today and not published_today and now_minutes >= pub_minutes:
             story_ok = publish_story()
@@ -491,6 +501,17 @@ def save():
 
     flash('Настройки сохранены', 'success')
     return redirect(url_for('admin'))
+
+
+@flask_app.route('/log-data')
+def log_data():
+    if not session.get('auth'):
+        return jsonify([])
+    return jsonify({
+        'log': list(app_state['log']),
+        'running': app_state['running'],
+        'current_prompt': app_state['current_prompt'],
+    })
 
 
 @flask_app.route('/run-now', methods=['POST'])
