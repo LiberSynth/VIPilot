@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>VK Publisher — Админка</title>
+<title>VK Publisher</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -11,203 +11,270 @@
     background: #0f0f13;
     color: #e8e8f0;
     min-height: 100vh;
-    padding: 0 0 40px;
+    padding-bottom: 48px;
   }
+
   header {
     background: #1a1a24;
     border-bottom: 1px solid #2a2a38;
-    padding: 16px 20px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+    padding: 14px 20px 0;
     position: sticky;
     top: 0;
     z-index: 10;
   }
+  .header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
   .header-left { display: flex; align-items: center; gap: 10px; }
   .header-icon {
-    width: 36px; height: 36px;
+    width: 34px; height: 34px;
     background: linear-gradient(135deg, #4a7cf7, #6f4af7);
     border-radius: 9px;
     display: flex; align-items: center; justify-content: center;
-    font-size: 18px;
+    font-size: 16px;
   }
-  h1 { font-size: 17px; font-weight: 600; color: #fff; }
+  h1 { font-size: 16px; font-weight: 700; color: #fff; }
   .logout {
-    font-size: 13px;
-    color: #666;
+    font-size: 12px;
+    color: #555;
     text-decoration: none;
-    padding: 6px 12px;
+    padding: 5px 10px;
     border: 1px solid #2a2a38;
-    border-radius: 8px;
+    border-radius: 7px;
   }
   .logout:active { background: #2a2a38; }
 
-  .container { padding: 20px; max-width: 640px; margin: 0 auto; }
+  .tabs {
+    display: flex;
+    gap: 0;
+  }
+  .tab-btn {
+    flex: 1;
+    padding: 10px 0;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 500;
+    color: #555;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    transition: color .2s, border-color .2s;
+    letter-spacing: .01em;
+  }
+  .tab-btn.active {
+    color: #4a7cf7;
+    border-bottom-color: #4a7cf7;
+  }
+  .tab-btn:active { opacity: .7; }
+
+  .container { padding: 18px 16px; max-width: 640px; margin: 0 auto; }
+
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
 
   .status-card {
     background: #1a1a24;
     border: 1px solid #2a2a38;
     border-radius: 14px;
-    padding: 16px 18px;
-    margin-bottom: 20px;
+    padding: 14px 16px;
+    margin-bottom: 14px;
     display: flex;
     align-items: center;
-    gap: 14px;
+    gap: 12px;
   }
   .status-dot {
-    width: 10px; height: 10px;
+    width: 9px; height: 9px;
     border-radius: 50%;
     flex-shrink: 0;
   }
   .status-dot.ok { background: #3ecf8e; box-shadow: 0 0 8px #3ecf8e88; }
-  .status-dot.idle { background: #666; }
-  .status-dot.running { background: #f5a623; box-shadow: 0 0 8px #f5a62388; animation: pulse 1.5s infinite; }
-  @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:.4 } }
-  .status-info { flex: 1; }
+  .status-dot.idle { background: #444; }
+  .status-dot.running { background: #f5a623; box-shadow: 0 0 8px #f5a62388; animation: pulse 1.4s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.35} }
+  .status-info { flex: 1; min-width: 0; }
   .status-title { font-size: 14px; font-weight: 600; color: #fff; }
-  .status-sub { font-size: 12px; color: #666; margin-top: 2px; }
+  .status-sub { font-size: 11px; color: #555; margin-top: 2px; }
 
-  section {
+  .card {
     background: #1a1a24;
     border: 1px solid #2a2a38;
     border-radius: 14px;
-    padding: 18px;
-    margin-bottom: 16px;
-  }
-  .section-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+    padding: 16px;
     margin-bottom: 12px;
   }
-  .section-title { font-size: 15px; font-weight: 600; color: #fff; }
-  .badge {
-    font-size: 11px;
-    color: #4a7cf7;
-    background: rgba(74,124,247,.15);
-    border-radius: 6px;
-    padding: 3px 8px;
-    font-weight: 500;
-  }
-  .hint {
-    font-size: 12px;
-    color: #555;
+  .card-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: .06em;
     margin-bottom: 12px;
-    line-height: 1.5;
   }
+
+  .schedule-row { display: flex; gap: 10px; }
+  .schedule-item {
+    flex: 1;
+    background: #0f0f13;
+    border: 1px solid #1e1e2e;
+    border-radius: 10px;
+    padding: 12px;
+    text-align: center;
+  }
+  .schedule-time { font-size: 24px; font-weight: 700; color: #fff; letter-spacing: 1.5px; font-variant-numeric: tabular-nums; }
+  .schedule-label { font-size: 11px; color: #555; margin-top: 4px; }
+
+  .hint { font-size: 12px; color: #555; margin-bottom: 10px; line-height: 1.55; }
+
+  input[type="time"] {
+    width: 100%;
+    padding: 14px 16px;
+    background: #0f0f13;
+    border: 1px solid #2a2a38;
+    border-radius: 11px;
+    color: #fff;
+    font-size: 22px;
+    font-family: inherit;
+    font-variant-numeric: tabular-nums;
+    appearance: none;
+    -webkit-appearance: none;
+    outline: none;
+    transition: border-color .2s;
+    letter-spacing: 2px;
+  }
+  input[type="time"]:focus { border-color: #4a7cf7; }
+
   textarea {
     width: 100%;
     background: #0f0f13;
     border: 1px solid #2a2a38;
-    border-radius: 10px;
+    border-radius: 11px;
     padding: 14px;
     font-size: 14px;
     color: #e8e8f0;
     line-height: 1.6;
     resize: vertical;
     outline: none;
-    min-height: 280px;
+    min-height: 200px;
     font-family: inherit;
     transition: border-color .2s;
   }
   textarea:focus { border-color: #4a7cf7; }
-  .count { font-size: 11px; color: #444; text-align: right; margin-top: 6px; }
+  .char-count { font-size: 11px; color: #3a3a50; text-align: right; margin-top: 6px; }
 
   .flash {
     border-radius: 10px;
-    padding: 12px 16px;
-    font-size: 14px;
-    margin-bottom: 16px;
+    padding: 12px 14px;
+    font-size: 13px;
+    margin-bottom: 12px;
     font-weight: 500;
   }
-  .flash.success {
-    background: rgba(62,207,142,.12);
-    border: 1px solid rgba(62,207,142,.3);
-    color: #3ecf8e;
-  }
-  .flash.error {
-    background: rgba(255,80,80,.12);
-    border: 1px solid rgba(255,80,80,.3);
-    color: #ff6060;
-  }
+  .flash.success { background: rgba(62,207,142,.1); border: 1px solid rgba(62,207,142,.25); color: #3ecf8e; }
+  .flash.error { background: rgba(255,80,80,.1); border: 1px solid rgba(255,80,80,.25); color: #ff6060; }
 
-  .actions { display: flex; gap: 10px; margin-top: 6px; }
-  .btn-save {
-    flex: 1;
+  .btn-primary {
+    width: 100%;
     background: linear-gradient(135deg, #4a7cf7, #6f4af7);
     color: #fff;
     border: none;
-    border-radius: 10px;
-    padding: 14px;
+    border-radius: 12px;
+    padding: 16px;
     font-size: 15px;
     font-weight: 600;
     cursor: pointer;
+    transition: opacity .15s;
   }
-  .btn-save:active { opacity: .85; }
-  .btn-test {
+  .btn-primary:active { opacity: .8; }
+  .btn-primary:disabled { opacity: .4; cursor: default; }
+
+  .btn-secondary {
+    width: 100%;
     background: transparent;
     color: #4a7cf7;
-    border: 1px solid #4a7cf7;
-    border-radius: 10px;
-    padding: 14px 18px;
+    border: 1px solid rgba(74,124,247,.4);
+    border-radius: 12px;
+    padding: 15px;
     font-size: 15px;
     font-weight: 600;
     cursor: pointer;
-    white-space: nowrap;
+    margin-top: 8px;
+    transition: background .15s;
   }
-  .btn-test:active { background: rgba(74,124,247,.12); }
-  .schedule-row {
+  .btn-secondary:active { background: rgba(74,124,247,.1); }
+  .btn-secondary:disabled { opacity: .4; cursor: default; }
+
+  .divider { height: 1px; background: #1e1e2e; margin: 16px 0; }
+
+  .log-header {
     display: flex;
-    gap: 10px;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
   }
-  .schedule-item {
-    flex: 1;
+  .log-badge {
+    font-size: 11px;
+    padding: 3px 9px;
+    border-radius: 20px;
+    font-weight: 600;
+    background: rgba(74,124,247,.12);
+    color: #4a7cf7;
+    transition: background .3s, color .3s;
+  }
+  .log-badge.running {
+    background: rgba(245,166,35,.12);
+    color: #f5a623;
+  }
+
+  .prompt-label { font-size: 11px; color: #444; margin-bottom: 6px; }
+  .prompt-box {
     background: #0f0f13;
-    border: 1px solid #2a2a38;
+    border: 1px solid #1e1e2e;
     border-radius: 10px;
-    padding: 12px;
-    text-align: center;
+    padding: 10px 13px;
+    font-size: 13px;
+    color: #7070a0;
+    line-height: 1.6;
+    font-style: italic;
+    margin-bottom: 12px;
   }
-  .schedule-time { font-size: 22px; font-weight: 700; color: #fff; letter-spacing: 1px; }
-  .schedule-label { font-size: 11px; color: #555; margin-top: 3px; }
+
   .log-box {
     background: #07070a;
-    border: 1px solid #1e1e2e;
+    border: 1px solid #151520;
     border-radius: 12px;
-    padding: 12px;
-    max-height: 280px;
+    padding: 10px;
+    max-height: 400px;
     overflow-y: auto;
     font-family: 'SF Mono', 'Fira Code', monospace;
     font-size: 12px;
-    line-height: 1.7;
+    line-height: 1.75;
   }
-  .log-entry { display: flex; gap: 8px; padding: 2px 0; border-bottom: 1px solid #111; }
+  .log-entry { display: flex; gap: 8px; padding: 1px 0; border-bottom: 1px solid #111; }
   .log-entry:last-child { border-bottom: none; }
-  .log-ts { color: #444; flex-shrink: 0; }
-  .log-msg { color: #c8c8d8; word-break: break-word; }
+  .log-ts { color: #3a3a55; flex-shrink: 0; }
+  .log-msg { color: #b0b0c8; word-break: break-word; }
   .log-msg.error { color: #ff6060; }
   .log-msg.ok { color: #4fc87a; }
-  .log-empty { color: #333; text-align: center; padding: 20px 0; }
-  .prompt-box {
-    background: #0f0f13;
-    border: 1px solid #2a2a38;
-    border-radius: 10px;
-    padding: 12px 14px;
-    font-size: 13px;
-    color: #9090b0;
-    line-height: 1.6;
-    font-style: italic;
-  }
+  .log-empty { color: #2a2a40; text-align: center; padding: 24px 0; }
 </style>
 </head>
 <body>
+
 <header>
-  <div class="header-left">
-    <div class="header-icon">🎬</div>
-    <h1>VK Publisher</h1>
+  <div class="header-top">
+    <div class="header-left">
+      <div class="header-icon">🎬</div>
+      <h1>VK Publisher</h1>
+    </div>
+    <a href="/logout" class="logout">Выйти</a>
   </div>
-  <a href="/logout" class="logout">Выйти</a>
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('settings', this)">Настройки</button>
+    <button class="tab-btn" onclick="switchTab('log', this)">Лог</button>
+  </div>
 </header>
 
 <div class="container">
@@ -218,112 +285,121 @@
     {% endfor %}
   {% endwith %}
 
-  <div class="status-card">
-    {% if status.running %}
-    <div class="status-dot running"></div>
-    {% elif status.last_ok %}
-    <div class="status-dot ok"></div>
-    {% else %}
-    <div class="status-dot idle"></div>
-    {% endif %}
-    <div class="status-info">
-      <div class="status-title">
-        {% if status.running %}
-          Генерация видео...
-        {% elif status.last_ok %}
-          Последняя история опубликована
-        {% else %}
-          Ожидание расписания
-        {% endif %}
-      </div>
-      <div class="status-sub">
-        {% if status.last_published %}
-          {{ status.last_published }}
-        {% else %}
-          Публикаций ещё не было
-        {% endif %}
+  <div id="panel-settings" class="tab-panel active">
+
+    <div class="status-card">
+      {% if status.running %}
+        <div class="status-dot running"></div>
+      {% elif status.last_ok %}
+        <div class="status-dot ok"></div>
+      {% else %}
+        <div class="status-dot idle"></div>
+      {% endif %}
+      <div class="status-info">
+        <div class="status-title">
+          {% if status.running %}Генерация видео...
+          {% elif status.last_ok %}Последняя история опубликована
+          {% else %}Ожидание расписания{% endif %}
+        </div>
+        <div class="status-sub">
+          {{ status.last_published if status.last_published else 'Публикаций ещё не было' }}
+        </div>
       </div>
     </div>
+
+    <div class="card">
+      <div class="card-title">Расписание (UTC)</div>
+      <div class="schedule-row">
+        <div class="schedule-item">
+          <div class="schedule-time">{{ generate_time }}</div>
+          <div class="schedule-label">Генерация</div>
+        </div>
+        <div class="schedule-item">
+          <div class="schedule-time">{{ publish_time }}</div>
+          <div class="schedule-label">Публикация</div>
+        </div>
+      </div>
+    </div>
+
+    <form method="post" action="/save">
+      <div class="card">
+        <div class="card-title">Время публикации (UTC)</div>
+        <div class="hint">Генерация запустится автоматически за 2 часа до публикации.</div>
+        <input type="time" name="publish_time" value="{{ publish_time }}">
+      </div>
+
+      <div class="card">
+        <div class="card-title">Мета-промпт</div>
+        <div class="hint">Стиль, тема и характер видео. Каждый день генерируется новый уникальный сюжет.</div>
+        <textarea name="metaprompt" id="ta" spellcheck="true">{{ metaprompt }}</textarea>
+        <div class="char-count" id="charcount"></div>
+      </div>
+
+      <button type="submit" class="btn-primary">Сохранить настройки</button>
+    </form>
+
+    <form method="post" action="/run-now">
+      <button type="submit" class="btn-secondary" {% if status.running %}disabled{% endif %}>
+        {% if status.running %}Генерация идёт...{% else %}Запустить сейчас{% endif %}
+      </button>
+    </form>
+
   </div>
 
-  <section>
-    <div class="section-header">
-      <div class="section-title">Расписание (UTC)</div>
-    </div>
-    <div class="schedule-row">
-      <div class="schedule-item">
-        <div class="schedule-time">{{ generate_time }}</div>
-        <div class="schedule-label">Генерация</div>
-      </div>
-      <div class="schedule-item">
-        <div class="schedule-time">{{ publish_time }}</div>
-        <div class="schedule-label">Публикация</div>
-      </div>
-    </div>
-  </section>
+  <div id="panel-log" class="tab-panel">
 
-  <section>
-    <div class="section-header">
-      <div class="section-title">Лог</div>
-      <span class="badge" id="log-status">—</span>
-    </div>
-    <div id="prompt-wrap" style="margin-bottom:10px;display:none;">
-      <div style="font-size:11px;color:#555;margin-bottom:4px;">Текущий промпт</div>
-      <div class="prompt-box" id="current-prompt"></div>
-    </div>
-    <div class="log-box" id="log-box">
-      <div class="log-empty">Нет записей</div>
-    </div>
-  </section>
-
-  <form method="post" action="/save">
-    <section>
-      <div class="section-header">
-        <div class="section-title">Время публикации (UTC)</div>
+    <div class="card">
+      <div class="log-header">
+        <div class="card-title" style="margin-bottom:0;">Последний промпт</div>
+        <span class="log-badge" id="log-badge">ожидание</span>
       </div>
-      <div class="hint">Видео будет опубликовано в это время. Генерация запустится автоматически за 2 часа до публикации.</div>
-      <input type="time" name="publish_time" value="{{ publish_time }}" style="width:100%;padding:14px 16px;background:#0f0f13;border:1px solid #2a2a38;border-radius:12px;color:#fff;font-size:20px;font-family:inherit;box-sizing:border-box;appearance:none;-webkit-appearance:none;">
-    </section>
-    <section>
-      <div class="section-header">
-        <div class="section-title">Мета-промпт</div>
-        <span class="badge" id="cnt"></span>
+      <div id="prompt-wrap" style="display:none;margin-top:10px;">
+        <div class="prompt-box" id="current-prompt"></div>
       </div>
-      <div class="hint">Опишите стиль, тему и характер видео. Каждый раз будет генерироваться новый уникальный сюжет.</div>
-      <textarea name="metaprompt" id="ta" spellcheck="true" style="min-height:180px;">{{ metaprompt }}</textarea>
-      <div class="count" id="charcount"></div>
-    </section>
-    <div class="actions">
-      <button type="submit" class="btn-save">Сохранить</button>
     </div>
-  </form>
 
-  <form method="post" action="/run-now" style="margin-top:6px;">
-    <button type="submit" class="btn-test" style="width:100%;" {% if status.running %}disabled{% endif %}>
-      {% if status.running %}Генерация идёт...{% else %}Запустить сейчас{% endif %}
-    </button>
-  </form>
+    <div class="card">
+      <div class="card-title">Журнал событий</div>
+      <div class="log-box" id="log-box">
+        <div class="log-empty">Нет записей</div>
+      </div>
+    </div>
+
+  </div>
+
 </div>
 
 <script>
-const ta = document.getElementById('ta');
-const cnt = document.getElementById('cnt');
-const cc = document.getElementById('charcount');
-
-function update() {
-  cc.textContent = ta.value.length + ' символов';
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  btn.classList.add('active');
+  if (name === 'log') scrollLogToBottom();
 }
-ta.addEventListener('input', update);
-update();
+
+const ta = document.getElementById('ta');
+const cc = document.getElementById('charcount');
+function updateCount() { cc.textContent = ta ? ta.value.length + ' символов' : ''; }
+if (ta) { ta.addEventListener('input', updateCount); updateCount(); }
 
 const logBox = document.getElementById('log-box');
-const logStatus = document.getElementById('log-status');
+const badge = document.getElementById('log-badge');
 const promptWrap = document.getElementById('prompt-wrap');
-const currentPromptEl = document.getElementById('current-prompt');
+const promptEl = document.getElementById('current-prompt');
+let autoScroll = true;
 
-function levelClass(level) {
-  if (level === 'error') return 'error';
-  if (level === 'ok') return 'ok';
+logBox.addEventListener('scroll', () => {
+  autoScroll = logBox.scrollHeight - logBox.scrollTop - logBox.clientHeight < 40;
+});
+
+function scrollLogToBottom() {
+  if (autoScroll) logBox.scrollTop = logBox.scrollHeight;
+}
+
+function levelClass(l) {
+  if (l === 'error') return 'error';
+  if (l === 'ok') return 'ok';
   return '';
 }
 
@@ -332,13 +408,19 @@ async function refreshLog() {
     const r = await fetch('/log-data');
     const data = await r.json();
 
-    logStatus.textContent = data.running ? 'Генерация...' : 'Ожидание';
-    logStatus.style.background = data.running ? 'rgba(255,180,0,.15)' : '';
-    logStatus.style.color = data.running ? '#ffb400' : '';
+    if (data.running) {
+      badge.textContent = 'Генерация...';
+      badge.classList.add('running');
+    } else {
+      badge.textContent = 'ожидание';
+      badge.classList.remove('running');
+    }
 
     if (data.current_prompt) {
       promptWrap.style.display = '';
-      currentPromptEl.textContent = data.current_prompt;
+      promptEl.textContent = data.current_prompt;
+    } else {
+      promptWrap.style.display = 'none';
     }
 
     if (!data.log || data.log.length === 0) {
@@ -347,6 +429,7 @@ async function refreshLog() {
       logBox.innerHTML = data.log.map(e =>
         `<div class="log-entry"><span class="log-ts">${e.ts}</span><span class="log-msg ${levelClass(e.level)}">${e.msg}</span></div>`
       ).join('');
+      scrollLogToBottom();
     }
   } catch(e) {}
 }

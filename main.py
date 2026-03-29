@@ -298,10 +298,13 @@ def download_and_transcode(video_url):
 
     log_msg('Транскодирую в H.264...')
     subprocess.run([
-        'ffmpeg', '-i', VIDEO_PATH,
+        'ffmpeg',
+        '-i', VIDEO_PATH,
+        '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo',
         '-c:v', 'libx264', '-profile:v', 'high', '-preset', 'fast', '-crf', '23',
         '-pix_fmt', 'yuv420p', '-r', '30',
         '-c:a', 'aac', '-b:a', '128k',
+        '-shortest',
         '-movflags', '+faststart',
         VIDEO_VK_PATH, '-y'
     ], capture_output=True, timeout=120)
