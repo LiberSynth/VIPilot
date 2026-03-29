@@ -22,11 +22,8 @@ FAL_HEADERS = {'Authorization': f'Key {FAL_KEY}', 'Content-Type': 'application/j
 
 VIDEO_PATH = '/tmp/story_raw.mp4'
 VIDEO_VK_PATH = '/tmp/story_vk.mp4'
-VIDEO_LIBRARY_DIR = './video_library'
 
 MSK_OFFSET = timedelta(hours=3)
-
-os.makedirs(VIDEO_LIBRARY_DIR, exist_ok=True)
 
 
 def get_db():
@@ -115,6 +112,13 @@ def init_db():
                         status TEXT NOT NULL,
                         entries JSONB NOT NULL DEFAULT '[]',
                         summary JSONB NOT NULL DEFAULT '{}'
+                    )
+                ''')
+                cur.execute('''
+                    CREATE TABLE IF NOT EXISTS video_urls (
+                        id SERIAL PRIMARY KEY,
+                        url TEXT NOT NULL,
+                        created_at FLOAT NOT NULL
                     )
                 ''')
             conn.commit()
@@ -351,28 +355,37 @@ def is_emulation():
     return db_get('emulation_mode', '0') == '1'
 
 
-def library_videos():
-    files = sorted(
-        [f for f in os.listdir(VIDEO_LIBRARY_DIR) if f.endswith('.mp4')],
-        key=lambda f: os.path.getmtime(os.path.join(VIDEO_LIBRARY_DIR, f)),
-        reverse=True
-    )
-    return [os.path.join(VIDEO_LIBRARY_DIR, f) for f in files]
-
-
-def save_to_library():
-    import shutil
+def db_save_video_url(url):
     try:
-        ts = int(time.time())
-        dest = os.path.join(VIDEO_LIBRARY_DIR, f'{ts}.mp4')
-        shutil.copy2(VIDEO_VK_PATH, dest)
-        existing = library_videos()
-        if len(existing) > 10:
-            for old in existing[10:]:
-                os.remove(old)
-        log_msg(f'Видео сохранено в библиотеку ({len(library_videos())} шт.)')
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    'INSERT INTO video_urls (url, created_at) VALUES (%s, %s)',
+                    (url, time.time())
+                )
+                cur.execute('SELECT COUNT(*) FROM video_urls')
+                count = cur.fetchone()[0]
+                if count > 20:
+                    cur.execute(
+                        'DELETE FROM video_urls WHERE id IN '
+                        '(SELECT id FROM video_urls ORDER BY created_at ASC LIMIT %s)',
+                        (count - 20,)
+                    )
+            conn.commit()
     except Exception as e:
-        print(f'[library] Ошибка сохранения: {e}')
+        print(f'[DB] Ошибка сохранения URL видео: {e}')
+
+
+def db_get_random_video_url():
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute('SELECT url FROM video_urls ORDER BY RANDOM() LIMIT 1')
+                row = cur.fetchone()
+                return row[0] if row else None
+    except Exception as e:
+        print(f'[DB] Ошибка получения URL видео: {e}')
+        return None
 
 
 def transcode_video():
@@ -399,38 +412,19 @@ def transcode_video():
     return True
 
 
-def create_test_video():
-    log_msg('[ЭМУЛЯЦИЯ] Создаю тестовый паттерн 9:16...')
-    result = subprocess.run([
-        'ffmpeg',
-        '-f', 'lavfi', '-i', 'testsrc2=size=1080x1920:rate=30',
-        '-t', '6',
-        '-c:v', 'libx264', '-profile:v', 'high', '-preset', 'fast', '-crf', '20',
-        '-pix_fmt', 'yuv420p',
-        VIDEO_PATH, '-y'
-    ], capture_output=True, timeout=60)
-    if result.returncode != 0:
-        err = result.stderr.decode(errors='replace')[-400:]
-        log_msg(f'ffmpeg ошибка (тест-паттерн): {err}', 'error')
-        return False
-    log_msg('[ЭМУЛЯЦИЯ] Паттерн создан, транскодирую...')
-    return transcode_video()
-
-
 def generate_video():
     prompt = generate_prompt()
     app_state['running'] = True
 
     if is_emulation():
         try:
-            log_msg('[ЭМУЛЯЦИЯ] Пропускаю запрос к fal.ai')
-            if os.path.exists(VIDEO_PATH) and os.path.getsize(VIDEO_PATH) > 10000:
-                size = os.path.getsize(VIDEO_PATH)
-                log_msg(f'[ЭМУЛЯЦИЯ] Использую существующий файл ({round(size/1024/1024, 1)} МБ)')
-                return transcode_video()
-            else:
-                log_msg('[ЭМУЛЯЦИЯ] Существующего видео нет — создаю тестовое')
-                return create_test_video()
+            log_msg('[ЭМУЛЯЦИЯ] Пропускаю генерацию, беру случайное видео из базы...')
+            url = db_get_random_video_url()
+            if not url:
+                log_msg('[ЭМУЛЯЦИЯ] В базе нет сохранённых URL — сначала запустите хотя бы один обычный цикл', 'error')
+                return False
+            log_msg(f'[ЭМУЛЯЦИЯ] URL выбран: {url[:60]}...')
+            return download_and_transcode(url)
         finally:
             app_state['running'] = False
 
@@ -508,7 +502,10 @@ def download_and_transcode(video_url):
     if not ok:
         return False
 
-    return transcode_video()
+    result = transcode_video()
+    if result and not is_emulation():
+        db_save_video_url(video_url)
+    return result
 
 
 def publish_story():
