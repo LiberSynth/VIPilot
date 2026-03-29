@@ -332,24 +332,6 @@
     </div>
 
     <form method="post" action="/save">
-      <div class="card emulation-card">
-        <div class="toggle-row">
-          <div>
-            <div class="toggle-label">
-              Режим эмуляции
-              {% if emulation_mode %}<span class="emulation-badge">ВКЛ</span>{% endif %}
-            </div>
-            <div class="toggle-hint">fal.ai не вызывается — видео не тратится. Использует сохранённый файл или цветную заглушку.</div>
-          </div>
-          <label class="toggle-wrap">
-            <input type="hidden" name="emulation_mode" id="emulation_hidden" value="{{ '1' if emulation_mode else '0' }}">
-            <input type="checkbox" id="emulation_check" {% if emulation_mode %}checked{% endif %}
-                   onchange="document.getElementById('emulation_hidden').value = this.checked ? '1' : '0'">
-            <span class="toggle-track"></span>
-          </label>
-        </div>
-      </div>
-
       <div class="card">
         <div class="card-title">Мета-промпт</div>
         <div class="hint">Стиль, тема и характер видео. Каждый день генерируется новый уникальный сюжет.</div>
@@ -378,6 +360,24 @@
         <div class="lead-row">
           <input type="number" name="history_days" value="{{ history_days }}" min="1" max="365" step="1">
           <span class="lead-unit">дней</span>
+        </div>
+      </div>
+
+      <div class="card emulation-card">
+        <div class="toggle-row">
+          <div>
+            <div class="toggle-label">
+              Режим эмуляции
+              {% if emulation_mode %}<span class="emulation-badge">ВКЛ</span>{% endif %}
+            </div>
+            <div class="toggle-hint">fal.ai не вызывается — видео не тратится. Использует сохранённый файл или цветную заглушку.</div>
+          </div>
+          <label class="toggle-wrap">
+            <input type="hidden" name="emulation_mode" id="emulation_hidden" value="{{ '1' if emulation_mode else '0' }}">
+            <input type="checkbox" id="emulation_check" {% if emulation_mode %}checked{% endif %}
+                   onchange="document.getElementById('emulation_hidden').value = this.checked ? '1' : '0'">
+            <span class="toggle-track"></span>
+          </label>
         </div>
       </div>
 
