@@ -685,8 +685,9 @@ def send_failure_sms(message):
         log_msg(f'[УВЕДОМЛЕНИЕ] Ошибка отправки SMS: {e}', 'error')
 
 
-def notify_failure(reason, log_entries=None):
-    msg = f'Сбой {msk_ts()}: {reason}'
+def notify_failure(reason, log_entries=None, partial=False):
+    prefix = 'Частично' if partial else 'Сбой'
+    msg = f'{prefix} {msk_ts()}: {reason}'
     log_msg(f'[УВЕДОМЛЕНИЕ] Отправляю уведомление о сбое: {reason}')
     send_failure_email(msg, log_entries=log_entries or [])
     send_failure_sms(msg)
@@ -711,7 +712,7 @@ def run_full_cycle():
         reason = 'ошибка генерации видео' if not gen_ok else 'ошибка публикации в VK'
         notify_failure(reason, log_entries=entries)
     elif story_partial_fail:
-        notify_failure('ошибка публикации истории в VK (стена опубликована успешно)', log_entries=entries)
+        notify_failure('ошибка публикации истории в VK (стена опубликована успешно)', log_entries=entries, partial=True)
     return gen_ok, pub_ok
 
 
