@@ -48,3 +48,10 @@ externalPort = 5000
 [[ports]]
 localPort = 8080
 externalPort = 80
+
+[userenv]
+
+[userenv.shared]
+SMTP_HOST = "smtp.mail.ru"
+SMTP_PORT = "587"
+SMTP_FROM = "red-brick@internet.ru"

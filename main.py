@@ -636,7 +636,7 @@ def send_failure_email(message):
     to_addr = db_get('notify_email', '').strip()
     smtp_host = os.environ.get('SMTP_HOST', '').strip()
     smtp_user = os.environ.get('SMTP_USER', '').strip()
-    smtp_pass = os.environ.get('SMTP_PASS', '').strip()
+    smtp_pass = os.environ.get('SMTP_PASSWORD', '').strip()
     if not all([to_addr, smtp_host, smtp_user, smtp_pass]):
         return
     smtp_port = int(os.environ.get('SMTP_PORT', '587'))
