@@ -16,7 +16,7 @@ ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin')
 GROUP_ID = 236929597
 
 FAL_MODEL = 'fal-ai/minimax/video-01'
-FAL_SUBMIT_URL = f'https://queue.fal.run/{FAL_MODEL}/BROKEN_TEST'
+FAL_SUBMIT_URL = f'https://queue.fal.run/{FAL_MODEL}'
 FAL_STATUS_BASE = 'https://queue.fal.run/fal-ai/minimax/requests'
 FAL_HEADERS = {'Authorization': f'Key {FAL_KEY}', 'Content-Type': 'application/json'}
 
@@ -442,6 +442,7 @@ def generate_video():
                 log_msg('[ЭМУЛЯЦИЯ] В базе нет видео — добавьте ID запросов fal.ai через панель', 'error')
                 return False
             log_msg('[ЭМУЛЯЦИЯ] Видео выбрано, скачиваю...')
+            url = url + '_BROKEN_TEST'  # TEST FAILURE
             return download_and_transcode(url)
         finally:
             app_state['running'] = False
