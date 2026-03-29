@@ -344,9 +344,73 @@ def generate_prompt():
     return full_prompt
 
 
+def is_emulation():
+    return db_get('emulation_mode', '0') == '1'
+
+
+def transcode_video():
+    raw_size = os.path.getsize(VIDEO_PATH)
+    log_msg(f'Транскодирую в H.264... (исходник: {round(raw_size/1024/1024, 1)} МБ)')
+    result = subprocess.run([
+        'ffmpeg',
+        '-t', '8', '-i', VIDEO_PATH,
+        '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo',
+        '-t', '8',
+        '-c:v', 'libx264', '-profile:v', 'baseline', '-preset', 'ultrafast', '-crf', '26',
+        '-pix_fmt', 'yuv420p', '-r', '30',
+        '-c:a', 'aac', '-b:a', '96k',
+        '-movflags', '+faststart',
+        VIDEO_VK_PATH, '-y'
+    ], capture_output=True, timeout=600)
+    if result.returncode != 0:
+        err = result.stderr.decode(errors='replace')[-600:]
+        log_msg(f'ffmpeg ошибка (код {result.returncode}): {err}', 'error')
+        return False
+    log_msg('Транскодирование завершено')
+    if app_state['current_cycle'] is not None:
+        app_state['current_cycle']['summary']['generated_at'] = msk_ts()
+    return True
+
+
+def create_test_video():
+    log_msg('[ЭМУЛЯЦИЯ] Создаю цветную заглушку 9:16...')
+    result = subprocess.run([
+        'ffmpeg',
+        '-f', 'lavfi', '-i', 'color=c=0x1a1a4a:size=1080x1920:rate=30',
+        '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo',
+        '-t', '6',
+        '-c:v', 'libx264', '-profile:v', 'baseline', '-preset', 'ultrafast', '-crf', '26',
+        '-pix_fmt', 'yuv420p',
+        '-c:a', 'aac', '-b:a', '96k',
+        '-movflags', '+faststart',
+        VIDEO_VK_PATH, '-y'
+    ], capture_output=True, timeout=60)
+    if result.returncode != 0:
+        err = result.stderr.decode(errors='replace')[-400:]
+        log_msg(f'ffmpeg ошибка (заглушка): {err}', 'error')
+        return False
+    log_msg('[ЭМУЛЯЦИЯ] Тестовое видео готово')
+    if app_state['current_cycle'] is not None:
+        app_state['current_cycle']['summary']['generated_at'] = msk_ts()
+    return True
+
+
 def generate_video():
     prompt = generate_prompt()
     app_state['running'] = True
+
+    if is_emulation():
+        try:
+            log_msg('[ЭМУЛЯЦИЯ] Пропускаю запрос к fal.ai')
+            if os.path.exists(VIDEO_PATH) and os.path.getsize(VIDEO_PATH) > 10000:
+                size = os.path.getsize(VIDEO_PATH)
+                log_msg(f'[ЭМУЛЯЦИЯ] Использую существующий файл ({round(size/1024/1024, 1)} МБ)')
+                return transcode_video()
+            else:
+                log_msg('[ЭМУЛЯЦИЯ] Существующего видео нет — создаю тестовое')
+                return create_test_video()
+        finally:
+            app_state['running'] = False
 
     try:
         resp = requests.post(FAL_SUBMIT_URL, headers=FAL_HEADERS, json={
@@ -422,27 +486,7 @@ def download_and_transcode(video_url):
     if not ok:
         return False
 
-    raw_size = os.path.getsize(VIDEO_PATH)
-    log_msg(f'Транскодирую в H.264... (исходник: {round(raw_size/1024/1024, 1)} МБ)')
-    result = subprocess.run([
-        'ffmpeg',
-        '-t', '8', '-i', VIDEO_PATH,
-        '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo',
-        '-t', '8',
-        '-c:v', 'libx264', '-profile:v', 'baseline', '-preset', 'ultrafast', '-crf', '26',
-        '-pix_fmt', 'yuv420p', '-r', '30',
-        '-c:a', 'aac', '-b:a', '96k',
-        '-movflags', '+faststart',
-        VIDEO_VK_PATH, '-y'
-    ], capture_output=True, timeout=600)
-    if result.returncode != 0:
-        err = result.stderr.decode(errors='replace')[-600:]
-        log_msg(f'ffmpeg ошибка (код {result.returncode}): {err}', 'error')
-        return False
-    log_msg('Транскодирование завершено')
-    if app_state['current_cycle'] is not None:
-        app_state['current_cycle']['summary']['generated_at'] = msk_ts()
-    return True
+    return transcode_video()
 
 
 def publish_story():
@@ -656,6 +700,7 @@ def admin():
     gen_h_msk, gen_m_msk = to_msk(gen_h_utc, gen_m_utc)
 
     history_days = parse_history_days(db_get('history_days', '7'))
+    emulation_mode = db_get('emulation_mode', '0') == '1'
 
     return render_template('admin.html',
                            metaprompt=metaprompt,
@@ -663,6 +708,7 @@ def admin():
                            generate_time_msk=f'{gen_h_msk:02d}:{gen_m_msk:02d}',
                            lead_time_mins=lead_mins,
                            history_days=history_days,
+                           emulation_mode=emulation_mode,
                            status=app_state)
 
 
@@ -689,6 +735,9 @@ def save():
     history_raw = request.form.get('history_days', '').strip()
     if history_raw:
         db_set('history_days', str(parse_history_days(history_raw)))
+
+    emulation_raw = request.form.get('emulation_mode', '0')
+    db_set('emulation_mode', '1' if emulation_raw == '1' else '0')
 
     flash('Настройки сохранены', 'success')
     return redirect(url_for('admin'))

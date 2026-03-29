@@ -133,6 +133,36 @@
   .flash.success { background: rgba(62,207,142,.1); border: 1px solid rgba(62,207,142,.25); color: #3ecf8e; }
   .flash.error { background: rgba(255,80,80,.1); border: 1px solid rgba(255,80,80,.25); color: #ff6060; }
 
+  .toggle-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+  .toggle-label { font-size: 14px; color: #e0e0f0; font-weight: 500; }
+  .toggle-hint { font-size: 12px; color: #888; margin-top: 3px; }
+  .toggle-wrap { position: relative; flex-shrink: 0; }
+  .toggle-wrap input[type="checkbox"] { opacity: 0; width: 0; height: 0; position: absolute; }
+  .toggle-track {
+    display: block; width: 48px; height: 28px;
+    background: #2a2a38; border-radius: 14px;
+    cursor: pointer; transition: background .2s; position: relative;
+  }
+  .toggle-track::after {
+    content: ''; position: absolute;
+    top: 3px; left: 3px;
+    width: 22px; height: 22px;
+    background: #fff; border-radius: 50%;
+    transition: transform .2s;
+  }
+  .toggle-wrap input:checked + .toggle-track { background: #f5a623; }
+  .toggle-wrap input:checked + .toggle-track::after { transform: translateX(20px); }
+
+  .card.emulation-card { border-color: rgba(245,166,35,.35); }
+  .emulation-badge {
+    display: inline-block; font-size: 10px; font-weight: 700;
+    background: rgba(245,166,35,.18); color: #f5a623;
+    border-radius: 5px; padding: 2px 7px; margin-left: 8px;
+    vertical-align: middle; letter-spacing: .04em;
+  }
+
   .btn-primary {
     width: 100%; background: linear-gradient(135deg, #4a7cf7, #6f4af7);
     color: #fff; border: none; border-radius: 12px;
@@ -302,6 +332,24 @@
     </div>
 
     <form method="post" action="/save">
+      <div class="card emulation-card">
+        <div class="toggle-row">
+          <div>
+            <div class="toggle-label">
+              Режим эмуляции
+              {% if emulation_mode %}<span class="emulation-badge">ВКЛ</span>{% endif %}
+            </div>
+            <div class="toggle-hint">fal.ai не вызывается — видео не тратится. Использует сохранённый файл или цветную заглушку.</div>
+          </div>
+          <label class="toggle-wrap">
+            <input type="hidden" name="emulation_mode" id="emulation_hidden" value="{{ '1' if emulation_mode else '0' }}">
+            <input type="checkbox" id="emulation_check" {% if emulation_mode %}checked{% endif %}
+                   onchange="document.getElementById('emulation_hidden').value = this.checked ? '1' : '0'">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+      </div>
+
       <div class="card">
         <div class="card-title">Мета-промпт</div>
         <div class="hint">Стиль, тема и характер видео. Каждый день генерируется новый уникальный сюжет.</div>
