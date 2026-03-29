@@ -104,10 +104,83 @@ def init_db():
                         ('lead_time_mins', '120')
                     ON CONFLICT (key) DO NOTHING
                 ''')
+                cur.execute('''
+                    CREATE TABLE IF NOT EXISTS cycles (
+                        id SERIAL PRIMARY KEY,
+                        started TEXT NOT NULL,
+                        started_ts FLOAT NOT NULL,
+                        status TEXT NOT NULL,
+                        entries JSONB NOT NULL DEFAULT '[]',
+                        summary JSONB NOT NULL DEFAULT '{}'
+                    )
+                ''')
             conn.commit()
         print('[DB] Инициализация выполнена')
     except Exception as e:
         print(f'[DB] Ошибка инициализации: {e}')
+
+
+def db_save_cycle(cycle):
+    import json
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute('''
+                    INSERT INTO cycles (started, started_ts, status, entries, summary)
+                    VALUES (%s, %s, %s, %s, %s)
+                    RETURNING id
+                ''', (
+                    cycle['started'],
+                    cycle['started_ts'],
+                    cycle['status'],
+                    json.dumps(cycle['entries'], ensure_ascii=False),
+                    json.dumps(cycle.get('summary', {}), ensure_ascii=False),
+                ))
+                row = cur.fetchone()
+                cycle['db_id'] = row[0]
+            conn.commit()
+    except Exception as e:
+        print(f'[DB] Ошибка сохранения цикла: {e}')
+
+
+def db_load_cycles():
+    import json
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute('''
+                    SELECT id, started, started_ts, status, entries, summary
+                    FROM cycles ORDER BY started_ts DESC LIMIT 20
+                ''')
+                rows = cur.fetchall()
+        result = []
+        for row in rows:
+            result.append({
+                'db_id': row[0],
+                'started': row[1],
+                'started_ts': row[2],
+                'status': row[3],
+                'entries': row[4] if isinstance(row[4], list) else json.loads(row[4] or '[]'),
+                'summary': row[5] if isinstance(row[5], dict) else json.loads(row[5] or '{}'),
+            })
+        return result
+    except Exception as e:
+        print(f'[DB] Ошибка загрузки циклов: {e}')
+        return []
+
+
+def db_trim_cycles(keep=20):
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute('''
+                    DELETE FROM cycles WHERE id NOT IN (
+                        SELECT id FROM cycles ORDER BY started_ts DESC LIMIT %s
+                    )
+                ''', (keep,))
+            conn.commit()
+    except Exception as e:
+        print(f'[DB] Ошибка обрезки циклов: {e}')
 
 
 app_state = {
@@ -141,8 +214,11 @@ def end_cycle(ok):
     if cycle is None:
         return
     cycle['status'] = 'ok' if ok else 'error'
-    app_state['cycles'].appendleft(dict(cycle))
+    completed = dict(cycle)
+    app_state['cycles'].appendleft(completed)
     app_state['current_cycle'] = None
+    db_save_cycle(completed)
+    db_trim_cycles(keep=20)
 
 
 def log_msg(msg, level='info'):
@@ -675,6 +751,16 @@ def start_scheduler():
     global _scheduler_started
     if not _scheduler_started:
         _scheduler_started = True
+        init_db()
+        saved = db_load_cycles()
+        for c in saved:
+            app_state['cycles'].append(c)
+        if saved:
+            last = saved[0]
+            if last.get('summary', {}).get('published_at'):
+                app_state['last_published'] = last['summary']['published_at']
+                app_state['last_ok'] = last['status'] == 'ok'
+        print(f'[DB] Загружено циклов из БД: {len(saved)}')
         t = threading.Thread(target=scheduler_loop, daemon=True)
         t.start()
 
