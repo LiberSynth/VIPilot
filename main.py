@@ -476,11 +476,9 @@ def generate_video():
 
     try:
         resp = requests.post(FAL_SUBMIT_URL, headers=FAL_HEADERS, json={
-            'input': {
-                'prompt': prompt,
-                'duration': 6,
-                'image_size': {'width': 1080, 'height': 1920},
-            }
+            'prompt': prompt,
+            'duration': 6,
+            'image_size': {'width': 1080, 'height': 1920},
         }, timeout=30)
         data = resp.json()
 
