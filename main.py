@@ -849,8 +849,9 @@ def save():
     db_set('notify_email', request.form.get('notify_email', '').strip())
     db_set('notify_phone', request.form.get('notify_phone', '').strip())
 
+    active_tab = request.form.get('active_tab', 'pipeline')
     flash('Настройки сохранены', 'success')
-    return redirect(url_for('admin'))
+    return redirect(url_for('admin') + f'?tab={active_tab}')
 
 
 @flask_app.route('/log-data')

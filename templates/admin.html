@@ -385,6 +385,7 @@
   <div id="panel-service" class="tab-panel">
 
     <form method="post" action="/save">
+      <input type="hidden" name="active_tab" value="service">
       <!-- Пайплайн-поля — скрытые дубликаты -->
       <input type="hidden" name="metaprompt" id="h_metaprompt" value="">
       <input type="hidden" name="publish_time" id="h_publish_time" value="{{ publish_time_msk }}">
@@ -454,6 +455,17 @@ function switchTab(name, btn) {
   document.getElementById('panel-' + name).classList.add('active');
   btn.classList.add('active');
 }
+
+// Восстановить вкладку из ?tab=... после сохранения
+(function() {
+  const tab = new URLSearchParams(window.location.search).get('tab');
+  if (tab) {
+    const panel = document.getElementById('panel-' + tab);
+    const btn = document.querySelector('.tab-btn[onclick*="\'' + tab + '\'"]');
+    if (panel && btn) switchTab(tab, btn);
+    history.replaceState(null, '', window.location.pathname);
+  }
+})();
 
 const ta = document.getElementById('ta');
 const cc = document.getElementById('charcount');
