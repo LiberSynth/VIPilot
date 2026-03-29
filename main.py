@@ -22,8 +22,11 @@ FAL_HEADERS = {'Authorization': f'Key {FAL_KEY}', 'Content-Type': 'application/j
 
 VIDEO_PATH = '/tmp/story_raw.mp4'
 VIDEO_VK_PATH = '/tmp/story_vk.mp4'
+VIDEO_LIBRARY_DIR = './video_library'
 
 MSK_OFFSET = timedelta(hours=3)
+
+os.makedirs(VIDEO_LIBRARY_DIR, exist_ok=True)
 
 
 def get_db():
@@ -346,6 +349,30 @@ def generate_prompt():
 
 def is_emulation():
     return db_get('emulation_mode', '0') == '1'
+
+
+def library_videos():
+    files = sorted(
+        [f for f in os.listdir(VIDEO_LIBRARY_DIR) if f.endswith('.mp4')],
+        key=lambda f: os.path.getmtime(os.path.join(VIDEO_LIBRARY_DIR, f)),
+        reverse=True
+    )
+    return [os.path.join(VIDEO_LIBRARY_DIR, f) for f in files]
+
+
+def save_to_library():
+    import shutil
+    try:
+        ts = int(time.time())
+        dest = os.path.join(VIDEO_LIBRARY_DIR, f'{ts}.mp4')
+        shutil.copy2(VIDEO_VK_PATH, dest)
+        existing = library_videos()
+        if len(existing) > 10:
+            for old in existing[10:]:
+                os.remove(old)
+        log_msg(f'Видео сохранено в библиотеку ({len(library_videos())} шт.)')
+    except Exception as e:
+        print(f'[library] Ошибка сохранения: {e}')
 
 
 def transcode_video():
