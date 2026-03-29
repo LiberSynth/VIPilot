@@ -483,6 +483,93 @@ function toggleCycle(card) {
 
 let cycleData = [];
 
+function getCardKey(cycle) {
+  return String(cycle.started_ts || cycle.started);
+}
+
+function updateExistingCard(card, cycle, idx) {
+  const isRunning = cycle.status === 'running';
+  const sm = cycle.summary || {};
+
+  // Update status class
+  card.className = `cycle-card ${cycle.status}${card.classList.contains('open') ? ' open' : ''}`;
+
+  // Update icon color and symbol
+  const iconEl = card.querySelector('.cycle-icon');
+  if (iconEl) {
+    iconEl.style.color = statusColor(cycle.status);
+    iconEl.innerHTML = statusIcon(cycle.status);
+  }
+
+  // Update subtitle
+  const subtitleEl = card.querySelector('.cycle-subtitle');
+  if (subtitleEl) {
+    let headerSub = '';
+    if (cycle.entries.length > 0) {
+      const last = cycle.entries[cycle.entries.length - 1].msg;
+      headerSub = last.slice(0, 64) + (last.length > 64 ? '…' : '');
+    } else if (sm.prompt) {
+      headerSub = sm.prompt.slice(0, 64) + (sm.prompt.length > 64 ? '…' : '');
+    }
+    subtitleEl.textContent = headerSub;
+  }
+
+  // Update summary block
+  const body = card.querySelector('.cycle-body');
+  if (body && (sm.prompt || sm.generated_at || sm.published_at)) {
+    let existingSummary = body.querySelector('.cycle-summary-block');
+    let summaryHtml = `<div class="cycle-summary-block">`;
+    if (sm.prompt) summaryHtml += `<div class="cs-row"><span class="cs-label">Промпт</span><span class="cs-val">${escHtml(sm.prompt)}</span></div>`;
+    if (sm.generated_at) summaryHtml += `<div class="cs-row"><span class="cs-label">Сгенерировано</span><span class="cs-val">${escHtml(sm.generated_at)}</span></div>`;
+    if (sm.published_at) summaryHtml += `<div class="cs-row"><span class="cs-label">Опубликовано</span><span class="cs-val">${escHtml(sm.published_at)}</span></div>`;
+    summaryHtml += `</div>`;
+    if (!existingSummary) {
+      const tmp = document.createElement('div');
+      tmp.innerHTML = summaryHtml;
+      body.insertBefore(tmp.firstElementChild, body.firstChild);
+    } else {
+      existingSummary.outerHTML = summaryHtml;
+    }
+  }
+
+  // Append only NEW log entries to log-box (preserve scroll)
+  if (cycle.entries.length > 0 && body) {
+    let logBox = body.querySelector('.log-box');
+    const existingCount = logBox ? logBox.querySelectorAll('.log-entry').length : 0;
+    const newEntries = cycle.entries.slice(existingCount);
+
+    if (!logBox && newEntries.length > 0) {
+      // Create actions + log-box fresh
+      const actionsDiv = document.createElement('div');
+      actionsDiv.className = 'cycle-actions';
+      actionsDiv.innerHTML = `<button class="btn-copy" onclick="copyEntries(this, cycleData[${idx}].entries)">Скопировать</button>`;
+      body.appendChild(actionsDiv);
+      logBox = document.createElement('div');
+      logBox.className = 'log-box';
+      body.appendChild(logBox);
+    }
+
+    if (logBox && newEntries.length > 0) {
+      const atBottom = logBox.scrollHeight - logBox.scrollTop - logBox.clientHeight < 32;
+      newEntries.forEach(e => {
+        const row = document.createElement('div');
+        row.className = 'log-entry';
+        row.innerHTML = `<span class="log-ts">${e.ts}</span><span class="log-msg ${levelClass(e.level)}">${escHtml(e.msg)}</span>`;
+        logBox.appendChild(row);
+      });
+      if (atBottom) logBox.scrollTop = logBox.scrollHeight;
+    }
+
+    // Add copy button if just finished and was missing
+    if (!isRunning && !body.querySelector('.btn-copy') && logBox) {
+      const actionsDiv = document.createElement('div');
+      actionsDiv.className = 'cycle-actions';
+      actionsDiv.innerHTML = `<button class="btn-copy" onclick="copyEntries(this, cycleData[${idx}].entries)">Скопировать</button>`;
+      body.insertBefore(actionsDiv, logBox);
+    }
+  }
+}
+
 async function refreshLog() {
   try {
     const r = await fetch('/log-data');
@@ -495,20 +582,37 @@ async function refreshLog() {
       return;
     }
 
-    // Запоминаем, какие раскрыты
-    const openSet = new Set();
-    container.querySelectorAll('.cycle-card.open').forEach(c => openSet.add(+c.dataset.idx));
+    // Build map of existing cards by key
+    const existingCards = {};
+    container.querySelectorAll('.cycle-card[data-key]').forEach(c => {
+      existingCards[c.dataset.key] = c;
+    });
 
-    container.innerHTML = '';
+    const newKeys = cycleData.map(getCardKey);
+
+    // Remove cards no longer in data
+    Object.keys(existingCards).forEach(k => {
+      if (!newKeys.includes(k)) existingCards[k].remove();
+    });
+
     cycleData.forEach((cycle, idx) => {
-      const card = buildCycleCard(cycle, idx);
-      // Восстанавливаем раскрытое состояние (по индексу)
-      if (!openSet.has(idx) && !card.classList.contains('open')) {
-        // already collapsed
-      } else if (openSet.has(idx) && !card.classList.contains('open')) {
-        card.classList.add('open');
+      const key = getCardKey(cycle);
+      if (existingCards[key]) {
+        // Update in place — no scroll reset
+        existingCards[key].dataset.idx = idx;
+        updateExistingCard(existingCards[key], cycle, idx);
+        // Ensure correct DOM position
+        const current = container.children[idx];
+        if (current !== existingCards[key]) {
+          container.insertBefore(existingCards[key], current || null);
+        }
+      } else {
+        // Create new card
+        const card = buildCycleCard(cycle, idx);
+        card.dataset.key = key;
+        const current = container.children[idx];
+        container.insertBefore(card, current || null);
       }
-      container.appendChild(card);
     });
   } catch(e) {}
 }

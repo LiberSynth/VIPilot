@@ -705,6 +705,7 @@ def log_data():
         age_ok = is_current or c.get('started_ts', 0) >= cutoff_ts
         return {
             'started': c['started'],
+            'started_ts': c.get('started_ts', 0),
             'status': c['status'],
             'summary': c.get('summary', {}),
             'entries': c['entries'] if age_ok else [],
