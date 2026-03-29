@@ -38,28 +38,18 @@
   }
   h1 { font-size: 16px; font-weight: 700; color: #fff; }
   .logout {
-    font-size: 12px;
-    color: #555;
-    text-decoration: none;
-    padding: 5px 10px;
-    border: 1px solid #2a2a38;
-    border-radius: 7px;
+    font-size: 12px; color: #555; text-decoration: none;
+    padding: 5px 10px; border: 1px solid #2a2a38; border-radius: 7px;
   }
   .logout:active { background: #2a2a38; }
 
   .tabs { display: flex; }
   .tab-btn {
-    flex: 1;
-    padding: 10px 0;
-    text-align: center;
-    font-size: 14px;
-    font-weight: 500;
-    color: #555;
-    background: none;
-    border: none;
+    flex: 1; padding: 10px 0; text-align: center;
+    font-size: 14px; font-weight: 500; color: #555;
+    background: none; border: none;
     border-bottom: 2px solid transparent;
-    cursor: pointer;
-    transition: color .15s, border-color .15s;
+    cursor: pointer; transition: color .15s, border-color .15s;
   }
   .tab-btn.active { color: #4a7cf7; border-bottom-color: #4a7cf7; }
   .tab-btn:active { opacity: .7; }
@@ -69,18 +59,11 @@
   .tab-panel.active { display: block; }
 
   .status-card {
-    background: #1a1a24;
-    border: 1px solid #2a2a38;
-    border-radius: 14px;
-    padding: 14px 16px;
-    margin-bottom: 14px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
+    background: #1a1a24; border: 1px solid #2a2a38;
+    border-radius: 14px; padding: 14px 16px;
+    margin-bottom: 14px; display: flex; align-items: center; gap: 12px;
   }
-  .status-dot {
-    width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
-  }
+  .status-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
   .status-dot.ok { background: #3ecf8e; box-shadow: 0 0 8px #3ecf8e88; }
   .status-dot.idle { background: #444; }
   .status-dot.running { background: #f5a623; box-shadow: 0 0 8px #f5a62388; animation: pulse 1.4s infinite; }
@@ -90,202 +73,159 @@
   .status-sub { font-size: 11px; color: #555; margin-top: 2px; }
 
   .card {
-    background: #1a1a24;
-    border: 1px solid #2a2a38;
-    border-radius: 14px;
-    padding: 16px;
-    margin-bottom: 12px;
+    background: #1a1a24; border: 1px solid #2a2a38;
+    border-radius: 14px; padding: 16px; margin-bottom: 12px;
   }
   .card-title {
-    font-size: 11px;
-    font-weight: 600;
-    color: #666;
-    text-transform: uppercase;
-    letter-spacing: .07em;
-    margin-bottom: 12px;
+    font-size: 11px; font-weight: 600; color: #666;
+    text-transform: uppercase; letter-spacing: .07em; margin-bottom: 12px;
   }
-  .card-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 12px;
-  }
-  .card-row:last-child { margin-bottom: 0; }
 
   .schedule-row { display: flex; gap: 10px; }
   .schedule-item {
-    flex: 1;
-    background: #0f0f13;
-    border: 1px solid #1e1e2e;
-    border-radius: 10px;
-    padding: 12px;
-    text-align: center;
+    flex: 1; background: #0f0f13; border: 1px solid #1e1e2e;
+    border-radius: 10px; padding: 12px; text-align: center;
   }
   .schedule-time { font-size: 26px; font-weight: 700; color: #fff; letter-spacing: 2px; font-variant-numeric: tabular-nums; }
   .schedule-label { font-size: 11px; color: #555; margin-top: 4px; }
 
   .tz-badge {
-    font-size: 10px;
-    color: #4a7cf7;
-    background: rgba(74,124,247,.12);
-    border-radius: 5px;
-    padding: 2px 6px;
-    font-weight: 600;
-    margin-left: 6px;
-    vertical-align: middle;
+    font-size: 10px; color: #4a7cf7;
+    background: rgba(74,124,247,.12); border-radius: 5px;
+    padding: 2px 6px; font-weight: 600; margin-left: 6px; vertical-align: middle;
   }
-
   .hint { font-size: 12px; color: #555; margin-bottom: 10px; line-height: 1.55; }
 
-  .field-label {
-    font-size: 12px;
-    color: #666;
-    margin-bottom: 7px;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-  }
-
   input[type="time"] {
-    width: 100%;
-    padding: 14px 16px;
-    background: #0f0f13;
-    border: 1px solid #2a2a38;
-    border-radius: 11px;
-    color: #fff;
-    font-size: 22px;
-    font-family: inherit;
-    font-variant-numeric: tabular-nums;
-    appearance: none;
-    -webkit-appearance: none;
-    outline: none;
-    transition: border-color .2s;
-    letter-spacing: 2px;
+    width: 100%; padding: 14px 16px;
+    background: #0f0f13; border: 1px solid #2a2a38; border-radius: 11px;
+    color: #fff; font-size: 22px; font-family: inherit;
+    font-variant-numeric: tabular-nums; appearance: none; -webkit-appearance: none;
+    outline: none; transition: border-color .2s; letter-spacing: 2px;
   }
   input[type="time"]:focus { border-color: #4a7cf7; }
 
-  .lead-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
+  .lead-row { display: flex; align-items: center; gap: 12px; }
   input[type="number"] {
-    flex: 1;
-    padding: 14px 16px;
-    background: #0f0f13;
-    border: 1px solid #2a2a38;
-    border-radius: 11px;
-    color: #fff;
-    font-size: 22px;
-    font-family: inherit;
-    font-variant-numeric: tabular-nums;
-    outline: none;
-    transition: border-color .2s;
-    -moz-appearance: textfield;
+    flex: 1; padding: 14px 16px;
+    background: #0f0f13; border: 1px solid #2a2a38; border-radius: 11px;
+    color: #fff; font-size: 22px; font-family: inherit;
+    font-variant-numeric: tabular-nums; outline: none;
+    transition: border-color .2s; -moz-appearance: textfield;
   }
   input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
   input[type="number"]:focus { border-color: #4a7cf7; }
   .lead-unit { font-size: 14px; color: #555; white-space: nowrap; }
 
   textarea {
-    width: 100%;
-    background: #0f0f13;
-    border: 1px solid #2a2a38;
-    border-radius: 11px;
-    padding: 14px;
-    font-size: 14px;
-    color: #e8e8f0;
-    line-height: 1.6;
-    resize: vertical;
-    outline: none;
-    min-height: 200px;
-    font-family: inherit;
-    transition: border-color .2s;
+    width: 100%; background: #0f0f13; border: 1px solid #2a2a38;
+    border-radius: 11px; padding: 14px; font-size: 14px; color: #e8e8f0;
+    line-height: 1.6; resize: vertical; outline: none; min-height: 200px;
+    font-family: inherit; transition: border-color .2s;
   }
   textarea:focus { border-color: #4a7cf7; }
   .char-count { font-size: 11px; color: #3a3a50; text-align: right; margin-top: 6px; }
 
   .flash {
-    border-radius: 10px;
-    padding: 12px 14px;
-    font-size: 13px;
-    margin-bottom: 12px;
-    font-weight: 500;
+    border-radius: 10px; padding: 12px 14px;
+    font-size: 13px; margin-bottom: 12px; font-weight: 500;
   }
   .flash.success { background: rgba(62,207,142,.1); border: 1px solid rgba(62,207,142,.25); color: #3ecf8e; }
   .flash.error { background: rgba(255,80,80,.1); border: 1px solid rgba(255,80,80,.25); color: #ff6060; }
 
   .btn-primary {
-    width: 100%;
-    background: linear-gradient(135deg, #4a7cf7, #6f4af7);
-    color: #fff;
-    border: none;
-    border-radius: 12px;
-    padding: 16px;
-    font-size: 15px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: opacity .15s;
+    width: 100%; background: linear-gradient(135deg, #4a7cf7, #6f4af7);
+    color: #fff; border: none; border-radius: 12px;
+    padding: 16px; font-size: 15px; font-weight: 600; cursor: pointer;
   }
   .btn-primary:active { opacity: .8; }
-
   .btn-secondary {
-    width: 100%;
-    background: transparent;
-    color: #4a7cf7;
-    border: 1px solid rgba(74,124,247,.4);
-    border-radius: 12px;
-    padding: 15px;
-    font-size: 15px;
-    font-weight: 600;
-    cursor: pointer;
-    margin-top: 8px;
-    transition: background .15s;
+    width: 100%; background: transparent; color: #4a7cf7;
+    border: 1px solid rgba(74,124,247,.4); border-radius: 12px;
+    padding: 15px; font-size: 15px; font-weight: 600;
+    cursor: pointer; margin-top: 8px;
   }
   .btn-secondary:active { background: rgba(74,124,247,.1); }
   .btn-secondary:disabled { opacity: .4; cursor: default; }
 
-  .log-badge {
-    font-size: 11px;
-    padding: 3px 9px;
-    border-radius: 20px;
-    font-weight: 600;
-    background: rgba(74,124,247,.12);
-    color: #4a7cf7;
-    transition: all .3s;
-  }
-  .log-badge.running { background: rgba(245,166,35,.12); color: #f5a623; }
+  /* ── Cycle cards ── */
+  .cycle-list { display: flex; flex-direction: column; gap: 10px; }
 
-  .prompt-box {
-    background: #0f0f13;
-    border: 1px solid #1e1e2e;
-    border-radius: 10px;
-    padding: 10px 13px;
-    font-size: 13px;
-    color: #7070a0;
-    line-height: 1.6;
-    font-style: italic;
-    margin-top: 10px;
+  .cycle-card {
+    background: #1a1a24;
+    border: 1px solid #2a2a38;
+    border-radius: 14px;
+    overflow: hidden;
   }
+  .cycle-card.running { border-color: rgba(245,166,35,.4); }
+  .cycle-card.ok     { border-color: rgba(62,207,142,.25); }
+  .cycle-card.error  { border-color: rgba(255,80,80,.25); }
+
+  .cycle-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 13px 14px;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .cycle-header:active { background: rgba(255,255,255,.03); }
+
+  .cycle-icon { font-size: 15px; flex-shrink: 0; line-height: 1; }
+  .cycle-icon .spin {
+    display: inline-block;
+    animation: spin 1s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .cycle-meta { flex: 1; min-width: 0; }
+  .cycle-started { font-size: 13px; font-weight: 600; color: #e0e0f0; }
+  .cycle-summary { font-size: 11px; color: #555; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .cycle-arrow {
+    font-size: 12px; color: #444; flex-shrink: 0;
+    transition: transform .2s;
+  }
+  .cycle-card.open .cycle-arrow { transform: rotate(180deg); }
+
+  .cycle-body { display: none; }
+  .cycle-card.open .cycle-body { display: block; }
+
+  .cycle-actions {
+    display: flex;
+    justify-content: flex-end;
+    padding: 0 12px 10px;
+  }
+  .btn-copy {
+    font-size: 12px; color: #4a7cf7;
+    background: rgba(74,124,247,.1);
+    border: 1px solid rgba(74,124,247,.25);
+    border-radius: 7px; padding: 5px 12px;
+    cursor: pointer; font-family: inherit;
+    transition: background .15s;
+  }
+  .btn-copy:active { background: rgba(74,124,247,.25); }
+  .btn-copy.copied { color: #3ecf8e; background: rgba(62,207,142,.1); border-color: rgba(62,207,142,.25); }
 
   .log-box {
-    background: #07070a;
-    border: 1px solid #151520;
-    border-radius: 12px;
+    background: #07070a; border-top: 1px solid #151520;
     padding: 10px;
-    max-height: 420px;
-    overflow-y: auto;
     font-family: 'SF Mono', 'Fira Code', monospace;
-    font-size: 12px;
-    line-height: 1.75;
+    font-size: 12px; line-height: 1.75;
+    max-height: 360px; overflow-y: auto;
   }
-  .log-entry { display: flex; gap: 8px; padding: 1px 0; border-bottom: 1px solid #111; }
+  .log-entry { display: flex; gap: 8px; padding: 1px 0; border-bottom: 1px solid #0e0e16; }
   .log-entry:last-child { border-bottom: none; }
   .log-ts { color: #3a3a55; flex-shrink: 0; }
   .log-msg { color: #b0b0c8; word-break: break-word; }
   .log-msg.error { color: #ff6060; }
-  .log-msg.ok { color: #4fc87a; }
-  .log-empty { color: #2a2a40; text-align: center; padding: 24px 0; }
+  .log-msg.ok    { color: #4fc87a; }
+
+  .log-empty-cycles {
+    text-align: center; color: #2a2a40;
+    padding: 40px 0; font-size: 14px;
+  }
 </style>
 </head>
 <body>
@@ -300,7 +240,7 @@
   </div>
   <div class="tabs">
     <button class="tab-btn active" onclick="switchTab('settings', this)">Настройки</button>
-    <button class="tab-btn" onclick="switchTab('log', this)">Лог</button>
+    <button class="tab-btn" onclick="switchTab('log', this)">История</button>
   </div>
 </header>
 
@@ -312,6 +252,7 @@
     {% endfor %}
   {% endwith %}
 
+  <!-- ══ НАСТРОЙКИ ══ -->
   <div id="panel-settings" class="tab-panel active">
 
     <div class="status-card">
@@ -351,13 +292,13 @@
     <form method="post" action="/save">
       <div class="card">
         <div class="card-title">Время публикации <span class="tz-badge">МСК</span></div>
-        <div class="hint">Видео публикуется в это время по Москве. Хранится и рассчитывается в UTC.</div>
+        <div class="hint">Видео публикуется в это время по Москве. Хранится в UTC.</div>
         <input type="time" name="publish_time" value="{{ publish_time_msk }}">
       </div>
 
       <div class="card">
         <div class="card-title">Время упреждения генерации</div>
-        <div class="hint">За сколько минут до публикации запускать генерацию видео. Если до публикации осталось меньше — генерация стартует немедленно.</div>
+        <div class="hint">За сколько минут до публикации запускать генерацию. Если до публикации осталось меньше — стартует немедленно.</div>
         <div class="lead-row">
           <input type="number" name="lead_time_mins" value="{{ lead_time_mins }}" min="10" max="1440" step="10">
           <span class="lead-unit">минут</span>
@@ -382,25 +323,11 @@
 
   </div>
 
+  <!-- ══ ИСТОРИЯ ══ -->
   <div id="panel-log" class="tab-panel">
-
-    <div class="card">
-      <div style="display:flex;align-items:center;justify-content:space-between;">
-        <div class="card-title" style="margin-bottom:0;">Текущий сюжет</div>
-        <span class="log-badge" id="log-badge">ожидание</span>
-      </div>
-      <div id="prompt-wrap" style="display:none;">
-        <div class="prompt-box" id="current-prompt"></div>
-      </div>
+    <div id="cycle-list" class="cycle-list">
+      <div class="log-empty-cycles">Нет запусков</div>
     </div>
-
-    <div class="card">
-      <div class="card-title">Журнал событий</div>
-      <div class="log-box" id="log-box">
-        <div class="log-empty">Нет записей</div>
-      </div>
-    </div>
-
   </div>
 
 </div>
@@ -411,7 +338,6 @@ function switchTab(name, btn) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('panel-' + name).classList.add('active');
   btn.classList.add('active');
-  if (name === 'log') scrollLogToBottom();
 }
 
 const ta = document.getElementById('ta');
@@ -419,52 +345,125 @@ const cc = document.getElementById('charcount');
 function updateCount() { if (ta && cc) cc.textContent = ta.value.length + ' символов'; }
 if (ta) { ta.addEventListener('input', updateCount); updateCount(); }
 
-const logBox = document.getElementById('log-box');
-const badge = document.getElementById('log-badge');
-const promptWrap = document.getElementById('prompt-wrap');
-const promptEl = document.getElementById('current-prompt');
-let autoScroll = true;
-
-logBox.addEventListener('scroll', () => {
-  autoScroll = logBox.scrollHeight - logBox.scrollTop - logBox.clientHeight < 40;
-});
-
-function scrollLogToBottom() {
-  if (autoScroll) logBox.scrollTop = logBox.scrollHeight;
-}
-
 function levelClass(l) {
   return l === 'error' ? 'error' : l === 'ok' ? 'ok' : '';
 }
+
+function statusIcon(status) {
+  if (status === 'running') return '<span class="spin">◌</span>';
+  if (status === 'ok') return '✓';
+  return '✗';
+}
+
+function statusColor(status) {
+  if (status === 'running') return '#f5a623';
+  if (status === 'ok') return '#3ecf8e';
+  return '#ff6060';
+}
+
+function buildLogText(entries) {
+  return entries.map(e => `${e.ts}  ${e.msg}`).join('\n');
+}
+
+function copyEntries(btn, entries) {
+  const text = buildLogText(entries);
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = 'Скопировано';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = 'Скопировать';
+      btn.classList.remove('copied');
+    }, 2000);
+  }).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta);
+    btn.textContent = 'Скопировано';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Скопировать'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+
+function buildCycleCard(cycle, idx) {
+  const isRunning = cycle.status === 'running';
+  const entryCount = cycle.entries.length;
+  const summary = entryCount === 0
+    ? 'нет записей'
+    : cycle.entries[cycle.entries.length - 1].msg.slice(0, 60) + (cycle.entries[cycle.entries.length - 1].msg.length > 60 ? '…' : '');
+
+  const card = document.createElement('div');
+  card.className = `cycle-card ${cycle.status}${isRunning || idx === 0 ? ' open' : ''}`;
+  card.dataset.idx = idx;
+
+  const iconColor = statusColor(cycle.status);
+  const entriesHtml = entryCount === 0
+    ? '<div style="color:#333;text-align:center;padding:16px 0;font-size:12px;">Нет записей</div>'
+    : cycle.entries.map(e =>
+        `<div class="log-entry"><span class="log-ts">${e.ts}</span><span class="log-msg ${levelClass(e.level)}">${escHtml(e.msg)}</span></div>`
+      ).join('');
+
+  card.innerHTML = `
+    <div class="cycle-header" onclick="toggleCycle(this.closest('.cycle-card'))">
+      <div class="cycle-icon" style="color:${iconColor}">${statusIcon(cycle.status)}</div>
+      <div class="cycle-meta">
+        <div class="cycle-started">${escHtml(cycle.started)}</div>
+        <div class="cycle-summary">${escHtml(summary)}</div>
+      </div>
+      <div class="cycle-arrow">▾</div>
+    </div>
+    <div class="cycle-body">
+      <div class="cycle-actions">
+        <button class="btn-copy" onclick="copyEntries(this, cycleData[${idx}].entries)">Скопировать</button>
+      </div>
+      <div class="log-box">${entriesHtml}</div>
+    </div>
+  `;
+  return card;
+}
+
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function toggleCycle(card) {
+  card.classList.toggle('open');
+}
+
+let cycleData = [];
 
 async function refreshLog() {
   try {
     const r = await fetch('/log-data');
     const data = await r.json();
+    cycleData = data.cycles || [];
 
-    if (data.running) {
-      badge.textContent = 'Генерация...';
-      badge.classList.add('running');
-    } else {
-      badge.textContent = 'ожидание';
-      badge.classList.remove('running');
+    const container = document.getElementById('cycle-list');
+    if (cycleData.length === 0) {
+      container.innerHTML = '<div class="log-empty-cycles">Нет запусков</div>';
+      return;
     }
 
-    if (data.current_prompt) {
-      promptWrap.style.display = '';
-      promptEl.textContent = data.current_prompt;
-    } else {
-      promptWrap.style.display = 'none';
-    }
+    // Запоминаем, какие раскрыты
+    const openSet = new Set();
+    container.querySelectorAll('.cycle-card.open').forEach(c => openSet.add(+c.dataset.idx));
 
-    if (!data.log || data.log.length === 0) {
-      logBox.innerHTML = '<div class="log-empty">Нет записей</div>';
-    } else {
-      logBox.innerHTML = data.log.map(e =>
-        `<div class="log-entry"><span class="log-ts">${e.ts}</span><span class="log-msg ${levelClass(e.level)}">${e.msg}</span></div>`
-      ).join('');
-      scrollLogToBottom();
-    }
+    container.innerHTML = '';
+    cycleData.forEach((cycle, idx) => {
+      const card = buildCycleCard(cycle, idx);
+      // Восстанавливаем раскрытое состояние (по индексу)
+      if (!openSet.has(idx) && !card.classList.contains('open')) {
+        // already collapsed
+      } else if (openSet.has(idx) && !card.classList.contains('open')) {
+        card.classList.add('open');
+      }
+      container.appendChild(card);
+    });
   } catch(e) {}
 }
 

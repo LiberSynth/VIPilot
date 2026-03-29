@@ -102,20 +102,45 @@ def init_db():
     except Exception as e:
         print(f'[DB] Ошибка инициализации: {e}')
 
+
 app_state = {
     'running': False,
     'last_published': None,
     'last_ok': False,
     'current_prompt': None,
-    'log': deque(maxlen=80),
+    'current_cycle': None,   # dict with 'started', 'status', 'entries' (list)
+    'cycles': deque(maxlen=20),  # completed cycles, newest first
 }
+
+
+def start_cycle():
+    msk = datetime.now(timezone.utc) + MSK_OFFSET
+    cycle = {
+        'started': msk.strftime('%d.%m.%Y %H:%M МСК'),
+        'started_ts': time.time(),
+        'status': 'running',
+        'entries': [],
+    }
+    app_state['current_cycle'] = cycle
+    return cycle
+
+
+def end_cycle(ok):
+    cycle = app_state['current_cycle']
+    if cycle is None:
+        return
+    cycle['status'] = 'ok' if ok else 'error'
+    app_state['cycles'].appendleft(dict(cycle))
+    app_state['current_cycle'] = None
 
 
 def log_msg(msg, level='info'):
     ts = datetime.now(timezone.utc).strftime('%d.%m %H:%M:%S')
     entry = {'ts': ts, 'msg': msg, 'level': level}
-    app_state['log'].appendleft(entry)
+    if app_state['current_cycle'] is not None:
+        app_state['current_cycle']['entries'].append(entry)
     print(f'[{ts} UTC] {msg}')
+
 
 SUBJECTS = [
     'Стая рыб выпрыгивает из реки',
@@ -211,10 +236,6 @@ STYLES = [
     'Визуальный аттракцион, замедленная съёмка, кинематограф, 9:16.',
     'Эпичная широкоугольная съёмка, золотой закат, вертикальный формат 9:16.',
 ]
-
-
-def load_metaprompt():
-    return db_get('metaprompt', 'Залипательное на тему строительства и ремонта.')
 
 
 def generate_prompt():
@@ -373,7 +394,7 @@ def publish_story():
             story_id = save['response']['items'][0]['id']
             msk = datetime.now(timezone.utc) + MSK_OFFSET
             ts = msk.strftime('%d.%m.%Y в %H:%M МСК')
-            log_msg(f'✓ История опубликована! ID: {story_id}')
+            log_msg(f'✓ История опубликована! ID: {story_id}', 'ok')
             app_state['last_published'] = ts
             app_state['last_ok'] = True
             return True
@@ -421,7 +442,7 @@ def publish_to_wall():
 
         if 'response' in post_resp:
             post_id = post_resp['response']['post_id']
-            log_msg(f'✓ Видео опубликовано на стене! post_id: {post_id}')
+            log_msg(f'✓ Видео опубликовано на стене! post_id: {post_id}', 'ok')
             return True
         else:
             log_msg(f'Ошибка wall.post: {post_resp}', 'error')
@@ -429,6 +450,18 @@ def publish_to_wall():
     except Exception as e:
         log_msg(f'Исключение при публикации на стену: {e}', 'error')
         return False
+
+
+def run_full_cycle():
+    start_cycle()
+    gen_ok = generate_video()
+    pub_ok = False
+    if gen_ok:
+        story_ok = publish_story()
+        wall_ok = publish_to_wall()
+        pub_ok = story_ok or wall_ok
+    end_cycle(pub_ok if gen_ok else False)
+    return gen_ok, pub_ok
 
 
 def scheduler_loop():
@@ -455,7 +488,8 @@ def scheduler_loop():
             next_retry_after = 0
             pub_h_msk, pub_m_msk = to_msk(pub_h, pub_m)
             gen_h_msk, gen_m_msk = to_msk(gen_h, gen_m)
-            log_msg(
+            print(
+                f'[{now_utc.strftime("%d.%m %H:%M:%S")} UTC] '
                 f'Новый день. Генерация в {gen_h_msk:02d}:{gen_m_msk:02d} МСК, '
                 f'публикация в {pub_h_msk:02d}:{pub_m_msk:02d} МСК '
                 f'(упреждение {lead_mins} мин).'
@@ -463,27 +497,25 @@ def scheduler_loop():
 
         now_mins = now_utc.hour * 60 + now_utc.minute
         pub_mins = pub_h * 60 + pub_m
-
-        # Нужно ли стартовать генерацию прямо сейчас?
-        # Да, если до публикации осталось меньше, чем lead_time
         mins_to_pub = (pub_mins - now_mins) % 1440
         should_generate = mins_to_pub <= lead_mins
 
         if should_generate and not generated_today and not app_state['running'] and time.time() >= next_retry_after:
-            log_msg('Запускаю генерацию видео...')
-            generated_today = generate_video()
-            if not generated_today:
+            gen_ok, pub_ok = run_full_cycle()
+            generated_today = gen_ok
+            published_today = pub_ok
+            if not gen_ok:
                 next_retry_after = time.time() + 1800
-                log_msg('Генерация не удалась. Следующая попытка через 30 минут.', 'error')
-
-        if generated_today and not published_today:
-            # Публикуем если время публикации наступило (или уже прошло — генерация опоздала)
+                print('[scheduler] Генерация не удалась. Следующая попытка через 30 минут.')
+        elif generated_today and not published_today:
             now_mins_fresh = datetime.now(timezone.utc).hour * 60 + datetime.now(timezone.utc).minute
             mins_past_pub = (now_mins_fresh - pub_mins) % 1440
-            if mins_past_pub < 720:  # мы в течение 12ч после времени публикации
+            if mins_past_pub < 720:
+                start_cycle()
                 story_ok = publish_story()
                 wall_ok = publish_to_wall()
                 published_today = story_ok or wall_ok
+                end_cycle(published_today)
 
         time.sleep(30)
 
@@ -561,11 +593,24 @@ def save():
 @flask_app.route('/log-data')
 def log_data():
     if not session.get('auth'):
-        return jsonify([])
+        return jsonify({})
+
+    def serialize_cycle(c):
+        return {
+            'started': c['started'],
+            'status': c['status'],
+            'entries': c['entries'],
+        }
+
+    cycles = [serialize_cycle(c) for c in app_state['cycles']]
+    current = app_state['current_cycle']
+    if current:
+        cycles = [serialize_cycle(current)] + cycles
+
     return jsonify({
-        'log': list(app_state['log']),
         'running': app_state['running'],
         'current_prompt': app_state['current_prompt'],
+        'cycles': cycles,
     })
 
 
@@ -578,10 +623,7 @@ def run_now():
         return redirect(url_for('admin'))
 
     def run():
-        ok = generate_video()
-        if ok:
-            publish_story()
-            publish_to_wall()
+        run_full_cycle()
 
     t = threading.Thread(target=run, daemon=True)
     t.start()
