@@ -70,6 +70,13 @@ def parse_lead_mins(s):
         return 120
 
 
+def parse_history_days(s):
+    try:
+        return max(1, min(365, int(s)))
+    except Exception:
+        return 7
+
+
 def to_msk(h, m):
     total = (h * 60 + m + 180) % 1440
     return total // 60, total % 60
@@ -113,13 +120,17 @@ app_state = {
 }
 
 
+def msk_ts():
+    return (datetime.now(timezone.utc) + MSK_OFFSET).strftime('%d.%m.%Y %H:%M МСК')
+
+
 def start_cycle():
-    msk = datetime.now(timezone.utc) + MSK_OFFSET
     cycle = {
-        'started': msk.strftime('%d.%m.%Y %H:%M МСК'),
+        'started': msk_ts(),
         'started_ts': time.time(),
         'status': 'running',
         'entries': [],
+        'summary': {'prompt': None, 'generated_at': None, 'published_at': None},
     }
     app_state['current_cycle'] = cycle
     return cycle
@@ -251,6 +262,8 @@ def generate_prompt():
     full_prompt = f'{scene} {style}'
 
     app_state['current_prompt'] = scene
+    if app_state['current_cycle'] is not None:
+        app_state['current_cycle']['summary']['prompt'] = scene
     log_msg(f'Сюжет: {scene}')
     return full_prompt
 
@@ -350,6 +363,8 @@ def download_and_transcode(video_url):
         log_msg(f'ffmpeg ошибка (код {result.returncode}): {err}', 'error')
         return False
     log_msg('Транскодирование завершено')
+    if app_state['current_cycle'] is not None:
+        app_state['current_cycle']['summary']['generated_at'] = msk_ts()
     return True
 
 
@@ -396,11 +411,12 @@ def publish_story():
 
         if 'response' in save:
             story_id = save['response']['items'][0]['id']
-            msk = datetime.now(timezone.utc) + MSK_OFFSET
-            ts = msk.strftime('%d.%m.%Y в %H:%M МСК')
+            ts = msk_ts()
             log_msg(f'✓ История опубликована! ID: {story_id}', 'ok')
             app_state['last_published'] = ts
             app_state['last_ok'] = True
+            if app_state['current_cycle'] is not None:
+                app_state['current_cycle']['summary']['published_at'] = ts
             return True
         else:
             log_msg(f'Ошибка stories.save: {save}', 'error')
@@ -562,11 +578,14 @@ def admin():
     pub_h_msk, pub_m_msk = to_msk(pub_h_utc, pub_m_utc)
     gen_h_msk, gen_m_msk = to_msk(gen_h_utc, gen_m_utc)
 
+    history_days = parse_history_days(db_get('history_days', '7'))
+
     return render_template('admin.html',
                            metaprompt=metaprompt,
                            publish_time_msk=f'{pub_h_msk:02d}:{pub_m_msk:02d}',
                            generate_time_msk=f'{gen_h_msk:02d}:{gen_m_msk:02d}',
                            lead_time_mins=lead_mins,
+                           history_days=history_days,
                            status=app_state)
 
 
@@ -590,6 +609,10 @@ def save():
     if lead_raw:
         db_set('lead_time_mins', str(parse_lead_mins(lead_raw)))
 
+    history_raw = request.form.get('history_days', '').strip()
+    if history_raw:
+        db_set('history_days', str(parse_history_days(history_raw)))
+
     flash('Настройки сохранены', 'success')
     return redirect(url_for('admin'))
 
@@ -599,17 +622,22 @@ def log_data():
     if not session.get('auth'):
         return jsonify({})
 
-    def serialize_cycle(c):
+    history_days = parse_history_days(db_get('history_days', '7'))
+    cutoff_ts = time.time() - history_days * 86400
+
+    def serialize_cycle(c, is_current=False):
+        age_ok = is_current or c.get('started_ts', 0) >= cutoff_ts
         return {
             'started': c['started'],
             'status': c['status'],
-            'entries': c['entries'],
+            'summary': c.get('summary', {}),
+            'entries': c['entries'] if age_ok else [],
         }
 
     cycles = [serialize_cycle(c) for c in app_state['cycles']]
     current = app_state['current_cycle']
     if current:
-        cycles = [serialize_cycle(current)] + cycles
+        cycles = [serialize_cycle(current, is_current=True)] + cycles
 
     return jsonify({
         'running': app_state['running'],

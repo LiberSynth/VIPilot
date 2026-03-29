@@ -181,7 +181,19 @@
 
   .cycle-meta { flex: 1; min-width: 0; }
   .cycle-started { font-size: 13px; font-weight: 600; color: #e0e0f0; }
-  .cycle-summary { font-size: 11px; color: #555; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cycle-subtitle { font-size: 11px; color: #555; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .cycle-summary-block {
+    margin: 0 12px 10px;
+    background: #0f0f13;
+    border: 1px solid #1e1e2e;
+    border-radius: 10px;
+    padding: 10px 12px;
+  }
+  .cs-row { display: flex; gap: 8px; padding: 3px 0; border-bottom: 1px solid #181820; }
+  .cs-row:last-child { border-bottom: none; }
+  .cs-label { font-size: 11px; color: #555; flex-shrink: 0; min-width: 100px; padding-top: 1px; }
+  .cs-val { font-size: 12px; color: #9090b8; line-height: 1.55; word-break: break-word; }
 
   .cycle-arrow {
     font-size: 12px; color: #444; flex-shrink: 0;
@@ -306,6 +318,15 @@
       </div>
 
       <div class="card">
+        <div class="card-title">Детальный лог хранить</div>
+        <div class="hint">После указанного срока подробные записи цикла удаляются. Краткая сводка (промпт, время генерации и публикации) остаётся навсегда.</div>
+        <div class="lead-row">
+          <input type="number" name="history_days" value="{{ history_days }}" min="1" max="365" step="1">
+          <span class="lead-unit">дней</span>
+        </div>
+      </div>
+
+      <div class="card">
         <div class="card-title">Мета-промпт</div>
         <div class="hint">Стиль, тема и характер видео. Каждый день генерируется новый уникальный сюжет.</div>
         <textarea name="metaprompt" id="ta" spellcheck="true">{{ metaprompt }}</textarea>
@@ -390,35 +411,60 @@ function copyEntries(btn, entries) {
 function buildCycleCard(cycle, idx) {
   const isRunning = cycle.status === 'running';
   const entryCount = cycle.entries.length;
-  const summary = entryCount === 0
-    ? 'нет записей'
-    : cycle.entries[cycle.entries.length - 1].msg.slice(0, 60) + (cycle.entries[cycle.entries.length - 1].msg.length > 60 ? '…' : '');
+  const sm = cycle.summary || {};
+
+  // Header subtitle: last log line or summary prompt
+  let headerSub = '';
+  if (entryCount > 0) {
+    const last = cycle.entries[cycle.entries.length - 1].msg;
+    headerSub = last.slice(0, 64) + (last.length > 64 ? '…' : '');
+  } else if (sm.prompt) {
+    headerSub = sm.prompt.slice(0, 64) + (sm.prompt.length > 64 ? '…' : '');
+  }
 
   const card = document.createElement('div');
   card.className = `cycle-card ${cycle.status}${isRunning || idx === 0 ? ' open' : ''}`;
   card.dataset.idx = idx;
 
   const iconColor = statusColor(cycle.status);
-  const entriesHtml = entryCount === 0
-    ? '<div style="color:#333;text-align:center;padding:16px 0;font-size:12px;">Нет записей</div>'
-    : cycle.entries.map(e =>
-        `<div class="log-entry"><span class="log-ts">${e.ts}</span><span class="log-msg ${levelClass(e.level)}">${escHtml(e.msg)}</span></div>`
-      ).join('');
+
+  // Summary block (always shown if data exists)
+  let summaryHtml = '';
+  if (sm.prompt || sm.generated_at || sm.published_at) {
+    summaryHtml = `<div class="cycle-summary-block">`;
+    if (sm.prompt) summaryHtml += `<div class="cs-row"><span class="cs-label">Промпт</span><span class="cs-val">${escHtml(sm.prompt)}</span></div>`;
+    if (sm.generated_at) summaryHtml += `<div class="cs-row"><span class="cs-label">Сгенерировано</span><span class="cs-val">${escHtml(sm.generated_at)}</span></div>`;
+    if (sm.published_at) summaryHtml += `<div class="cs-row"><span class="cs-label">Опубликовано</span><span class="cs-val">${escHtml(sm.published_at)}</span></div>`;
+    summaryHtml += `</div>`;
+  }
+
+  // Detailed log (only if entries exist)
+  let detailHtml = '';
+  if (entryCount > 0) {
+    const entriesHtml = cycle.entries.map(e =>
+      `<div class="log-entry"><span class="log-ts">${e.ts}</span><span class="log-msg ${levelClass(e.level)}">${escHtml(e.msg)}</span></div>`
+    ).join('');
+    detailHtml = `
+      <div class="cycle-actions">
+        <button class="btn-copy" onclick="copyEntries(this, cycleData[${idx}].entries)">Скопировать</button>
+      </div>
+      <div class="log-box">${entriesHtml}</div>`;
+  } else if (!summaryHtml) {
+    detailHtml = `<div style="color:#333;text-align:center;padding:16px 0;font-size:12px;">Нет записей</div>`;
+  }
 
   card.innerHTML = `
     <div class="cycle-header" onclick="toggleCycle(this.closest('.cycle-card'))">
       <div class="cycle-icon" style="color:${iconColor}">${statusIcon(cycle.status)}</div>
       <div class="cycle-meta">
         <div class="cycle-started">${escHtml(cycle.started)}</div>
-        <div class="cycle-summary">${escHtml(summary)}</div>
+        <div class="cycle-subtitle">${escHtml(headerSub)}</div>
       </div>
       <div class="cycle-arrow">▾</div>
     </div>
     <div class="cycle-body">
-      <div class="cycle-actions">
-        <button class="btn-copy" onclick="copyEntries(this, cycleData[${idx}].entries)">Скопировать</button>
-      </div>
-      <div class="log-box">${entriesHtml}</div>
+      ${summaryHtml}
+      ${detailHtml}
     </div>
   `;
   return card;
