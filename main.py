@@ -482,6 +482,8 @@ def generate_video():
                         if not video_url:
                             log_msg(f'Нет URL видео в ответе: {result}', 'error')
                             return False
+                        log_msg(f'URL получен, сохраняю в базу: {video_url[:60]}...')
+                        db_save_video_url(video_url)
                         return download_and_transcode(video_url)
                     except Exception as e:
                         log_msg(f'Ошибка обработки готового видео: {e}', 'error')
@@ -523,10 +525,6 @@ def download_and_transcode(video_url):
         return False
 
     result = transcode_video()
-    if result and not is_emulation():
-        log_msg(f'Сохраняю URL в базу для эмуляции...')
-        db_save_video_url(video_url)
-        log_msg(f'URL сохранён: {video_url[:60]}...')
     return result
 
 
