@@ -246,16 +246,20 @@ def generate_video():
                 log_msg(f'Статус [{attempt+1}]: {status}')
 
                 if status == 'COMPLETED':
-                    result = requests.get(
-                        f'{FAL_STATUS_BASE}/{request_id}',
-                        headers={'Authorization': f'Key {FAL_KEY}'},
-                        timeout=10
-                    ).json()
-                    video_url = result.get('video', {}).get('url')
-                    if not video_url:
-                        log_msg(f'Нет URL видео в ответе: {result}', 'error')
+                    try:
+                        result = requests.get(
+                            f'{FAL_STATUS_BASE}/{request_id}',
+                            headers={'Authorization': f'Key {FAL_KEY}'},
+                            timeout=10
+                        ).json()
+                        video_url = result.get('video', {}).get('url')
+                        if not video_url:
+                            log_msg(f'Нет URL видео в ответе: {result}', 'error')
+                            return False
+                        return download_and_transcode(video_url)
+                    except Exception as e:
+                        log_msg(f'Ошибка обработки готового видео: {e}', 'error')
                         return False
-                    return download_and_transcode(video_url)
 
                 elif status == 'FAILED':
                     log_msg(f'Генерация провалилась: {s}', 'error')
