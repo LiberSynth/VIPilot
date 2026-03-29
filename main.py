@@ -422,20 +422,21 @@ def download_and_transcode(video_url):
     if not ok:
         return False
 
-    log_msg('Транскодирую в H.264...')
+    raw_size = os.path.getsize(VIDEO_PATH)
+    log_msg(f'Транскодирую в H.264... (исходник: {round(raw_size/1024/1024, 1)} МБ)')
     result = subprocess.run([
         'ffmpeg',
-        '-i', VIDEO_PATH,
+        '-t', '8', '-i', VIDEO_PATH,
         '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo',
-        '-t', '10',
-        '-c:v', 'libx264', '-profile:v', 'high', '-preset', 'fast', '-crf', '23',
+        '-t', '8',
+        '-c:v', 'libx264', '-profile:v', 'baseline', '-preset', 'ultrafast', '-crf', '26',
         '-pix_fmt', 'yuv420p', '-r', '30',
-        '-c:a', 'aac', '-b:a', '128k',
+        '-c:a', 'aac', '-b:a', '96k',
         '-movflags', '+faststart',
         VIDEO_VK_PATH, '-y'
-    ], capture_output=True, timeout=300)
+    ], capture_output=True, timeout=600)
     if result.returncode != 0:
-        err = result.stderr.decode(errors='replace')[-400:]
+        err = result.stderr.decode(errors='replace')[-600:]
         log_msg(f'ffmpeg ошибка (код {result.returncode}): {err}', 'error')
         return False
     log_msg('Транскодирование завершено')
