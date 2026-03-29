@@ -893,6 +893,15 @@ def run_now():
     return redirect(url_for('admin'))
 
 
+@flask_app.route('/test-notify', methods=['POST'])
+def test_notify():
+    if not session.get('auth'):
+        return redirect(url_for('login'))
+    notify_failure('тестовый сбой (проверка уведомлений)')
+    flash('Тестовое уведомление отправлено', 'success')
+    return redirect(url_for('admin'))
+
+
 @flask_app.route('/logout')
 def logout():
     session.clear()
