@@ -104,6 +104,14 @@
     outline: none; transition: border-color .2s; letter-spacing: 2px;
   }
   input[type="time"]:focus { border-color: #4a7cf7; }
+  input[type="email"], input[type="tel"] {
+    width: 100%; padding: 12px 16px; box-sizing: border-box;
+    background: #0f0f13; border: 1px solid #2a2a38; border-radius: 11px;
+    color: #fff; font-size: 16px; font-family: inherit;
+    outline: none; transition: border-color .2s;
+  }
+  input[type="email"]:focus, input[type="tel"]:focus { border-color: #4a7cf7; }
+  input[type="email"]::placeholder, input[type="tel"]::placeholder { color: #555; }
 
   .lead-row { display: flex; align-items: center; gap: 12px; }
   input[type="number"] {
