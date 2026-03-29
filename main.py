@@ -687,7 +687,8 @@ def notify_failure(reason):
 
 def run_full_cycle():
     start_cycle()
-    gen_ok = generate_video()
+    gen_ok = False  # TEST FAILURE
+    generate_video()
     pub_ok = False
     if gen_ok:
         story_ok = publish_story()
