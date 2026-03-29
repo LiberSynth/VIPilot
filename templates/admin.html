@@ -169,6 +169,7 @@
     padding: 16px; font-size: 15px; font-weight: 600; cursor: pointer;
   }
   .btn-primary:active { opacity: .8; }
+  .btn-primary:disabled { opacity: .35; cursor: default; background: #2a2a38; }
   .btn-secondary {
     width: 100%; background: transparent; color: #4a7cf7;
     border: 1px solid rgba(74,124,247,.4); border-radius: 12px;
@@ -381,7 +382,7 @@
         </div>
       </div>
 
-      <button type="submit" class="btn-primary">Сохранить настройки</button>
+      <button type="submit" class="btn-primary" id="save-btn" disabled>Сохранить настройки</button>
     </form>
 
     <form method="post" action="/run-now">
@@ -413,6 +414,33 @@ const ta = document.getElementById('ta');
 const cc = document.getElementById('charcount');
 function updateCount() { if (ta && cc) cc.textContent = ta.value.length + ' символов'; }
 if (ta) { ta.addEventListener('input', updateCount); updateCount(); }
+
+(function() {
+  const saveBtn = document.getElementById('save-btn');
+  if (!saveBtn) return;
+
+  const fields = [
+    document.querySelector('input[name="publish_time"]'),
+    document.querySelector('input[name="lead_time_mins"]'),
+    document.querySelector('input[name="history_days"]'),
+    ta,
+  ].filter(Boolean);
+  const emulCheck = document.getElementById('emulation_check');
+
+  const initial = {};
+  fields.forEach(f => { initial[f.name] = f.value; });
+  if (emulCheck) initial['emulation_mode'] = emulCheck.checked;
+
+  function checkDirty() {
+    const dirty = fields.some(f => f.value !== initial[f.name])
+      || (emulCheck ? emulCheck.checked !== initial['emulation_mode'] : false);
+    saveBtn.disabled = !dirty;
+  }
+
+  fields.forEach(f => f.addEventListener('input', checkDirty));
+  fields.forEach(f => f.addEventListener('change', checkDirty));
+  if (emulCheck) emulCheck.addEventListener('change', checkDirty);
+})();
 
 function levelClass(l) {
   return l === 'error' ? 'error' : l === 'ok' ? 'ok' : '';
