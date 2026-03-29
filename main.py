@@ -16,7 +16,7 @@ ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin')
 GROUP_ID = 236929597
 
 FAL_MODEL = 'fal-ai/minimax/video-01'
-FAL_SUBMIT_URL = f'https://queue.fal.run/{FAL_MODEL}'
+FAL_SUBMIT_URL = f'https://queue.fal.run/{FAL_MODEL}/BROKEN_TEST'
 FAL_STATUS_BASE = 'https://queue.fal.run/fal-ai/minimax/requests'
 FAL_HEADERS = {'Authorization': f'Key {FAL_KEY}', 'Content-Type': 'application/json'}
 
@@ -687,7 +687,7 @@ def notify_failure(reason):
 
 def run_full_cycle():
     start_cycle()
-    gen_ok = False  # TEST FAILURE
+    gen_ok = generate_video()
     pub_ok = False
     if gen_ok:
         story_ok = publish_story()
