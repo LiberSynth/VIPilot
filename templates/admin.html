@@ -303,6 +303,13 @@
 
     <form method="post" action="/save">
       <div class="card">
+        <div class="card-title">Мета-промпт</div>
+        <div class="hint">Стиль, тема и характер видео. Каждый день генерируется новый уникальный сюжет.</div>
+        <textarea name="metaprompt" id="ta" spellcheck="true">{{ metaprompt }}</textarea>
+        <div class="char-count" id="charcount"></div>
+      </div>
+
+      <div class="card">
         <div class="card-title">Время публикации <span class="tz-badge">МСК</span></div>
         <div class="hint">Видео публикуется в это время по Москве. Хранится в UTC.</div>
         <input type="time" name="publish_time" value="{{ publish_time_msk }}">
@@ -324,13 +331,6 @@
           <input type="number" name="history_days" value="{{ history_days }}" min="1" max="365" step="1">
           <span class="lead-unit">дней</span>
         </div>
-      </div>
-
-      <div class="card">
-        <div class="card-title">Мета-промпт</div>
-        <div class="hint">Стиль, тема и характер видео. Каждый день генерируется новый уникальный сюжет.</div>
-        <textarea name="metaprompt" id="ta" spellcheck="true">{{ metaprompt }}</textarea>
-        <div class="char-count" id="charcount"></div>
       </div>
 
       <button type="submit" class="btn-primary">Сохранить настройки</button>
