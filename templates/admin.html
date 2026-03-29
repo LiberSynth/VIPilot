@@ -462,21 +462,21 @@
       </div>
 
       <div class="card">
-        <div class="card-title">Краткий лог хранить</div>
-        <div class="hint">После указанного срока записи цикла полностью удаляются из базы.</div>
-        <div class="lead-row">
-          <input type="number" name="short_log_days" id="short_log_days" value="{{ short_log_days }}" min="1" max="3650" step="1"
-                 oninput="document.getElementById('h_short_log_days').value = this.value">
-          <span class="lead-unit">дней</span>
-        </div>
-      </div>
-
-      <div class="card">
         <div class="card-title">Детальный лог хранить</div>
         <div class="hint">После указанного срока подробные записи цикла удаляются. Краткая сводка остаётся до срока краткого лога.</div>
         <div class="lead-row">
           <input type="number" name="history_days" id="history_days" value="{{ history_days }}" min="1" max="365" step="1"
                  oninput="document.getElementById('h_history_days').value = this.value">
+          <span class="lead-unit">дней</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Краткий лог хранить</div>
+        <div class="hint">После указанного срока записи цикла полностью удаляются из базы.</div>
+        <div class="lead-row">
+          <input type="number" name="short_log_days" id="short_log_days" value="{{ short_log_days }}" min="1" max="3650" step="1"
+                 oninput="document.getElementById('h_short_log_days').value = this.value">
           <span class="lead-unit">дней</span>
         </div>
       </div>
