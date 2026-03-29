@@ -38,7 +38,7 @@ def db_get(key, default=''):
                 row = cur.fetchone()
                 return row[0] if row else default
     except Exception as e:
-        print(f'[DB] Ошибка чтения {key}: {e}')
+        log_msg(f'[DB] Ошибка чтения {key}: {e}', 'error')
         return default
 
 
@@ -52,7 +52,7 @@ def db_set(key, value):
                 ''', (key, value))
             conn.commit()
     except Exception as e:
-        print(f'[DB] Ошибка записи {key}: {e}')
+        log_msg(f'[DB] Ошибка записи {key}: {e}', 'error')
 
 
 def parse_hhmm(s):
@@ -151,7 +151,7 @@ def db_save_cycle(cycle):
                 cycle['db_id'] = row[0]
             conn.commit()
     except Exception as e:
-        print(f'[DB] Ошибка сохранения цикла: {e}')
+        log_msg(f'[DB] Ошибка сохранения цикла: {e}', 'error')
 
 
 def db_load_cycles():
@@ -524,7 +524,9 @@ def download_and_transcode(video_url):
 
     result = transcode_video()
     if result and not is_emulation():
+        log_msg(f'Сохраняю URL в базу для эмуляции...')
         db_save_video_url(video_url)
+        log_msg(f'URL сохранён: {video_url[:60]}...')
     return result
 
 
