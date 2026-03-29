@@ -101,7 +101,9 @@ def init_db():
                     INSERT INTO settings (key, value) VALUES
                         ('metaprompt', 'Залипательное на тему ремонта, коттеджного строительства и продажи стройматериалов. Сюжет подбирай случайным образом. Неожиданный, вплоть до абсурдного, удивляющий, умеренно шокирующий, при этом красивый. Например: река, рыбки выпрыгивают из воды, они превращаются в стройматериалы, река исчезает и из них получается дом.'),
                         ('publish_time', '03:00'),
-                        ('lead_time_mins', '120')
+                        ('lead_time_mins', '120'),
+                        ('notify_email', ''),
+                        ('notify_phone', '')
                     ON CONFLICT (key) DO NOTHING
                 ''')
                 cur.execute('''
@@ -628,6 +630,61 @@ def publish_to_wall():
         return False
 
 
+def send_failure_email(message):
+    import smtplib
+    from email.mime.text import MIMEText
+    to_addr = db_get('notify_email', '').strip()
+    smtp_host = os.environ.get('SMTP_HOST', '').strip()
+    smtp_user = os.environ.get('SMTP_USER', '').strip()
+    smtp_pass = os.environ.get('SMTP_PASS', '').strip()
+    if not all([to_addr, smtp_host, smtp_user, smtp_pass]):
+        return
+    smtp_port = int(os.environ.get('SMTP_PORT', '587'))
+    smtp_from = os.environ.get('SMTP_FROM', smtp_user)
+    try:
+        msg = MIMEText(message, 'plain', 'utf-8')
+        msg['Subject'] = 'VK Publisher: сбой в пайплайне'
+        msg['From'] = smtp_from
+        msg['To'] = to_addr
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as s:
+            s.starttls()
+            s.login(smtp_user, smtp_pass)
+            s.send_message(msg)
+        print(f'[NOTIFY] Email отправлен на {to_addr}')
+    except Exception as e:
+        print(f'[NOTIFY] Ошибка отправки email: {e}')
+
+
+def send_failure_sms(message):
+    phone = db_get('notify_phone', '').strip()
+    smsc_login = os.environ.get('SMSC_LOGIN', '').strip()
+    smsc_pass = os.environ.get('SMSC_PASS', '').strip()
+    if not all([phone, smsc_login, smsc_pass]):
+        return
+    try:
+        r = requests.get('https://smsc.ru/sys/send.php', params={
+            'login': smsc_login,
+            'psw': smsc_pass,
+            'phones': phone,
+            'mes': message[:160],
+            'charset': 'utf-8',
+            'fmt': 3,
+        }, timeout=10)
+        data = r.json()
+        if data.get('error_code'):
+            print(f'[NOTIFY] SMSC ошибка: {data}')
+        else:
+            print(f'[NOTIFY] SMS отправлено на {phone}')
+    except Exception as e:
+        print(f'[NOTIFY] Ошибка отправки SMS: {e}')
+
+
+def notify_failure(reason):
+    msg = f'Сбой {msk_ts()}: {reason}'
+    send_failure_email(msg)
+    send_failure_sms(msg)
+
+
 def run_full_cycle():
     start_cycle()
     gen_ok = generate_video()
@@ -636,7 +693,11 @@ def run_full_cycle():
         story_ok = publish_story()
         wall_ok = publish_to_wall()
         pub_ok = story_ok or wall_ok
-    end_cycle(pub_ok if gen_ok else False)
+    success = pub_ok if gen_ok else False
+    end_cycle(success)
+    if not success:
+        reason = 'ошибка генерации видео' if not gen_ok else 'ошибка публикации в VK'
+        notify_failure(reason)
     return gen_ok, pub_ok
 
 
@@ -736,6 +797,8 @@ def admin():
 
     history_days = parse_history_days(db_get('history_days', '7'))
     emulation_mode = db_get('emulation_mode', '0') == '1'
+    notify_email = db_get('notify_email', '')
+    notify_phone = db_get('notify_phone', '')
 
     return render_template('admin.html',
                            metaprompt=metaprompt,
@@ -744,6 +807,8 @@ def admin():
                            lead_time_mins=lead_mins,
                            history_days=history_days,
                            emulation_mode=emulation_mode,
+                           notify_email=notify_email,
+                           notify_phone=notify_phone,
                            status=app_state)
 
 
@@ -773,6 +838,9 @@ def save():
 
     emulation_raw = request.form.get('emulation_mode', '0')
     db_set('emulation_mode', '1' if emulation_raw == '1' else '0')
+
+    db_set('notify_email', request.form.get('notify_email', '').strip())
+    db_set('notify_phone', request.form.get('notify_phone', '').strip())
 
     flash('Настройки сохранены', 'success')
     return redirect(url_for('admin'))

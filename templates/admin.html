@@ -371,7 +371,7 @@
               Режим эмуляции
               {% if emulation_mode %}<span class="emulation-badge">ВКЛ</span>{% endif %}
             </div>
-            <div class="toggle-hint">fal.ai не вызывается — видео не тратится. Использует сохранённый файл или цветную заглушку.</div>
+            <div class="toggle-hint">fal.ai не вызывается — берётся случайное ранее сгенерированное видео из базы.</div>
           </div>
           <label class="toggle-wrap">
             <input type="hidden" name="emulation_mode" id="emulation_hidden" value="{{ '1' if emulation_mode else '0' }}">
@@ -379,6 +379,19 @@
                    onchange="document.getElementById('emulation_hidden').value = this.checked ? '1' : '0'">
             <span class="toggle-track"></span>
           </label>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Уведомление о сбое</div>
+        <div class="hint">При ошибке генерации или публикации придёт уведомление. Для работы нужно задать переменные окружения: SMTP_HOST, SMTP_USER, SMTP_PASS для email; SMSC_LOGIN, SMSC_PASS для SMS.</div>
+        <div style="margin-top:14px">
+          <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block">Email</label>
+          <input type="email" name="notify_email" value="{{ notify_email }}" placeholder="admin@example.com" style="width:100%;box-sizing:border-box">
+        </div>
+        <div style="margin-top:12px">
+          <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block">SMS (номер в формате 79161234567)</label>
+          <input type="tel" name="notify_phone" id="notify_phone" value="{{ notify_phone }}" placeholder="79161234567" style="width:100%;box-sizing:border-box">
         </div>
       </div>
 
@@ -423,6 +436,8 @@ if (ta) { ta.addEventListener('input', updateCount); updateCount(); }
     document.querySelector('input[name="publish_time"]'),
     document.querySelector('input[name="lead_time_mins"]'),
     document.querySelector('input[name="history_days"]'),
+    document.querySelector('input[name="notify_email"]'),
+    document.querySelector('input[name="notify_phone"]'),
     ta,
   ].filter(Boolean);
   const emulCheck = document.getElementById('emulation_check');
