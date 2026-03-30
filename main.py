@@ -15,7 +15,7 @@ VK_TOKEN = os.environ['VK_USER_TOKEN']
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin')
 GROUP_ID = 236929597
 
-FAL_QUEUE_BASE = 'https://queue.fal.run'
+FAL_QUEUE_BASE = 'https://queue.fal.run/fal-ai'
 FAL_HEADERS = {'Authorization': f'Key {FAL_KEY}', 'Content-Type': 'application/json'}
 
 VIDEO_PATH = '/tmp/story_raw.mp4'
