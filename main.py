@@ -174,22 +174,31 @@ def init_db():
                     )
                 """)
                 import json as _json
-                _body_tpl = _json.dumps({
-                    "prompt": "{}",
-                    "duration": "{:d}s",
-                    "aspect_ratio": "{:d}:{:d}",
-                })
+
+                _body_tpl = _json.dumps(
+                    {
+                        "prompt": "{}",
+                        "duration": "{:d}s",
+                        "aspect_ratio": "{:d}:{:d}",
+                    }
+                )
                 # Миграция: обновить body для строк, где шаблон ещё не применён
                 cur.execute(
                     "UPDATE models SET body = %s::jsonb WHERE body->>'prompt' IS DISTINCT FROM '{}'",
-                    (_body_tpl,)
+                    (_body_tpl,),
                 )
                 cur.execute("SELECT COUNT(*) FROM models")
                 if cur.fetchone()[0] == 0:
                     models_seed = [
-                        ("veo2",                    "veo2",                                  _body_tpl, 1, True),
-                        ("minimax/video-01",         "minimax/video-01",                      _body_tpl, 2, False),
-                        ("kling-video/v1.6/standard","kling-video/v1.6/standard/text-to-video",_body_tpl, 3, False),
+                        ("veo2", "veo2", _body_tpl, 1, True),
+                        ("minimax/video-01", "minimax/video-01", _body_tpl, 2, False),
+                        (
+                            "kling-video/v1.6/standard",
+                            "kling-video/v1.6/standard/text-to-video",
+                            _body_tpl,
+                            3,
+                            False,
+                        ),
                     ]
                     cur.executemany(
                         'INSERT INTO models (name, url, body, "order", active) VALUES (%s, %s, %s, %s, %s)',
@@ -431,11 +440,11 @@ SETTINGS = [
 ]
 
 STYLES = [
-    "Кинематографическая съёмка, тёплый свет, 4K, вертикальное видео 9:16.",
-    "Магический реализм, яркие насыщенные цвета, верти �альный формат 9:16.",
-    "Художественная съёмка, мягкое освещение, сюрреализм, вертикальное видео 9:16.",
-    "Визуальный аттракцион, замедленная съёмка, кинематограф, 9:16.",
-    "Эпичная широкоугольная съёмка, золотой закат, вертикальный формат 9:16.",
+    "Кинематографическая съёмка, тёплый свет, 4K.",
+    "Магический реализм, яркие насыщенные цвета.",
+    "Художественная съёмка, мягкое освещение, сюрреализм.",
+    "Визуальный аттракцион, замедленная съёмка, кинематограф.",
+    "Эпичная широкоугольная съёмка, золотой закат.",
 ]
 
 
