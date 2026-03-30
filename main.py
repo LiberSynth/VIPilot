@@ -1,5 +1,4 @@
 import os
-import base64
 import time
 import random
 import threading
@@ -18,8 +17,8 @@ from flask import (
     session,
     flash,
     jsonify,
-    make_response,
 )
+import hashlib
 
 FAL_KEY = os.environ["FAL_API_KEY"]
 VK_TOKEN = os.environ["VK_USER_TOKEN"]
@@ -1054,20 +1053,15 @@ def favicon():
     return send_file("generated-icon.png", mimetype="image/png")
 
 
-def check_basic_auth():
-    auth_header = request.headers.get("Authorization", "")
-    if auth_header.startswith("Basic "):
-        try:
-            decoded = base64.b64decode(auth_header[6:]).decode("utf-8")
-            _, _, password = decoded.partition(":")
-            return password == ADMIN_PASSWORD
-        except Exception:
-            pass
-    return False
+def password_fingerprint():
+    return hashlib.sha256(ADMIN_PASSWORD.encode()).hexdigest()[:16]
 
 
 def is_authenticated():
-    return check_basic_auth()
+    return (
+        session.get("auth") is True
+        and session.get("pw_fp") == password_fingerprint()
+    )
 
 
 @flask_app.route("/", methods=["GET", "POST"])
@@ -1078,11 +1072,10 @@ def login():
     error = False
     if request.method == "POST":
         if request.form.get("password") == ADMIN_PASSWORD:
-            # Пароль верный — просим браузер сохранить его как Basic Auth
-            response = make_response(render_template("login.html", error=False, basic_auth_prompt=True))
-            response.headers["WWW-Authenticate"] = 'Basic realm="Red Brick Core"'
-            response.status_code = 401
-            return response
+            session["auth"] = True
+            session["pw_fp"] = password_fingerprint()
+            session.permanent = True
+            return redirect(url_for("admin"))
         error = True
     return render_template("login.html", error=error)
 
@@ -1320,10 +1313,8 @@ def api_models_reorder():
 
 @flask_app.route("/logout")
 def logout():
-    response = make_response(redirect(url_for("login")))
-    response.headers["WWW-Authenticate"] = 'Basic realm="Red Brick Core"'
-    response.status_code = 401
-    return response
+    session.clear()
+    return redirect(url_for("login"))
 
 
 _scheduler_started = False
