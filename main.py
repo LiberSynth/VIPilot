@@ -1,4 +1,5 @@
 import os
+import base64
 import time
 import random
 import threading
@@ -1056,6 +1057,19 @@ def favicon():
 def login():
     if session.get("auth"):
         return redirect(url_for("admin"))
+
+    # Проверка Basic Auth — браузер отправляет сохранённый пароль автоматически
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Basic "):
+        try:
+            decoded = base64.b64decode(auth_header[6:]).decode("utf-8")
+            _, _, password = decoded.partition(":")
+            if password == ADMIN_PASSWORD:
+                session["auth"] = True
+                return redirect(url_for("admin"))
+        except Exception:
+            pass
+
     error = False
     if request.method == "POST":
         if request.form.get("password") == ADMIN_PASSWORD:
