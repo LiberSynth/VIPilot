@@ -565,7 +565,15 @@ def generate_video():
         log_msg(f'Отправляю запрос: {submit_url}  тело: {body}')
 
         resp = requests.post(submit_url, headers=FAL_HEADERS, json=body, timeout=30)
-        data = resp.json()
+        try:
+            data = resp.json()
+        except ValueError:
+            log_msg(f'fal.ai вернул не-JSON ответ (HTTP {resp.status_code}): {resp.text[:500]}', 'error')
+            return False
+
+        if resp.status_code >= 400:
+            log_msg(f'fal.ai HTTP {resp.status_code}: {data}', 'error')
+            return False
 
         if 'request_id' not in data:
             log_msg(f'Ошибка запроса к fal.ai: {data}', 'error')
