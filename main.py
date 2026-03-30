@@ -1211,7 +1211,6 @@ def save():
     db_set("video_duration", str(vid_dur))
 
     active_tab = request.form.get("active_tab", "pipeline")
-    flash("Настройки сохранены", "success")
     return redirect(url_for("admin") + f"?tab={active_tab}")
 
 
