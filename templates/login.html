@@ -54,9 +54,6 @@
     transition: border-color .2s;
   }
   input[type=password]:focus { border-color: #4a7cf7; }
-  @keyframes autofillDetect { from {} to {} }
-  input:-webkit-autofill { animation-name: autofillDetect; animation-duration: 1ms; }
-  input:autofill { animation-name: autofillDetect; animation-duration: 1ms; }
   .error {
     background: rgba(255,80,80,.12);
     border: 1px solid rgba(255,80,80,.3);
@@ -91,46 +88,13 @@
   {% if error %}
   <div class="error">Неверный пароль</div>
   {% endif %}
-  <form method="post" id="loginForm">
+  <form method="post">
     <div class="field">
       <label>Пароль</label>
-      <input type="password" name="password" id="passwordField" autocomplete="current-password" placeholder="Введите пароль">
+      <input type="password" name="password" autofocus placeholder="Введите пароль">
     </div>
     <button type="submit">Войти</button>
   </form>
 </div>
-<script>
-  var field = document.getElementById('passwordField');
-
-  // Метод 1: CSS-анимация срабатывает в момент автозаполнения браузером
-  field.addEventListener('animationstart', function(e) {
-    if (e.animationName === 'autofillDetect') {
-      // Небольшая задержка, чтобы браузер успел установить значение
-      setTimeout(function() {
-        document.getElementById('loginForm').submit();
-      }, 100);
-    }
-  });
-
-  // Метод 2: Резервная проверка через короткий интервал (на случай Firefox и др.)
-  var attempts = 0;
-  var interval = setInterval(function() {
-    attempts++;
-    try {
-      // Проверяем через matches, т.к. .value может быть пустым при автозаполнении
-      if (field.matches(':-webkit-autofill') || field.matches(':autofill')) {
-        clearInterval(interval);
-        setTimeout(function() {
-          document.getElementById('loginForm').submit();
-        }, 100);
-        return;
-      }
-    } catch(e) {}
-    if (attempts >= 20) {
-      clearInterval(interval);
-      field.focus();
-    }
-  }, 100);
-</script>
 </body>
 </html>
