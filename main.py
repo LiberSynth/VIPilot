@@ -18,6 +18,7 @@ from flask import (
     session,
     flash,
     jsonify,
+    make_response,
 )
 
 FAL_KEY = os.environ["FAL_API_KEY"]
@@ -1066,14 +1067,7 @@ def check_basic_auth():
 
 
 def is_authenticated():
-    # Основной метод: Basic Auth — пароль проверяется при каждом запросе
-    if check_basic_auth():
-        return True
-    # Запасной метод: короткая сессия 30 минут (только после входа через форму)
-    auth_time = session.get("auth_time", 0)
-    if auth_time and (time.time() - auth_time) < 1800:
-        return True
-    return False
+    return check_basic_auth()
 
 
 @flask_app.route("/", methods=["GET", "POST"])
@@ -1084,9 +1078,11 @@ def login():
     error = False
     if request.method == "POST":
         if request.form.get("password") == ADMIN_PASSWORD:
-            session["auth_time"] = time.time()
-            session.permanent = False
-            return redirect(url_for("admin"))
+            # Пароль верный — просим браузер сохранить его как Basic Auth
+            response = make_response(render_template("login.html", error=False, basic_auth_prompt=True))
+            response.headers["WWW-Authenticate"] = 'Basic realm="Red Brick Core"'
+            response.status_code = 401
+            return response
         error = True
     return render_template("login.html", error=error)
 
@@ -1324,8 +1320,10 @@ def api_models_reorder():
 
 @flask_app.route("/logout")
 def logout():
-    session.clear()
-    return redirect(url_for("login"))
+    response = make_response(redirect(url_for("login")))
+    response.headers["WWW-Authenticate"] = 'Basic realm="Red Brick Core"'
+    response.status_code = 401
+    return response
 
 
 _scheduler_started = False
