@@ -536,7 +536,10 @@ def build_fal_body(body_tpl, prompt):
             dur = max(1, min(60, int(db_get("video_duration", "6"))))
         except (ValueError, TypeError):
             dur = 6
-        body["duration"] = str(body["duration"]).format(dur)
+        if body["duration"] == "{int}":
+            body["duration"] = dur
+        else:
+            body["duration"] = str(body["duration"]).format(dur)
     if "aspect_ratio" in body:
         try:
             ar_x = int(db_get("aspect_ratio_x", "9"))
