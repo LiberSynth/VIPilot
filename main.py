@@ -112,7 +112,9 @@ def init_db():
                         ('notify_email', ''),
                         ('notify_phone', ''),
                         ('vk_publish_story', '1'),
-                        ('vk_publish_wall', '1')
+                        ('vk_publish_wall', '1'),
+                        ('aspect_ratio_x', '9'),
+                        ('aspect_ratio_y', '16')
                     ON CONFLICT (key) DO NOTHING
                 ''')
                 cur.execute('''
@@ -847,6 +849,8 @@ def admin():
     notify_phone = db_get('notify_phone', '')
     vk_publish_story = db_get('vk_publish_story', '1') == '1'
     vk_publish_wall  = db_get('vk_publish_wall',  '1') == '1'
+    aspect_ratio_x   = int(db_get('aspect_ratio_x', '9'))
+    aspect_ratio_y   = int(db_get('aspect_ratio_y', '16'))
 
     return render_template('admin.html',
                            metaprompt=metaprompt,
@@ -860,6 +864,8 @@ def admin():
                            notify_phone=notify_phone,
                            vk_publish_story=vk_publish_story,
                            vk_publish_wall=vk_publish_wall,
+                           aspect_ratio_x=aspect_ratio_x,
+                           aspect_ratio_y=aspect_ratio_y,
                            status=app_state)
 
 
@@ -904,6 +910,17 @@ def save():
         vk_story_raw = '1'
     db_set('vk_publish_story', '1' if vk_story_raw == '1' else '0')
     db_set('vk_publish_wall',  '1' if vk_wall_raw  == '1' else '0')
+
+    try:
+        ar_x = max(1, min(99, int(request.form.get('aspect_ratio_x', '9'))))
+    except (ValueError, TypeError):
+        ar_x = 9
+    try:
+        ar_y = max(1, min(99, int(request.form.get('aspect_ratio_y', '16'))))
+    except (ValueError, TypeError):
+        ar_y = 16
+    db_set('aspect_ratio_x', str(ar_x))
+    db_set('aspect_ratio_y', str(ar_y))
 
     active_tab = request.form.get('active_tab', 'pipeline')
     flash('Настройки сохранены', 'success')
