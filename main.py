@@ -1058,10 +1058,11 @@ def password_fingerprint():
 
 
 def is_authenticated():
-    return (
-        session.get("auth") is True
-        and session.get("pw_fp") == password_fingerprint()
-    )
+    if not (session.get("auth") is True and session.get("pw_fp") == password_fingerprint()):
+        return False
+    # Сессия живёт не более 8 часов
+    auth_ts = session.get("auth_ts", 0)
+    return (time.time() - auth_ts) < 28800
 
 
 @flask_app.route("/", methods=["GET", "POST"])
@@ -1074,7 +1075,8 @@ def login():
         if request.form.get("password") == ADMIN_PASSWORD:
             session["auth"] = True
             session["pw_fp"] = password_fingerprint()
-            session.permanent = True
+            session["auth_ts"] = time.time()
+            session.permanent = False
             return redirect(url_for("admin"))
         error = True
     return render_template("login.html", error=error)
