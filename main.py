@@ -94,10 +94,25 @@ def to_utc_from_msk(h, m):
     return total // 60, total % 60
 
 
+def _migrate_serial_to_uuid(cur, table_name):
+    """Drop table if its id column is still SERIAL (integer) so it can be recreated as UUID."""
+    cur.execute("""
+        SELECT data_type FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = %s AND column_name = 'id'
+    """, (table_name,))
+    row = cur.fetchone()
+    if row and row[0] in ('integer', 'bigint'):
+        cur.execute(f'DROP TABLE IF EXISTS "{table_name}" CASCADE')
+        print(f'[DB] Миграция: таблица {table_name} пересоздаётся с UUID')
+
+
 def init_db():
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
+                _migrate_serial_to_uuid(cur, 'video_urls')
+                _migrate_serial_to_uuid(cur, 'cycles')
+                _migrate_serial_to_uuid(cur, 'models')
                 cur.execute('''
                     CREATE TABLE IF NOT EXISTS settings (
                         key VARCHAR(100) PRIMARY KEY,
@@ -120,14 +135,14 @@ def init_db():
                 ''')
                 cur.execute('''
                     CREATE TABLE IF NOT EXISTS video_urls (
-                        id SERIAL PRIMARY KEY,
+                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                         url TEXT NOT NULL UNIQUE,
                         created_at FLOAT NOT NULL
                     )
                 ''')
                 cur.execute('''
                     CREATE TABLE IF NOT EXISTS cycles (
-                        id SERIAL PRIMARY KEY,
+                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                         started TEXT NOT NULL,
                         started_ts FLOAT NOT NULL,
                         status TEXT NOT NULL,
@@ -137,7 +152,7 @@ def init_db():
                 ''')
                 cur.execute('''
                     CREATE TABLE IF NOT EXISTS models (
-                        id SERIAL PRIMARY KEY,
+                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                         name VARCHAR(200) NOT NULL,
                         url VARCHAR(500) NOT NULL,
                         body JSONB NOT NULL DEFAULT '{}',
@@ -1039,7 +1054,7 @@ def api_models():
         return jsonify({'error': str(e)}), 500
 
 
-@flask_app.route('/api/models/<int:model_id>/activate', methods=['POST'])
+@flask_app.route('/api/models/<string:model_id>/activate', methods=['POST'])
 def api_model_activate(model_id):
     if not session.get('auth'):
         return jsonify({'error': 'unauthorized'}), 401

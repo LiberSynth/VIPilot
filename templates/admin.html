@@ -888,7 +888,7 @@ function toggleCP(id) {
       item.dataset.id = m.id;
       item.draggable = true;
       item.innerHTML =
-        '<div class="model-radio" onclick="activateModel(' + m.id + ')">' +
+        '<div class="model-radio" onclick="activateModel(\'' + m.id + '\')">' +
           '<div class="model-radio-dot"></div>' +
         '</div>' +
         '<div class="model-name">' + escHtml(m.name) + '</div>' +
@@ -935,7 +935,7 @@ function toggleCP(id) {
         const insertBefore = e.clientY < mid;
         // Build new ordered id list
         const items = Array.from(container.querySelectorAll('.model-item'));
-        const ids = items.map(function(el) { return parseInt(el.dataset.id); });
+        const ids = items.map(function(el) { return el.dataset.id; });
         const srcIdx = ids.indexOf(dragSrcId);
         ids.splice(srcIdx, 1);
         var destIdx = ids.indexOf(m.id);
