@@ -15,9 +15,7 @@ VK_TOKEN = os.environ['VK_USER_TOKEN']
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin')
 GROUP_ID = 236929597
 
-FAL_MODEL = 'fal-ai/fast-svd-lcm/text-to-video'
-FAL_SUBMIT_URL = f'https://queue.fal.run/{FAL_MODEL}'
-FAL_STATUS_BASE = 'https://queue.fal.run/fal-ai/fast-svd-lcm/requests'
+FAL_QUEUE_BASE = 'https://queue.fal.run'
 FAL_HEADERS = {'Authorization': f'Key {FAL_KEY}', 'Content-Type': 'application/json'}
 
 VIDEO_PATH = '/tmp/story_raw.mp4'
@@ -467,16 +465,53 @@ def db_get_random_video_url():
         return None
 
 
-def fal_request_id_to_url(request_id):
+def get_active_model():
+    """Returns (submit_url, body_template) for the active model, or (None, None)."""
     try:
-        r = requests.get(
-            f'{FAL_STATUS_BASE}/{request_id}',
-            headers={'Authorization': f'Key {FAL_KEY}'},
-            timeout=10
-        )
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute('SELECT url, body FROM models WHERE active = TRUE LIMIT 1')
+                row = cur.fetchone()
+        if not row:
+            return None, None
+        model_url = row[0]
+        body_tpl = row[1] if isinstance(row[1], dict) else {}
+        submit_url = f'{FAL_QUEUE_BASE}/{model_url}'
+        return submit_url, body_tpl
+    except Exception as e:
+        log_msg(f'[DB] Ошибка получения активной модели: {e}', 'error')
+        return None, None
+
+
+def build_fal_body(body_tpl, prompt):
+    """Fill body template with current settings values."""
+    body = dict(body_tpl)
+    if 'prompt' in body:
+        body['prompt'] = prompt
+    if 'duration' in body:
+        try:
+            body['duration'] = max(1, min(60, int(db_get('video_duration', '6'))))
+        except (ValueError, TypeError):
+            body['duration'] = 6
+    if 'aspect_ratio' in body:
+        try:
+            ar_x = int(db_get('aspect_ratio_x', '9'))
+            ar_y = int(db_get('aspect_ratio_y', '16'))
+        except (ValueError, TypeError):
+            ar_x, ar_y = 9, 16
+        body['aspect_ratio'] = f'{ar_x}:{ar_y}'
+    return body
+
+
+def fal_request_id_to_url(request_id, response_url=None):
+    """Resolve a fal.ai request_id to a video URL.
+    Uses response_url if provided, otherwise falls back to a best-effort guess."""
+    try:
+        url = response_url or f'{FAL_QUEUE_BASE}/requests/{request_id}'
+        r = requests.get(url, headers={'Authorization': f'Key {FAL_KEY}'}, timeout=10)
         r.raise_for_status()
         return r.json().get('video', {}).get('url')
-    except Exception as e:
+    except Exception:
         return None
 
 
@@ -521,11 +556,15 @@ def generate_video():
             app_state['running'] = False
 
     try:
-        resp = requests.post(FAL_SUBMIT_URL, headers=FAL_HEADERS, json={
-            'prompt': prompt,
-            'duration': 6,
-            'image_size': {'width': 1080, 'height': 1920},
-        }, timeout=30)
+        submit_url, body_tpl = get_active_model()
+        if not submit_url:
+            log_msg('Нет активной модели в базе. Выберите модель на вкладке "Запрос".', 'error')
+            return False
+
+        body = build_fal_body(body_tpl, prompt)
+        log_msg(f'Отправляю запрос: {submit_url}  тело: {body}')
+
+        resp = requests.post(submit_url, headers=FAL_HEADERS, json=body, timeout=30)
         data = resp.json()
 
         if 'request_id' not in data:
@@ -533,7 +572,8 @@ def generate_video():
             return False
 
         request_id = data['request_id']
-        status_url = data['status_url']
+        status_url = data.get('status_url')
+        response_url = data.get('response_url')
         log_msg(f'Генерация запущена. ID: {request_id}')
 
         for attempt in range(240):
@@ -545,8 +585,9 @@ def generate_video():
 
                 if status == 'COMPLETED':
                     try:
+                        result_url = response_url or f'{FAL_QUEUE_BASE}/requests/{request_id}'
                         result = requests.get(
-                            f'{FAL_STATUS_BASE}/{request_id}',
+                            result_url,
                             headers={'Authorization': f'Key {FAL_KEY}'},
                             timeout=10
                         ).json()
