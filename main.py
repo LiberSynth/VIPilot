@@ -8,35 +8,44 @@ import psycopg2
 import psycopg2.extras
 from collections import deque
 from datetime import datetime, timezone, timedelta
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
+from flask import (
+    Flask,
+    render_template,
+    request,
+    redirect,
+    url_for,
+    session,
+    flash,
+    jsonify,
+)
 
-FAL_KEY = os.environ['FAL_API_KEY']
-VK_TOKEN = os.environ['VK_USER_TOKEN']
-ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin')
+FAL_KEY = os.environ["FAL_API_KEY"]
+VK_TOKEN = os.environ["VK_USER_TOKEN"]
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin")
 GROUP_ID = 236929597
 
-FAL_QUEUE_BASE = 'https://queue.fal.run/fal-ai'
-FAL_HEADERS = {'Authorization': f'Key {FAL_KEY}', 'Content-Type': 'application/json'}
+FAL_QUEUE_BASE = "https://queue.fal.run/fal-ai"
+FAL_HEADERS = {"Authorization": f"Key {FAL_KEY}", "Content-Type": "application/json"}
 
-VIDEO_PATH = '/tmp/story_raw.mp4'
-VIDEO_VK_PATH = '/tmp/story_vk.mp4'
+VIDEO_PATH = "/tmp/story_raw.mp4"
+VIDEO_VK_PATH = "/tmp/story_vk.mp4"
 
 MSK_OFFSET = timedelta(hours=3)
 
 
 def get_db():
-    return psycopg2.connect(os.environ['DATABASE_URL'])
+    return psycopg2.connect(os.environ["DATABASE_URL"])
 
 
-def db_get(key, default=''):
+def db_get(key, default=""):
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
-                cur.execute('SELECT value FROM settings WHERE key = %s', (key,))
+                cur.execute("SELECT value FROM settings WHERE key = %s", (key,))
                 row = cur.fetchone()
                 return row[0] if row else default
     except Exception as e:
-        log_msg(f'[DB] Ошибка чтения {key}: {e}', 'error')
+        log_msg(f"[DB] Ошибка чтения {key}: {e}", "error")
         return default
 
 
@@ -44,18 +53,21 @@ def db_set(key, value):
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
-                cur.execute('''
+                cur.execute(
+                    """
                     INSERT INTO settings (key, value) VALUES (%s, %s)
                     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
-                ''', (key, value))
+                """,
+                    (key, value),
+                )
             conn.commit()
     except Exception as e:
-        log_msg(f'[DB] Ошибка записи {key}: {e}', 'error')
+        log_msg(f"[DB] Ошибка записи {key}: {e}", "error")
 
 
 def parse_hhmm(s):
     try:
-        h, m = s.strip().split(':')
+        h, m = s.strip().split(":")
         return int(h) % 24, int(m) % 60
     except Exception:
         return 6, 0
@@ -94,30 +106,33 @@ def to_utc_from_msk(h, m):
 
 def _migrate_serial_to_uuid(cur, table_name):
     """Drop table if its id column is still SERIAL (integer) so it can be recreated as UUID."""
-    cur.execute("""
+    cur.execute(
+        """
         SELECT data_type FROM information_schema.columns
         WHERE table_schema = 'public' AND table_name = %s AND column_name = 'id'
-    """, (table_name,))
+    """,
+        (table_name,),
+    )
     row = cur.fetchone()
-    if row and row[0] in ('integer', 'bigint'):
+    if row and row[0] in ("integer", "bigint"):
         cur.execute(f'DROP TABLE IF EXISTS "{table_name}" CASCADE')
-        print(f'[DB] Миграция: таблица {table_name} пересоздаётся с UUID')
+        print(f"[DB] Миграция: таблица {table_name} пересоздаётся с UUID")
 
 
 def init_db():
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
-                _migrate_serial_to_uuid(cur, 'video_urls')
-                _migrate_serial_to_uuid(cur, 'cycles')
-                _migrate_serial_to_uuid(cur, 'models')
-                cur.execute('''
+                _migrate_serial_to_uuid(cur, "video_urls")
+                _migrate_serial_to_uuid(cur, "cycles")
+                _migrate_serial_to_uuid(cur, "models")
+                cur.execute("""
                     CREATE TABLE IF NOT EXISTS settings (
                         key VARCHAR(100) PRIMARY KEY,
                         value TEXT NOT NULL
                     )
-                ''')
-                cur.execute('''
+                """)
+                cur.execute("""
                     INSERT INTO settings (key, value) VALUES
                         ('metaprompt', ''),
                         ('publish_time', '03:00'),
@@ -130,15 +145,15 @@ def init_db():
                         ('aspect_ratio_y', '16'),
                         ('video_duration', '6')
                     ON CONFLICT (key) DO NOTHING
-                ''')
-                cur.execute('''
+                """)
+                cur.execute("""
                     CREATE TABLE IF NOT EXISTS video_urls (
                         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                         url TEXT NOT NULL UNIQUE,
                         created_at FLOAT NOT NULL
                     )
-                ''')
-                cur.execute('''
+                """)
+                cur.execute("""
                     CREATE TABLE IF NOT EXISTS cycles (
                         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                         started TEXT NOT NULL,
@@ -147,8 +162,8 @@ def init_db():
                         entries JSONB NOT NULL DEFAULT '[]',
                         summary JSONB NOT NULL DEFAULT '{}'
                     )
-                ''')
-                cur.execute('''
+                """)
+                cur.execute("""
                     CREATE TABLE IF NOT EXISTS models (
                         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                         name VARCHAR(200) NOT NULL,
@@ -157,77 +172,119 @@ def init_db():
                         "order" INTEGER NOT NULL DEFAULT 0,
                         active BOOLEAN NOT NULL DEFAULT FALSE
                     )
-                ''')
-                cur.execute('SELECT COUNT(*) FROM models')
+                """)
+                cur.execute("SELECT COUNT(*) FROM models")
                 if cur.fetchone()[0] == 0:
                     import json as _json
+
                     models_seed = [
-                        ('veo2', 'veo2',
-                         _json.dumps({"prompt": "<сгенерированный промпт>", "duration": 6, "aspect_ratio": "9:16"}),
-                         1, True),
-                        ('minimax/video-01', 'minimax/video-01',
-                         _json.dumps({"prompt": "<сгенерированный промпт>", "duration": 6, "aspect_ratio": "9:16"}),
-                         2, False),
-                        ('kling-video/v1.6/standard', 'kling-video/v1.6/standard/text-to-video',
-                         _json.dumps({"prompt": "<сгенерированный промпт>", "duration": 6, "aspect_ratio": "9:16"}),
-                         3, False),
+                        (
+                            "veo2",
+                            "veo2",
+                            _json.dumps(
+                                {
+                                    "prompt": "<сгенерированный промпт>",
+                                    "duration": 6,
+                                    "aspect_ratio": "9:16",
+                                }
+                            ),
+                            1,
+                            True,
+                        ),
+                        (
+                            "minimax/video-01",
+                            "minimax/video-01",
+                            _json.dumps(
+                                {
+                                    "prompt": "<сгенерированный промпт>",
+                                    "duration": 6,
+                                    "aspect_ratio": "9:16",
+                                }
+                            ),
+                            2,
+                            False,
+                        ),
+                        (
+                            "kling-video/v1.6/standard",
+                            "kling-video/v1.6/standard/text-to-video",
+                            _json.dumps(
+                                {
+                                    "prompt": "<сгенерированный промпт>",
+                                    "duration": 6,
+                                    "aspect_ratio": "9:16",
+                                }
+                            ),
+                            3,
+                            False,
+                        ),
                     ]
                     cur.executemany(
                         'INSERT INTO models (name, url, body, "order", active) VALUES (%s, %s, %s, %s, %s)',
-                        models_seed
+                        models_seed,
                     )
             conn.commit()
-        print('[DB] Инициализация выполнена')
+        print("[DB] Инициализация выполнена")
     except Exception as e:
-        print(f'[DB] Ошибка инициализации: {e}')
+        print(f"[DB] Ошибка инициализации: {e}")
 
 
 def db_save_cycle(cycle):
     import json
+
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
-                cur.execute('''
+                cur.execute(
+                    """
                     INSERT INTO cycles (started, started_ts, status, entries, summary)
                     VALUES (%s, %s, %s, %s, %s)
                     RETURNING id
-                ''', (
-                    cycle['started'],
-                    cycle['started_ts'],
-                    cycle['status'],
-                    json.dumps(cycle['entries'], ensure_ascii=False),
-                    json.dumps(cycle.get('summary', {}), ensure_ascii=False),
-                ))
+                """,
+                    (
+                        cycle["started"],
+                        cycle["started_ts"],
+                        cycle["status"],
+                        json.dumps(cycle["entries"], ensure_ascii=False),
+                        json.dumps(cycle.get("summary", {}), ensure_ascii=False),
+                    ),
+                )
                 row = cur.fetchone()
-                cycle['db_id'] = row[0]
+                cycle["db_id"] = row[0]
             conn.commit()
     except Exception as e:
-        log_msg(f'[DB] Ошибка сохранения цикла: {e}', 'error')
+        log_msg(f"[DB] Ошибка сохранения цикла: {e}", "error")
 
 
 def db_load_cycles():
     import json
+
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
-                cur.execute('''
+                cur.execute("""
                     SELECT id, started, started_ts, status, entries, summary
                     FROM cycles ORDER BY started_ts DESC LIMIT 20
-                ''')
+                """)
                 rows = cur.fetchall()
         result = []
         for row in rows:
-            result.append({
-                'db_id': row[0],
-                'started': row[1],
-                'started_ts': row[2],
-                'status': row[3],
-                'entries': row[4] if isinstance(row[4], list) else json.loads(row[4] or '[]'),
-                'summary': row[5] if isinstance(row[5], dict) else json.loads(row[5] or '{}'),
-            })
+            result.append(
+                {
+                    "db_id": row[0],
+                    "started": row[1],
+                    "started_ts": row[2],
+                    "status": row[3],
+                    "entries": row[4]
+                    if isinstance(row[4], list)
+                    else json.loads(row[4] or "[]"),
+                    "summary": row[5]
+                    if isinstance(row[5], dict)
+                    else json.loads(row[5] or "{}"),
+                }
+            )
         return result
     except Exception as e:
-        print(f'[DB] Ошибка загрузки циклов: {e}')
+        print(f"[DB] Ошибка загрузки циклов: {e}")
         return []
 
 
@@ -235,174 +292,177 @@ def db_trim_cycles(keep=20):
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
-                cur.execute('''
+                cur.execute(
+                    """
                     DELETE FROM cycles WHERE id NOT IN (
                         SELECT id FROM cycles ORDER BY started_ts DESC LIMIT %s
                     )
-                ''', (keep,))
+                """,
+                    (keep,),
+                )
             conn.commit()
     except Exception as e:
-        print(f'[DB] Ошибка обрезки циклов: {e}')
+        print(f"[DB] Ошибка обрезки циклов: {e}")
 
 
 def db_trim_cycles_by_age():
-    days = parse_short_log_days(db_get('short_log_days', '365'))
+    days = parse_short_log_days(db_get("short_log_days", "365"))
     cutoff = time.time() - days * 86400
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
-                cur.execute('DELETE FROM cycles WHERE started_ts < %s', (cutoff,))
+                cur.execute("DELETE FROM cycles WHERE started_ts < %s", (cutoff,))
             conn.commit()
     except Exception as e:
-        print(f'[DB] Ошибка очистки краткого лога: {e}')
-    to_remove = [c for c in app_state['cycles'] if c.get('started_ts', 0) < cutoff]
+        print(f"[DB] Ошибка очистки краткого лога: {e}")
+    to_remove = [c for c in app_state["cycles"] if c.get("started_ts", 0) < cutoff]
     for c in to_remove:
         try:
-            app_state['cycles'].remove(c)
+            app_state["cycles"].remove(c)
         except ValueError:
             pass
 
 
 app_state = {
-    'running': False,
-    'last_published': None,
-    'last_ok': False,
-    'current_prompt': None,
-    'current_cycle': None,   # dict with 'started', 'status', 'entries' (list)
-    'cycles': deque(maxlen=20),  # completed cycles, newest first
+    "running": False,
+    "last_published": None,
+    "last_ok": False,
+    "current_prompt": None,
+    "current_cycle": None,  # dict with 'started', 'status', 'entries' (list)
+    "cycles": deque(maxlen=20),  # completed cycles, newest first
 }
 
 
 def msk_ts():
-    return (datetime.now(timezone.utc) + MSK_OFFSET).strftime('%d.%m.%Y %H:%M МСК')
+    return (datetime.now(timezone.utc) + MSK_OFFSET).strftime("%d.%m.%Y %H:%M МСК")
 
 
 def start_cycle():
     cycle = {
-        'started': msk_ts(),
-        'started_ts': time.time(),
-        'status': 'running',
-        'entries': [],
-        'summary': {'prompt': None, 'generated_at': None, 'published_at': None},
+        "started": msk_ts(),
+        "started_ts": time.time(),
+        "status": "running",
+        "entries": [],
+        "summary": {"prompt": None, "generated_at": None, "published_at": None},
     }
-    app_state['current_cycle'] = cycle
+    app_state["current_cycle"] = cycle
     return cycle
 
 
 def end_cycle(ok):
-    cycle = app_state['current_cycle']
+    cycle = app_state["current_cycle"]
     if cycle is None:
         return
-    cycle['status'] = 'ok' if ok else 'error'
+    cycle["status"] = "ok" if ok else "error"
     completed = dict(cycle)
-    app_state['cycles'].appendleft(completed)
-    app_state['current_cycle'] = None
+    app_state["cycles"].appendleft(completed)
+    app_state["current_cycle"] = None
     db_save_cycle(completed)
     db_trim_cycles(keep=20)
     db_trim_cycles_by_age()
 
 
-def log_msg(msg, level='info'):
-    ts = (datetime.now(timezone.utc) + MSK_OFFSET).strftime('%d.%m %H:%M:%S')
-    entry = {'ts': ts, 'msg': msg, 'level': level}
-    if app_state['current_cycle'] is not None:
-        app_state['current_cycle']['entries'].append(entry)
-    print(f'[{ts} МСК] {msg}')
+def log_msg(msg, level="info"):
+    ts = (datetime.now(timezone.utc) + MSK_OFFSET).strftime("%d.%m %H:%M:%S")
+    entry = {"ts": ts, "msg": msg, "level": level}
+    if app_state["current_cycle"] is not None:
+        app_state["current_cycle"]["entries"].append(entry)
+    print(f"[{ts} МСК] {msg}")
 
 
 SUBJECTS = [
-    'Стая рыб выпрыгивает из реки',
-    'Снежинки падают с неба',
-    'Осенние листья кружатся в воздухе',
-    'Волны океана накатывают на берег',
-    'Молнии бьют в землю',
-    'Пузырьки поднимаются со дна озера',
-    'Стая птиц летит над полем',
-    'Бабочки порхают над цветами',
-    'Капли дождя падают в лужу',
-    'Льдинки тают на солнце',
-    'Лепестки роз кружатся по ветру',
-    'Искры вылетают из костра',
-    'Муравьи несут крошки по тропинке',
-    'Пчёлы роятся над ульем',
-    'Листья берёзы падают в реку',
-    'Семена одуванчика летят по ветру',
-    'Огонь в камине догорает',
-    'Дым поднимается спиралью вверх',
-    'Снежный ком катится с горы',
-    'Мыльные пузыри поднимаются в воздух',
-    'Стая скворцов кружится в небе',
-    'Кленовые вертолётики падают с дерева',
-    'Горная лавина несётся вниз',
-    'Звёзды падают с ночного неба',
-    'Лавовый поток течёт по горе',
+    "Стая рыб выпрыгивает из реки",
+    "Снежинки падают с неба",
+    "Осенние листья кружатся в воздухе",
+    "Волны океана накатывают на берег",
+    "Молнии бьют в землю",
+    "Пузырьки поднимаются со дна озера",
+    "Стая птиц летит над полем",
+    "Бабочки порхают над цветами",
+    "Капли дождя падают в лужу",
+    "Льдинки тают на солнце",
+    "Лепестки роз кружатся по ветру",
+    "Искры вылетают из костра",
+    "Муравьи несут крошки по тропинке",
+    "Пчёлы роятся над ульем",
+    "Листья берёзы падают в реку",
+    "Семена одуванчика летят по ветру",
+    "Огонь в камине догорает",
+    "Дым поднимается спиралью вверх",
+    "Снежный ком катится с горы",
+    "Мыльные пузыри поднимаются в воздух",
+    "Стая скворцов кружится в небе",
+    "Кленовые вертолётики падают с дерева",
+    "Горная лавина несётся вниз",
+    "Звёзды падают с ночного неба",
+    "Лавовый поток течёт по горе",
 ]
 
 TRANSFORMATIONS = [
-    'и превращаются в {material}, из которых {builds}',
-    'и на лету трансформируются в {material} — {builds} словно сам собой',
-    'и вдруг застывают, превращаясь в {material}, и {builds}',
-    'и, коснувшись земли, становятся {material}, из которых {builds}',
-    'и складываются в {material} — из них {builds}',
-    'и рассыпаются {material}ом, который сам собой {builds}',
-    'и в замедленной съёмке превращаются в {material}, {builds}',
-    'и взрываются облаком {material}, из которого {builds}',
+    "и превращаются в {material}, из которых {builds}",
+    "и на лету трансформируются в {material} — {builds} словно сам собой",
+    "и вдруг застывают, превращаясь в {material}, и {builds}",
+    "и, коснувшись земли, становятся {material}, из которых {builds}",
+    "и складываются в {material} — из них {builds}",
+    "и рассыпаются {material}ом, который сам собой {builds}",
+    "и в замедленной съёмке превращаются в {material}, {builds}",
+    "и взрываются облаком {material}, из которого {builds}",
 ]
 
 MATERIALS = [
-    'кирпичи',
-    'деревянные доски',
-    'керамическую плитку',
-    'стеклянные блоки',
-    'бетонные панели',
-    'черепицу',
-    'мраморные плиты',
-    'металлические балки',
-    'рулоны утеплителя',
-    'брёвна',
-    'гранитный щебень',
-    'листы фанеры',
-    'рулоны рубероида',
-    'арматурные прутья',
-    'сайдинг',
+    "кирпичи",
+    "деревянные доски",
+    "керамическую плитку",
+    "стеклянные блоки",
+    "бетонные панели",
+    "черепицу",
+    "мраморные плиты",
+    "металлические балки",
+    "рулоны утеплителя",
+    "брёвна",
+    "гранитный щебень",
+    "листы фанеры",
+    "рулоны рубероида",
+    "арматурные прутья",
+    "сайдинг",
 ]
 
 BUILDS = [
-    'вырастает красивый коттедж',
-    'складывается уютный деревянный дом',
-    'появляется кирпичный особняк',
-    'строится загородный дом',
-    'возникает терраса с видом на лес',
-    'строится забор вокруг сада',
-    'появляется крыша над головой',
-    'складывается камин в гостиной',
-    'вырастает стена дома',
-    'строится дорожка к дому',
-    'появляется веранда',
-    'складывается гараж',
-    'вырастает баня',
-    'строится беседка в саду',
+    "вырастает красивый коттедж",
+    "складывается уютный деревянный дом",
+    "появляется кирпичный особняк",
+    "строится загородный дом",
+    "возникает терраса с видом на лес",
+    "строится забор вокруг сада",
+    "появляется крыша над головой",
+    "складывается камин в гостиной",
+    "вырастает стена дома",
+    "строится дорожка к дому",
+    "появляется веранда",
+    "складывается гараж",
+    "вырастает баня",
+    "строится беседка в саду",
 ]
 
 SETTINGS = [
-    'на фоне заката над лесом',
-    'в осеннем лесу',
-    'у тихой реки на рассвете',
-    'в заснеженном поле',
-    'в летнем саду',
-    'на берегу озера',
-    'среди зелёных холмов',
-    'в хвойном лесу',
-    'на фоне грозового неба',
-    'в золотой час заката',
+    "на фоне заката над лесом",
+    "в осеннем лесу",
+    "у тихой реки на рассвете",
+    "в заснеженном поле",
+    "в летнем саду",
+    "на берегу озера",
+    "среди зелёных холмов",
+    "в хвойном лесу",
+    "на фоне грозового неба",
+    "в золотой час заката",
 ]
 
 STYLES = [
-    'Кинематографическая съёмка, тёплый свет, 4K, вертикальное видео 9:16.',
-    'Магический реализм, яркие насыщенные цвета, вертикальный формат 9:16.',
-    'Художественная съёмка, мягкое освещение, сюрреализм, вертикальное видео 9:16.',
-    'Визуальный аттракцион, замедленная съёмка, кинематограф, 9:16.',
-    'Эпичная широкоугольная съёмка, золотой закат, вертикальный формат 9:16.',
+    "Кинематографическая съёмка, тёплый свет, 4K, вертикальное видео 9:16.",
+    "Магический реализм, яркие насыщенные цвета, верти �альный формат 9:16.",
+    "Художественная съёмка, мягкое освещение, сюрреализм, вертикальное видео 9:16.",
+    "Визуальный аттракцион, замедленная съёмка, кинематограф, 9:16.",
+    "Эпичная широкоугольная съёмка, золотой закат, вертикальный формат 9:16.",
 ]
 
 
@@ -415,53 +475,53 @@ def generate_prompt():
     style = random.choice(STYLES)
 
     transform = transform_template.format(material=material, builds=build)
-    scene = f'{subject} {transform}, {setting}.'
-    full_prompt = f'{scene} {style}'
+    scene = f"{subject} {transform}, {setting}."
+    full_prompt = f"{scene} {style}"
 
-    app_state['current_prompt'] = scene
-    if app_state['current_cycle'] is not None:
-        app_state['current_cycle']['summary']['prompt'] = scene
-    log_msg(f'Сюжет: {scene}')
+    app_state["current_prompt"] = scene
+    if app_state["current_cycle"] is not None:
+        app_state["current_cycle"]["summary"]["prompt"] = scene
+    log_msg(f"Сюжет: {scene}")
     return full_prompt
 
 
 def is_emulation():
-    return db_get('emulation_mode', '0') == '1'
+    return db_get("emulation_mode", "0") == "1"
 
 
 def db_save_video_url(url):
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
-                cur.execute('SELECT 1 FROM video_urls WHERE url = %s', (url,))
+                cur.execute("SELECT 1 FROM video_urls WHERE url = %s", (url,))
                 if cur.fetchone():
                     return
                 cur.execute(
-                    'INSERT INTO video_urls (url, created_at) VALUES (%s, %s)',
-                    (url, time.time())
+                    "INSERT INTO video_urls (url, created_at) VALUES (%s, %s)",
+                    (url, time.time()),
                 )
-                cur.execute('SELECT COUNT(*) FROM video_urls')
+                cur.execute("SELECT COUNT(*) FROM video_urls")
                 count = cur.fetchone()[0]
                 if count > 50:
                     cur.execute(
-                        'DELETE FROM video_urls WHERE id IN '
-                        '(SELECT id FROM video_urls ORDER BY created_at ASC LIMIT %s)',
-                        (count - 50,)
+                        "DELETE FROM video_urls WHERE id IN "
+                        "(SELECT id FROM video_urls ORDER BY created_at ASC LIMIT %s)",
+                        (count - 50,),
                     )
             conn.commit()
     except Exception as e:
-        log_msg(f'[DB] Ошибка сохранения URL видео: {e}', 'error')
+        log_msg(f"[DB] Ошибка сохранения URL видео: {e}", "error")
 
 
 def db_get_random_video_url():
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
-                cur.execute('SELECT url FROM video_urls ORDER BY RANDOM() LIMIT 1')
+                cur.execute("SELECT url FROM video_urls ORDER BY RANDOM() LIMIT 1")
                 row = cur.fetchone()
                 return row[0] if row else None
     except Exception as e:
-        print(f'[DB] Ошибка получения URL видео: {e}')
+        print(f"[DB] Ошибка получения URL видео: {e}")
         return None
 
 
@@ -470,36 +530,36 @@ def get_active_model():
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
-                cur.execute('SELECT url, body FROM models WHERE active = TRUE LIMIT 1')
+                cur.execute("SELECT url, body FROM models WHERE active = TRUE LIMIT 1")
                 row = cur.fetchone()
         if not row:
             return None, None
         model_url = row[0]
         body_tpl = row[1] if isinstance(row[1], dict) else {}
-        submit_url = f'{FAL_QUEUE_BASE}/{model_url}'
+        submit_url = f"{FAL_QUEUE_BASE}/{model_url}"
         return submit_url, body_tpl
     except Exception as e:
-        log_msg(f'[DB] Ошибка получения активной модели: {e}', 'error')
+        log_msg(f"[DB] Ошибка получения активной модели: {e}", "error")
         return None, None
 
 
 def build_fal_body(body_tpl, prompt):
     """Fill body template with current settings values."""
     body = dict(body_tpl)
-    if 'prompt' in body:
-        body['prompt'] = prompt
-    if 'duration' in body:
+    if "prompt" in body:
+        body["prompt"] = prompt
+    if "duration" in body:
         try:
-            body['duration'] = max(1, min(60, int(db_get('video_duration', '6'))))
+            body["duration"] = max(1, min(60, int(db_get("video_duration", "6"))))
         except (ValueError, TypeError):
-            body['duration'] = 6
-    if 'aspect_ratio' in body:
+            body["duration"] = 6
+    if "aspect_ratio" in body:
         try:
-            ar_x = int(db_get('aspect_ratio_x', '9'))
-            ar_y = int(db_get('aspect_ratio_y', '16'))
+            ar_x = int(db_get("aspect_ratio_x", "9"))
+            ar_y = int(db_get("aspect_ratio_y", "16"))
         except (ValueError, TypeError):
             ar_x, ar_y = 9, 16
-        body['aspect_ratio'] = f'{ar_x}:{ar_y}'
+        body["aspect_ratio"] = f"{ar_x}:{ar_y}"
     return body
 
 
@@ -507,140 +567,189 @@ def fal_request_id_to_url(request_id, response_url=None):
     """Resolve a fal.ai request_id to a video URL.
     Uses response_url if provided, otherwise falls back to a best-effort guess."""
     try:
-        url = response_url or f'{FAL_QUEUE_BASE}/requests/{request_id}'
-        r = requests.get(url, headers={'Authorization': f'Key {FAL_KEY}'}, timeout=10)
+        url = response_url or f"{FAL_QUEUE_BASE}/requests/{request_id}"
+        r = requests.get(url, headers={"Authorization": f"Key {FAL_KEY}"}, timeout=10)
         r.raise_for_status()
-        return r.json().get('video', {}).get('url')
+        return r.json().get("video", {}).get("url")
     except Exception:
         return None
 
 
 def transcode_video():
     raw_size = os.path.getsize(VIDEO_PATH)
-    log_msg(f'Транскодирую в H.264... (исходник: {round(raw_size/1024/1024, 1)} МБ)')
-    result = subprocess.run([
-        'ffmpeg',
-        '-t', '8', '-i', VIDEO_PATH,
-        '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo',
-        '-t', '8',
-        '-c:v', 'libx264', '-profile:v', 'baseline', '-preset', 'ultrafast', '-crf', '26',
-        '-pix_fmt', 'yuv420p', '-r', '30',
-        '-c:a', 'aac', '-b:a', '96k',
-        '-movflags', '+faststart',
-        VIDEO_VK_PATH, '-y'
-    ], capture_output=True, timeout=600)
+    log_msg(
+        f"Транскодирую в H.264... (исходник: {round(raw_size / 1024 / 1024, 1)} МБ)"
+    )
+    result = subprocess.run(
+        [
+            "ffmpeg",
+            "-t",
+            "8",
+            "-i",
+            VIDEO_PATH,
+            "-f",
+            "lavfi",
+            "-i",
+            "anullsrc=r=44100:cl=stereo",
+            "-t",
+            "8",
+            "-c:v",
+            "libx264",
+            "-profile:v",
+            "baseline",
+            "-preset",
+            "ultrafast",
+            "-crf",
+            "26",
+            "-pix_fmt",
+            "yuv420p",
+            "-r",
+            "30",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "96k",
+            "-movflags",
+            "+faststart",
+            VIDEO_VK_PATH,
+            "-y",
+        ],
+        capture_output=True,
+        timeout=600,
+    )
     if result.returncode != 0:
-        err = result.stderr.decode(errors='replace')[-600:]
-        log_msg(f'ffmpeg ошибка (код {result.returncode}): {err}', 'error')
+        err = result.stderr.decode(errors="replace")[-600:]
+        log_msg(f"ffmpeg ошибка (код {result.returncode}): {err}", "error")
         return False
-    log_msg('Транскодирование завершено')
-    if app_state['current_cycle'] is not None:
-        app_state['current_cycle']['summary']['generated_at'] = msk_ts()
+    log_msg("Транскодирование завершено")
+    if app_state["current_cycle"] is not None:
+        app_state["current_cycle"]["summary"]["generated_at"] = msk_ts()
     return True
 
 
 def generate_video():
     prompt = generate_prompt()
-    app_state['running'] = True
+    app_state["running"] = True
 
     if is_emulation():
         try:
-            log_msg('[ЭМУЛЯЦИЯ] Пропускаю генерацию, беру случайное видео из базы...')
+            log_msg("[ЭМУЛЯЦИЯ] Пропускаю генерацию, беру случайное видео из базы...")
             url = db_get_random_video_url()
             if not url:
-                log_msg('[ЭМУЛЯЦИЯ] В базе нет видео — добавьте ID запросов fal.ai через панель', 'error')
+                log_msg(
+                    "[ЭМУЛЯЦИЯ] В базе нет видео — добавьте ID запросов fal.ai через панель",
+                    "error",
+                )
                 return False
-            log_msg('[ЭМУЛЯЦИЯ] Видео выбрано, скачиваю...')
+            log_msg("[ЭМУЛЯЦИЯ] Видео выбрано, скачиваю...")
             return download_and_transcode(url)
         finally:
-            app_state['running'] = False
+            app_state["running"] = False
 
     try:
         submit_url, body_tpl = get_active_model()
         if not submit_url:
-            log_msg('Нет активной модели в базе. Выберите модель на вкладке "Запрос".', 'error')
+            log_msg(
+                'Нет активной модели в базе. Выберите модель на вкладке "Запрос".',
+                "error",
+            )
             return False
 
         body = build_fal_body(body_tpl, prompt)
-        log_msg(f'Отправляю запрос: {submit_url}  тело: {body}')
+        log_msg(f"Отправляю запрос: {submit_url}  тело: {body}")
 
         resp = requests.post(submit_url, headers=FAL_HEADERS, json=body, timeout=30)
         try:
             data = resp.json()
         except ValueError:
-            log_msg(f'fal.ai вернул не-JSON ответ (HTTP {resp.status_code}): {resp.text[:500]}', 'error')
+            log_msg(
+                f"fal.ai вернул не-JSON ответ (HTTP {resp.status_code}): {resp.text[:500]}",
+                "error",
+            )
             return False
 
         if resp.status_code >= 400:
-            log_msg(f'fal.ai HTTP {resp.status_code}: {data}', 'error')
+            log_msg(f"fal.ai HTTP {resp.status_code}: {data}", "error")
             return False
 
-        if 'request_id' not in data:
-            log_msg(f'Ошибка запроса к fal.ai: {data}', 'error')
+        if "request_id" not in data:
+            log_msg(f"Ошибка запроса к fal.ai: {data}", "error")
             return False
 
-        request_id = data['request_id']
-        status_url = data.get('status_url')
-        response_url = data.get('response_url')
-        log_msg(f'Генерация запущена. ID: {request_id}')
+        request_id = data["request_id"]
+        status_url = data.get("status_url")
+        response_url = data.get("response_url")
+        log_msg(f"Генерация запущена. ID: {request_id}")
 
         for attempt in range(240):
             time.sleep(30)
             try:
-                s = requests.get(status_url, headers={'Authorization': f'Key {FAL_KEY}'}, timeout=10).json()
-                status = s.get('status')
-                log_msg(f'Статус [{attempt+1}]: {status}')
+                s = requests.get(
+                    status_url, headers={"Authorization": f"Key {FAL_KEY}"}, timeout=10
+                ).json()
+                status = s.get("status")
+                log_msg(f"Статус [{attempt + 1}]: {status}")
 
-                if status == 'COMPLETED':
+                if status == "COMPLETED":
                     try:
-                        result_url = response_url or f'{FAL_QUEUE_BASE}/requests/{request_id}'
+                        result_url = (
+                            response_url or f"{FAL_QUEUE_BASE}/requests/{request_id}"
+                        )
                         result = requests.get(
                             result_url,
-                            headers={'Authorization': f'Key {FAL_KEY}'},
-                            timeout=10
+                            headers={"Authorization": f"Key {FAL_KEY}"},
+                            timeout=10,
                         ).json()
-                        video_url = result.get('video', {}).get('url')
+                        video_url = result.get("video", {}).get("url")
                         if not video_url:
-                            log_msg(f'Нет URL видео в ответе: {result}', 'error')
+                            log_msg(f"Нет URL видео в ответе: {result}", "error")
                             return False
-                        log_msg(f'URL получен, сохраняю в базу: {video_url[:60]}...')
+                        log_msg(f"URL получен, сохраняю в базу: {video_url[:60]}...")
                         db_save_video_url(video_url)
                         return download_and_transcode(video_url)
                     except Exception as e:
-                        log_msg(f'Ошибка обработки готового видео: {e}', 'error')
+                        log_msg(f"Ошибка обработки готового видео: {e}", "error")
                         return False
 
-                elif status == 'FAILED':
-                    log_msg(f'Генерация провалилась: {s}', 'error')
+                elif status == "FAILED":
+                    log_msg(f"Генерация провалилась: {s}", "error")
                     return False
             except Exception as e:
-                log_msg(f'Ошибка опроса статуса: {e}', 'error')
+                log_msg(f"Ошибка опроса статуса: {e}", "error")
 
-        log_msg('Таймаут генерации (2 часа)', 'error')
+        log_msg("Таймаут генерации (2 часа)", "error")
         return False
     finally:
-        app_state['running'] = False
+        app_state["running"] = False
 
 
 def download_and_transcode(video_url):
-    log_msg('Скачиваю видео...')
+    log_msg("Скачиваю видео...")
     ok = False
     for attempt in range(3):
         try:
-            r = requests.get(video_url, stream=True, timeout=120, headers={'User-Agent': 'Mozilla/5.0'})
+            r = requests.get(
+                video_url,
+                stream=True,
+                timeout=120,
+                headers={"User-Agent": "Mozilla/5.0"},
+            )
             if r.status_code == 200:
-                with open(VIDEO_PATH, 'wb') as f:
+                with open(VIDEO_PATH, "wb") as f:
                     for chunk in r.iter_content(chunk_size=65536):
                         f.write(chunk)
                 size = os.path.getsize(VIDEO_PATH)
                 if size > 10000:
-                    log_msg(f'Видео скачано: {round(size/1024/1024, 1)} МБ')
+                    log_msg(f"Видео скачано: {round(size / 1024 / 1024, 1)} МБ")
                     ok = True
                     break
             else:
-                log_msg(f'HTTP {r.status_code} при скачивании, попытка {attempt+1}/3', 'error')
+                log_msg(
+                    f"HTTP {r.status_code} при скачивании, попытка {attempt + 1}/3",
+                    "error",
+                )
         except Exception as e:
-            log_msg(f'Ошибка скачивания (попытка {attempt+1}/3): {e}', 'error')
+            log_msg(f"Ошибка скачивания (попытка {attempt + 1}/3): {e}", "error")
         time.sleep(10)
     if not ok:
         return False
@@ -650,168 +759,203 @@ def download_and_transcode(video_url):
 
 
 def publish_story():
-    log_msg('Публикую историю в VK...')
+    log_msg("Публикую историю в VK...")
     try:
-        r = requests.post('https://api.vk.com/method/stories.getVideoUploadServer', data={
-            'group_id': GROUP_ID, 'add_to_news': 1, 'access_token': VK_TOKEN, 'v': '5.131'
-        }, timeout=15)
+        r = requests.post(
+            "https://api.vk.com/method/stories.getVideoUploadServer",
+            data={
+                "group_id": GROUP_ID,
+                "add_to_news": 1,
+                "access_token": VK_TOKEN,
+                "v": "5.131",
+            },
+            timeout=15,
+        )
         r.raise_for_status()
         server_data = r.json()
-        if 'error' in server_data:
-            log_msg(f'Ошибка getVideoUploadServer: {server_data["error"]}', 'error')
+        if "error" in server_data:
+            log_msg(f"Ошибка getVideoUploadServer: {server_data['error']}", "error")
             return False
-        upload_url = server_data['response']['upload_url']
-        log_msg('Upload URL получен, загружаю...')
+        upload_url = server_data["response"]["upload_url"]
+        log_msg("Upload URL получен, загружаю...")
 
         for attempt in range(3):
             try:
-                with open(VIDEO_VK_PATH, 'rb') as f:
-                    up = requests.post(upload_url, files={'video_file': ('video.mp4', f, 'video/mp4')}, timeout=300)
+                with open(VIDEO_VK_PATH, "rb") as f:
+                    up = requests.post(
+                        upload_url,
+                        files={"video_file": ("video.mp4", f, "video/mp4")},
+                        timeout=300,
+                    )
                 up.raise_for_status()
                 if not up.text.strip():
-                    log_msg(f'Пустой ответ от CDN, попытка {attempt+1}/3', 'error')
+                    log_msg(f"Пустой ответ от CDN, попытка {attempt + 1}/3", "error")
                     time.sleep(5)
                     continue
                 up_data = up.json()
-                if 'response' not in up_data:
-                    log_msg(f'Неожиданный ответ CDN: {up.text[:200]}', 'error')
+                if "response" not in up_data:
+                    log_msg(f"Неожиданный ответ CDN: {up.text[:200]}", "error")
                     return False
-                upload_result = up_data['response']['upload_result']
+                upload_result = up_data["response"]["upload_result"]
                 break
             except Exception as e:
-                log_msg(f'Ошибка загрузки видео (попытка {attempt+1}/3): {e}', 'error')
+                log_msg(
+                    f"Ошибка загрузки видео (попытка {attempt + 1}/3): {e}", "error"
+                )
                 time.sleep(5)
         else:
-            log_msg('Все попытки загрузки провалились', 'error')
+            log_msg("Все попытки загрузки провалились", "error")
             return False
 
-        log_msg('Видео загружено, сохраняю историю...')
-        save = requests.post('https://api.vk.com/method/stories.save', data={
-            'upload_results': upload_result, 'access_token': VK_TOKEN, 'v': '5.131'
-        }, timeout=15).json()
+        log_msg("Видео загружено, сохраняю историю...")
+        save = requests.post(
+            "https://api.vk.com/method/stories.save",
+            data={
+                "upload_results": upload_result,
+                "access_token": VK_TOKEN,
+                "v": "5.131",
+            },
+            timeout=15,
+        ).json()
 
-        if 'response' in save:
-            story_id = save['response']['items'][0]['id']
+        if "response" in save:
+            story_id = save["response"]["items"][0]["id"]
             ts = msk_ts()
-            log_msg(f'✓ История опубликована! ID: {story_id}', 'ok')
-            app_state['last_published'] = ts
-            app_state['last_ok'] = True
-            if app_state['current_cycle'] is not None:
-                app_state['current_cycle']['summary']['published_at'] = ts
+            log_msg(f"✓ История опубликована! ID: {story_id}", "ok")
+            app_state["last_published"] = ts
+            app_state["last_ok"] = True
+            if app_state["current_cycle"] is not None:
+                app_state["current_cycle"]["summary"]["published_at"] = ts
             return True
         else:
-            log_msg(f'Ошибка stories.save: {save}', 'error')
+            log_msg(f"Ошибка stories.save: {save}", "error")
             return False
     except Exception as e:
-        log_msg(f'Исключение при публикации истории: {e}', 'error')
+        log_msg(f"Исключение при публикации истории: {e}", "error")
         return False
 
 
 def publish_to_wall():
-    log_msg('Публикую видео на стену сообщества...')
+    log_msg("Публикую видео на стену сообщества...")
     try:
-        save_resp = requests.post('https://api.vk.com/method/video.save', data={
-            'group_id': GROUP_ID,
-            'name': 'Строительство и ремонт',
-            'description': '',
-            'wallpost': 0,
-            'access_token': VK_TOKEN,
-            'v': '5.131',
-        }, timeout=15).json()
+        save_resp = requests.post(
+            "https://api.vk.com/method/video.save",
+            data={
+                "group_id": GROUP_ID,
+                "name": "Строительство и ремонт",
+                "description": "",
+                "wallpost": 0,
+                "access_token": VK_TOKEN,
+                "v": "5.131",
+            },
+            timeout=15,
+        ).json()
 
-        if 'error' in save_resp:
-            log_msg(f'Ошибка video.save: {save_resp["error"]}', 'error')
+        if "error" in save_resp:
+            log_msg(f"Ошибка video.save: {save_resp['error']}", "error")
             return False
 
-        upload_url = save_resp['response']['upload_url']
-        video_id = save_resp['response']['video_id']
-        owner_id = save_resp['response']['owner_id']
-        log_msg('video.save OK, загружаю файл...')
+        upload_url = save_resp["response"]["upload_url"]
+        video_id = save_resp["response"]["video_id"]
+        owner_id = save_resp["response"]["owner_id"]
+        log_msg("video.save OK, загружаю файл...")
 
-        with open(VIDEO_VK_PATH, 'rb') as f:
-            up = requests.post(upload_url, files={'video_file': f}, timeout=300)
+        with open(VIDEO_VK_PATH, "rb") as f:
+            up = requests.post(upload_url, files={"video_file": f}, timeout=300)
         up.raise_for_status()
-        log_msg('Видео загружено. Публикую пост...')
+        log_msg("Видео загружено. Публикую пост...")
 
-        post_resp = requests.post('https://api.vk.com/method/wall.post', data={
-            'owner_id': -GROUP_ID,
-            'from_group': 1,
-            'attachments': f'video{owner_id}_{video_id}',
-            'access_token': VK_TOKEN,
-            'v': '5.131',
-        }, timeout=15).json()
+        post_resp = requests.post(
+            "https://api.vk.com/method/wall.post",
+            data={
+                "owner_id": -GROUP_ID,
+                "from_group": 1,
+                "attachments": f"video{owner_id}_{video_id}",
+                "access_token": VK_TOKEN,
+                "v": "5.131",
+            },
+            timeout=15,
+        ).json()
 
-        if 'response' in post_resp:
-            post_id = post_resp['response']['post_id']
-            log_msg(f'✓ Видео опубликовано на стене! post_id: {post_id}', 'ok')
+        if "response" in post_resp:
+            post_id = post_resp["response"]["post_id"]
+            log_msg(f"✓ Видео опубликовано на стене! post_id: {post_id}", "ok")
             return True
         else:
-            log_msg(f'Ошибка wall.post: {post_resp}', 'error')
+            log_msg(f"Ошибка wall.post: {post_resp}", "error")
             return False
     except Exception as e:
-        log_msg(f'Исключение при публикации на стену: {e}', 'error')
+        log_msg(f"Исключение при публикации на стену: {e}", "error")
         return False
 
 
 def send_failure_email(message, log_entries=None, partial=False):
     import smtplib
     from email.mime.text import MIMEText
-    to_addr = db_get('notify_email', '').strip()
-    smtp_host = os.environ.get('SMTP_HOST', '').strip()
-    smtp_user = os.environ.get('SMTP_USER', '').strip()
-    smtp_pass = os.environ.get('SMTP_PASSWORD', '').strip()
+
+    to_addr = db_get("notify_email", "").strip()
+    smtp_host = os.environ.get("SMTP_HOST", "").strip()
+    smtp_user = os.environ.get("SMTP_USER", "").strip()
+    smtp_pass = os.environ.get("SMTP_PASSWORD", "").strip()
     if not all([to_addr, smtp_host, smtp_user, smtp_pass]):
-        log_msg('[УВЕДОМЛЕНИЕ] Email не отправлен: не заданы SMTP-настройки или адрес', 'warn')
+        log_msg(
+            "[УВЕДОМЛЕНИЕ] Email не отправлен: не заданы SMTP-настройки или адрес",
+            "warn",
+        )
         return
-    smtp_port = int(os.environ.get('SMTP_PORT', '587'))
-    smtp_from = os.environ.get('SMTP_FROM', smtp_user)
-    subject_prefix = 'Частично' if partial else 'Сбой'
+    smtp_port = int(os.environ.get("SMTP_PORT", "587"))
+    smtp_from = os.environ.get("SMTP_FROM", smtp_user)
+    subject_prefix = "Частично" if partial else "Сбой"
     try:
         body = message
         if log_entries:
-            lines = '\n'.join(f"[{e['ts']}] {e['msg']}" for e in log_entries)
-            body += f'\n\n--- Подробный лог ---\n{lines}'
-        msg = MIMEText(body, 'plain', 'utf-8')
-        msg['Subject'] = f'VK Publisher: {subject_prefix.lower()} в пайплайне'
-        msg['From'] = smtp_from
-        msg['To'] = to_addr
+            lines = "\n".join(f"[{e['ts']}] {e['msg']}" for e in log_entries)
+            body += f"\n\n--- Подробный лог ---\n{lines}"
+        msg = MIMEText(body, "plain", "utf-8")
+        msg["Subject"] = f"VK Publisher: {subject_prefix.lower()} в пайплайне"
+        msg["From"] = smtp_from
+        msg["To"] = to_addr
         with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as s:
             s.starttls()
             s.login(smtp_user, smtp_pass)
             s.send_message(msg)
-        log_msg(f'[УВЕДОМЛЕНИЕ] Email отправлен на {to_addr}')
+        log_msg(f"[УВЕДОМЛЕНИЕ] Email отправлен на {to_addr}")
     except Exception as e:
-        log_msg(f'[УВЕДОМЛЕНИЕ] Ошибка отправки email: {e}', 'error')
+        log_msg(f"[УВЕДОМЛЕНИЕ] Ошибка отправки email: {e}", "error")
 
 
 def send_failure_sms(message):
-    phone = db_get('notify_phone', '').strip()
-    smsc_login = os.environ.get('SMSC_LOGIN', '').strip()
-    smsc_pass = os.environ.get('SMSC_PASS', '').strip()
+    phone = db_get("notify_phone", "").strip()
+    smsc_login = os.environ.get("SMSC_LOGIN", "").strip()
+    smsc_pass = os.environ.get("SMSC_PASS", "").strip()
     if not all([phone, smsc_login, smsc_pass]):
         return
     try:
-        r = requests.get('https://smsc.ru/sys/send.php', params={
-            'login': smsc_login,
-            'psw': smsc_pass,
-            'phones': phone,
-            'mes': message[:160],
-            'charset': 'utf-8',
-            'fmt': 3,
-        }, timeout=10)
+        r = requests.get(
+            "https://smsc.ru/sys/send.php",
+            params={
+                "login": smsc_login,
+                "psw": smsc_pass,
+                "phones": phone,
+                "mes": message[:160],
+                "charset": "utf-8",
+                "fmt": 3,
+            },
+            timeout=10,
+        )
         data = r.json()
-        if data.get('error_code'):
-            log_msg(f'[УВЕДОМЛЕНИЕ] SMSC ошибка: {data}', 'error')
+        if data.get("error_code"):
+            log_msg(f"[УВЕДОМЛЕНИЕ] SMSC ошибка: {data}", "error")
         else:
-            log_msg(f'[УВЕДОМЛЕНИЕ] SMS отправлено на {phone}')
+            log_msg(f"[УВЕДОМЛЕНИЕ] SMS отправлено на {phone}")
     except Exception as e:
-        log_msg(f'[УВЕДОМЛЕНИЕ] Ошибка отправки SMS: {e}', 'error')
+        log_msg(f"[УВЕДОМЛЕНИЕ] Ошибка отправки SMS: {e}", "error")
 
 
 def notify_failure(reason, log_entries=None, partial=False):
-    prefix = 'Частично' if partial else 'Сбой'
-    msg = f'{prefix} {msk_ts()}: {reason}'
-    log_msg(f'[УВЕДОМЛЕНИЕ] Отправляю уведомление [{prefix}]: {reason}')
+    prefix = "Частично" if partial else "Сбой"
+    msg = f"{prefix} {msk_ts()}: {reason}"
+    log_msg(f"[УВЕДОМЛЕНИЕ] Отправляю уведомление [{prefix}]: {reason}")
     send_failure_email(msg, log_entries=log_entries or [], partial=partial)
     send_failure_sms(msg)
 
@@ -822,20 +966,28 @@ def run_full_cycle():
     pub_ok = False
     do_story = do_wall = story_ok = wall_ok = False
     if gen_ok:
-        do_story = db_get('vk_publish_story', '1') == '1'
-        do_wall  = db_get('vk_publish_wall',  '1') == '1'
-        story_ok = publish_story()    if do_story else False
-        wall_ok  = publish_to_wall() if do_wall  else False
+        do_story = db_get("vk_publish_story", "1") == "1"
+        do_wall = db_get("vk_publish_wall", "1") == "1"
+        story_ok = publish_story() if do_story else False
+        wall_ok = publish_to_wall() if do_wall else False
         pub_ok = story_ok or wall_ok
     story_partial_fail = gen_ok and do_story and not story_ok and wall_ok
     success = pub_ok if gen_ok else False
-    entries = list(app_state['current_cycle']['entries']) if app_state['current_cycle'] else []
+    entries = (
+        list(app_state["current_cycle"]["entries"])
+        if app_state["current_cycle"]
+        else []
+    )
     end_cycle(success)
     if not success:
-        reason = 'ошибка генерации видео' if not gen_ok else 'ошибка публикации в VK'
+        reason = "ошибка генерации видео" if not gen_ok else "ошибка публикации в VK"
         notify_failure(reason, log_entries=entries)
     elif story_partial_fail:
-        notify_failure('ошибка публикации истории в VK (стена опубликована успешно)', log_entries=entries, partial=True)
+        notify_failure(
+            "ошибка публикации истории в VK (стена опубликована успешно)",
+            log_entries=entries,
+            partial=True,
+        )
     return gen_ok, pub_ok
 
 
@@ -846,8 +998,8 @@ def scheduler_loop():
     next_retry_after = 0
 
     while True:
-        pub_h, pub_m = parse_hhmm(db_get('publish_time', '03:00'))
-        lead_mins = parse_lead_mins(db_get('lead_time_mins', '120'))
+        pub_h, pub_m = parse_hhmm(db_get("publish_time", "03:00"))
+        lead_mins = parse_lead_mins(db_get("lead_time_mins", "120"))
 
         gen_total = (pub_h * 60 + pub_m - lead_mins) % 1440
         gen_h = gen_total // 60
@@ -864,10 +1016,10 @@ def scheduler_loop():
             pub_h_msk, pub_m_msk = to_msk(pub_h, pub_m)
             gen_h_msk, gen_m_msk = to_msk(gen_h, gen_m)
             print(
-                f'[{now_utc.strftime("%d.%m %H:%M:%S")} UTC] '
-                f'Новый день. Генерация в {gen_h_msk:02d}:{gen_m_msk:02d} МСК, '
-                f'публикация в {pub_h_msk:02d}:{pub_m_msk:02d} МСК '
-                f'(упреждение {lead_mins} мин).'
+                f"[{now_utc.strftime('%d.%m %H:%M:%S')} UTC] "
+                f"Новый день. Генерация в {gen_h_msk:02d}:{gen_m_msk:02d} МСК, "
+                f"публикация в {pub_h_msk:02d}:{pub_m_msk:02d} МСК "
+                f"(упреждение {lead_mins} мин)."
             )
 
         now_mins = now_utc.hour * 60 + now_utc.minute
@@ -875,58 +1027,68 @@ def scheduler_loop():
         mins_to_pub = (pub_mins - now_mins) % 1440
         should_generate = mins_to_pub <= lead_mins
 
-        if should_generate and not generated_today and not app_state['running'] and time.time() >= next_retry_after:
+        if (
+            should_generate
+            and not generated_today
+            and not app_state["running"]
+            and time.time() >= next_retry_after
+        ):
             gen_ok, pub_ok = run_full_cycle()
             generated_today = gen_ok
             published_today = pub_ok
             if not gen_ok:
                 next_retry_after = time.time() + 1800
-                print('[scheduler] Генерация не удалась. Следующая попытка через 30 минут.')
+                print(
+                    "[scheduler] Генерация не удалась. Следующая попытка через 30 минут."
+                )
         elif generated_today and not published_today:
-            now_mins_fresh = datetime.now(timezone.utc).hour * 60 + datetime.now(timezone.utc).minute
+            now_mins_fresh = (
+                datetime.now(timezone.utc).hour * 60 + datetime.now(timezone.utc).minute
+            )
             mins_past_pub = (now_mins_fresh - pub_mins) % 1440
             if mins_past_pub < 720:
                 start_cycle()
-                do_story = db_get('vk_publish_story', '1') == '1'
-                do_wall  = db_get('vk_publish_wall',  '1') == '1'
-                story_ok = publish_story()    if do_story else False
-                wall_ok  = publish_to_wall() if do_wall  else False
+                do_story = db_get("vk_publish_story", "1") == "1"
+                do_wall = db_get("vk_publish_wall", "1") == "1"
+                story_ok = publish_story() if do_story else False
+                wall_ok = publish_to_wall() if do_wall else False
                 published_today = story_ok or wall_ok
                 end_cycle(published_today)
 
         time.sleep(30)
 
 
-flask_app = Flask(__name__, static_folder='.')
-flask_app.secret_key = os.environ.get('FLASK_SECRET', os.urandom(24).hex())
+flask_app = Flask(__name__, static_folder=".")
+flask_app.secret_key = os.environ.get("FLASK_SECRET", os.urandom(24).hex())
 
 
-@flask_app.route('/favicon.ico')
+@flask_app.route("/favicon.ico")
 def favicon():
     from flask import send_file
-    return send_file('generated-icon.png', mimetype='image/png')
+
+    return send_file("generated-icon.png", mimetype="image/png")
 
 
-@flask_app.route('/', methods=['GET', 'POST'])
+@flask_app.route("/", methods=["GET", "POST"])
 def login():
-    if session.get('auth'):
-        return redirect(url_for('admin'))
+    if session.get("auth"):
+        return redirect(url_for("admin"))
     error = False
-    if request.method == 'POST':
-        if request.form.get('password') == ADMIN_PASSWORD:
-            session['auth'] = True
-            return redirect(url_for('admin'))
+    if request.method == "POST":
+        if request.form.get("password") == ADMIN_PASSWORD:
+            session["auth"] = True
+            return redirect(url_for("admin"))
         error = True
-    return render_template('login.html', error=error)
+    return render_template("login.html", error=error)
 
 
-@flask_app.route('/admin')
+@flask_app.route("/admin")
 def admin():
-    if not session.get('auth'):
-        return redirect(url_for('login'))
-    metaprompt = db_get('metaprompt', '')
-    pub_h_utc, pub_m_utc = parse_hhmm(db_get('publish_time', '03:00'))
-    lead_mins = parse_lead_mins(db_get('lead_time_mins', '120'))
+    if not session.get("auth"):
+        return redirect(url_for("login"))
+    metaprompt = db_get("metaprompt", "")
+    pub_h_utc, pub_m_utc = parse_hhmm(db_get("publish_time", "03:00"))
+    lead_mins = parse_lead_mins(db_get("lead_time_mins", "120"))
 
     gen_total = (pub_h_utc * 60 + pub_m_utc - lead_mins) % 1440
     gen_h_utc = gen_total // 60
@@ -935,215 +1097,230 @@ def admin():
     pub_h_msk, pub_m_msk = to_msk(pub_h_utc, pub_m_utc)
     gen_h_msk, gen_m_msk = to_msk(gen_h_utc, gen_m_utc)
 
-    history_days = parse_history_days(db_get('history_days', '7'))
-    short_log_days = parse_short_log_days(db_get('short_log_days', '365'))
-    emulation_mode = db_get('emulation_mode', '0') == '1'
-    notify_email = db_get('notify_email', '')
-    notify_phone = db_get('notify_phone', '')
-    vk_publish_story = db_get('vk_publish_story', '1') == '1'
-    vk_publish_wall  = db_get('vk_publish_wall',  '1') == '1'
-    aspect_ratio_x   = int(db_get('aspect_ratio_x', '9'))
-    aspect_ratio_y   = int(db_get('aspect_ratio_y', '16'))
-    video_duration   = max(1, min(60, int(db_get('video_duration', '6'))))
+    history_days = parse_history_days(db_get("history_days", "7"))
+    short_log_days = parse_short_log_days(db_get("short_log_days", "365"))
+    emulation_mode = db_get("emulation_mode", "0") == "1"
+    notify_email = db_get("notify_email", "")
+    notify_phone = db_get("notify_phone", "")
+    vk_publish_story = db_get("vk_publish_story", "1") == "1"
+    vk_publish_wall = db_get("vk_publish_wall", "1") == "1"
+    aspect_ratio_x = int(db_get("aspect_ratio_x", "9"))
+    aspect_ratio_y = int(db_get("aspect_ratio_y", "16"))
+    video_duration = max(1, min(60, int(db_get("video_duration", "6"))))
 
-    return render_template('admin.html',
-                           metaprompt=metaprompt,
-                           publish_time_msk=f'{pub_h_msk:02d}:{pub_m_msk:02d}',
-                           generate_time_msk=f'{gen_h_msk:02d}:{gen_m_msk:02d}',
-                           lead_time_mins=lead_mins,
-                           history_days=history_days,
-                           short_log_days=short_log_days,
-                           emulation_mode=emulation_mode,
-                           notify_email=notify_email,
-                           notify_phone=notify_phone,
-                           vk_publish_story=vk_publish_story,
-                           vk_publish_wall=vk_publish_wall,
-                           aspect_ratio_x=aspect_ratio_x,
-                           aspect_ratio_y=aspect_ratio_y,
-                           video_duration=video_duration,
-                           status=app_state)
+    return render_template(
+        "admin.html",
+        metaprompt=metaprompt,
+        publish_time_msk=f"{pub_h_msk:02d}:{pub_m_msk:02d}",
+        generate_time_msk=f"{gen_h_msk:02d}:{gen_m_msk:02d}",
+        lead_time_mins=lead_mins,
+        history_days=history_days,
+        short_log_days=short_log_days,
+        emulation_mode=emulation_mode,
+        notify_email=notify_email,
+        notify_phone=notify_phone,
+        vk_publish_story=vk_publish_story,
+        vk_publish_wall=vk_publish_wall,
+        aspect_ratio_x=aspect_ratio_x,
+        aspect_ratio_y=aspect_ratio_y,
+        video_duration=video_duration,
+        status=app_state,
+    )
 
 
-@flask_app.route('/save', methods=['POST'])
+@flask_app.route("/save", methods=["POST"])
 def save():
-    if not session.get('auth'):
-        return redirect(url_for('login'))
-    metaprompt = request.form.get('metaprompt', '').strip()
+    if not session.get("auth"):
+        return redirect(url_for("login"))
+    metaprompt = request.form.get("metaprompt", "").strip()
     if not metaprompt:
-        flash('Мета-промпт не может быть пустым', 'error')
-        return redirect(url_for('admin'))
-    db_set('metaprompt', metaprompt)
+        flash("Мета-промпт не может быть пустым", "error")
+        return redirect(url_for("admin"))
+    db_set("metaprompt", metaprompt)
 
-    pub_time_msk = request.form.get('publish_time', '').strip()
+    pub_time_msk = request.form.get("publish_time", "").strip()
     if pub_time_msk:
         h_msk, m_msk = parse_hhmm(pub_time_msk)
         h_utc, m_utc = to_utc_from_msk(h_msk, m_msk)
-        db_set('publish_time', f'{h_utc:02d}:{m_utc:02d}')
+        db_set("publish_time", f"{h_utc:02d}:{m_utc:02d}")
 
-    lead_raw = request.form.get('lead_time_mins', '').strip()
+    lead_raw = request.form.get("lead_time_mins", "").strip()
     if lead_raw:
-        db_set('lead_time_mins', str(parse_lead_mins(lead_raw)))
+        db_set("lead_time_mins", str(parse_lead_mins(lead_raw)))
 
-    history_raw = request.form.get('history_days', '').strip()
+    history_raw = request.form.get("history_days", "").strip()
     if history_raw:
-        db_set('history_days', str(parse_history_days(history_raw)))
+        db_set("history_days", str(parse_history_days(history_raw)))
 
-    short_log_raw = request.form.get('short_log_days', '').strip()
+    short_log_raw = request.form.get("short_log_days", "").strip()
     if short_log_raw:
-        db_set('short_log_days', str(parse_short_log_days(short_log_raw)))
+        db_set("short_log_days", str(parse_short_log_days(short_log_raw)))
 
-    emulation_raw = request.form.get('emulation_mode', '0')
-    db_set('emulation_mode', '1' if emulation_raw == '1' else '0')
+    emulation_raw = request.form.get("emulation_mode", "0")
+    db_set("emulation_mode", "1" if emulation_raw == "1" else "0")
 
-    db_set('notify_email', request.form.get('notify_email', '').strip())
-    db_set('notify_phone', request.form.get('notify_phone', '').strip())
+    db_set("notify_email", request.form.get("notify_email", "").strip())
+    db_set("notify_phone", request.form.get("notify_phone", "").strip())
 
-    vk_story_raw = request.form.get('vk_publish_story', '0')
-    vk_wall_raw  = request.form.get('vk_publish_wall',  '0')
+    vk_story_raw = request.form.get("vk_publish_story", "0")
+    vk_wall_raw = request.form.get("vk_publish_wall", "0")
     # хотя бы одно должно быть включено
-    if vk_story_raw != '1' and vk_wall_raw != '1':
-        vk_story_raw = '1'
-    db_set('vk_publish_story', '1' if vk_story_raw == '1' else '0')
-    db_set('vk_publish_wall',  '1' if vk_wall_raw  == '1' else '0')
+    if vk_story_raw != "1" and vk_wall_raw != "1":
+        vk_story_raw = "1"
+    db_set("vk_publish_story", "1" if vk_story_raw == "1" else "0")
+    db_set("vk_publish_wall", "1" if vk_wall_raw == "1" else "0")
 
     try:
-        ar_x = max(1, min(99, int(request.form.get('aspect_ratio_x', '9'))))
+        ar_x = max(1, min(99, int(request.form.get("aspect_ratio_x", "9"))))
     except (ValueError, TypeError):
         ar_x = 9
     try:
-        ar_y = max(1, min(99, int(request.form.get('aspect_ratio_y', '16'))))
+        ar_y = max(1, min(99, int(request.form.get("aspect_ratio_y", "16"))))
     except (ValueError, TypeError):
         ar_y = 16
-    db_set('aspect_ratio_x', str(ar_x))
-    db_set('aspect_ratio_y', str(ar_y))
+    db_set("aspect_ratio_x", str(ar_x))
+    db_set("aspect_ratio_y", str(ar_y))
 
     try:
-        vid_dur = max(1, min(60, int(request.form.get('video_duration', '6'))))
+        vid_dur = max(1, min(60, int(request.form.get("video_duration", "6"))))
     except (ValueError, TypeError):
         vid_dur = 6
-    db_set('video_duration', str(vid_dur))
+    db_set("video_duration", str(vid_dur))
 
-    active_tab = request.form.get('active_tab', 'pipeline')
-    flash('Настройки сохранены', 'success')
-    return redirect(url_for('admin') + f'?tab={active_tab}')
+    active_tab = request.form.get("active_tab", "pipeline")
+    flash("Настройки сохранены", "success")
+    return redirect(url_for("admin") + f"?tab={active_tab}")
 
 
-@flask_app.route('/log-data')
+@flask_app.route("/log-data")
 def log_data():
-    if not session.get('auth'):
+    if not session.get("auth"):
         return jsonify({})
 
-    history_days = parse_history_days(db_get('history_days', '7'))
+    history_days = parse_history_days(db_get("history_days", "7"))
     cutoff_ts = time.time() - history_days * 86400
 
     def serialize_cycle(c, is_current=False):
-        age_ok = is_current or c.get('started_ts', 0) >= cutoff_ts
+        age_ok = is_current or c.get("started_ts", 0) >= cutoff_ts
         return {
-            'started': c['started'],
-            'started_ts': c.get('started_ts', 0),
-            'status': c['status'],
-            'summary': c.get('summary', {}),
-            'entries': c['entries'] if age_ok else [],
+            "started": c["started"],
+            "started_ts": c.get("started_ts", 0),
+            "status": c["status"],
+            "summary": c.get("summary", {}),
+            "entries": c["entries"] if age_ok else [],
         }
 
-    cycles = [serialize_cycle(c) for c in app_state['cycles']]
-    current = app_state['current_cycle']
+    cycles = [serialize_cycle(c) for c in app_state["cycles"]]
+    current = app_state["current_cycle"]
     if current:
         cycles = [serialize_cycle(current, is_current=True)] + cycles
 
-    return jsonify({
-        'running': app_state['running'],
-        'current_prompt': app_state['current_prompt'],
-        'cycles': cycles,
-    })
+    return jsonify(
+        {
+            "running": app_state["running"],
+            "current_prompt": app_state["current_prompt"],
+            "cycles": cycles,
+        }
+    )
 
 
-@flask_app.route('/run-now', methods=['POST'])
+@flask_app.route("/run-now", methods=["POST"])
 def run_now():
-    if not session.get('auth'):
-        return redirect(url_for('login'))
-    if app_state['running']:
-        flash('Генерация уже запущена', 'error')
-        return redirect(url_for('admin'))
+    if not session.get("auth"):
+        return redirect(url_for("login"))
+    if app_state["running"]:
+        flash("Генерация уже запущена", "error")
+        return redirect(url_for("admin"))
 
     def run():
         try:
             run_full_cycle()
         except Exception as e:
-            entries = list(app_state['current_cycle']['entries']) if app_state['current_cycle'] else []
-            log_msg(f'Критическая ошибка цикла: {e}', 'error')
-            notify_failure(f'необработанное исключение: {e}', log_entries=entries)
+            entries = (
+                list(app_state["current_cycle"]["entries"])
+                if app_state["current_cycle"]
+                else []
+            )
+            log_msg(f"Критическая ошибка цикла: {e}", "error")
+            notify_failure(f"необработанное исключение: {e}", log_entries=entries)
 
     t = threading.Thread(target=run, daemon=True)
     t.start()
-    flash('Цикл запущен — смотрите логи', 'success')
-    return redirect(url_for('admin'))
+    flash("Цикл запущен — смотрите логи", "success")
+    return redirect(url_for("admin"))
 
 
-@flask_app.route('/test-notify', methods=['POST'])
+@flask_app.route("/test-notify", methods=["POST"])
 def test_notify():
-    if not session.get('auth'):
-        return redirect(url_for('login'))
-    notify_failure('тестовый сбой (проверка уведомлений)')
-    flash('Тестовое уведомление отправлено', 'success')
-    return redirect(url_for('admin'))
+    if not session.get("auth"):
+        return redirect(url_for("login"))
+    notify_failure("тестовый сбой (проверка уведомлений)")
+    flash("Тестовое уведомление отправлено", "success")
+    return redirect(url_for("admin"))
 
 
-@flask_app.route('/api/models')
+@flask_app.route("/api/models")
 def api_models():
-    if not session.get('auth'):
-        return jsonify({'error': 'unauthorized'}), 401
+    if not session.get("auth"):
+        return jsonify({"error": "unauthorized"}), 401
     try:
         with get_db() as conn:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-                cur.execute('SELECT id, name, url, body, "order", active FROM models ORDER BY "order" ASC')
+                cur.execute(
+                    'SELECT id, name, url, body, "order", active FROM models ORDER BY "order" ASC'
+                )
                 rows = cur.fetchall()
         return jsonify([dict(r) for r in rows])
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({"error": str(e)}), 500
 
 
-@flask_app.route('/api/models/<string:model_id>/activate', methods=['POST'])
+@flask_app.route("/api/models/<string:model_id>/activate", methods=["POST"])
 def api_model_activate(model_id):
-    if not session.get('auth'):
-        return jsonify({'error': 'unauthorized'}), 401
+    if not session.get("auth"):
+        return jsonify({"error": "unauthorized"}), 401
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
-                cur.execute('UPDATE models SET active = FALSE')
-                cur.execute('UPDATE models SET active = TRUE WHERE id = %s', (model_id,))
+                cur.execute("UPDATE models SET active = FALSE")
+                cur.execute(
+                    "UPDATE models SET active = TRUE WHERE id = %s", (model_id,)
+                )
             conn.commit()
-        return jsonify({'ok': True})
+        return jsonify({"ok": True})
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({"error": str(e)}), 500
 
 
-@flask_app.route('/api/models/reorder', methods=['POST'])
+@flask_app.route("/api/models/reorder", methods=["POST"])
 def api_models_reorder():
-    if not session.get('auth'):
-        return jsonify({'error': 'unauthorized'}), 401
+    if not session.get("auth"):
+        return jsonify({"error": "unauthorized"}), 401
     data = request.get_json(silent=True) or {}
-    ids = data.get('ids', [])
+    ids = data.get("ids", [])
     if not ids or not isinstance(ids, list):
-        return jsonify({'error': 'ids required'}), 400
+        return jsonify({"error": "ids required"}), 400
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
                 for idx, model_id in enumerate(ids, start=1):
-                    cur.execute('UPDATE models SET "order" = %s WHERE id = %s', (idx, model_id))
+                    cur.execute(
+                        'UPDATE models SET "order" = %s WHERE id = %s', (idx, model_id)
+                    )
             conn.commit()
-        return jsonify({'ok': True})
+        return jsonify({"ok": True})
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({"error": str(e)}), 500
 
 
-@flask_app.route('/logout')
+@flask_app.route("/logout")
 def logout():
     session.clear()
-    return redirect(url_for('login'))
+    return redirect(url_for("login"))
 
 
 _scheduler_started = False
+
 
 def start_scheduler():
     global _scheduler_started
@@ -1152,18 +1329,18 @@ def start_scheduler():
         init_db()
         saved = db_load_cycles()
         for c in saved:
-            app_state['cycles'].append(c)
+            app_state["cycles"].append(c)
         if saved:
             last = saved[0]
-            if last.get('summary', {}).get('published_at'):
-                app_state['last_published'] = last['summary']['published_at']
-                app_state['last_ok'] = last['status'] == 'ok'
-        print(f'[DB] Загружено циклов из БД: {len(saved)}')
+            if last.get("summary", {}).get("published_at"):
+                app_state["last_published"] = last["summary"]["published_at"]
+                app_state["last_ok"] = last["status"] == "ok"
+        print(f"[DB] Загружено циклов из БД: {len(saved)}")
         t = threading.Thread(target=scheduler_loop, daemon=True)
         t.start()
 
 
 start_scheduler()
 
-if __name__ == '__main__':
-    flask_app.run(host='0.0.0.0', port=5000, debug=False)
+if __name__ == "__main__":
+    flask_app.run(host="0.0.0.0", port=5000, debug=False)
