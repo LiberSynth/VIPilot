@@ -173,15 +173,19 @@ def init_db():
                         active BOOLEAN NOT NULL DEFAULT FALSE
                     )
                 """)
+                import json as _json
+                _body_tpl = _json.dumps({
+                    "prompt": "{}",
+                    "duration": "{:d}s",
+                    "aspect_ratio": "{:d}:{:d}",
+                })
+                # Миграция: обновить body для строк, где шаблон ещё не применён
+                cur.execute(
+                    "UPDATE models SET body = %s::jsonb WHERE body->>'prompt' IS DISTINCT FROM '{}'",
+                    (_body_tpl,)
+                )
                 cur.execute("SELECT COUNT(*) FROM models")
                 if cur.fetchone()[0] == 0:
-                    import json as _json
-
-                    _body_tpl = _json.dumps({
-                        "prompt": "{}",
-                        "duration": "{:d}s",
-                        "aspect_ratio": "{:d}:{:d}",
-                    })
                     models_seed = [
                         ("veo2",                    "veo2",                                  _body_tpl, 1, True),
                         ("minimax/video-01",         "minimax/video-01",                      _body_tpl, 2, False),
