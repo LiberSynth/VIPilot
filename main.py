@@ -134,6 +134,34 @@ def init_db():
                         summary JSONB NOT NULL DEFAULT '{}'
                     )
                 ''')
+                cur.execute('''
+                    CREATE TABLE IF NOT EXISTS models (
+                        id SERIAL PRIMARY KEY,
+                        name VARCHAR(200) NOT NULL,
+                        url VARCHAR(500) NOT NULL,
+                        body JSONB NOT NULL DEFAULT '{}',
+                        "order" INTEGER NOT NULL DEFAULT 0,
+                        active BOOLEAN NOT NULL DEFAULT FALSE
+                    )
+                ''')
+                cur.execute('SELECT COUNT(*) FROM models')
+                if cur.fetchone()[0] == 0:
+                    import json as _json
+                    models_seed = [
+                        ('veo2', 'veo2',
+                         _json.dumps({"prompt": "<сгенерированный промпт>", "duration": 6, "aspect_ratio": "9:16"}),
+                         1, True),
+                        ('minimax/video-01', 'minimax/video-01',
+                         _json.dumps({"prompt": "<сгенерированный промпт>", "duration": 6, "aspect_ratio": "9:16"}),
+                         2, False),
+                        ('kling-video/v1.6/standard', 'kling-video/v1.6/standard/text-to-video',
+                         _json.dumps({"prompt": "<сгенерированный промпт>", "duration": 6, "aspect_ratio": "9:16"}),
+                         3, False),
+                    ]
+                    cur.executemany(
+                        'INSERT INTO models (name, url, body, "order", active) VALUES (%s, %s, %s, %s, %s)',
+                        models_seed
+                    )
             conn.commit()
         print('[DB] Инициализация выполнена')
     except Exception as e:
@@ -986,6 +1014,68 @@ def test_notify():
     notify_failure('тестовый сбой (проверка уведомлений)')
     flash('Тестовое уведомление отправлено', 'success')
     return redirect(url_for('admin'))
+
+
+@flask_app.route('/api/models')
+def api_models():
+    if not session.get('auth'):
+        return jsonify({'error': 'unauthorized'}), 401
+    try:
+        with get_db() as conn:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute('SELECT id, name, url, body, "order", active FROM models ORDER BY "order" ASC')
+                rows = cur.fetchall()
+        return jsonify([dict(r) for r in rows])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@flask_app.route('/api/models/<int:model_id>/activate', methods=['POST'])
+def api_model_activate(model_id):
+    if not session.get('auth'):
+        return jsonify({'error': 'unauthorized'}), 401
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute('UPDATE models SET active = FALSE')
+                cur.execute('UPDATE models SET active = TRUE WHERE id = %s', (model_id,))
+            conn.commit()
+        return jsonify({'ok': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@flask_app.route('/api/models/<int:model_id>/move', methods=['POST'])
+def api_model_move(model_id):
+    if not session.get('auth'):
+        return jsonify({'error': 'unauthorized'}), 401
+    direction = request.json.get('direction') if request.is_json else request.form.get('direction')
+    if direction not in ('up', 'down'):
+        return jsonify({'error': 'invalid direction'}), 400
+    try:
+        with get_db() as conn:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute('SELECT id, "order" FROM models ORDER BY "order" ASC')
+                rows = cur.fetchall()
+            ids = [r['id'] for r in rows]
+            if model_id not in ids:
+                return jsonify({'error': 'not found'}), 404
+            idx = ids.index(model_id)
+            if direction == 'up' and idx > 0:
+                swap_idx = idx - 1
+            elif direction == 'down' and idx < len(ids) - 1:
+                swap_idx = idx + 1
+            else:
+                return jsonify({'ok': True})
+            with conn.cursor() as cur:
+                ord_a = rows[idx]['order']
+                ord_b = rows[swap_idx]['order']
+                cur.execute('UPDATE models SET "order" = %s WHERE id = %s', (ord_b, ids[idx]))
+                cur.execute('UPDATE models SET "order" = %s WHERE id = %s', (ord_a, ids[swap_idx]))
+            conn.commit()
+        return jsonify({'ok': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @flask_app.route('/logout')

@@ -285,6 +285,68 @@
     padding: 40px 0; font-size: 14px;
   }
 
+  /* ── Collapsible panel ── */
+  .cp-card {
+    background: #1a1a24; border: 1px solid #2a2a38;
+    border-radius: 14px; margin-bottom: 12px; overflow: hidden;
+  }
+  .cp-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px; cursor: pointer; user-select: none;
+    -webkit-user-select: none;
+  }
+  .cp-header:active { background: rgba(255,255,255,.03); }
+  .cp-header-left { display: flex; align-items: center; gap: 10px; }
+  .cp-icon { font-size: 16px; line-height: 1; }
+  .cp-title { font-size: 14px; font-weight: 600; color: #e0e0f0; }
+  .cp-arrow {
+    font-size: 14px; color: #555; transition: transform .2s;
+  }
+  .cp-card.open .cp-arrow { transform: rotate(180deg); }
+  .cp-body { display: none; border-top: 1px solid #1e1e2e; padding: 14px 16px; }
+  .cp-card.open .cp-body { display: block; }
+  .cp-section-label {
+    font-size: 11px; font-weight: 600; color: #8888a8;
+    text-transform: uppercase; letter-spacing: .07em; margin-bottom: 10px;
+  }
+
+  /* ── Model list ── */
+  .model-list { display: flex; flex-direction: column; gap: 6px; }
+  .model-loading { font-size: 13px; color: #555; padding: 8px 0; }
+  .model-item {
+    display: flex; align-items: center; gap: 10px;
+    background: #0f0f13; border: 1px solid #1e1e2e;
+    border-radius: 10px; padding: 10px 12px;
+    transition: border-color .15s;
+  }
+  .model-item.model-active { border-color: rgba(62,207,142,.35); }
+  .model-radio {
+    width: 18px; height: 18px; border-radius: 50%;
+    border: 2px solid #2a2a38; flex-shrink: 0; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: border-color .15s;
+  }
+  .model-item.model-active .model-radio { border-color: #3ecf8e; }
+  .model-radio-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #3ecf8e; display: none;
+  }
+  .model-item.model-active .model-radio-dot { display: block; }
+  .model-name {
+    flex: 1; font-size: 13px; color: #c8c8e0;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    word-break: break-all; min-width: 0;
+  }
+  .model-item.model-active .model-name { color: #fff; }
+  .model-actions { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; }
+  .model-move-btn {
+    background: none; border: none; color: #444; font-size: 12px;
+    cursor: pointer; padding: 2px 4px; line-height: 1;
+    transition: color .15s; font-family: inherit;
+  }
+  .model-move-btn:hover { color: #4a7cf7; }
+  .model-move-btn:disabled { opacity: .2; cursor: default; }
+
   /* ── Aspect ratio control ── */
   .ar-wrap { display: flex; align-items: center; gap: 16px; margin-top: 14px; }
   .ar-preview-box {
@@ -419,14 +481,23 @@
 
   <!-- ══ ЗАПРОС ══ -->
   <div id="panel-request" class="tab-panel">
-    <div class="card">
-      <div class="card-title">Модель генерации</div>
-      <div class="hint">Запрос отправляется в fal.ai на модель <strong style="color:#c0c0d8">fast-svd-lcm/text-to-video</strong>. Параметры: длительность 6 сек, разрешение 1080×1920 (9:16).</div>
+
+    <div class="cp-card" id="cp-falai">
+      <div class="cp-header" onclick="toggleCP('cp-falai')">
+        <div class="cp-header-left">
+          <span class="cp-icon">⚙</span>
+          <span class="cp-title">Платформа fal.ai</span>
+        </div>
+        <span class="cp-arrow">▾</span>
+      </div>
+      <div class="cp-body">
+        <div class="cp-section-label">Модели</div>
+        <div class="model-list" id="model-list">
+          <div class="model-loading">Загрузка...</div>
+        </div>
+      </div>
     </div>
-    <div class="card">
-      <div class="card-title">Сюжет</div>
-      <div class="hint">Промпт генерируется автоматически из случайных комбинаций: субъект → трансформация → материал → объект → локация → стиль. Мета-промпт с вкладки «Пайплайн» добавляется к каждому запросу.</div>
-    </div>
+
   </div>
 
   <!-- ══ ПУБЛИКАЦИЯ ══ -->
@@ -768,6 +839,97 @@ function setAR(x, y) {
 }
 
 updateAR();
+
+// ── Collapsible panels ──
+function toggleCP(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.toggle('open');
+}
+
+// ── Models list ──
+(function() {
+  function renderModels(list) {
+    const container = document.getElementById('model-list');
+    if (!container) return;
+    if (!list || list.length === 0) {
+      container.innerHTML = '<div class="model-loading">Нет моделей</div>';
+      return;
+    }
+    container.innerHTML = '';
+    list.forEach(function(m, idx) {
+      const item = document.createElement('div');
+      item.className = 'model-item' + (m.active ? ' model-active' : '');
+      item.dataset.id = m.id;
+      item.innerHTML =
+        '<div class="model-radio" onclick="activateModel(' + m.id + ')">' +
+          '<div class="model-radio-dot"></div>' +
+        '</div>' +
+        '<div class="model-name">' + escHtml(m.name) + '</div>' +
+        '<div class="model-actions">' +
+          '<button type="button" class="model-move-btn" title="Вверх"' +
+            (idx === 0 ? ' disabled' : '') +
+            ' onclick="moveModel(' + m.id + ',\'up\')">▲</button>' +
+          '<button type="button" class="model-move-btn" title="Вниз"' +
+            (idx === list.length - 1 ? ' disabled' : '') +
+            ' onclick="moveModel(' + m.id + ',\'down\')">▼</button>' +
+        '</div>';
+      container.appendChild(item);
+    });
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  window.activateModel = function(id) {
+    fetch('/api/models/' + id + '/activate', {method: 'POST'})
+      .then(function(r) { return r.json(); })
+      .then(function() { loadModels(); })
+      .catch(function(e) { console.error('activate error', e); });
+  };
+
+  window.moveModel = function(id, direction) {
+    fetch('/api/models/' + id + '/move', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({direction: direction})
+    })
+      .then(function(r) { return r.json(); })
+      .then(function() { loadModels(); })
+      .catch(function(e) { console.error('move error', e); });
+  };
+
+  function loadModels() {
+    fetch('/api/models')
+      .then(function(r) { return r.json(); })
+      .then(function(data) { renderModels(data); })
+      .catch(function() {
+        const c = document.getElementById('model-list');
+        if (c) c.innerHTML = '<div class="model-loading">Ошибка загрузки</div>';
+      });
+  }
+
+  // Auto-open and load when request tab is clicked
+  document.querySelectorAll('.tab-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      if (btn.getAttribute('onclick') && btn.getAttribute('onclick').indexOf("'request'") !== -1) {
+        const cp = document.getElementById('cp-falai');
+        if (cp && !cp.classList.contains('open')) cp.classList.add('open');
+        loadModels();
+      }
+    });
+  });
+
+  // Load immediately if request tab is active on page load
+  (function() {
+    const requestPanel = document.getElementById('panel-request');
+    if (requestPanel && requestPanel.classList.contains('active')) {
+      const cp = document.getElementById('cp-falai');
+      if (cp) cp.classList.add('open');
+      loadModels();
+    }
+  })();
+})();
 
 // Трекинг изменений — форма Служебные
 (function() {
