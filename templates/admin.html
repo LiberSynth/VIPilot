@@ -539,8 +539,14 @@
       </div>
     </div>
 
-    <form method="post" action="/save" id="settings-form">
-      <div class="card">
+    <form method="post" action="/run-now">
+      <button type="submit" class="btn-secondary" {% if status.running %}disabled{% endif %}>
+        {% if status.running %}Генерация идёт...{% else %}Запустить сейчас{% endif %}
+      </button>
+    </form>
+
+    <form id="settings-form" style="margin-top:0">
+      <div class="card" style="margin-top:12px">
         <div class="card-title">Мета-промпт</div>
         <div class="hint">Стиль, тема и характер видео. Каждый день генерируется новый уникальный сюжет.</div>
         <textarea name="metaprompt" id="ta" spellcheck="true">{{ metaprompt }}</textarea>
@@ -584,14 +590,6 @@
       <input type="hidden" name="history_days" id="h_history_days" value="{{ history_days }}">
       <input type="hidden" name="short_log_days" id="h_short_log_days" value="{{ short_log_days }}">
       <input type="hidden" name="emulation_mode" id="h_emulation_mode" value="{{ '1' if emulation_mode else '0' }}">
-
-      <button type="submit" class="btn-primary" id="save-btn" disabled>Сохранить настройки</button>
-    </form>
-
-    <form method="post" action="/run-now">
-      <button type="submit" class="btn-secondary" {% if status.running %}disabled{% endif %}>
-        {% if status.running %}Генерация идёт...{% else %}Запустить сейчас{% endif %}
-      </button>
     </form>
 
   </div>
@@ -898,27 +896,38 @@ function onVkPublishToggle(changedChk, otherId, selfHidId, otherHidId) {
   savePublishSettings();
 }
 
-// Трекинг изменений — форма Пайплайн
-var checkDirtyPipeline;
+// ── Автосохранение панели «Пайплайн» ──
+var _pipelineSaveTimer = null;
+
+function savePipelineSettings() {
+  const form = document.getElementById('settings-form');
+  if (!form) return;
+  const data = new FormData(form);
+  data.set('active_tab', 'pipeline');
+  fetch('/save', { method: 'POST', body: data })
+    .then(r => {
+      if (r.ok || r.redirected) { showToast('Сохранено'); }
+      else { showToast('Ошибка сохранения', true); }
+    })
+    .catch(() => showToast('Ошибка сохранения', true));
+}
+
+function schedulePipelineSave() {
+  clearTimeout(_pipelineSaveTimer);
+  _pipelineSaveTimer = setTimeout(savePipelineSettings, 800);
+}
+
 (function() {
-  const saveBtn = document.getElementById('save-btn');
-  if (!saveBtn) return;
   const fields = [
     document.querySelector('#settings-form input[name="publish_time"]'),
     document.querySelector('#settings-form input[name="lead_time_mins"]'),
     document.querySelector('#settings-form input[name="video_duration"]'),
     ta,
   ].filter(Boolean);
-  const initial = {};
-  fields.forEach(f => { initial[f.name || f.id] = f.value; });
-  checkDirtyPipeline = function() {
-    const fieldsDirty = fields.some(f => f.value !== initial[f.name || f.id]);
-    saveBtn.disabled = !fieldsDirty;
-  };
-  fields.forEach(f => f.addEventListener('input', checkDirtyPipeline));
-  fields.forEach(f => f.addEventListener('change', checkDirtyPipeline));
-  const form = document.getElementById('settings-form');
-  if (form) form.addEventListener('submit', function() { saveBtn.disabled = true; });
+  fields.forEach(f => {
+    f.addEventListener('input', schedulePipelineSave);
+    f.addEventListener('change', schedulePipelineSave);
+  });
 })();
 
 // ── Автосохранение панели «Публикация» ──
