@@ -413,19 +413,6 @@
     border-bottom: 2px solid #4a7cf7;
   }
 
-  /* ── Auto-save toast ── */
-  .autosave-toast {
-    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(16px);
-    background: #1e2a1e; border: 1px solid rgba(62,207,142,.35);
-    color: #3ecf8e; font-size: 13px; font-weight: 500;
-    padding: 9px 18px; border-radius: 10px;
-    opacity: 0; pointer-events: none;
-    transition: opacity .2s, transform .2s;
-    z-index: 500; white-space: nowrap;
-  }
-  .autosave-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-  .autosave-toast.error { background: #1e1414; border-color: rgba(255,80,80,.35); color: #ff6060; }
-
   /* ── Aspect ratio control ── */
   .ar-wrap { display: flex; align-items: center; gap: 16px; margin-top: 14px; }
   .ar-preview-box {
@@ -462,8 +449,6 @@
 </style>
 </head>
 <body>
-
-<div class="autosave-toast" id="autosave-toast">Сохранено</div>
 
 <!-- Sidebar overlay (closes on click) -->
 <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
@@ -904,12 +889,7 @@ function savePipelineSettings() {
   if (!form) return;
   const data = new FormData(form);
   data.set('active_tab', 'pipeline');
-  fetch('/save', { method: 'POST', body: data })
-    .then(r => {
-      if (r.ok || r.redirected) { showToast('Сохранено'); }
-      else { showToast('Ошибка сохранения', true); }
-    })
-    .catch(() => showToast('Ошибка сохранения', true));
+  fetch('/save', { method: 'POST', body: data }).catch(() => {});
 }
 
 function schedulePipelineSave() {
@@ -933,26 +913,11 @@ function schedulePipelineSave() {
 // ── Автосохранение панели «Публикация» ──
 var _publishSaveTimer = null;
 
-function showToast(msg, isError) {
-  const t = document.getElementById('autosave-toast');
-  if (!t) return;
-  t.textContent = msg || 'Сохранено';
-  t.classList.toggle('error', !!isError);
-  t.classList.add('show');
-  clearTimeout(t._hideTimer);
-  t._hideTimer = setTimeout(() => t.classList.remove('show'), 2000);
-}
-
 function savePublishSettings() {
   const form = document.querySelector('#panel-publish form');
   if (!form) return;
   const data = new FormData(form);
-  fetch('/save', { method: 'POST', body: data })
-    .then(r => {
-      if (r.ok || r.redirected) { showToast('Сохранено'); }
-      else { showToast('Ошибка сохранения', true); }
-    })
-    .catch(() => showToast('Ошибка сохранения', true));
+  fetch('/save', { method: 'POST', body: data }).catch(() => {});
 }
 
 function schedulePublishSave() {
