@@ -338,14 +338,21 @@
     word-break: break-all; min-width: 0;
   }
   .model-item.model-active .model-name { color: #fff; }
-  .model-actions { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; }
-  .model-move-btn {
-    background: none; border: none; color: #444; font-size: 12px;
-    cursor: pointer; padding: 2px 4px; line-height: 1;
-    transition: color .15s; font-family: inherit;
+  .model-drag-handle {
+    color: #333; font-size: 14px; cursor: grab; flex-shrink: 0;
+    padding: 0 2px; line-height: 1; user-select: none;
+    -webkit-user-select: none; transition: color .15s;
   }
-  .model-move-btn:hover { color: #4a7cf7; }
-  .model-move-btn:disabled { opacity: .2; cursor: default; }
+  .model-drag-handle:active { cursor: grabbing; }
+  .model-item:hover .model-drag-handle { color: #555; }
+  .model-item.dragging { opacity: .4; }
+  .model-item.drag-over-top {
+    border-top: 2px solid #4a7cf7;
+    border-radius: 10px 10px 10px 10px;
+  }
+  .model-item.drag-over-bottom {
+    border-bottom: 2px solid #4a7cf7;
+  }
 
   /* ── Aspect ratio control ── */
   .ar-wrap { display: flex; align-items: center; gap: 16px; margin-top: 14px; }
@@ -846,8 +853,14 @@ function toggleCP(id) {
   if (el) el.classList.toggle('open');
 }
 
-// ── Models list ──
+// ── Models list with drag-and-drop ──
 (function() {
+  var dragSrcId = null;
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
   function renderModels(list) {
     const container = document.getElementById('model-list');
     if (!container) return;
@@ -856,29 +869,82 @@ function toggleCP(id) {
       return;
     }
     container.innerHTML = '';
-    list.forEach(function(m, idx) {
+    list.forEach(function(m) {
       const item = document.createElement('div');
       item.className = 'model-item' + (m.active ? ' model-active' : '');
       item.dataset.id = m.id;
+      item.draggable = true;
       item.innerHTML =
         '<div class="model-radio" onclick="activateModel(' + m.id + ')">' +
           '<div class="model-radio-dot"></div>' +
         '</div>' +
         '<div class="model-name">' + escHtml(m.name) + '</div>' +
-        '<div class="model-actions">' +
-          '<button type="button" class="model-move-btn" title="Вверх"' +
-            (idx === 0 ? ' disabled' : '') +
-            ' onclick="moveModel(' + m.id + ',\'up\')">▲</button>' +
-          '<button type="button" class="model-move-btn" title="Вниз"' +
-            (idx === list.length - 1 ? ' disabled' : '') +
-            ' onclick="moveModel(' + m.id + ',\'down\')">▼</button>' +
-        '</div>';
+        '<div class="model-drag-handle" title="Перетащить">⠿</div>';
+
+      item.addEventListener('dragstart', function(e) {
+        dragSrcId = m.id;
+        item.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', m.id);
+      });
+      item.addEventListener('dragend', function() {
+        item.classList.remove('dragging');
+        container.querySelectorAll('.model-item').forEach(function(el) {
+          el.classList.remove('drag-over-top', 'drag-over-bottom');
+        });
+      });
+      item.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        if (dragSrcId === m.id) return;
+        const rect = item.getBoundingClientRect();
+        const mid = rect.top + rect.height / 2;
+        container.querySelectorAll('.model-item').forEach(function(el) {
+          el.classList.remove('drag-over-top', 'drag-over-bottom');
+        });
+        if (e.clientY < mid) {
+          item.classList.add('drag-over-top');
+        } else {
+          item.classList.add('drag-over-bottom');
+        }
+      });
+      item.addEventListener('dragleave', function() {
+        item.classList.remove('drag-over-top', 'drag-over-bottom');
+      });
+      item.addEventListener('drop', function(e) {
+        e.preventDefault();
+        if (dragSrcId === null || dragSrcId === m.id) return;
+        container.querySelectorAll('.model-item').forEach(function(el) {
+          el.classList.remove('drag-over-top', 'drag-over-bottom');
+        });
+        const rect = item.getBoundingClientRect();
+        const mid = rect.top + rect.height / 2;
+        const insertBefore = e.clientY < mid;
+        // Build new ordered id list
+        const items = Array.from(container.querySelectorAll('.model-item'));
+        const ids = items.map(function(el) { return parseInt(el.dataset.id); });
+        const srcIdx = ids.indexOf(dragSrcId);
+        ids.splice(srcIdx, 1);
+        var destIdx = ids.indexOf(m.id);
+        if (!insertBefore) destIdx += 1;
+        ids.splice(destIdx, 0, dragSrcId);
+        dragSrcId = null;
+        saveOrder(ids);
+      });
+
       container.appendChild(item);
     });
   }
 
-  function escHtml(s) {
-    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  function saveOrder(ids) {
+    fetch('/api/models/reorder', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ids: ids})
+    })
+      .then(function(r) { return r.json(); })
+      .then(function() { loadModels(); })
+      .catch(function(e) { console.error('reorder error', e); });
   }
 
   window.activateModel = function(id) {
@@ -886,17 +952,6 @@ function toggleCP(id) {
       .then(function(r) { return r.json(); })
       .then(function() { loadModels(); })
       .catch(function(e) { console.error('activate error', e); });
-  };
-
-  window.moveModel = function(id, direction) {
-    fetch('/api/models/' + id + '/move', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({direction: direction})
-    })
-      .then(function(r) { return r.json(); })
-      .then(function() { loadModels(); })
-      .catch(function(e) { console.error('move error', e); });
   };
 
   function loadModels() {

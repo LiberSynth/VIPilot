@@ -1045,33 +1045,19 @@ def api_model_activate(model_id):
         return jsonify({'error': str(e)}), 500
 
 
-@flask_app.route('/api/models/<int:model_id>/move', methods=['POST'])
-def api_model_move(model_id):
+@flask_app.route('/api/models/reorder', methods=['POST'])
+def api_models_reorder():
     if not session.get('auth'):
         return jsonify({'error': 'unauthorized'}), 401
-    direction = request.json.get('direction') if request.is_json else request.form.get('direction')
-    if direction not in ('up', 'down'):
-        return jsonify({'error': 'invalid direction'}), 400
+    data = request.get_json(silent=True) or {}
+    ids = data.get('ids', [])
+    if not ids or not isinstance(ids, list):
+        return jsonify({'error': 'ids required'}), 400
     try:
         with get_db() as conn:
-            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-                cur.execute('SELECT id, "order" FROM models ORDER BY "order" ASC')
-                rows = cur.fetchall()
-            ids = [r['id'] for r in rows]
-            if model_id not in ids:
-                return jsonify({'error': 'not found'}), 404
-            idx = ids.index(model_id)
-            if direction == 'up' and idx > 0:
-                swap_idx = idx - 1
-            elif direction == 'down' and idx < len(ids) - 1:
-                swap_idx = idx + 1
-            else:
-                return jsonify({'ok': True})
             with conn.cursor() as cur:
-                ord_a = rows[idx]['order']
-                ord_b = rows[swap_idx]['order']
-                cur.execute('UPDATE models SET "order" = %s WHERE id = %s', (ord_b, ids[idx]))
-                cur.execute('UPDATE models SET "order" = %s WHERE id = %s', (ord_a, ids[swap_idx]))
+                for idx, model_id in enumerate(ids, start=1):
+                    cur.execute('UPDATE models SET "order" = %s WHERE id = %s', (idx, model_id))
             conn.commit()
         return jsonify({'ok': True})
     except Exception as e:
