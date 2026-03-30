@@ -969,33 +969,39 @@ def notify_failure(reason, log_entries=None, partial=False):
 
 def run_full_cycle():
     start_cycle()
-    gen_ok = generate_video()
-    pub_ok = False
-    do_story = do_wall = story_ok = wall_ok = False
-    if gen_ok:
-        do_story = db_get("vk_publish_story", "1") == "1"
-        do_wall = db_get("vk_publish_wall", "1") == "1"
-        story_ok = publish_story() if do_story else False
-        wall_ok = publish_to_wall() if do_wall else False
-        pub_ok = story_ok or wall_ok
-    story_partial_fail = gen_ok and do_story and not story_ok and wall_ok
-    success = pub_ok if gen_ok else False
-    entries = (
-        list(app_state["current_cycle"]["entries"])
-        if app_state["current_cycle"]
-        else []
-    )
-    end_cycle(success)
-    if not success:
-        reason = "ошибка генерации видео" if not gen_ok else "ошибка публикации в VK"
-        notify_failure(reason, log_entries=entries)
-    elif story_partial_fail:
-        notify_failure(
-            "ошибка публикации истории в VK (стена опубликована успешно)",
-            log_entries=entries,
-            partial=True,
+    try:
+        gen_ok = generate_video()
+        pub_ok = False
+        do_story = do_wall = story_ok = wall_ok = False
+        if gen_ok:
+            do_story = db_get("vk_publish_story", "1") == "1"
+            do_wall = db_get("vk_publish_wall", "1") == "1"
+            story_ok = publish_story() if do_story else False
+            wall_ok = publish_to_wall() if do_wall else False
+            pub_ok = story_ok or wall_ok
+        story_partial_fail = gen_ok and do_story and not story_ok and wall_ok
+        success = pub_ok if gen_ok else False
+        entries = (
+            list(app_state["current_cycle"]["entries"])
+            if app_state["current_cycle"]
+            else []
         )
-    return gen_ok, pub_ok
+        end_cycle(success)
+        if not success:
+            reason = "ошибка генерации видео" if not gen_ok else "ошибка публикации в VK"
+            notify_failure(reason, log_entries=entries)
+        elif story_partial_fail:
+            notify_failure(
+                "ошибка публикации истории в VK (стена опубликована успешно)",
+                log_entries=entries,
+                partial=True,
+            )
+        return gen_ok, pub_ok
+    except Exception:
+        cycle = app_state.get("current_cycle")
+        if cycle and cycle.get("status") == "running":
+            end_cycle(False)
+        raise
 
 
 def scheduler_loop():
