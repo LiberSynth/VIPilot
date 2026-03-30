@@ -1053,27 +1053,39 @@ def favicon():
     return send_file("generated-icon.png", mimetype="image/png")
 
 
-@flask_app.route("/", methods=["GET", "POST"])
-def login():
-    if session.get("auth"):
-        return redirect(url_for("admin"))
-
-    # Проверка Basic Auth — браузер отправляет сохранённый пароль автоматически
+def check_basic_auth():
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Basic "):
         try:
             decoded = base64.b64decode(auth_header[6:]).decode("utf-8")
             _, _, password = decoded.partition(":")
-            if password == ADMIN_PASSWORD:
-                session["auth"] = True
-                return redirect(url_for("admin"))
+            return password == ADMIN_PASSWORD
         except Exception:
             pass
+    return False
+
+
+def is_authenticated():
+    # Основной метод: Basic Auth — пароль проверяется при каждом запросе
+    if check_basic_auth():
+        return True
+    # Запасной метод: короткая сессия 30 минут (только после входа через форму)
+    auth_time = session.get("auth_time", 0)
+    if auth_time and (time.time() - auth_time) < 1800:
+        return True
+    return False
+
+
+@flask_app.route("/", methods=["GET", "POST"])
+def login():
+    if is_authenticated():
+        return redirect(url_for("admin"))
 
     error = False
     if request.method == "POST":
         if request.form.get("password") == ADMIN_PASSWORD:
-            session["auth"] = True
+            session["auth_time"] = time.time()
+            session.permanent = False
             return redirect(url_for("admin"))
         error = True
     return render_template("login.html", error=error)
@@ -1081,7 +1093,7 @@ def login():
 
 @flask_app.route("/admin")
 def admin():
-    if not session.get("auth"):
+    if not is_authenticated():
         return redirect(url_for("login"))
     metaprompt = db_get("metaprompt", "")
     pub_h_utc, pub_m_utc = parse_hhmm(db_get("publish_time", "03:00"))
@@ -1127,7 +1139,7 @@ def admin():
 
 @flask_app.route("/save", methods=["POST"])
 def save():
-    if not session.get("auth"):
+    if not is_authenticated():
         return redirect(url_for("login"))
     metaprompt = request.form.get("metaprompt", "").strip()
     if not metaprompt:
@@ -1191,7 +1203,7 @@ def save():
 
 @flask_app.route("/log-data")
 def log_data():
-    if not session.get("auth"):
+    if not is_authenticated():
         return jsonify({})
 
     history_days = parse_history_days(db_get("history_days", "7"))
@@ -1223,7 +1235,7 @@ def log_data():
 
 @flask_app.route("/run-now", methods=["POST"])
 def run_now():
-    if not session.get("auth"):
+    if not is_authenticated():
         return redirect(url_for("login"))
     if app_state["running"]:
         flash("Генерация уже запущена", "error")
@@ -1249,7 +1261,7 @@ def run_now():
 
 @flask_app.route("/test-notify", methods=["POST"])
 def test_notify():
-    if not session.get("auth"):
+    if not is_authenticated():
         return redirect(url_for("login"))
     notify_failure("тестовый сбой (проверка уведомлений)")
     flash("Тестовое уведомление отправлено", "success")
@@ -1258,7 +1270,7 @@ def test_notify():
 
 @flask_app.route("/api/models")
 def api_models():
-    if not session.get("auth"):
+    if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
     try:
         with get_db() as conn:
@@ -1274,7 +1286,7 @@ def api_models():
 
 @flask_app.route("/api/models/<string:model_id>/activate", methods=["POST"])
 def api_model_activate(model_id):
-    if not session.get("auth"):
+    if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
     try:
         with get_db() as conn:
@@ -1291,7 +1303,7 @@ def api_model_activate(model_id):
 
 @flask_app.route("/api/models/reorder", methods=["POST"])
 def api_models_reorder():
-    if not session.get("auth"):
+    if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
     data = request.get_json(silent=True) or {}
     ids = data.get("ids", [])
