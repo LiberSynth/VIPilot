@@ -205,6 +205,26 @@ def init_db():
                         'INSERT INTO models (name, url, body, "order", active) VALUES (%s, %s, %s, %s, %s)',
                         models_seed,
                     )
+
+                # Добавить sora-2, если ещё нет
+                _sora_body_tpl = _json.dumps(
+                    {
+                        "prompt": "{}",
+                        "duration": "{int}",
+                        "aspect_ratio": "{:d}:{:d}",
+                    }
+                )
+                cur.execute("SELECT COUNT(*) FROM models WHERE name = 'sora-2'")
+                if cur.fetchone()[0] == 0:
+                    cur.execute(
+                        'INSERT INTO models (name, url, body, "order", active) VALUES (%s, %s, %s::jsonb, %s, %s)',
+                        ("sora-2", "sora-2/text-to-video", _sora_body_tpl, 4, False),
+                    )
+
+                # Миграция: обновить duration для sora-2 на "{int}"
+                cur.execute(
+                    """UPDATE models SET body = jsonb_set(body, '{duration}', '"{int}"') WHERE name = 'sora-2' AND body->>'duration' != '{int}'""",
+                )
             conn.commit()
         print("[DB] Инициализация выполнена")
     except Exception as e:
