@@ -895,7 +895,7 @@ def send_failure_email(message, log_entries=None, partial=False):
             lines = "\n".join(f"[{e['ts']}] {e['msg']}" for e in log_entries)
             body += f"\n\n--- Подробный лог ---\n{lines}"
         msg = MIMEText(body, "plain", "utf-8")
-        msg["Subject"] = f"VK Publisher: {subject_prefix.lower()} в пайплайне"
+        msg["Subject"] = f"Red Brick Core: {subject_prefix.lower()} в пайплайне"
         msg["From"] = smtp_from
         msg["To"] = to_addr
         with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as s:
