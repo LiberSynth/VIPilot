@@ -177,46 +177,15 @@ def init_db():
                 if cur.fetchone()[0] == 0:
                     import json as _json
 
+                    _body_tpl = _json.dumps({
+                        "prompt": "{}",
+                        "duration": "{:d}s",
+                        "aspect_ratio": "{:d}:{:d}",
+                    })
                     models_seed = [
-                        (
-                            "veo2",
-                            "veo2",
-                            _json.dumps(
-                                {
-                                    "prompt": "<сгенерированный промпт>",
-                                    "duration": 6,
-                                    "aspect_ratio": "9:16",
-                                }
-                            ),
-                            1,
-                            True,
-                        ),
-                        (
-                            "minimax/video-01",
-                            "minimax/video-01",
-                            _json.dumps(
-                                {
-                                    "prompt": "<сгенерированный промпт>",
-                                    "duration": 6,
-                                    "aspect_ratio": "9:16",
-                                }
-                            ),
-                            2,
-                            False,
-                        ),
-                        (
-                            "kling-video/v1.6/standard",
-                            "kling-video/v1.6/standard/text-to-video",
-                            _json.dumps(
-                                {
-                                    "prompt": "<сгенерированный промпт>",
-                                    "duration": 6,
-                                    "aspect_ratio": "9:16",
-                                }
-                            ),
-                            3,
-                            False,
-                        ),
+                        ("veo2",                    "veo2",                                  _body_tpl, 1, True),
+                        ("minimax/video-01",         "minimax/video-01",                      _body_tpl, 2, False),
+                        ("kling-video/v1.6/standard","kling-video/v1.6/standard/text-to-video",_body_tpl, 3, False),
                     ]
                     cur.executemany(
                         'INSERT INTO models (name, url, body, "order", active) VALUES (%s, %s, %s, %s, %s)',
@@ -544,22 +513,23 @@ def get_active_model():
 
 
 def build_fal_body(body_tpl, prompt):
-    """Fill body template with current settings values."""
+    """Fill body template with current settings values using template format strings."""
     body = dict(body_tpl)
     if "prompt" in body:
-        body["prompt"] = prompt
+        body["prompt"] = str(body["prompt"]).format(prompt)
     if "duration" in body:
         try:
-            body["duration"] = max(1, min(60, int(db_get("video_duration", "6"))))
+            dur = max(1, min(60, int(db_get("video_duration", "6"))))
         except (ValueError, TypeError):
-            body["duration"] = 6
+            dur = 6
+        body["duration"] = str(body["duration"]).format(dur)
     if "aspect_ratio" in body:
         try:
             ar_x = int(db_get("aspect_ratio_x", "9"))
             ar_y = int(db_get("aspect_ratio_y", "16"))
         except (ValueError, TypeError):
             ar_x, ar_y = 9, 16
-        body["aspect_ratio"] = f"{ar_x}:{ar_y}"
+        body["aspect_ratio"] = str(body["aspect_ratio"]).format(ar_x, ar_y)
     return body
 
 
