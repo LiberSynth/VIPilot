@@ -114,7 +114,8 @@ def init_db():
                         ('vk_publish_story', '1'),
                         ('vk_publish_wall', '1'),
                         ('aspect_ratio_x', '9'),
-                        ('aspect_ratio_y', '16')
+                        ('aspect_ratio_y', '16'),
+                        ('video_duration', '6')
                     ON CONFLICT (key) DO NOTHING
                 ''')
                 cur.execute('''
@@ -879,6 +880,7 @@ def admin():
     vk_publish_wall  = db_get('vk_publish_wall',  '1') == '1'
     aspect_ratio_x   = int(db_get('aspect_ratio_x', '9'))
     aspect_ratio_y   = int(db_get('aspect_ratio_y', '16'))
+    video_duration   = max(1, min(60, int(db_get('video_duration', '6'))))
 
     return render_template('admin.html',
                            metaprompt=metaprompt,
@@ -894,6 +896,7 @@ def admin():
                            vk_publish_wall=vk_publish_wall,
                            aspect_ratio_x=aspect_ratio_x,
                            aspect_ratio_y=aspect_ratio_y,
+                           video_duration=video_duration,
                            status=app_state)
 
 
@@ -949,6 +952,12 @@ def save():
         ar_y = 16
     db_set('aspect_ratio_x', str(ar_x))
     db_set('aspect_ratio_y', str(ar_y))
+
+    try:
+        vid_dur = max(1, min(60, int(request.form.get('video_duration', '6'))))
+    except (ValueError, TypeError):
+        vid_dur = 6
+    db_set('video_duration', str(vid_dur))
 
     active_tab = request.form.get('active_tab', 'pipeline')
     flash('Настройки сохранены', 'success')
