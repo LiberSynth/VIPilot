@@ -53,7 +53,7 @@
   .tabs { display: flex; }
   .tab-btn {
     flex: 1; padding: 10px 0; text-align: center;
-    font-size: 14px; font-weight: 500; color: #888;
+    font-size: 12px; font-weight: 500; color: #888;
     background: none; border: none;
     border-bottom: 2px solid transparent;
     cursor: pointer; transition: color .15s, border-color .15s;
@@ -298,6 +298,8 @@
   </div>
   <div class="tabs">
     <button class="tab-btn active" onclick="switchTab('pipeline', this)">Пайплайн</button>
+    <button class="tab-btn" onclick="switchTab('request', this)">Запрос</button>
+    <button class="tab-btn" onclick="switchTab('publish', this)">Публикация</button>
     <button class="tab-btn" onclick="switchTab('service', this)">Служебные</button>
     <button class="tab-btn" onclick="switchTab('log', this)">Лог</button>
   </div>
@@ -334,20 +336,6 @@
       </div>
     </div>
 
-    <div class="card">
-      <div class="card-title">Расписание <span class="tz-badge">МСК</span></div>
-      <div class="schedule-row">
-        <div class="schedule-item">
-          <div class="schedule-time">{{ generate_time_msk }}</div>
-          <div class="schedule-label">Генерация</div>
-        </div>
-        <div class="schedule-item">
-          <div class="schedule-time">{{ publish_time_msk }}</div>
-          <div class="schedule-label">Публикация</div>
-        </div>
-      </div>
-    </div>
-
     <form method="post" action="/save" id="settings-form">
       <div class="card">
         <div class="card-title">Мета-промпт</div>
@@ -358,45 +346,22 @@
 
       <div class="card">
         <div class="card-title">Время публикации <span class="tz-badge">МСК</span></div>
-        <div class="hint">Видео публикуется в это время по Москве. Хранится в UTC.</div>
+        <div class="hint">Видео публикуется в это время по Москве.</div>
         <input type="time" name="publish_time" value="{{ publish_time_msk }}">
       </div>
 
       <div class="card">
-        <div class="card-title">Время упреждения генерации</div>
-        <div class="hint">За сколько минут до публикации запускать генерацию. Если до публикации осталось меньше — стартует немедленно.</div>
+        <div class="card-title">Упреждения генерации</div>
+        <div class="hint">За сколько минут до публикации запрашивать генерацию видео у модели. Если до публикации осталось меньше — стартует немедленно.</div>
         <div class="lead-row">
           <input type="number" name="lead_time_mins" value="{{ lead_time_mins }}" min="10" max="1440" step="10">
           <span class="lead-unit">минут</span>
         </div>
       </div>
 
-      <div class="card">
-        <div class="card-title">Публикация в ВКонтакте</div>
-        <div class="hint">Хотя бы одна опция должна быть включена.</div>
-        <div class="toggle-row" style="margin-top:10px">
-          <div>
-            <div class="toggle-label">Публиковать историю</div>
-          </div>
-          <label class="toggle-wrap">
-            <input type="hidden" name="vk_publish_story" id="vk_story_hidden" value="{{ '1' if vk_publish_story else '0' }}">
-            <input type="checkbox" id="vk_story_check" {% if vk_publish_story %}checked{% endif %}
-                   onchange="onVkToggle(this, 'vk_wall_check', 'vk_story_hidden', 'vk_wall_hidden')">
-            <span class="toggle-track"></span>
-          </label>
-        </div>
-        <div class="toggle-row" style="margin-top:10px">
-          <div>
-            <div class="toggle-label">Публиковать на стену</div>
-          </div>
-          <label class="toggle-wrap">
-            <input type="hidden" name="vk_publish_wall" id="vk_wall_hidden" value="{{ '1' if vk_publish_wall else '0' }}">
-            <input type="checkbox" id="vk_wall_check" {% if vk_publish_wall %}checked{% endif %}
-                   onchange="onVkToggle(this, 'vk_story_check', 'vk_wall_hidden', 'vk_story_hidden')">
-            <span class="toggle-track"></span>
-          </label>
-        </div>
-      </div>
+      <!-- Публикация ВК — скрытые дубликаты (реальные переключатели на вкладке "Публикация") -->
+      <input type="hidden" name="vk_publish_story" id="vk_story_hidden" value="{{ '1' if vk_publish_story else '0' }}">
+      <input type="hidden" name="vk_publish_wall" id="vk_wall_hidden" value="{{ '1' if vk_publish_wall else '0' }}">
 
       <!-- Служебные поля — скрытые дубликаты для корректной отправки формы -->
       <input type="hidden" name="notify_email" id="h_notify_email" value="{{ notify_email }}">
@@ -416,6 +381,65 @@
 
   </div>
 
+  <!-- ══ ЗАПРОС ══ -->
+  <div id="panel-request" class="tab-panel">
+    <div class="card">
+      <div class="card-title">Модель генерации</div>
+      <div class="hint">Запрос отправляется в fal.ai на модель <strong style="color:#c0c0d8">fast-svd-lcm/text-to-video</strong>. Параметры: длительность 6 сек, разрешение 1080×1920 (9:16).</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Сюжет</div>
+      <div class="hint">Промпт генерируется автоматически из случайных комбинаций: субъект → трансформация → материал → объект → локация → стиль. Мета-промпт с вкладки «Пайплайн» добавляется к каждому запросу.</div>
+    </div>
+  </div>
+
+  <!-- ══ ПУБЛИКАЦИЯ ══ -->
+  <div id="panel-publish" class="tab-panel">
+
+    <form method="post" action="/save">
+      <input type="hidden" name="active_tab" value="publish">
+      <!-- Скрытые дубликаты остальных настроек -->
+      <input type="hidden" name="metaprompt" id="pub_h_metaprompt" value="">
+      <input type="hidden" name="publish_time" id="pub_h_publish_time" value="{{ publish_time_msk }}">
+      <input type="hidden" name="lead_time_mins" id="pub_h_lead_time_mins" value="{{ lead_time_mins }}">
+      <input type="hidden" name="notify_email" id="pub_h_notify_email" value="{{ notify_email }}">
+      <input type="hidden" name="notify_phone" id="pub_h_notify_phone" value="{{ notify_phone }}">
+      <input type="hidden" name="history_days" id="pub_h_history_days" value="{{ history_days }}">
+      <input type="hidden" name="short_log_days" id="pub_h_short_log_days" value="{{ short_log_days }}">
+      <input type="hidden" name="emulation_mode" id="pub_h_emulation_mode" value="{{ '1' if emulation_mode else '0' }}">
+
+      <div class="card">
+        <div class="card-title">Публикация в ВКонтакте</div>
+        <div class="hint">Хотя бы одна опция должна быть включена.</div>
+        <div class="toggle-row" style="margin-top:10px">
+          <div>
+            <div class="toggle-label">Публиковать историю</div>
+          </div>
+          <label class="toggle-wrap">
+            <input type="hidden" name="vk_publish_story" id="vk_story_pub_hidden" value="{{ '1' if vk_publish_story else '0' }}">
+            <input type="checkbox" id="vk_story_pub_check" {% if vk_publish_story %}checked{% endif %}
+                   onchange="onVkPublishToggle(this, 'vk_wall_pub_check', 'vk_story_pub_hidden', 'vk_wall_pub_hidden')">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        <div class="toggle-row" style="margin-top:10px">
+          <div>
+            <div class="toggle-label">Публиковать на стену</div>
+          </div>
+          <label class="toggle-wrap">
+            <input type="hidden" name="vk_publish_wall" id="vk_wall_pub_hidden" value="{{ '1' if vk_publish_wall else '0' }}">
+            <input type="checkbox" id="vk_wall_pub_check" {% if vk_publish_wall %}checked{% endif %}
+                   onchange="onVkPublishToggle(this, 'vk_story_pub_check', 'vk_wall_pub_hidden', 'vk_story_pub_hidden')">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-primary" id="save-btn-publish" disabled>Сохранить настройки</button>
+    </form>
+
+  </div>
+
   <!-- ══ СЛУЖЕБНЫЕ ══ -->
   <div id="panel-service" class="tab-panel">
 
@@ -428,27 +452,9 @@
       <input type="hidden" name="vk_publish_story" id="h_vk_story" value="{{ '1' if vk_publish_story else '0' }}">
       <input type="hidden" name="vk_publish_wall" id="h_vk_wall" value="{{ '1' if vk_publish_wall else '0' }}">
 
-      <div class="card emulation-card">
-        <div class="toggle-row">
-          <div>
-            <div class="toggle-label">
-              Режим эмуляции
-              {% if emulation_mode %}<span class="emulation-badge">ВКЛ</span>{% endif %}
-            </div>
-            <div class="toggle-hint">fal.ai не вызывается — берётся случайное ранее сгенерированное видео из базы.</div>
-          </div>
-          <label class="toggle-wrap">
-            <input type="hidden" name="emulation_mode" id="emulation_hidden" value="{{ '1' if emulation_mode else '0' }}">
-            <input type="checkbox" id="emulation_check" {% if emulation_mode %}checked{% endif %}
-                   onchange="document.getElementById('emulation_hidden').value = this.checked ? '1' : '0'; document.getElementById('h_emulation_mode').value = this.checked ? '1' : '0'">
-            <span class="toggle-track"></span>
-          </label>
-        </div>
-      </div>
-
       <div class="card">
         <div class="card-title">Уведомление о сбое</div>
-        <div class="hint">При ошибке генерации или публикации придёт уведомление на указанный емайл или номер.</div>
+        <div class="hint">При ошибке выполнения пайплайна придёт уведомление на указанный емайл или номер.</div>
         <div style="margin-top:14px">
           <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block">Email</label>
           <input type="email" name="notify_email" id="notify_email" value="{{ notify_email }}" placeholder="admin@example.com"
@@ -458,6 +464,24 @@
           <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block">SMS (номер в формате 79161234567)</label>
           <input type="tel" name="notify_phone" id="notify_phone" value="{{ notify_phone }}" placeholder="79161234567"
                  oninput="document.getElementById('h_notify_phone').value = this.value">
+        </div>
+      </div>
+
+      <div class="card emulation-card">
+        <div class="toggle-row">
+          <div>
+            <div class="toggle-label">
+              Режим эмуляции
+              {% if emulation_mode %}<span class="emulation-badge">ВКЛ</span>{% endif %}
+            </div>
+            <div class="toggle-hint">Генерация не запрашивается. Берётся случайное ранее сгенерированное видео.</div>
+          </div>
+          <label class="toggle-wrap">
+            <input type="hidden" name="emulation_mode" id="emulation_hidden" value="{{ '1' if emulation_mode else '0' }}">
+            <input type="checkbox" id="emulation_check" {% if emulation_mode %}checked{% endif %}
+                   onchange="document.getElementById('emulation_hidden').value = this.checked ? '1' : '0'; document.getElementById('h_emulation_mode').value = this.checked ? '1' : '0'">
+            <span class="toggle-track"></span>
+          </label>
         </div>
       </div>
 
@@ -519,26 +543,78 @@ const cc = document.getElementById('charcount');
 function updateCount() { if (ta && cc) cc.textContent = ta.value.length + ' символов'; }
 if (ta) { ta.addEventListener('input', updateCount); updateCount(); }
 
-// Синхронизация textarea метапромпта в скрытое поле формы Служебных
+// Синхронизация textarea метапромпта в скрытые поля других форм
 const hMeta = document.getElementById('h_metaprompt');
-if (ta && hMeta) {
-  hMeta.value = ta.value;
-  ta.addEventListener('input', () => { hMeta.value = ta.value; });
+const pubHMeta = document.getElementById('pub_h_metaprompt');
+function syncMeta() {
+  if (!ta) return;
+  if (hMeta) hMeta.value = ta.value;
+  if (pubHMeta) pubHMeta.value = ta.value;
 }
+if (ta) { syncMeta(); ta.addEventListener('input', syncMeta); }
 
-// Логика переключателей ВК — хотя бы один должен быть включён
-// changedChk — чекбокс который только что изменился
-// otherId — id другого чекбокса
-// selfHidId — id скрытого поля для этого чекбокса
-// otherHidId — id скрытого поля для другого чекбокса
-function onVkToggle(changedChk, otherId, selfHidId, otherHidId) {
+// Синхронизация полей пайплайна в скрытые поля формы Публикации
+(function() {
+  const ptInput = document.querySelector('#settings-form input[name="publish_time"]');
+  const ltInput = document.querySelector('#settings-form input[name="lead_time_mins"]');
+  function syncPub() {
+    if (ptInput && document.getElementById('pub_h_publish_time'))
+      document.getElementById('pub_h_publish_time').value = ptInput.value;
+    if (ltInput && document.getElementById('pub_h_lead_time_mins'))
+      document.getElementById('pub_h_lead_time_mins').value = ltInput.value;
+  }
+  syncPub();
+  if (ptInput) ptInput.addEventListener('input', syncPub);
+  if (ltInput) ltInput.addEventListener('input', syncPub);
+})();
+
+// Синхронизация полей служебных в скрытые поля формы Публикации
+(function() {
+  const pairs = [
+    ['notify_email',  'pub_h_notify_email'],
+    ['notify_phone',  'pub_h_notify_phone'],
+    ['history_days',  'pub_h_history_days'],
+    ['short_log_days','pub_h_short_log_days'],
+  ];
+  pairs.forEach(([srcId, dstId]) => {
+    const src = document.getElementById(srcId);
+    const dst = document.getElementById(dstId);
+    if (src && dst) {
+      dst.value = src.value;
+      src.addEventListener('input', () => { dst.value = src.value; });
+    }
+  });
+  const emulChk = document.getElementById('emulation_check');
+  const pubEmul = document.getElementById('pub_h_emulation_mode');
+  if (emulChk && pubEmul) {
+    pubEmul.value = emulChk.checked ? '1' : '0';
+    emulChk.addEventListener('change', () => { pubEmul.value = emulChk.checked ? '1' : '0'; });
+  }
+})();
+
+// Логика переключателей ВК на вкладке "Публикация"
+function onVkPublishToggle(changedChk, otherId, selfHidId, otherHidId) {
   const otherChk = document.getElementById(otherId);
   if (!changedChk.checked && !otherChk.checked) {
-    changedChk.checked = true; // не даём выключить последний
+    changedChk.checked = true;
   }
-  document.getElementById(selfHidId).value  = changedChk.checked ? '1' : '0';
-  document.getElementById(otherHidId).value = otherChk.checked  ? '1' : '0';
-  if (checkDirtyPipeline) checkDirtyPipeline();
+  const selfVal  = changedChk.checked ? '1' : '0';
+  const otherVal = otherChk.checked   ? '1' : '0';
+  document.getElementById(selfHidId).value  = selfVal;
+  document.getElementById(otherHidId).value = otherVal;
+  // Синхронизируем с pipeline и service формами
+  const isStory = selfHidId === 'vk_story_pub_hidden';
+  const storyVal = isStory ? selfVal : otherVal;
+  const wallVal  = isStory ? otherVal : selfVal;
+  const pipeStory = document.getElementById('vk_story_hidden');
+  const pipeWall  = document.getElementById('vk_wall_hidden');
+  const svcStory  = document.getElementById('h_vk_story');
+  const svcWall   = document.getElementById('h_vk_wall');
+  if (pipeStory) pipeStory.value = storyVal;
+  if (pipeWall)  pipeWall.value  = wallVal;
+  if (svcStory)  svcStory.value  = storyVal;
+  if (svcWall)   svcWall.value   = wallVal;
+  if (checkDirtyPublish) checkDirtyPublish();
 }
 
 // Трекинг изменений — форма Пайплайн
@@ -551,20 +627,32 @@ var checkDirtyPipeline;
     document.querySelector('#settings-form input[name="lead_time_mins"]'),
     ta,
   ].filter(Boolean);
-  const storyChk = document.getElementById('vk_story_check');
-  const wallChk  = document.getElementById('vk_wall_check');
   const initial = {};
-  fields.forEach(f => { initial[f.name] = f.value; });
-  const initStory = storyChk ? storyChk.checked : true;
-  const initWall  = wallChk  ? wallChk.checked  : true;
+  fields.forEach(f => { initial[f.name || f.id] = f.value; });
   checkDirtyPipeline = function() {
-    const fieldsDirty = fields.some(f => f.value !== initial[f.name]);
-    const vkDirty = (storyChk && storyChk.checked !== initStory) || (wallChk && wallChk.checked !== initWall);
-    saveBtn.disabled = !(fieldsDirty || vkDirty);
+    const fieldsDirty = fields.some(f => f.value !== initial[f.name || f.id]);
+    saveBtn.disabled = !fieldsDirty;
   };
   fields.forEach(f => f.addEventListener('input', checkDirtyPipeline));
   fields.forEach(f => f.addEventListener('change', checkDirtyPipeline));
   const form = document.getElementById('settings-form');
+  if (form) form.addEventListener('submit', function() { saveBtn.disabled = true; });
+})();
+
+// Трекинг изменений — форма Публикация
+var checkDirtyPublish;
+(function() {
+  const saveBtn = document.getElementById('save-btn-publish');
+  if (!saveBtn) return;
+  const storyChk = document.getElementById('vk_story_pub_check');
+  const wallChk  = document.getElementById('vk_wall_pub_check');
+  const initStory = storyChk ? storyChk.checked : true;
+  const initWall  = wallChk  ? wallChk.checked  : true;
+  checkDirtyPublish = function() {
+    const vkDirty = (storyChk && storyChk.checked !== initStory) || (wallChk && wallChk.checked !== initWall);
+    saveBtn.disabled = !vkDirty;
+  };
+  const form = saveBtn.closest('form');
   if (form) form.addEventListener('submit', function() { saveBtn.disabled = true; });
 })();
 
