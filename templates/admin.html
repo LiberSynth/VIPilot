@@ -456,23 +456,14 @@
     flex-shrink: 0;
   }
   .pt-btn-remove:active { background: rgba(255,80,80,.12); }
-  .pt-add-row { display: flex; gap: 10px; align-items: center; }
   .pt-time-input {
-    flex: 1; padding: 14px 16px;
+    width: 100%; padding: 14px 16px;
     background: #0f0f13; border: 1px solid #2a2a38; border-radius: 11px;
     color: #fff; font-size: 22px; font-family: inherit;
     font-variant-numeric: tabular-nums; appearance: none; -webkit-appearance: none;
     outline: none; transition: border-color .2s; letter-spacing: 2px;
   }
   .pt-time-input:focus { border-color: #4a7cf7; }
-  .pt-btn-add {
-    background: rgba(74,124,247,.15); border: 1px solid rgba(74,124,247,.4);
-    border-radius: 11px; color: #4a7cf7; font-size: 14px; font-weight: 600;
-    padding: 0 18px; height: 54px; cursor: pointer; font-family: inherit;
-    white-space: nowrap; transition: background .15s;
-    flex-shrink: 0;
-  }
-  .pt-btn-add:active { background: rgba(74,124,247,.3); }
 </style>
 </head>
 <body>
@@ -565,10 +556,7 @@
         <div class="card-title">Время публикации <span class="tz-badge">МСК</span></div>
         <div class="hint">Видео публикуется в указанные моменты по Москве. Можно задать несколько.</div>
         <div id="publish-times-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px;"></div>
-        <div class="pt-add-row">
-          <input type="time" id="new-publish-time" class="pt-time-input">
-          <button type="button" class="pt-btn-add" onclick="addPublishTime()">Добавить</button>
-        </div>
+        <input type="time" id="new-publish-time" class="pt-time-input">
       </div>
 
       <div class="card">
@@ -1540,24 +1528,22 @@ setInterval(refreshLog, 4000);
       .catch(function() {});
   }
 
-  window.addPublishTime = function() {
+  function addPublishTime() {
     const input = document.getElementById('new-publish-time');
     if (!input || !input.value) return;
-    const btn = document.querySelector('.pt-btn-add');
-    if (btn) btn.disabled = true;
+    const val = input.value;
+    input.value = '';
     fetch('/api/publish-times', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({time: input.value})
+      body: JSON.stringify({time: val})
     })
       .then(function(r) { return r.json(); })
-      .then(function() {
-        input.value = '';
-        loadPublishTimes();
-      })
-      .catch(function() {})
-      .finally(function() { if (btn) btn.disabled = false; });
-  };
+      .then(function() { loadPublishTimes(); })
+      .catch(function() {});
+  }
+
+  window.addPublishTime = addPublishTime;
 
   window.deletePublishTime = function(id) {
     fetch('/api/publish-times/' + id, {method: 'DELETE'})
@@ -1565,6 +1551,16 @@ setInterval(refreshLog, 4000);
       .then(function() { loadPublishTimes(); })
       .catch(function() {});
   };
+
+  // Auto-add on change of the empty time input
+  (function() {
+    const input = document.getElementById('new-publish-time');
+    if (input) {
+      input.addEventListener('change', function() {
+        if (input.value) addPublishTime();
+      });
+    }
+  })();
 
   // Load on page load if pipeline panel is active
   (function() {
