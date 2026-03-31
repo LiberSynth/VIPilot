@@ -1724,9 +1724,24 @@ function updateExistingCard(card, cycle, idx) {
     const treeLog = body.querySelector('.tree-log');
     const scrollTop = treeLog ? treeLog.scrollTop : 0;
 
+    // Remember which stages are open
+    const openStages = new Set();
+    body.querySelectorAll('.tree-stage.open').forEach(s => {
+      if (s.dataset.stageKey) openStages.add(s.dataset.stageKey);
+    });
+
     // Clear and rebuild
     body.innerHTML = '';
     body.appendChild(buildBodyContent(cycle, idx));
+
+    // Restore open stages
+    if (openStages.size > 0) {
+      body.querySelectorAll('.tree-stage').forEach(s => {
+        if (s.dataset.stageKey && openStages.has(s.dataset.stageKey)) {
+          s.classList.add('open');
+        }
+      });
+    }
 
     // Restore scroll
     const newTreeLog = body.querySelector('.tree-log');
