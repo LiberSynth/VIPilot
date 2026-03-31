@@ -252,6 +252,10 @@ def init_db():
                     "WHERE id = '6345fd09-349f-4bcf-9b07-37f20fe6bed3' "
                     "AND name = 'mistral-small-3.1-24b-instruct'"
                 )
+                # Миграция: удаление дубликата mistral-7b-instruct (order=4), появившегося при предыдущем деплое
+                cur.execute(
+                    "DELETE FROM models WHERE id = '08985f92-9523-42d3-a40f-589d3d5e96c5'"
+                )
 
             conn.commit()
         print("[DB] Инициализация выполнена")
