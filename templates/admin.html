@@ -535,6 +535,7 @@
 
     <form id="settings-form" style="margin-top:0">
       <input type="hidden" name="metaprompt" id="h_metaprompt" value="{{ metaprompt }}">
+      <input type="hidden" name="system_prompt" id="h_system_prompt" value="{{ system_prompt }}">
 
       <div class="card" style="margin-top:12px">
         <div class="card-title">Время публикации <span class="tz-badge">МСК</span></div>
@@ -581,8 +582,14 @@
   <div id="panel-story" class="tab-panel">
     <form id="story-form" style="margin-top:0">
       <div class="card" style="margin-top:12px">
-        <div class="card-title">Мета-промпт</div>
-        <div class="hint">Стиль, тема и характер видео. Каждый день генерируется новый уникальный сюжет.</div>
+        <div class="card-title">Системный промпт</div>
+        <div class="hint">Инструкция для текстовой модели: формат ответа, стиль, ограничения. Модель получает этот промпт как системное сообщение перед мета-промптом.</div>
+        <textarea name="system_prompt" id="ta_sysprompt" spellcheck="true">{{ system_prompt }}</textarea>
+        <div class="char-count" id="charcount_sysprompt"></div>
+      </div>
+      <div class="card" style="margin-top:12px">
+        <div class="card-title">Мета-промпт сюжета</div>
+        <div class="hint">Стиль, тема и характер сценария. Описание для формирования раскадровки.</div>
         <textarea name="metaprompt" id="ta" spellcheck="true">{{ metaprompt }}</textarea>
         <div class="char-count" id="charcount"></div>
       </div>
@@ -615,6 +622,7 @@
       <input type="hidden" name="active_tab" value="publish">
       <!-- Скрытые дубликаты остальных настроек -->
       <input type="hidden" name="metaprompt" id="pub_h_metaprompt" value="">
+      <input type="hidden" name="system_prompt" id="pub_h_system_prompt" value="{{ system_prompt }}">
       <input type="hidden" name="publish_time" id="pub_h_publish_time" value="{{ publish_time_msk }}">
       <input type="hidden" name="lead_time_mins" id="pub_h_lead_time_mins" value="{{ lead_time_mins }}">
       <input type="hidden" name="video_duration" id="pub_h_video_duration" value="{{ video_duration }}">
@@ -689,6 +697,7 @@
       <input type="hidden" name="active_tab" value="service">
       <!-- Пайплайн-поля — скрытые дубликаты -->
       <input type="hidden" name="metaprompt" id="h_metaprompt" value="">
+      <input type="hidden" name="system_prompt" id="svc_h_system_prompt" value="{{ system_prompt }}">
       <input type="hidden" name="publish_time" id="h_publish_time" value="{{ publish_time_msk }}">
       <input type="hidden" name="lead_time_mins" id="h_lead_time_mins" value="{{ lead_time_mins }}">
       <input type="hidden" name="vk_publish_story" id="h_vk_story" value="{{ '1' if vk_publish_story else '0' }}">
@@ -817,6 +826,11 @@ const cc = document.getElementById('charcount');
 function updateCount() { if (ta && cc) cc.textContent = ta.value.length + ' символов'; }
 if (ta) { ta.addEventListener('input', updateCount); updateCount(); }
 
+const taSys = document.getElementById('ta_sysprompt');
+const ccSys = document.getElementById('charcount_sysprompt');
+function updateSysCount() { if (taSys && ccSys) ccSys.textContent = taSys.value.length + ' символов'; }
+if (taSys) { taSys.addEventListener('input', updateSysCount); updateSysCount(); }
+
 // Синхронизация textarea метапромпта в скрытые поля других форм
 const hMeta = document.getElementById('h_metaprompt');
 const pubHMeta = document.getElementById('pub_h_metaprompt');
@@ -826,6 +840,18 @@ function syncMeta() {
   if (pubHMeta) pubHMeta.value = ta.value;
 }
 if (ta) { syncMeta(); ta.addEventListener('input', syncMeta); }
+
+// Синхронизация textarea системного промпта в скрытые поля других форм
+const hSys = document.getElementById('h_system_prompt');
+const svcHSys = document.getElementById('svc_h_system_prompt');
+const pubHSys = document.getElementById('pub_h_system_prompt');
+function syncSys() {
+  if (!taSys) return;
+  if (hSys) hSys.value = taSys.value;
+  if (svcHSys) svcHSys.value = taSys.value;
+  if (pubHSys) pubHSys.value = taSys.value;
+}
+if (taSys) { syncSys(); taSys.addEventListener('input', syncSys); }
 
 // Синхронизация полей пайплайна в скрытые поля формы Публикации
 (function() {
@@ -936,13 +962,18 @@ function scheduleStorySave() {
 }
 
 (function() {
-  if (!ta) return;
-  ta.addEventListener('input', function() {
-    const hidden = document.getElementById('h_metaprompt');
-    if (hidden) hidden.value = ta.value;
-    scheduleStorySave();
-  });
-  ta.addEventListener('change', scheduleStorySave);
+  if (ta) {
+    ta.addEventListener('input', function() {
+      const hidden = document.getElementById('h_metaprompt');
+      if (hidden) hidden.value = ta.value;
+      scheduleStorySave();
+    });
+    ta.addEventListener('change', scheduleStorySave);
+  }
+  if (taSys) {
+    taSys.addEventListener('input', scheduleStorySave);
+    taSys.addEventListener('change', scheduleStorySave);
+  }
 })();
 
 // ── Автосохранение панели «Публикация» ──

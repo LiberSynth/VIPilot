@@ -136,6 +136,7 @@ def init_db():
                 cur.execute("""
                     INSERT INTO settings (key, value) VALUES
                         ('metaprompt', ''),
+                        ('system_prompt', ''),
                         ('publish_time', '03:00'),
                         ('lead_time_mins', '60'),
                         ('notify_email', ''),
@@ -1175,6 +1176,7 @@ def admin():
     if not is_authenticated():
         return redirect(url_for("login"))
     metaprompt = db_get("metaprompt", "")
+    system_prompt = db_get("system_prompt", "")
     pub_h_utc, pub_m_utc = parse_hhmm(db_get("publish_time", "03:00"))
     lead_mins = parse_lead_mins(db_get("lead_time_mins", "120"))
 
@@ -1199,6 +1201,7 @@ def admin():
     return render_template(
         "admin.html",
         metaprompt=metaprompt,
+        system_prompt=system_prompt,
         publish_time_msk=f"{pub_h_msk:02d}:{pub_m_msk:02d}",
         generate_time_msk=f"{gen_h_msk:02d}:{gen_m_msk:02d}",
         lead_time_mins=lead_mins,
@@ -1220,6 +1223,10 @@ def admin():
 def save():
     if not is_authenticated():
         return redirect(url_for("login"))
+    system_prompt_val = request.form.get("system_prompt")
+    if system_prompt_val is not None:
+        db_set("system_prompt", system_prompt_val)
+
     metaprompt = request.form.get("metaprompt", "").strip()
     if not metaprompt:
         flash("Мета-промпт не может быть пустым", "error")
