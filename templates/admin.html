@@ -1740,14 +1740,14 @@ function updateExistingCard(card, cycle, idx) {
     body.innerHTML = '';
     body.appendChild(buildBodyContent(cycle, idx));
 
-    // Restore open stages
-    if (openStages.size > 0) {
-      body.querySelectorAll('.tree-stage').forEach(s => {
-        if (s.dataset.stageKey && openStages.has(s.dataset.stageKey)) {
-          s.classList.add('open');
-        }
-      });
-    }
+    // Restore open stages (always override what buildBodyContent set)
+    body.querySelectorAll('.tree-stage').forEach(s => {
+      if (s.dataset.stageKey && openStages.has(s.dataset.stageKey)) {
+        s.classList.add('open');
+      } else {
+        s.classList.remove('open');
+      }
+    });
 
     // Restore scroll
     const newTreeLog = body.querySelector('.tree-log');
