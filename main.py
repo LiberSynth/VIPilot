@@ -801,6 +801,11 @@ def generate_story():
 
     system_prompt = db_get("system_prompt", "")
     user_prompt = generate_prompt()
+    try:
+        dur = max(1, min(60, int(db_get("video_duration", "6"))))
+    except (ValueError, TypeError):
+        dur = 6
+    user_prompt = f"{user_prompt} Продолжительность {dur:d} секунд."
 
     body = dict(body_tpl)
     if "messages" in body:
