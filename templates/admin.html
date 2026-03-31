@@ -525,36 +525,20 @@
     </form>
 
     <form id="settings-form" style="margin-top:0">
-      <input type="hidden" name="metaprompt" id="h_metaprompt" value="{{ metaprompt }}">
-      <input type="hidden" name="system_prompt" id="h_system_prompt" value="{{ system_prompt }}">
-
       <div class="card" style="margin-top:12px">
         <div class="card-title">Время публикации <span class="tz-badge">МСК</span></div>
         <div class="hint">Видео публикуется в это время по Москве.</div>
-        <input type="time" name="publish_time" value="{{ publish_time_msk }}">
+        <input type="time" id="publish_time" name="publish_time" value="{{ publish_time_msk }}">
       </div>
 
       <div class="card">
         <div class="card-title">Упреждения генерации</div>
         <div class="hint">За сколько минут до публикации запрашивать генерацию видео у модели. Если до публикации осталось меньше — стартует немедленно.</div>
         <div class="lead-row">
-          <input type="number" name="lead_time_mins" value="{{ lead_time_mins }}" min="10" max="1440" step="10">
+          <input type="number" id="lead_time_mins" name="lead_time_mins" value="{{ lead_time_mins }}" min="10" max="1440" step="10">
           <span class="lead-unit">минут</span>
         </div>
       </div>
-
-      <!-- Публикация ВК — скрытые дубликаты (реальные переключатели на вкладке "Публикация") -->
-      <input type="hidden" name="vk_publish_story" id="vk_story_hidden" value="{{ '1' if vk_publish_story else '0' }}">
-      <input type="hidden" name="vk_publish_wall" id="vk_wall_hidden" value="{{ '1' if vk_publish_wall else '0' }}">
-      <input type="hidden" name="aspect_ratio_x" id="pip_h_ar_x" value="{{ aspect_ratio_x }}">
-      <input type="hidden" name="aspect_ratio_y" id="pip_h_ar_y" value="{{ aspect_ratio_y }}">
-
-      <!-- Служебные поля — скрытые дубликаты для корректной отправки формы -->
-      <input type="hidden" name="notify_email" id="h_notify_email" value="{{ notify_email }}">
-      <input type="hidden" name="notify_phone" id="h_notify_phone" value="{{ notify_phone }}">
-      <input type="hidden" name="history_days" id="h_history_days" value="{{ history_days }}">
-      <input type="hidden" name="short_log_days" id="h_short_log_days" value="{{ short_log_days }}">
-      <input type="hidden" name="emulation_mode" id="h_emulation_mode" value="{{ '1' if emulation_mode else '0' }}">
     </form>
 
   </div>
@@ -608,18 +592,7 @@
   <!-- ══ ПУБЛИКАЦИЯ ══ -->
   <div id="panel-publish" class="tab-panel">
 
-    <form method="post" action="/save">
-      <input type="hidden" name="active_tab" value="publish">
-      <!-- Скрытые дубликаты остальных настроек -->
-      <input type="hidden" name="metaprompt" id="pub_h_metaprompt" value="">
-      <input type="hidden" name="system_prompt" id="pub_h_system_prompt" value="{{ system_prompt }}">
-      <input type="hidden" name="publish_time" id="pub_h_publish_time" value="{{ publish_time_msk }}">
-      <input type="hidden" name="lead_time_mins" id="pub_h_lead_time_mins" value="{{ lead_time_mins }}">
-      <input type="hidden" name="notify_email" id="pub_h_notify_email" value="{{ notify_email }}">
-      <input type="hidden" name="notify_phone" id="pub_h_notify_phone" value="{{ notify_phone }}">
-      <input type="hidden" name="history_days" id="pub_h_history_days" value="{{ history_days }}">
-      <input type="hidden" name="short_log_days" id="pub_h_short_log_days" value="{{ short_log_days }}">
-      <input type="hidden" name="emulation_mode" id="pub_h_emulation_mode" value="{{ '1' if emulation_mode else '0' }}">
+    <form id="publish-form" style="margin-top:0">
 
       <div class="card">
         <div class="card-title">Соотношение сторон</div>
@@ -682,30 +655,18 @@
   <!-- ══ СЛУЖЕБНЫЕ ══ -->
   <div id="panel-service" class="tab-panel">
 
-    <form method="post" action="/save">
-      <input type="hidden" name="active_tab" value="service">
-      <!-- Пайплайн-поля — скрытые дубликаты -->
-      <input type="hidden" name="metaprompt" id="svc_h_metaprompt" value="">
-      <input type="hidden" name="system_prompt" id="svc_h_system_prompt" value="{{ system_prompt }}">
-      <input type="hidden" name="publish_time" id="h_publish_time" value="{{ publish_time_msk }}">
-      <input type="hidden" name="lead_time_mins" id="h_lead_time_mins" value="{{ lead_time_mins }}">
-      <input type="hidden" name="vk_publish_story" id="h_vk_story" value="{{ '1' if vk_publish_story else '0' }}">
-      <input type="hidden" name="vk_publish_wall" id="h_vk_wall" value="{{ '1' if vk_publish_wall else '0' }}">
-      <input type="hidden" name="aspect_ratio_x" id="svc_h_ar_x" value="{{ aspect_ratio_x }}">
-      <input type="hidden" name="aspect_ratio_y" id="svc_h_ar_y" value="{{ aspect_ratio_y }}">
+    <form id="service-form" style="margin-top:0">
 
       <div class="card">
         <div class="card-title">Уведомление о сбое</div>
         <div class="hint">При ошибке выполнения пайплайна придёт уведомление на указанный емайл или номер.</div>
         <div style="margin-top:14px">
           <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block">Email</label>
-          <input type="email" name="notify_email" id="notify_email" value="{{ notify_email }}" placeholder="admin@example.com"
-                 oninput="document.getElementById('h_notify_email').value = this.value">
+          <input type="email" name="notify_email" id="notify_email" value="{{ notify_email }}" placeholder="admin@example.com">
         </div>
         <div style="margin-top:12px">
           <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block">SMS (номер в формате 79161234567)</label>
-          <input type="tel" name="notify_phone" id="notify_phone" value="{{ notify_phone }}" placeholder="79161234567"
-                 oninput="document.getElementById('h_notify_phone').value = this.value">
+          <input type="tel" name="notify_phone" id="notify_phone" value="{{ notify_phone }}" placeholder="79161234567">
         </div>
       </div>
 
@@ -721,7 +682,7 @@
           <label class="toggle-wrap">
             <input type="hidden" name="emulation_mode" id="emulation_hidden" value="{{ '1' if emulation_mode else '0' }}">
             <input type="checkbox" id="emulation_check" {% if emulation_mode %}checked{% endif %}
-                   onchange="document.getElementById('emulation_hidden').value = this.checked ? '1' : '0'; document.getElementById('h_emulation_mode').value = this.checked ? '1' : '0'">
+                   onchange="document.getElementById('emulation_hidden').value = this.checked ? '1' : '0'">
             <span class="toggle-track"></span>
           </label>
         </div>
@@ -731,8 +692,7 @@
         <div class="card-title">Детальный лог хранить</div>
         <div class="hint">После указанного срока подробные записи цикла удаляются. Краткая сводка остаётся до срока краткого лога.</div>
         <div class="lead-row">
-          <input type="number" name="history_days" id="history_days" value="{{ history_days }}" min="1" max="365" step="1"
-                 oninput="document.getElementById('h_history_days').value = this.value">
+          <input type="number" name="history_days" id="history_days" value="{{ history_days }}" min="1" max="365" step="1">
           <span class="lead-unit">дней</span>
         </div>
       </div>
@@ -741,8 +701,7 @@
         <div class="card-title">Краткий лог хранить</div>
         <div class="hint">После указанного срока записи цикла полностью удаляются из базы.</div>
         <div class="lead-row">
-          <input type="number" name="short_log_days" id="short_log_days" value="{{ short_log_days }}" min="1" max="3650" step="1"
-                 oninput="document.getElementById('h_short_log_days').value = this.value">
+          <input type="number" name="short_log_days" id="short_log_days" value="{{ short_log_days }}" min="1" max="3650" step="1">
           <span class="lead-unit">дней</span>
         </div>
       </div>
@@ -852,68 +811,27 @@ if (taSys) { taSys.addEventListener('input', updateSysCount); updateSysCount(); 
   }
 })();
 
-// Синхронизация textarea метапромпта в скрытые поля других форм
-const hMeta = document.getElementById('h_metaprompt');
-const pubHMeta = document.getElementById('pub_h_metaprompt');
-const svcHMeta = document.getElementById('svc_h_metaprompt');
-function syncMeta() {
-  if (!ta) return;
-  if (hMeta) hMeta.value = ta.value;
-  if (pubHMeta) pubHMeta.value = ta.value;
-  if (svcHMeta) svcHMeta.value = ta.value;
+// Собирает все настройки со всех вкладок в один объект FormData
+function collectAllSettings(activeTab) {
+  const data = new FormData();
+  data.set('active_tab', activeTab || 'pipeline');
+  const v = id => { const el = document.getElementById(id); return el ? el.value : ''; };
+  data.set('metaprompt',      ta      ? ta.value      : '');
+  data.set('system_prompt',   taSys   ? taSys.value   : '');
+  data.set('publish_time',    v('publish_time'));
+  data.set('lead_time_mins',  v('lead_time_mins'));
+  data.set('video_duration',  v('video_duration'));
+  data.set('vk_publish_story', v('vk_story_pub_hidden'));
+  data.set('vk_publish_wall',  v('vk_wall_pub_hidden'));
+  data.set('aspect_ratio_x',  v('ar-x'));
+  data.set('aspect_ratio_y',  v('ar-y'));
+  data.set('notify_email',    v('notify_email'));
+  data.set('notify_phone',    v('notify_phone'));
+  data.set('history_days',    v('history_days'));
+  data.set('short_log_days',  v('short_log_days'));
+  data.set('emulation_mode',  v('emulation_hidden'));
+  return data;
 }
-if (ta) { syncMeta(); ta.addEventListener('input', syncMeta); }
-
-// Синхронизация textarea системного промпта в скрытые поля других форм
-const hSys = document.getElementById('h_system_prompt');
-const svcHSys = document.getElementById('svc_h_system_prompt');
-const pubHSys = document.getElementById('pub_h_system_prompt');
-function syncSys() {
-  if (!taSys) return;
-  if (hSys) hSys.value = taSys.value;
-  if (svcHSys) svcHSys.value = taSys.value;
-  if (pubHSys) pubHSys.value = taSys.value;
-}
-if (taSys) { syncSys(); taSys.addEventListener('input', syncSys); }
-
-// Синхронизация полей пайплайна в скрытые поля формы Публикации
-(function() {
-  const ptInput = document.querySelector('#settings-form input[name="publish_time"]');
-  const ltInput = document.querySelector('#settings-form input[name="lead_time_mins"]');
-  function syncPub() {
-    if (ptInput && document.getElementById('pub_h_publish_time'))
-      document.getElementById('pub_h_publish_time').value = ptInput.value;
-    if (ltInput && document.getElementById('pub_h_lead_time_mins'))
-      document.getElementById('pub_h_lead_time_mins').value = ltInput.value;
-  }
-  syncPub();
-  if (ptInput) ptInput.addEventListener('input', syncPub);
-  if (ltInput) ltInput.addEventListener('input', syncPub);
-})();
-
-// Синхронизация полей служебных в скрытые поля формы Публикации
-(function() {
-  const pairs = [
-    ['notify_email',  'pub_h_notify_email'],
-    ['notify_phone',  'pub_h_notify_phone'],
-    ['history_days',  'pub_h_history_days'],
-    ['short_log_days','pub_h_short_log_days'],
-  ];
-  pairs.forEach(([srcId, dstId]) => {
-    const src = document.getElementById(srcId);
-    const dst = document.getElementById(dstId);
-    if (src && dst) {
-      dst.value = src.value;
-      src.addEventListener('input', () => { dst.value = src.value; });
-    }
-  });
-  const emulChk = document.getElementById('emulation_check');
-  const pubEmul = document.getElementById('pub_h_emulation_mode');
-  if (emulChk && pubEmul) {
-    pubEmul.value = emulChk.checked ? '1' : '0';
-    emulChk.addEventListener('change', () => { pubEmul.value = emulChk.checked ? '1' : '0'; });
-  }
-})();
 
 // Логика переключателей ВК на вкладке "Публикация"
 function onVkPublishToggle(changedChk, otherId, selfHidId, otherHidId) {
@@ -925,18 +843,6 @@ function onVkPublishToggle(changedChk, otherId, selfHidId, otherHidId) {
   const otherVal = otherChk.checked   ? '1' : '0';
   document.getElementById(selfHidId).value  = selfVal;
   document.getElementById(otherHidId).value = otherVal;
-  // Синхронизируем с pipeline и service формами
-  const isStory = selfHidId === 'vk_story_pub_hidden';
-  const storyVal = isStory ? selfVal : otherVal;
-  const wallVal  = isStory ? otherVal : selfVal;
-  const pipeStory = document.getElementById('vk_story_hidden');
-  const pipeWall  = document.getElementById('vk_wall_hidden');
-  const svcStory  = document.getElementById('h_vk_story');
-  const svcWall   = document.getElementById('h_vk_wall');
-  if (pipeStory) pipeStory.value = storyVal;
-  if (pipeWall)  pipeWall.value  = wallVal;
-  if (svcStory)  svcStory.value  = storyVal;
-  if (svcWall)   svcWall.value   = wallVal;
   savePublishSettings();
 }
 
@@ -944,13 +850,7 @@ function onVkPublishToggle(changedChk, otherId, selfHidId, otherHidId) {
 var _pipelineSaveTimer = null;
 
 function savePipelineSettings() {
-  const form = document.getElementById('settings-form');
-  if (!form) return;
-  const data = new FormData(form);
-  data.set('active_tab', 'pipeline');
-  const dur = document.getElementById('video_duration');
-  if (dur) data.set('video_duration', dur.value);
-  fetch('/save', { method: 'POST', body: data }).catch(() => {});
+  fetch('/save', { method: 'POST', body: collectAllSettings('pipeline') }).catch(() => {});
 }
 
 function schedulePipelineSave() {
@@ -960,8 +860,8 @@ function schedulePipelineSave() {
 
 (function() {
   const fields = [
-    document.querySelector('#settings-form input[name="publish_time"]'),
-    document.querySelector('#settings-form input[name="lead_time_mins"]'),
+    document.getElementById('publish_time'),
+    document.getElementById('lead_time_mins'),
     document.getElementById('video_duration'),
   ].filter(Boolean);
   fields.forEach(f => {
@@ -974,11 +874,7 @@ function schedulePipelineSave() {
 var _storySaveTimer = null;
 
 function saveStorySettings() {
-  const form = document.getElementById('story-form');
-  if (!form) return;
-  const data = new FormData(form);
-  data.set('active_tab', 'story');
-  fetch('/save', { method: 'POST', body: data }).catch(() => {});
+  fetch('/save', { method: 'POST', body: collectAllSettings('story') }).catch(() => {});
 }
 
 function scheduleStorySave() {
@@ -988,10 +884,7 @@ function scheduleStorySave() {
 
 (function() {
   if (ta) {
-    ta.addEventListener('input', function() {
-      syncMeta();
-      scheduleStorySave();
-    });
+    ta.addEventListener('input', scheduleStorySave);
     ta.addEventListener('change', scheduleStorySave);
   }
   if (taSys) {
@@ -1004,16 +897,40 @@ function scheduleStorySave() {
 var _publishSaveTimer = null;
 
 function savePublishSettings() {
-  const form = document.querySelector('#panel-publish form');
-  if (!form) return;
-  const data = new FormData(form);
-  fetch('/save', { method: 'POST', body: data }).catch(() => {});
+  fetch('/save', { method: 'POST', body: collectAllSettings('publish') }).catch(() => {});
 }
 
 function schedulePublishSave() {
   clearTimeout(_publishSaveTimer);
   _publishSaveTimer = setTimeout(savePublishSettings, 600);
 }
+
+// ── Автосохранение панели «Служебные» ──
+var _serviceSaveTimer = null;
+
+function saveServiceSettings() {
+  fetch('/save', { method: 'POST', body: collectAllSettings('service') }).catch(() => {});
+}
+
+function scheduleServiceSave() {
+  clearTimeout(_serviceSaveTimer);
+  _serviceSaveTimer = setTimeout(saveServiceSettings, 800);
+}
+
+(function() {
+  const fields = [
+    document.getElementById('notify_email'),
+    document.getElementById('notify_phone'),
+    document.getElementById('history_days'),
+    document.getElementById('short_log_days'),
+  ].filter(Boolean);
+  fields.forEach(f => {
+    f.addEventListener('input', scheduleServiceSave);
+    f.addEventListener('change', scheduleServiceSave);
+  });
+  const emulChk = document.getElementById('emulation_check');
+  if (emulChk) emulChk.addEventListener('change', scheduleServiceSave);
+})();
 
 // ── Aspect ratio visual control ──
 function updateAR() {
@@ -1029,15 +946,6 @@ function updateAR() {
   else        { h = maxSide; w = Math.round(maxSide * x / y); }
   rect.style.width  = w + 'px';
   rect.style.height = h + 'px';
-  // Sync hidden fields in other forms
-  const pipX = document.getElementById('pip_h_ar_x');
-  const pipY = document.getElementById('pip_h_ar_y');
-  const svcX = document.getElementById('svc_h_ar_x');
-  const svcY = document.getElementById('svc_h_ar_y');
-  if (pipX) pipX.value = x;
-  if (pipY) pipY.value = y;
-  if (svcX) svcX.value = x;
-  if (svcY) svcY.value = y;
   // Update active preset highlight
   document.querySelectorAll('.ar-preset').forEach(btn => {
     const [bx, by] = btn.textContent.split(':').map(Number);

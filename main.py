@@ -953,7 +953,7 @@ def publish_to_wall():
             "https://api.vk.com/method/video.save",
             data={
                 "group_id": GROUP_ID,
-                "name": "Строительство и ремонт",
+                "name": "",
                 "description": "",
                 "wallpost": 0,
                 "access_token": VK_TOKEN,
