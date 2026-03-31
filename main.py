@@ -235,6 +235,7 @@ def init_db():
                 for _name, _url, _order, _active in [
                     ("qwen3.6-plus-preview", "qwen/qwen3.6-plus-preview:free", 1, True),
                     ("llama-3.1-8b-instruct", "meta-llama/llama-3.1-8b-instruct:free", 2, False),
+                    ("mistral-small-3.1-24b-instruct", "mistralai/mistral-small-3.1-24b-instruct:free", 3, False),
                 ]:
                     cur.execute("SELECT COUNT(*) FROM models WHERE name = %s", (_name,))
                     if cur.fetchone()[0] == 0:
