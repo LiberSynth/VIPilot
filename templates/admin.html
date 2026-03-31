@@ -1532,8 +1532,14 @@ setInterval(refreshLog, 4000);
     });
   }
 
+  function setPtDisabled(disabled) {
+    document.querySelectorAll('.pt-btn-add, .pt-btn-remove').forEach(function(b) {
+      b.disabled = disabled;
+    });
+  }
+
   function loadPublishTimes() {
-    fetch('/api/publish-times')
+    return fetch('/api/publish-times')
       .then(function(r) { return r.json(); })
       .then(renderPublishTimes)
       .catch(function() {});
@@ -1542,28 +1548,29 @@ setInterval(refreshLog, 4000);
   function addPublishTime() {
     const input = document.getElementById('new-publish-time');
     if (!input || !input.value) return;
-    const btn = document.querySelector('.pt-btn-add');
     const val = input.value;
     input.value = '';
-    if (btn) btn.disabled = true;
+    setPtDisabled(true);
     fetch('/api/publish-times', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({time: val})
     })
       .then(function(r) { return r.json(); })
-      .then(function() { loadPublishTimes(); })
+      .then(function() { return loadPublishTimes(); })
       .catch(function() {})
-      .finally(function() { if (btn) btn.disabled = false; });
+      .finally(function() { setPtDisabled(false); });
   }
 
   window.addPublishTime = addPublishTime;
 
   window.deletePublishTime = function(id) {
+    setPtDisabled(true);
     fetch('/api/publish-times/' + id, {method: 'DELETE'})
       .then(function(r) { return r.json(); })
-      .then(function() { loadPublishTimes(); })
-      .catch(function() {});
+      .then(function() { return loadPublishTimes(); })
+      .catch(function() {})
+      .finally(function() { setPtDisabled(false); });
   };
 
   // Load on page load if pipeline panel is active
