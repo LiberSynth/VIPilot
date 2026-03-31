@@ -165,7 +165,19 @@ def init_db():
                     )
                 """)
                 cur.execute("""
-                    CREATE TABLE IF NOT EXISTS models (
+                    DO $$
+                    BEGIN
+                        IF EXISTS (
+                            SELECT 1 FROM information_schema.tables WHERE table_name = 'models'
+                        ) AND NOT EXISTS (
+                            SELECT 1 FROM information_schema.tables WHERE table_name = 'video_models'
+                        ) THEN
+                            ALTER TABLE models RENAME TO video_models;
+                        END IF;
+                    END $$
+                """)
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS video_models (
                         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                         name VARCHAR(200) NOT NULL,
                         platform_url VARCHAR(500) NOT NULL DEFAULT 'https://queue.fal.run/fal-ai',
@@ -176,7 +188,7 @@ def init_db():
                     )
                 """)
                 cur.execute("""
-                    ALTER TABLE models ADD COLUMN IF NOT EXISTS
+                    ALTER TABLE video_models ADD COLUMN IF NOT EXISTS
                     platform_url VARCHAR(500) NOT NULL DEFAULT 'https://queue.fal.run/fal-ai'
                 """)
                 import json as _json
@@ -190,10 +202,10 @@ def init_db():
                 )
                 # Миграция: обновить body для строк, где шаблон ещё не применён
                 cur.execute(
-                    "UPDATE models SET body = %s::jsonb WHERE body->>'prompt' IS DISTINCT FROM '{}'",
+                    "UPDATE video_models SET body = %s::jsonb WHERE body->>'prompt' IS DISTINCT FROM '{}'",
                     (_body_tpl,),
                 )
-                cur.execute("SELECT COUNT(*) FROM models")
+                cur.execute("SELECT COUNT(*) FROM video_models")
                 if cur.fetchone()[0] == 0:
                     models_seed = [
                         ("veo2", "veo2", _body_tpl, 1, True),
@@ -207,7 +219,7 @@ def init_db():
                         ),
                     ]
                     cur.executemany(
-                        'INSERT INTO models (name, url, body, "order", active) VALUES (%s, %s, %s, %s, %s)',
+                        'INSERT INTO video_models (name, url, body, "order", active) VALUES (%s, %s, %s, %s, %s)',
                         models_seed,
                     )
 
@@ -219,16 +231,16 @@ def init_db():
                         "aspect_ratio": "{:d}:{:d}",
                     }
                 )
-                cur.execute("SELECT COUNT(*) FROM models WHERE name = 'sora-2'")
+                cur.execute("SELECT COUNT(*) FROM video_models WHERE name = 'sora-2'")
                 if cur.fetchone()[0] == 0:
                     cur.execute(
-                        'INSERT INTO models (name, url, body, "order", active) VALUES (%s, %s, %s::jsonb, %s, %s)',
+                        'INSERT INTO video_models (name, url, body, "order", active) VALUES (%s, %s, %s::jsonb, %s, %s)',
                         ("sora-2", "sora-2/text-to-video", _sora_body_tpl, 4, False),
                     )
 
                 # Миграция: обновить duration для sora-2 на "{int}"
                 cur.execute(
-                    """UPDATE models SET body = jsonb_set(body, '{duration}', '"{int}"') WHERE name = 'sora-2' AND body->>'duration' != '{int}'""",
+                    """UPDATE video_models SET body = jsonb_set(body, '{duration}', '"{int}"') WHERE name = 'sora-2' AND body->>'duration' != '{int}'""",
                 )
             conn.commit()
         print("[DB] Инициализация выполнена")
@@ -538,7 +550,7 @@ def get_active_model():
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
-                cur.execute("SELECT platform_url, url, body FROM models WHERE active = TRUE LIMIT 1")
+                cur.execute("SELECT platform_url, url, body FROM video_models WHERE active = TRUE LIMIT 1")
                 row = cur.fetchone()
         if not row:
             return None, None, None
@@ -1302,7 +1314,7 @@ def api_models():
         with get_db() as conn:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
                 cur.execute(
-                    'SELECT id, name, url, body, "order", active FROM models ORDER BY "order" ASC'
+                    'SELECT id, name, url, body, "order", active FROM video_models ORDER BY "order" ASC'
                 )
                 rows = cur.fetchall()
         return jsonify([dict(r) for r in rows])
@@ -1317,9 +1329,9 @@ def api_model_activate(model_id):
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
-                cur.execute("UPDATE models SET active = FALSE")
+                cur.execute("UPDATE video_models SET active = FALSE")
                 cur.execute(
-                    "UPDATE models SET active = TRUE WHERE id = %s", (model_id,)
+                    "UPDATE video_models SET active = TRUE WHERE id = %s", (model_id,)
                 )
             conn.commit()
         return jsonify({"ok": True})
@@ -1340,7 +1352,7 @@ def api_models_reorder():
             with conn.cursor() as cur:
                 for idx, model_id in enumerate(ids, start=1):
                     cur.execute(
-                        'UPDATE models SET "order" = %s WHERE id = %s', (idx, model_id)
+                        'UPDATE video_models SET "order" = %s WHERE id = %s', (idx, model_id)
                     )
             conn.commit()
         return jsonify({"ok": True})
