@@ -110,28 +110,24 @@ def to_utc_from_msk(h, m):
     return total // 60, total % 60
 
 
-def _migrate_serial_to_uuid(cur, table_name):
-    """Drop table if its id column is still SERIAL (integer) so it can be recreated as UUID."""
-    cur.execute(
-        """
-        SELECT data_type FROM information_schema.columns
-        WHERE table_schema = 'public' AND table_name = %s AND column_name = 'id'
-    """,
-        (table_name,),
-    )
-    row = cur.fetchone()
-    if row and row[0] in ("integer", "bigint"):
-        cur.execute(f'DROP TABLE IF EXISTS "{table_name}" CASCADE')
-        print(f"[DB] Миграция: таблица {table_name} пересоздаётся с UUID")
-
-
 def init_db():
+    import json as _json
+
+    _fal_body = _json.dumps({"prompt": "{}", "duration": "{:d}s", "aspect_ratio": "{:d}:{:d}"})
+    _kling_body = _json.dumps({"prompt": "{}", "duration": "{:d}", "aspect_ratio": "{:d}:{:d}"})
+    _sora_body = _json.dumps({"prompt": "{}", "duration": "{int}", "aspect_ratio": "{:d}:{:d}"})
+    _text_body = _json.dumps({
+        "messages": [
+            {"role": "system", "content": "{}"},
+            {"role": "user", "content": "{}"},
+        ],
+        "temperature": 0.9,
+        "max_tokens": 300,
+    })
+
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
-                _migrate_serial_to_uuid(cur, "video_urls")
-                _migrate_serial_to_uuid(cur, "cycles")
-                _migrate_serial_to_uuid(cur, "models")
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS settings (
                         key VARCHAR(100) PRIMARY KEY,
@@ -195,12 +191,6 @@ def init_db():
                     ) AS v(name, url)
                     WHERE NOT EXISTS (SELECT 1 FROM ai_platforms WHERE name = v.name)
                 """)
-                # Миграция: models -> video_models -> models
-                cur.execute(
-                    "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'video_models'"
-                )
-                if cur.fetchone()[0] > 0:
-                    cur.execute("ALTER TABLE video_models RENAME TO models")
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS models (
                         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -209,120 +199,52 @@ def init_db():
                         body JSONB NOT NULL DEFAULT '{}',
                         "order" INTEGER NOT NULL DEFAULT 0,
                         active BOOLEAN NOT NULL DEFAULT FALSE,
-                        type SMALLINT NOT NULL DEFAULT 0
+                        type SMALLINT NOT NULL DEFAULT 0,
+                        ai_platform_id UUID REFERENCES ai_platforms(id)
                     )
                 """)
                 cur.execute("""
                     ALTER TABLE models ADD COLUMN IF NOT EXISTS
                     ai_platform_id UUID REFERENCES ai_platforms(id)
                 """)
-                cur.execute("ALTER TABLE models DROP COLUMN IF EXISTS platform_url")
                 cur.execute("""
                     ALTER TABLE models ADD COLUMN IF NOT EXISTS type SMALLINT NOT NULL DEFAULT 0
                 """)
-                cur.execute("ALTER TABLE models ALTER COLUMN type DROP DEFAULT")
                 cur.execute("""
                     UPDATE models
                     SET ai_platform_id = (SELECT id FROM ai_platforms WHERE name = 'fal')
-                    WHERE ai_platform_id IS NULL
+                    WHERE ai_platform_id IS NULL AND type = 0
                 """)
-                import json as _json
 
-                _body_tpl = _json.dumps(
-                    {
-                        "prompt": "{}",
-                        "duration": "{:d}s",
-                        "aspect_ratio": "{:d}:{:d}",
-                    }
-                )
-                # Миграция: обновить body для строк, где шаблон ещё не применён
-                cur.execute(
-                    "UPDATE models SET body = %s::jsonb WHERE body->>'prompt' IS DISTINCT FROM '{}'",
-                    (_body_tpl,),
-                )
-                cur.execute("SELECT COUNT(*) FROM models")
+                # Seed: видео-модели
+                cur.execute("SELECT COUNT(*) FROM models WHERE type = 0")
                 if cur.fetchone()[0] == 0:
-                    models_seed = [
-                        ("veo2", "veo2", _body_tpl, 1, True),
-                        ("minimax/video-01", "minimax/video-01", _body_tpl, 2, False),
-                        (
-                            "kling-video/v1.6/standard",
-                            "kling-video/v1.6/standard/text-to-video",
-                            _body_tpl,
-                            3,
-                            False,
-                        ),
-                    ]
                     cur.executemany(
-                        'INSERT INTO models (name, url, body, "order", active) VALUES (%s, %s, %s, %s, %s)',
-                        models_seed,
+                        'INSERT INTO models (name, url, body, "order", active, type, ai_platform_id) '
+                        "VALUES (%s, %s, %s::jsonb, %s, %s, 0, "
+                        "(SELECT id FROM ai_platforms WHERE name = 'fal'))",
+                        [
+                            ("veo2", "veo2", _fal_body, 1, True),
+                            ("minimax/video-01", "minimax/video-01", _fal_body, 2, False),
+                            ("kling-video/v1.6/standard", "kling-video/v1.6/standard/text-to-video", _kling_body, 3, False),
+                            ("sora-2", "sora-2/text-to-video", _sora_body, 4, False),
+                        ],
                     )
 
-                # Добавить sora-2, если ещё нет
-                _sora_body_tpl = _json.dumps(
-                    {
-                        "prompt": "{}",
-                        "duration": "{int}",
-                        "aspect_ratio": "{:d}:{:d}",
-                    }
-                )
-                cur.execute("SELECT COUNT(*) FROM models WHERE name = 'sora-2'")
-                if cur.fetchone()[0] == 0:
-                    cur.execute(
-                        'INSERT INTO models (name, url, body, "order", active) VALUES (%s, %s, %s::jsonb, %s, %s)',
-                        ("sora-2", "sora-2/text-to-video", _sora_body_tpl, 4, False),
-                    )
-
-                # Миграция: обновить duration для sora-2 на "{int}"
-                cur.execute(
-                    """UPDATE models SET body = jsonb_set(body, '{duration}', '"{int}"') WHERE name = 'sora-2' AND body->>'duration' != '{int}'""",
-                )
-
-                # Миграция: убрать суффикс 's' из duration для kling (принимает только "5" или "10")
-                cur.execute(
-                    """UPDATE models SET body = jsonb_set(body, '{duration}', '"{:d}"')
-                       WHERE name LIKE 'kling%' AND body->>'duration' = '{:d}s'""",
-                )
-
-                # Добавить текстовые модели OpenRouter, если ещё нет
-                _text_body_tpl = _json.dumps({
-                    "messages": [
-                        {"role": "system", "content": "{}"},
-                        {"role": "user", "content": "{}"},
-                    ],
-                    "temperature": 0.9,
-                    "max_tokens": 300,
-                })
-                _text_models = [
+                # Seed: текстовые модели OpenRouter
+                for _name, _url, _order, _active in [
                     ("qwen3.6-plus-preview", "qwen/qwen3.6-plus-preview:free", 1, True),
                     ("llama-3.1-8b-instruct", "meta-llama/llama-3.1-8b-instruct:free", 2, False),
-                ]
-                for _tm_name, _tm_url, _tm_order, _tm_active in _text_models:
-                    cur.execute("SELECT COUNT(*) FROM models WHERE name = %s", (_tm_name,))
+                ]:
+                    cur.execute("SELECT COUNT(*) FROM models WHERE name = %s", (_name,))
                     if cur.fetchone()[0] == 0:
                         cur.execute(
                             'INSERT INTO models (name, url, body, "order", active, type, ai_platform_id) '
                             "VALUES (%s, %s, %s::jsonb, %s, %s, 1, "
                             "(SELECT id FROM ai_platforms WHERE name = 'OpenRouter'))",
-                            (_tm_name, _tm_url, _text_body_tpl, _tm_order, _tm_active),
+                            (_name, _url, _text_body, _order, _active),
                         )
 
-                # Миграция: обновить body для текстовых моделей, если ещё нет поля messages
-                cur.execute(
-                    "UPDATE models SET body = %s::jsonb WHERE type = 1 AND (body -> 'messages') IS NULL",
-                    (_text_body_tpl,),
-                )
-
-                # Установить дефолтный системный промпт, если ещё пустой
-                _default_sys = (
-                    "Ты генерируешь только один короткий сценарий для вертикального видео"
-                    " (Shorts/Reels). Никаких пояснений, вопросов и заголовков."
-                    " Первый ответ — только чистый текст сценария."
-                )
-                cur.execute(
-                    "UPDATE settings SET value = %s WHERE key = 'system_prompt' AND value = ''",
-                    (_default_sys,),
-                )
             conn.commit()
         print("[DB] Инициализация выполнена")
     except Exception as e:
