@@ -1738,6 +1738,8 @@ def start_scheduler():
                 app_state["last_published"] = last["summary"]["published_at"]
                 app_state["last_ok"] = last["status"] == "ok"
         print(f"[DB] Загружено циклов из БД: {len(saved)}")
+        db_trim_cycles_by_age()
+        db_clear_old_entries()
         t = threading.Thread(target=scheduler_loop, daemon=True)
         t.start()
 
