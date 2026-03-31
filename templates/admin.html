@@ -1371,20 +1371,32 @@ function statusColor(status) {
 // ── Tree grouping logic ──
 
 const STAGE_DEFS = [
-  { key: 'story',       label: 'Сюжет',       modelKey: 'story_model',  doneKey: 'story_generated_at' },
-  { key: 'video',       label: 'Видео',        modelKey: 'video_model',  doneKey: 'video_generated_at' },
-  { key: 'transcoding', label: 'Транскодинг',  modelKey: null,           doneKey: 'transcoded_at'      },
-  { key: 'publish',     label: 'Публикация',   modelKey: null,           doneKey: 'published_at'       },
+  { key: 'story',       label: 'Генерация сюжета',    modelKey: 'story_model',       methodKey: null,                 doneKey: 'story_generated_at' },
+  { key: 'video',       label: 'Генерация видео',      modelKey: 'video_model',       methodKey: null,                 doneKey: 'video_generated_at' },
+  { key: 'transcoding', label: 'Транскодирование',     modelKey: null,                methodKey: 'transcoding_method', doneKey: 'transcoded_at'      },
+  { key: 'publish',     label: 'Публикация',           modelKey: null,                methodKey: null,                 doneKey: 'published_at'       },
 ];
 
-function tsToMs(tsStr) {
+// Parse Moscow-time strings to milliseconds for comparison.
+// Supported formats:
+//   "DD.MM.YYYY HH:MM МСК"  — summary _at fields
+//   "DD.MM.YYYY HH:MM:SS"   — legacy
+//   "DD.MM HH:MM:SS"        — entries .ts (no year; yearHint required)
+function tsToMs(tsStr, yearHint) {
   if (!tsStr) return null;
-  // Format: "ДД.ММ.ГГГГ ЧЧ:ММ:СС" or ISO
-  const m = tsStr.match(/^(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}):(\d{2}):(\d{2})$/);
+  // "DD.MM.YYYY HH:MM" (with optional seconds and optional trailing text like МСК)
+  let m = tsStr.match(/^(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}):(\d{2})(?::(\d{2}))?/);
   if (m) {
-    return new Date(`${m[3]}-${m[2]}-${m[1]}T${m[4]}:${m[5]}:${m[6]}`).getTime();
+    return new Date(`${m[3]}-${m[2]}-${m[1]}T${m[4]}:${m[5]}:${m[6] || '00'}`).getTime();
   }
-  return new Date(tsStr).getTime() || null;
+  // "DD.MM HH:MM:SS" — entry timestamp without year
+  m = tsStr.match(/^(\d{2})\.(\d{2})\s+(\d{2}):(\d{2}):(\d{2})$/);
+  if (m) {
+    const y = yearHint || new Date().getFullYear();
+    return new Date(`${y}-${m[2]}-${m[1]}T${m[3]}:${m[4]}:${m[5]}`).getTime();
+  }
+  const t = new Date(tsStr).getTime();
+  return isNaN(t) ? null : t;
 }
 
 function buildTreeNodes(cycle) {
@@ -1392,104 +1404,87 @@ function buildTreeNodes(cycle) {
   const entries = cycle.entries || [];
   const cycleStatus = cycle.status;
 
-  // Parse done timestamps for each stage (null = not done)
-  const stageDoneTsMs = STAGE_DEFS.map(s => tsToMs(sm[s.doneKey]));
+  // Extract year from cycle.started ("DD.MM.YYYY HH:MM МСК")
+  const yearHint = (cycle.started || '').match(/(\d{4})/)?.[1] || String(new Date().getFullYear());
 
-  // Find index of last completed stage (-1 if none)
+  // Parse completion timestamps for each stage
+  const stageDoneTsMs = STAGE_DEFS.map(s => tsToMs(sm[s.doneKey], yearHint));
+
+  // Index of last completed stage (-1 if none)
   const lastDoneIdx = stageDoneTsMs.reduce((acc, ts, i) => ts !== null ? i : acc, -1);
 
-  // Determine each stage status
+  // Status of each stage node
   function stageStatus(i) {
     if (stageDoneTsMs[i] !== null) return 'ok';
     if (cycleStatus === 'error') {
-      if (i === lastDoneIdx + 1) return 'error';
-      return 'pending';
+      return i === lastDoneIdx + 1 ? 'error' : 'pending';
     }
     if (cycleStatus === 'running') {
-      if (i === lastDoneIdx + 1) return 'running';
-      return 'pending';
+      return i === lastDoneIdx + 1 ? 'running' : 'pending';
     }
     return 'pending';
   }
 
-  // Stage windows (prevDone exclusive, thisDone inclusive):
-  //   story: (cycleStart, story_done]; video: (story_done, video_done]
-  //   transcoding: (video_done, transcoded_done]; publish: (transcoded_done, +Inf)
-  // Entries outside all windows → Инициализация; if !anyDone → all entries → Инициализация.
-  // cycle.started and entry.ts share the same Moscow-time string format.
-  const cycleStartMs = tsToMs(cycle.started);
-
-  const anyDone = stageDoneTsMs.some(t => t !== null);
-
+  // Bucket entries into stages.
+  // Stage i window: (stageDoneTsMs[i-1], stageDoneTsMs[i]]
+  // Stage 0 starts from cycle start (or -Inf if unknown).
+  // Last stage (publish) has no upper bound.
+  const cycleStartMs = tsToMs(cycle.started, yearHint);
   const stageBuckets = STAGE_DEFS.map(() => []);
-  const initBucket = [];
 
   entries.forEach(e => {
-    const eMs = tsToMs(e.ts);
+    const eMs = tsToMs(e.ts, yearHint);
 
-    // If no stage is done, all entries are pre-pipeline → Инициализация
-    if (!anyDone) {
-      initBucket.push(e);
-      return;
-    }
-
-    // Try to assign entry to a stage window: (prevDone, thisDone]
-    // Stage 0's prevDone = cycleStartMs (inclusive lower bound for init check)
-    let assigned = false;
     for (let i = 0; i < STAGE_DEFS.length; i++) {
-      const prevDone = i === 0 ? cycleStartMs : stageDoneTsMs[i - 1];
-      // Last stage (publish) has no upper bound — captures all trailing entries
-      const isLastStage = i === STAGE_DEFS.length - 1;
-      const thisDone = isLastStage ? null : stageDoneTsMs[i];
+      const prevMs = i === 0 ? (cycleStartMs ?? -Infinity) : stageDoneTsMs[i - 1];
+      const nextMs = i === STAGE_DEFS.length - 1 ? null : stageDoneTsMs[i];
 
-      // prevDone=null means cycleStartMs is unknown → no lower bound for stage 0
-      const afterPrev = prevDone === null
-        ? true
-        : (eMs !== null && eMs > prevDone);
+      const afterPrev = prevMs === null ? true : (eMs !== null && eMs >= prevMs);
+      const beforeNext = nextMs === null ? true : (eMs !== null && eMs <= nextMs);
 
-      // thisDone=null: stage is open (active/running) or last stage → captures to +Inf
-      const atOrBeforeThis = thisDone === null
-        ? true
-        : (eMs !== null && eMs <= thisDone);
-
-      if (afterPrev && atOrBeforeThis) {
+      if (afterPrev && beforeNext) {
         stageBuckets[i].push(e);
-        assigned = true;
         break;
       }
     }
-
-    // Entries not matching any stage window → Инициализация
-    if (!assigned) {
-      initBucket.push(e);
-    }
+    // Entries that don't fit any window (shouldn't happen) → first stage
   });
 
-  // Build nodes array
+  // Build nodes: only stages with a doneKey in summary OR currently active/running
   const nodes = [];
 
-  // Init node only shown when it has entries
-  if (initBucket.length > 0) {
-    nodes.push({
-      key: '__init__',
-      label: 'Инициализация',
-      model: null,
-      meta: null,
-      status: 'ok',
-      entries: initBucket,
-    });
-  }
-
   STAGE_DEFS.forEach((s, i) => {
+    const isDone = stageDoneTsMs[i] !== null;
+    const status = stageStatus(i);
+    // Show stage if completed, running, or is next after last completed (error/running)
+    if (!isDone && status === 'pending') return;
+
+    const model  = s.modelKey  ? (sm[s.modelKey]  || null) : null;
+    const method = s.methodKey ? (sm[s.methodKey] || null) : null;
+
     nodes.push({
-      key: s.key,
-      label: s.label,
-      model: s.modelKey ? sm[s.modelKey] : null,
-      meta: sm[s.doneKey] || null,
-      status: stageStatus(i),
+      key:     s.key,
+      label:   s.label,
+      model:   model || method,
+      meta:    sm[s.doneKey] || null,
+      status,
       entries: stageBuckets[i],
     });
   });
+
+  // Add Сбой node for error cycles
+  if (cycleStatus === 'error' && sm.failed) {
+    const lastEntry = entries.length > 0 ? entries[entries.length - 1] : null;
+    nodes.push({
+      key:     '__fail__',
+      label:   'Сбой',
+      model:   null,
+      meta:    lastEntry ? lastEntry.ts : null,
+      status:  'error',
+      entries: [],
+      errorText: sm.failed,
+    });
+  }
 
   return nodes;
 }
@@ -1531,7 +1526,12 @@ function buildTreeHtml(nodes, activeStageKey) {
     children.className = 'tree-children';
     const inner = document.createElement('div');
     inner.className = 'tree-children-inner';
-    if (node.entries.length === 0) {
+    if (node.errorText) {
+      const errEl = document.createElement('div');
+      errEl.style.cssText = 'color:#c0392b;padding:4px 0;font-size:11px;white-space:pre-wrap;';
+      errEl.textContent = node.errorText;
+      inner.appendChild(errEl);
+    } else if (node.entries.length === 0) {
       const empty = document.createElement('div');
       empty.style.cssText = 'color:#333;padding:4px 0;font-size:11px;';
       empty.textContent = 'Нет записей';
@@ -1551,18 +1551,14 @@ function buildTreeHtml(nodes, activeStageKey) {
 
 function activeStageKey(cycle) {
   const sm = cycle.summary || {};
-  const DONE_KEYS = ['story_generated_at', 'video_generated_at', 'transcoded_at', 'published_at'];
-  const STAGE_KEYS = ['story', 'video', 'transcoding', 'publish'];
-  if (cycle.status === 'running' || cycle.status === 'error') {
-    // If no stage is done yet, the active node is Инициализация
-    const anyDone = DONE_KEYS.some(k => sm[k]);
-    if (!anyDone) return '__init__';
-    for (let i = 0; i < DONE_KEYS.length; i++) {
-      if (!sm[DONE_KEYS[i]]) return STAGE_KEYS[i];
-    }
+  if (cycle.status === 'error') {
+    return sm.failed ? '__fail__' : STAGE_DEFS.find((s, i) => !sm[s.doneKey])?.key || STAGE_DEFS[STAGE_DEFS.length - 1].key;
   }
-  // Completed: show last stage
-  return STAGE_KEYS[STAGE_KEYS.length - 1];
+  if (cycle.status === 'running') {
+    const running = STAGE_DEFS.find(s => !sm[s.doneKey]);
+    return running ? running.key : STAGE_DEFS[STAGE_DEFS.length - 1].key;
+  }
+  return STAGE_DEFS[STAGE_DEFS.length - 1].key;
 }
 
 // Build tree text for clipboard
@@ -1570,6 +1566,7 @@ function buildTreeText(nodes) {
   const lines = [];
   nodes.forEach(node => {
     lines.push(`[${node.label}${node.model ? ' / ' + node.model : ''}${node.meta ? '  ' + node.meta : ''}]`);
+    if (node.errorText) lines.push(`  ${node.errorText}`);
     node.entries.forEach(e => lines.push(`  ${e.ts}  ${e.msg}`));
   });
   return lines.join('\n');
