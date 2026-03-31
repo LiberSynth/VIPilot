@@ -463,8 +463,11 @@
     <button class="sidebar-item active" data-panel="pipeline" onclick="switchPanel('pipeline')">
       <span class="sidebar-item-icon">▶</span>Пайплайн
     </button>
+    <button class="sidebar-item" data-panel="story" onclick="switchPanel('story')">
+      <span class="sidebar-item-icon">✍</span>Генерация сюжета
+    </button>
     <button class="sidebar-item" data-panel="request" onclick="switchPanel('request')">
-      <span class="sidebar-item-icon">⚙</span>Генерация
+      <span class="sidebar-item-icon">⚙</span>Генерация видео
     </button>
     <button class="sidebar-item" data-panel="publish" onclick="switchPanel('publish')">
       <span class="sidebar-item-icon">📤</span>Публикация
@@ -531,14 +534,9 @@
     </form>
 
     <form id="settings-form" style="margin-top:0">
-      <div class="card" style="margin-top:12px">
-        <div class="card-title">Мета-промпт</div>
-        <div class="hint">Стиль, тема и характер видео. Каждый день генерируется новый уникальный сюжет.</div>
-        <textarea name="metaprompt" id="ta" spellcheck="true">{{ metaprompt }}</textarea>
-        <div class="char-count" id="charcount"></div>
-      </div>
+      <input type="hidden" name="metaprompt" id="h_metaprompt" value="{{ metaprompt }}">
 
-      <div class="card">
+      <div class="card" style="margin-top:12px">
         <div class="card-title">Время публикации <span class="tz-badge">МСК</span></div>
         <div class="hint">Видео публикуется в это время по Москве.</div>
         <input type="time" name="publish_time" value="{{ publish_time_msk }}">
@@ -577,6 +575,18 @@
       <input type="hidden" name="emulation_mode" id="h_emulation_mode" value="{{ '1' if emulation_mode else '0' }}">
     </form>
 
+  </div>
+
+  <!-- ══ ГЕНЕРАЦИЯ СЮЖЕТА ══ -->
+  <div id="panel-story" class="tab-panel">
+    <form id="story-form" style="margin-top:0">
+      <div class="card" style="margin-top:12px">
+        <div class="card-title">Мета-промпт</div>
+        <div class="hint">Стиль, тема и характер видео. Каждый день генерируется новый уникальный сюжет.</div>
+        <textarea name="metaprompt" id="ta" spellcheck="true">{{ metaprompt }}</textarea>
+        <div class="char-count" id="charcount"></div>
+      </div>
+    </form>
   </div>
 
   <!-- ══ ЗАПРОС ══ -->
@@ -758,6 +768,7 @@
 <script>
 const PANEL_TITLES = {
   pipeline: 'Пайплайн',
+  story:    'Генерация сюжета',
   request:  'Запрос',
   publish:  'Публикация',
   service:  'Служебные',
@@ -901,12 +912,37 @@ function schedulePipelineSave() {
     document.querySelector('#settings-form input[name="publish_time"]'),
     document.querySelector('#settings-form input[name="lead_time_mins"]'),
     document.querySelector('#settings-form input[name="video_duration"]'),
-    ta,
   ].filter(Boolean);
   fields.forEach(f => {
     f.addEventListener('input', schedulePipelineSave);
     f.addEventListener('change', schedulePipelineSave);
   });
+})();
+
+// ── Автосохранение панели «Генерация сюжета» ──
+var _storySaveTimer = null;
+
+function saveStorySettings() {
+  const form = document.getElementById('story-form');
+  if (!form) return;
+  const data = new FormData(form);
+  data.set('active_tab', 'story');
+  fetch('/save', { method: 'POST', body: data }).catch(() => {});
+}
+
+function scheduleStorySave() {
+  clearTimeout(_storySaveTimer);
+  _storySaveTimer = setTimeout(saveStorySettings, 800);
+}
+
+(function() {
+  if (!ta) return;
+  ta.addEventListener('input', function() {
+    const hidden = document.getElementById('h_metaprompt');
+    if (hidden) hidden.value = ta.value;
+    scheduleStorySave();
+  });
+  ta.addEventListener('change', scheduleStorySave);
 })();
 
 // ── Автосохранение панели «Публикация» ──
