@@ -442,10 +442,11 @@
   .pt-item-row { display: flex; align-items: center; gap: 8px; }
   .pt-val-box {
     flex: 1; background: #0f0f13; border: 1px solid #1e1e2e;
-    border-radius: 10px; padding: 10px 14px;
-    font-size: 22px; font-weight: 700; color: #fff; line-height: 1.2;
+    border-radius: 10px; padding: 0 14px;
+    font-size: 22px; font-weight: 700; color: #fff;
     letter-spacing: 2px; font-variant-numeric: tabular-nums;
-    box-sizing: border-box;
+    box-sizing: border-box; height: 48px;
+    display: flex; align-items: center;
   }
   .pt-btn-remove {
     background: rgba(255,80,80,.08); border: 1px solid rgba(255,80,80,.3);
@@ -458,12 +459,12 @@
   .pt-btn-remove:disabled { opacity: .4; cursor: default; }
   .pt-add-row { display: flex; gap: 8px; align-items: center; }
   .pt-time-input {
-    flex: 1; padding: 10px 14px;
+    flex: 1; padding: 0 14px;
     background: #0f0f13; border: 1px solid #2a2a38; border-radius: 10px;
-    color: #fff; font-size: 22px; font-family: inherit; line-height: 1.2;
+    color: #fff; font-size: 22px; font-family: inherit;
     font-variant-numeric: tabular-nums; appearance: none; -webkit-appearance: none;
     outline: none; transition: border-color .2s; letter-spacing: 2px;
-    box-sizing: border-box;
+    box-sizing: border-box; height: 48px;
   }
   .pt-time-input:focus { border-color: #4a7cf7; }
   .pt-btn-add {
