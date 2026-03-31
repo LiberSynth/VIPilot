@@ -277,6 +277,17 @@ def init_db():
                             "(SELECT id FROM ai_platforms WHERE name = 'OpenRouter'))",
                             (_tm_name, _tm_url, _tm_order, _tm_active),
                         )
+
+                # Установить дефолтный системный промпт, если ещё пустой
+                _default_sys = (
+                    "Ты генерируешь только один короткий сценарий для вертикального видео"
+                    " (Shorts/Reels). Никаких пояснений, вопросов и заголовков."
+                    " Первый ответ — только чистый текст сценария."
+                )
+                cur.execute(
+                    "UPDATE settings SET value = %s WHERE key = 'system_prompt' AND value = ''",
+                    (_default_sys,),
+                )
             conn.commit()
         print("[DB] Инициализация выполнена")
     except Exception as e:
