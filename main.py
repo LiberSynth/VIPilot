@@ -1341,9 +1341,13 @@ def api_models():
     try:
         with get_db() as conn:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-                cur.execute(
-                    'SELECT id, name, url, body, "order", active FROM video_models ORDER BY "order" ASC'
-                )
+                cur.execute("""
+                    SELECT vm.id, vm.name, vm.url, vm.body, vm."order", vm.active,
+                           p.name AS platform_name
+                    FROM video_models vm
+                    LEFT JOIN ai_platforms p ON p.id = vm.ai_platform_id
+                    ORDER BY vm."order" ASC
+                """)
                 rows = cur.fetchall()
         return jsonify([dict(r) for r in rows])
     except Exception as e:

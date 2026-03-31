@@ -589,23 +589,11 @@
     </form>
   </div>
 
-  <!-- ══ ЗАПРОС ══ -->
+  <!-- ══ ГЕНЕРАЦИЯ ВИДЕО ══ -->
   <div id="panel-request" class="tab-panel">
 
-    <div class="cp-card" id="cp-falai">
-      <div class="cp-header" onclick="toggleCP('cp-falai')">
-        <div class="cp-header-left">
-          <span class="cp-icon">⚙</span>
-          <span class="cp-title">Платформа fal.ai</span>
-        </div>
-        <span class="cp-arrow">▾</span>
-      </div>
-      <div class="cp-body">
-        <div class="cp-section-label">Модели</div>
-        <div class="model-list" id="model-list">
-          <div class="model-loading">Загрузка...</div>
-        </div>
-      </div>
+    <div class="model-list" id="model-list" style="margin-top:12px">
+      <div class="model-loading">Загрузка...</div>
     </div>
 
   </div>
@@ -769,7 +757,7 @@
 const PANEL_TITLES = {
   pipeline: 'Пайплайн',
   story:    'Генерация сюжета',
-  request:  'Запрос',
+  request:  'Генерация видео',
   publish:  'Публикация',
   service:  'Служебные',
   log:      'Лог',
@@ -797,8 +785,6 @@ function switchPanel(name) {
   closeSidebar();
   // Load models when switching to request panel
   if (name === 'request') {
-    const cp = document.getElementById('cp-falai');
-    if (cp && !cp.classList.contains('open')) cp.classList.add('open');
     if (typeof loadModels === 'function') loadModels();
   }
 }
@@ -1001,12 +987,6 @@ function setAR(x, y) {
 
 updateAR();
 
-// ── Collapsible panels ──
-function toggleCP(id) {
-  const el = document.getElementById(id);
-  if (el) el.classList.toggle('open');
-}
-
 // ── Models list with drag-and-drop ──
 (function() {
   var dragSrcId = null;
@@ -1028,11 +1008,12 @@ function toggleCP(id) {
       item.className = 'model-item' + (m.active ? ' model-active' : '');
       item.dataset.id = m.id;
       item.draggable = true;
+      var caption = m.platform_name ? escHtml(m.platform_name) + ': ' + escHtml(m.name) : escHtml(m.name);
       item.innerHTML =
         '<div class="model-radio" onclick="activateModel(\'' + m.id + '\')">' +
           '<div class="model-radio-dot"></div>' +
         '</div>' +
-        '<div class="model-name">' + escHtml(m.name) + '</div>' +
+        '<div class="model-name">' + caption + '</div>' +
         '<div class="model-drag-handle" title="Перетащить">⠿</div>';
 
       item.addEventListener('dragstart', function(e) {
@@ -1125,8 +1106,6 @@ function toggleCP(id) {
   (function() {
     const requestPanel = document.getElementById('panel-request');
     if (requestPanel && requestPanel.classList.contains('active')) {
-      const cp = document.getElementById('cp-falai');
-      if (cp) cp.classList.add('open');
       loadModels();
     }
   })();
