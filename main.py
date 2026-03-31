@@ -622,7 +622,7 @@ def db_get_random_video_url():
 
 
 def get_active_model():
-    """Returns (submit_url, body_template, platform_url) for the active model, or (None, None, None)."""
+    """Returns (submit_url, body_template, platform_url) for the active video model, or (None, None, None)."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
@@ -630,7 +630,7 @@ def get_active_model():
                     SELECT p.url, vm.url, vm.body
                     FROM models vm
                     JOIN ai_platforms p ON p.id = vm.ai_platform_id
-                    WHERE vm.active = TRUE
+                    WHERE vm.active = TRUE AND vm.type = 0
                     LIMIT 1
                 """)
                 row = cur.fetchone()
