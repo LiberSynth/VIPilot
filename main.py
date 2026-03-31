@@ -217,35 +217,6 @@ def init_db():
                         result TEXT NOT NULL
                     )
                 """)
-                cur.execute("ALTER TABLE generated_stories DROP COLUMN IF EXISTS system_prompt")
-                cur.execute("ALTER TABLE generated_stories DROP COLUMN IF EXISTS user_prompt")
-                # Migration: replace model_name with model_id FK
-                cur.execute("""
-                    DO $$
-                    BEGIN
-                        IF EXISTS (
-                            SELECT 1 FROM information_schema.columns
-                            WHERE table_name = 'generated_stories' AND column_name = 'model_name'
-                        ) THEN
-                            ALTER TABLE generated_stories ADD COLUMN IF NOT EXISTS model_id UUID;
-                            UPDATE generated_stories gs
-                            SET model_id = m.id
-                            FROM models m
-                            WHERE m.name = gs.model_name AND gs.model_id IS NULL;
-                            ALTER TABLE generated_stories ALTER COLUMN model_id SET NOT NULL;
-                            IF NOT EXISTS (
-                                SELECT 1 FROM information_schema.table_constraints
-                                WHERE table_name = 'generated_stories'
-                                AND constraint_name = 'fk_generated_stories_model'
-                            ) THEN
-                                ALTER TABLE generated_stories
-                                ADD CONSTRAINT fk_generated_stories_model
-                                FOREIGN KEY (model_id) REFERENCES models(id);
-                            END IF;
-                            ALTER TABLE generated_stories DROP COLUMN model_name;
-                        END IF;
-                    END$$;
-                """)
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS cycles (
                         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -283,19 +254,6 @@ def init_db():
                         ai_platform_id UUID REFERENCES ai_platforms(id)
                     )
                 """)
-                cur.execute("""
-                    ALTER TABLE models ADD COLUMN IF NOT EXISTS
-                    ai_platform_id UUID REFERENCES ai_platforms(id)
-                """)
-                cur.execute("""
-                    ALTER TABLE models ADD COLUMN IF NOT EXISTS type SMALLINT NOT NULL DEFAULT 0
-                """)
-                cur.execute("""
-                    UPDATE models
-                    SET ai_platform_id = (SELECT id FROM ai_platforms WHERE name = 'fal')
-                    WHERE ai_platform_id IS NULL AND type = 0
-                """)
-
                 # Seed: видео-модели
                 cur.execute("SELECT COUNT(*) FROM models WHERE type = 0")
                 if cur.fetchone()[0] == 0:
@@ -325,17 +283,6 @@ def init_db():
                             "(SELECT id FROM ai_platforms WHERE name = 'OpenRouter'))",
                             (_name, _url, _text_body, _order, _active),
                         )
-
-                # Миграция: переименование mistral-small-3.1-24b-instruct → mistral-7b-instruct
-                cur.execute(
-                    "UPDATE models SET name = 'mistral-7b-instruct', url = 'mistralai/mistral-7b-instruct:free' "
-                    "WHERE id = '6345fd09-349f-4bcf-9b07-37f20fe6bed3' "
-                    "AND name = 'mistral-small-3.1-24b-instruct'"
-                )
-                # Миграция: удаление дубликата mistral-7b-instruct (order=4), появившегося при предыдущем деплое
-                cur.execute(
-                    "DELETE FROM models WHERE id = '08985f92-9523-42d3-a40f-589d3d5e96c5'"
-                )
 
             conn.commit()
         print("[DB] Инициализация выполнена")
