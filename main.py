@@ -161,11 +161,11 @@ def init_db():
                         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                         created_at FLOAT NOT NULL,
                         model_name VARCHAR(200) NOT NULL,
-                        system_prompt TEXT NOT NULL DEFAULT '',
-                        user_prompt TEXT NOT NULL DEFAULT '',
                         result TEXT NOT NULL
                     )
                 """)
+                cur.execute("ALTER TABLE generated_stories DROP COLUMN IF EXISTS system_prompt")
+                cur.execute("ALTER TABLE generated_stories DROP COLUMN IF EXISTS user_prompt")
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS cycles (
                         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -572,16 +572,15 @@ def transcode_video():
     return True
 
 
-def db_save_story(model_name, system_prompt, user_prompt, result):
+def db_save_story(model_name, result):
     """Save a generated story to the generated_stories table. Returns the new UUID or None."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "INSERT INTO generated_stories "
-                    "(created_at, model_name, system_prompt, user_prompt, result) "
-                    "VALUES (%s, %s, %s, %s, %s) RETURNING id",
-                    (time.time(), model_name, system_prompt, user_prompt, result),
+                    "INSERT INTO generated_stories (created_at, model_name, result) "
+                    "VALUES (%s, %s, %s) RETURNING id",
+                    (time.time(), model_name, result),
                 )
                 row = cur.fetchone()
             conn.commit()
@@ -685,7 +684,7 @@ def generate_story():
         app_state["current_cycle"]["summary"]["story"] = story
         app_state["current_cycle"]["summary"]["story_model"] = model_name
 
-    db_save_story(model_name, system_prompt, user_prompt, story)
+    db_save_story(model_name, story)
     return True, story
 
 
