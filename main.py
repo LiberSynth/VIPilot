@@ -164,18 +164,16 @@ def init_db():
                         summary JSONB NOT NULL DEFAULT '{}'
                     )
                 """)
-                cur.execute("""
-                    DO $$
-                    BEGIN
-                        IF EXISTS (
-                            SELECT 1 FROM information_schema.tables WHERE table_name = 'models'
-                        ) AND NOT EXISTS (
-                            SELECT 1 FROM information_schema.tables WHERE table_name = 'video_models'
-                        ) THEN
-                            ALTER TABLE models RENAME TO video_models;
-                        END IF;
-                    END $$
-                """)
+                cur.execute(
+                    "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'models'"
+                )
+                old_table_exists = cur.fetchone()[0] > 0
+                cur.execute(
+                    "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'video_models'"
+                )
+                new_table_exists = cur.fetchone()[0] > 0
+                if old_table_exists and not new_table_exists:
+                    cur.execute("ALTER TABLE models RENAME TO video_models")
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS video_models (
                         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
