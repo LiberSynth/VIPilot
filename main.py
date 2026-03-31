@@ -204,6 +204,7 @@ def init_db():
                 cur.execute("""
                     ALTER TABLE models ADD COLUMN IF NOT EXISTS type SMALLINT NOT NULL DEFAULT 0
                 """)
+                cur.execute("ALTER TABLE models ALTER COLUMN type DROP DEFAULT")
                 cur.execute("""
                     UPDATE models
                     SET ai_platform_id = (SELECT id FROM ai_platforms WHERE name = 'fal')
@@ -260,6 +261,21 @@ def init_db():
                 cur.execute(
                     """UPDATE models SET body = jsonb_set(body, '{duration}', '"{int}"') WHERE name = 'sora-2' AND body->>'duration' != '{int}'""",
                 )
+
+                # Добавить текстовые модели OpenRouter, если ещё нет
+                _text_models = [
+                    ("qwen3.6-plus-preview", "qwen/qwen3.6-plus-preview:free", 1, True),
+                    ("llama-3.1-8b-instruct", "meta-llama/llama-3.1-8b-instruct:free", 2, False),
+                ]
+                for _tm_name, _tm_url, _tm_order, _tm_active in _text_models:
+                    cur.execute("SELECT COUNT(*) FROM models WHERE name = %s", (_tm_name,))
+                    if cur.fetchone()[0] == 0:
+                        cur.execute(
+                            'INSERT INTO models (name, url, body, "order", active, type, ai_platform_id) '
+                            "VALUES (%s, %s, '\"\"'::jsonb, %s, %s, 1, "
+                            "(SELECT id FROM ai_platforms WHERE name = 'OpenRouter'))",
+                            (_tm_name, _tm_url, _tm_order, _tm_active),
+                        )
             conn.commit()
         print("[DB] Инициализация выполнена")
     except Exception as e:
