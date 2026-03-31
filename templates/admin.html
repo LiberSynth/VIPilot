@@ -564,7 +564,7 @@
         <div id="publish-times-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px;"></div>
         <div class="pt-add-row">
           <input type="time" id="new-publish-time" class="pt-time-input">
-          <button type="button" class="pt-btn-add" onclick="addPublishTime()">Сохранить</button>
+          <button type="button" class="pt-btn-add" id="pt-save-btn" onclick="addPublishTime()" disabled>Сохранить</button>
         </div>
       </div>
 
@@ -1527,14 +1527,8 @@ setInterval(refreshLog, 4000);
       row.dataset.id = t.id;
       row.innerHTML =
         '<div class="pt-val-box">' + t.time_msk + '</div>' +
-        '<button type="button" class="pt-btn-remove" onclick="deletePublishTime(\'' + t.id + '\')">Удалить</button>';
+        '<button type="button" class="pt-btn-remove" onclick="deletePublishTime(this,\'' + t.id + '\')">Удалить</button>';
       list.appendChild(row);
-    });
-  }
-
-  function setPtDisabled(disabled) {
-    document.querySelectorAll('.pt-btn-add, .pt-btn-remove').forEach(function(b) {
-      b.disabled = disabled;
     });
   }
 
@@ -1545,12 +1539,19 @@ setInterval(refreshLog, 4000);
       .catch(function() {});
   }
 
+  function updateSaveBtn() {
+    const input = document.getElementById('new-publish-time');
+    const btn = document.getElementById('pt-save-btn');
+    if (btn) btn.disabled = !input || !input.value;
+  }
+
   function addPublishTime() {
     const input = document.getElementById('new-publish-time');
+    const btn = document.getElementById('pt-save-btn');
     if (!input || !input.value) return;
     const val = input.value;
     input.value = '';
-    setPtDisabled(true);
+    if (btn) btn.disabled = true;
     fetch('/api/publish-times', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
@@ -1558,20 +1559,24 @@ setInterval(refreshLog, 4000);
     })
       .then(function(r) { return r.json(); })
       .then(function() { return loadPublishTimes(); })
-      .catch(function() {})
-      .finally(function() { setPtDisabled(false); });
+      .catch(function() {});
   }
 
   window.addPublishTime = addPublishTime;
 
-  window.deletePublishTime = function(id) {
-    setPtDisabled(true);
+  window.deletePublishTime = function(btn, id) {
+    btn.disabled = true;
     fetch('/api/publish-times/' + id, {method: 'DELETE'})
       .then(function(r) { return r.json(); })
       .then(function() { return loadPublishTimes(); })
-      .catch(function() {})
-      .finally(function() { setPtDisabled(false); });
+      .catch(function() {});
   };
+
+  // Enable/disable save button based on input completeness
+  (function() {
+    const input = document.getElementById('new-publish-time');
+    if (input) input.addEventListener('input', updateSaveBtn);
+  })();
 
   // Load on page load if pipeline panel is active
   (function() {
