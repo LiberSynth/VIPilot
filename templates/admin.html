@@ -1573,8 +1573,9 @@ function buildTreeText(nodes) {
 }
 
 // Floating buttons SVGs
-const SVG_EXPAND = `<svg viewBox="0 0 16 16"><polyline points="2,6 2,2 6,2"/><polyline points="10,2 14,2 14,6"/><polyline points="14,10 14,14 10,14"/><polyline points="6,14 2,14 2,10"/></svg>`;
-const SVG_COPY   = `<svg viewBox="0 0 16 16"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11V3a1 1 0 0 1 1-1h8"/></svg>`;
+const SVG_EXPAND   = `<svg viewBox="0 0 16 16"><polyline points="2,6 2,2 6,2"/><polyline points="10,2 14,2 14,6"/><polyline points="14,10 14,14 10,14"/><polyline points="6,14 2,14 2,10"/></svg>`;
+const SVG_COLLAPSE = `<svg viewBox="0 0 16 16"><polyline points="6,2 2,2 2,6"/><polyline points="14,6 14,2 10,2"/><polyline points="10,14 14,14 14,10"/><polyline points="2,10 2,14 6,14"/></svg>`;
+const SVG_COPY     = `<svg viewBox="0 0 16 16"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11V3a1 1 0 0 1 1-1h8"/></svg>`;
 
 function buildFloatBtns(cycleIdx) {
   const wrap = document.createElement('div');
@@ -1589,6 +1590,17 @@ function buildFloatBtns(cycleIdx) {
     const body = expandBtn.closest('.cycle-body');
     if (!body) return;
     body.querySelectorAll('.tree-stage').forEach(s => s.classList.add('open'));
+  });
+
+  const collapseBtn = document.createElement('button');
+  collapseBtn.className = 'cycle-float-btn';
+  collapseBtn.innerHTML = SVG_COLLAPSE;
+  collapseBtn.title = 'Свернуть все';
+  collapseBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    const body = collapseBtn.closest('.cycle-body');
+    if (!body) return;
+    body.querySelectorAll('.tree-stage').forEach(s => s.classList.remove('open'));
   });
 
   const copyBtn = document.createElement('button');
@@ -1618,6 +1630,7 @@ function buildFloatBtns(cycleIdx) {
   });
 
   wrap.appendChild(expandBtn);
+  wrap.appendChild(collapseBtn);
   wrap.appendChild(copyBtn);
   return wrap;
 }
