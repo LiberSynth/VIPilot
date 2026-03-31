@@ -742,7 +742,6 @@
         </div>
       </div>
 
-      <button type="submit" class="btn-primary" id="save-btn-service" disabled>Сохранить настройки</button>
     </form>
 
   </div>
@@ -1097,10 +1096,22 @@ function toggleCP(id) {
   })();
 })();
 
-// Трекинг изменений — форма Служебные
+// Автосохранение панели «Служебные»
+var _serviceSaveTimer = null;
+
+function saveServiceSettings() {
+  const form = document.querySelector('#panel-service form');
+  if (!form) return;
+  const data = new FormData(form);
+  fetch('/save', { method: 'POST', body: data }).catch(() => {});
+}
+
+function scheduleServiceSave() {
+  clearTimeout(_serviceSaveTimer);
+  _serviceSaveTimer = setTimeout(saveServiceSettings, 600);
+}
+
 (function() {
-  const saveBtn = document.getElementById('save-btn-service');
-  if (!saveBtn) return;
   const fields = [
     document.getElementById('notify_email'),
     document.getElementById('notify_phone'),
@@ -1108,19 +1119,11 @@ function toggleCP(id) {
     document.getElementById('history_days'),
   ].filter(Boolean);
   const emulCheck = document.getElementById('emulation_check');
-  const initial = {};
-  fields.forEach(f => { initial[f.id] = f.value; });
-  if (emulCheck) initial['emulation_check'] = emulCheck.checked;
-  function checkDirty() {
-    const dirty = fields.some(f => f.value !== initial[f.id])
-      || (emulCheck ? emulCheck.checked !== initial['emulation_check'] : false);
-    saveBtn.disabled = !dirty;
-  }
-  fields.forEach(f => f.addEventListener('input', checkDirty));
-  fields.forEach(f => f.addEventListener('change', checkDirty));
-  if (emulCheck) emulCheck.addEventListener('change', checkDirty);
-  const form = saveBtn.closest('form');
-  if (form) form.addEventListener('submit', function() { saveBtn.disabled = true; });
+  fields.forEach(f => {
+    f.addEventListener('input', scheduleServiceSave);
+    f.addEventListener('change', scheduleServiceSave);
+  });
+  if (emulCheck) emulCheck.addEventListener('change', scheduleServiceSave);
 })();
 
 function levelClass(l) {
