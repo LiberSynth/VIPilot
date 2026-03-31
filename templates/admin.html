@@ -194,10 +194,12 @@
   textarea {
     width: 100%; background: #0f0f13; border: 1px solid #2a2a38;
     border-radius: 11px; padding: 14px; font-size: 14px; color: #e8e8f0;
-    line-height: 1.6; resize: vertical; outline: none; min-height: 200px;
+    line-height: 1.6; resize: vertical; outline: none; min-height: 80px;
     font-family: inherit; transition: border-color .2s;
   }
   textarea:focus { border-color: #4a7cf7; }
+  #ta_sysprompt { height: 100px; }
+  #ta { height: 300px; }
   .char-count { font-size: 11px; color: #666; text-align: right; margin-top: 6px; }
 
   .flash {
@@ -830,6 +832,38 @@ const taSys = document.getElementById('ta_sysprompt');
 const ccSys = document.getElementById('charcount_sysprompt');
 function updateSysCount() { if (taSys && ccSys) ccSys.textContent = taSys.value.length + ' символов'; }
 if (taSys) { taSys.addEventListener('input', updateSysCount); updateSysCount(); }
+
+// ── Высоты textarea: сохранение и восстановление через cookies ──
+(function() {
+  function getCookie(name) {
+    const m = document.cookie.match('(?:^|; )' + name + '=([^;]*)');
+    return m ? decodeURIComponent(m[1]) : null;
+  }
+  function setCookie(name, value) {
+    document.cookie = name + '=' + encodeURIComponent(value) + '; max-age=31536000; path=/; SameSite=Lax';
+  }
+  function applyHeight(el, cookieName, defaultPx) {
+    const saved = getCookie(cookieName);
+    el.style.height = (saved ? parseInt(saved, 10) : defaultPx) + 'px';
+  }
+  function watchHeight(el, cookieName) {
+    var saveTimer = null;
+    new ResizeObserver(function() {
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(function() {
+        setCookie(cookieName, Math.round(el.offsetHeight));
+      }, 300);
+    }).observe(el);
+  }
+  if (taSys) {
+    applyHeight(taSys, 'sysprompt_h', 100);
+    watchHeight(taSys, 'sysprompt_h');
+  }
+  if (ta) {
+    applyHeight(ta, 'metaprompt_h', 300);
+    watchHeight(ta, 'metaprompt_h');
+  }
+})();
 
 // Синхронизация textarea метапромпта в скрытые поля других форм
 const hMeta = document.getElementById('h_metaprompt');
