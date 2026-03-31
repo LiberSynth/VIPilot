@@ -290,17 +290,6 @@
   .cycle-started { font-size: 13px; font-weight: 600; color: #e0e0f0; }
   .cycle-subtitle { font-size: 11px; color: #888; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-  .cycle-summary-block {
-    margin: 0 12px 10px;
-    background: #0f0f13;
-    border: 1px solid #1e1e2e;
-    border-radius: 10px;
-    padding: 10px 12px;
-  }
-  .cs-row { display: flex; gap: 8px; padding: 4px 0; border-bottom: 1px solid #1e1e2c; }
-  .cs-row:last-child { border-bottom: none; }
-  .cs-label { font-size: 11px; color: #8888a8; flex-shrink: 0; min-width: 100px; padding-top: 1px; }
-  .cs-val { font-size: 12px; color: #c0c0d8; line-height: 1.55; word-break: break-word; white-space: pre-wrap; }
 
   .cycle-arrow {
     font-size: 12px; color: #666; flex-shrink: 0;
@@ -1412,16 +1401,6 @@ function buildCycleCard(cycle, idx) {
 
   const iconColor = statusColor(cycle.status);
 
-  // Summary block (always shown if data exists)
-  let summaryHtml = '';
-  if (sm.prompt || sm.generated_at || sm.published_at) {
-    summaryHtml = `<div class="cycle-summary-block">`;
-    if (sm.prompt) summaryHtml += `<div class="cs-row"><span class="cs-label">Промпт</span><span class="cs-val">${escHtml(sm.prompt)}</span></div>`;
-    if (sm.generated_at) summaryHtml += `<div class="cs-row"><span class="cs-label">Сгенерировано</span><span class="cs-val">${escHtml(sm.generated_at)}</span></div>`;
-    if (sm.published_at) summaryHtml += `<div class="cs-row"><span class="cs-label">Опубликовано</span><span class="cs-val">${escHtml(sm.published_at)}</span></div>`;
-    summaryHtml += `</div>`;
-  }
-
   // Detailed log (only if entries exist)
   let detailHtml = '';
   if (entryCount > 0) {
@@ -1433,7 +1412,7 @@ function buildCycleCard(cycle, idx) {
         <button class="btn-copy" onclick="copyEntries(this, cycleData[${idx}].entries)">Скопировать</button>
       </div>
       <div class="log-box">${entriesHtml}</div>`;
-  } else if (!summaryHtml) {
+  } else {
     detailHtml = `<div style="color:#333;text-align:center;padding:16px 0;font-size:12px;">Нет записей</div>`;
   }
 
@@ -1447,7 +1426,6 @@ function buildCycleCard(cycle, idx) {
       <div class="cycle-arrow">▾</div>
     </div>
     <div class="cycle-body">
-      ${summaryHtml}
       ${detailHtml}
     </div>
   `;
@@ -1498,25 +1476,8 @@ function updateExistingCard(card, cycle, idx) {
     subtitleEl.textContent = headerSub;
   }
 
-  // Update summary block
-  const body = card.querySelector('.cycle-body');
-  if (body && (sm.prompt || sm.generated_at || sm.published_at)) {
-    let existingSummary = body.querySelector('.cycle-summary-block');
-    let summaryHtml = `<div class="cycle-summary-block">`;
-    if (sm.prompt) summaryHtml += `<div class="cs-row"><span class="cs-label">Промпт</span><span class="cs-val">${escHtml(sm.prompt)}</span></div>`;
-    if (sm.generated_at) summaryHtml += `<div class="cs-row"><span class="cs-label">Сгенерировано</span><span class="cs-val">${escHtml(sm.generated_at)}</span></div>`;
-    if (sm.published_at) summaryHtml += `<div class="cs-row"><span class="cs-label">Опубликовано</span><span class="cs-val">${escHtml(sm.published_at)}</span></div>`;
-    summaryHtml += `</div>`;
-    if (!existingSummary) {
-      const tmp = document.createElement('div');
-      tmp.innerHTML = summaryHtml;
-      body.insertBefore(tmp.firstElementChild, body.firstChild);
-    } else {
-      existingSummary.outerHTML = summaryHtml;
-    }
-  }
-
   // Append only NEW log entries to log-box (preserve scroll)
+  const body = card.querySelector('.cycle-body');
   if (cycle.entries.length > 0 && body) {
     let logBox = body.querySelector('.log-box');
     const existingCount = logBox ? logBox.querySelectorAll('.log-entry').length : 0;
