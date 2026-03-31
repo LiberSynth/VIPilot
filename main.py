@@ -458,7 +458,15 @@ def start_cycle():
         "started_ts": time.time(),
         "status": "running",
         "entries": [],
-        "summary": {"prompt": None, "generated_at": None, "published_at": None},
+        "summary": {
+            "story_model": None,
+            "story_generated_at": None,
+            "video_model": None,
+            "video_generated_at": None,
+            "transcoding_method": None,
+            "transcoded_at": None,
+            "published_at": None,
+        },
     }
     app_state["current_cycle"] = cycle
     return cycle
@@ -526,12 +534,12 @@ def db_get_random_video_url():
 
 
 def get_active_model():
-    """Returns (submit_url, body_template, platform_url) for the active video model, or (None, None, None)."""
+    """Returns (submit_url, body_template, platform_url, model_name) for the active video model, or (None, None, None, None)."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                    SELECT p.url, vm.url, vm.body
+                    SELECT p.url, vm.url, vm.body, vm.name
                     FROM models vm
                     JOIN ai_platforms p ON p.id = vm.ai_platform_id
                     WHERE vm.active = TRUE AND vm.type = 0
@@ -539,15 +547,16 @@ def get_active_model():
                 """)
                 row = cur.fetchone()
         if not row:
-            return None, None, None
+            return None, None, None, None
         platform_url = row[0]
         model_url = row[1]
         body_tpl = row[2] if isinstance(row[2], dict) else {}
+        model_name = row[3]
         submit_url = f"{platform_url}/{model_url}"
-        return submit_url, body_tpl, platform_url
+        return submit_url, body_tpl, platform_url, model_name
     except Exception as e:
         log_msg(f"[DB] Ошибка получения активной модели: {e}", "error")
-        return None, None, None
+        return None, None, None, None
 
 
 def get_active_text_model():
@@ -661,7 +670,8 @@ def transcode_video():
         return False
     log_msg("Транскодирование завершено")
     if app_state["current_cycle"] is not None:
-        app_state["current_cycle"]["summary"]["generated_at"] = msk_ts()
+        app_state["current_cycle"]["summary"]["transcoding_method"] = "ffmpeg/libx264"
+        app_state["current_cycle"]["summary"]["transcoded_at"] = msk_ts()
     return True
 
 
@@ -776,6 +786,7 @@ def generate_story():
     if app_state["current_cycle"] is not None:
         app_state["current_cycle"]["summary"]["story"] = story
         app_state["current_cycle"]["summary"]["story_model"] = model_name
+        app_state["current_cycle"]["summary"]["story_generated_at"] = msk_ts()
 
     db_save_story(model_uuid, story)
     return True, story
@@ -800,13 +811,16 @@ def generate_video(prompt):
             app_state["running"] = False
 
     try:
-        submit_url, body_tpl, platform_url = get_active_model()
+        submit_url, body_tpl, platform_url, video_model_name = get_active_model()
         if not submit_url:
             log_msg(
                 'Нет активной модели в базе. Выберите модель на вкладке "Запрос".',
                 "error",
             )
             return False
+
+        if app_state["current_cycle"] is not None:
+            app_state["current_cycle"]["summary"]["video_model"] = video_model_name
 
         body = build_fal_body(body_tpl, prompt)
         log_msg(f"Отправляю запрос: {submit_url}  тело: {body}")
@@ -870,6 +884,8 @@ def generate_video(prompt):
                             return False
                         log_msg(f"URL получен, сохраняю в базу: {video_url[:60]}...")
                         db_save_video_url(video_url)
+                        if app_state["current_cycle"] is not None:
+                            app_state["current_cycle"]["summary"]["video_generated_at"] = msk_ts()
                         return download_and_transcode(video_url)
                     except Exception as e:
                         log_msg(f"Ошибка обработки готового видео: {e}", "error")
@@ -1165,7 +1181,6 @@ def run_full_cycle():
             if app_state["current_cycle"]
             else []
         )
-        end_cycle(success)
         if not success:
             if not story_ok:
                 reason = "ошибка генерации сюжета"
@@ -1175,6 +1190,10 @@ def run_full_cycle():
                 reason = "ошибка генерации видео"
             else:
                 reason = "ошибка публикации в VK"
+            if app_state["current_cycle"] is not None:
+                app_state["current_cycle"]["summary"]["failed"] = reason
+        end_cycle(success)
+        if not success:
             notify_failure(reason, log_entries=entries)
         elif story_partial_fail:
             notify_failure(
@@ -1183,9 +1202,10 @@ def run_full_cycle():
                 partial=True,
             )
         return gen_ok, pub_ok
-    except Exception:
+    except Exception as _exc:
         cycle = app_state.get("current_cycle")
         if cycle and cycle.get("status") == "running":
+            cycle["summary"]["failed"] = str(_exc) or "неизвестная ошибка"
             end_cycle(False)
         raise
 
