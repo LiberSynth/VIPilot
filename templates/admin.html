@@ -330,6 +330,98 @@
   .log-msg.error { color: #ff6060; }
   .log-msg.ok    { color: #4fc87a; }
 
+  /* ── Cycle body wrapper (relative for floating buttons) ── */
+  .cycle-body { position: relative; }
+
+  /* ── Floating icon buttons ── */
+  .cycle-float-btns {
+    position: absolute; top: 8px; right: 10px;
+    display: flex; gap: 6px; z-index: 2;
+  }
+  .cycle-float-btn {
+    background: rgba(255,255,255,.07);
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 7px;
+    width: 30px; height: 30px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: background .15s;
+    flex-shrink: 0;
+  }
+  .cycle-float-btn:hover { background: rgba(255,255,255,.14); }
+  .cycle-float-btn:active { background: rgba(255,255,255,.22); }
+  .cycle-float-btn svg { width: 15px; height: 15px; fill: none; stroke: #aaa; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .cycle-float-btn.copied svg { stroke: #3ecf8e; }
+
+  /* ── Tree log ── */
+  .tree-log {
+    background: #07070a; border-top: 1px solid #151520;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 12px;
+    max-height: 400px; overflow-y: auto;
+  }
+
+  /* Stage (root node) */
+  .tree-stage {
+    border-bottom: 1px solid #0e0e16;
+  }
+  .tree-stage:last-child { border-bottom: none; }
+
+  .tree-stage-header {
+    display: flex; align-items: center; gap: 7px;
+    padding: 7px 10px; cursor: pointer;
+    user-select: none; -webkit-user-select: none;
+    transition: background .12s;
+  }
+  .tree-stage-header:hover { background: rgba(255,255,255,.03); }
+
+  .tree-stage-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .tree-stage.st-pending .tree-stage-dot  { background: #555575; }
+  .tree-stage.st-running .tree-stage-dot  { background: #f5a623; box-shadow: 0 0 5px #f5a62380; }
+  .tree-stage.st-ok      .tree-stage-dot  { background: #3ecf8e; }
+  .tree-stage.st-error   .tree-stage-dot  { background: #ff6060; }
+
+  .tree-stage-name {
+    flex: 1; font-weight: 600; line-height: 1.5;
+  }
+  .tree-stage.st-pending .tree-stage-name { color: #666688; }
+  .tree-stage.st-running .tree-stage-name { color: #f5a623; }
+  .tree-stage.st-ok      .tree-stage-name { color: #c8c8e0; }
+  .tree-stage.st-error   .tree-stage-name { color: #ff7070; }
+
+  .tree-stage-meta { font-size: 11px; color: #666688; flex-shrink: 0; }
+  .tree-stage-arrow { font-size: 10px; color: #444460; transition: transform .18s; flex-shrink: 0; }
+  .tree-stage.open .tree-stage-arrow { transform: rotate(180deg); }
+
+  /* Children entries */
+  .tree-children {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows .2s ease;
+    background: #050508;
+  }
+  .tree-children > .tree-children-inner {
+    overflow: hidden;
+    border-top: 1px solid #0a0a12;
+    padding: 0;
+  }
+  .tree-stage.open .tree-children { grid-template-rows: 1fr; }
+  .tree-stage.open .tree-children > .tree-children-inner { padding: 4px 0 4px 24px; }
+
+  .tree-children .log-entry {
+    border-bottom: 1px solid #0a0a12;
+    padding: 1px 4px 1px 0;
+  }
+  .tree-children .log-entry:last-child { border-bottom: none; }
+
+  @media (max-width: 480px) {
+    .cycle-float-btns { top: 6px; right: 6px; }
+    .tree-stage-header { padding: 6px 8px; }
+    .tree-stage.open .tree-children > .tree-children-inner { padding-left: 16px; }
+  }
+
   .log-empty-cycles {
     text-align: center; color: #555570;
     padding: 40px 0; font-size: 14px;
@@ -1276,30 +1368,270 @@ function statusColor(status) {
   return '#ff6060';
 }
 
-function buildLogText(entries) {
-  return entries.map(e => `${e.ts}  ${e.msg}`).join('\n');
+// ── Tree grouping logic ──
+
+const STAGE_DEFS = [
+  { key: 'story',       label: 'Сюжет',       modelKey: 'story_model',  doneKey: 'story_generated_at' },
+  { key: 'video',       label: 'Видео',        modelKey: 'video_model',  doneKey: 'video_generated_at' },
+  { key: 'transcoding', label: 'Транскодинг',  modelKey: null,           doneKey: 'transcoded_at'      },
+  { key: 'publish',     label: 'Публикация',   modelKey: null,           doneKey: 'published_at'       },
+];
+
+function tsToMs(tsStr) {
+  if (!tsStr) return null;
+  // Format: "ДД.ММ.ГГГГ ЧЧ:ММ:СС" or ISO
+  const m = tsStr.match(/^(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}):(\d{2}):(\d{2})$/);
+  if (m) {
+    return new Date(`${m[3]}-${m[2]}-${m[1]}T${m[4]}:${m[5]}:${m[6]}`).getTime();
+  }
+  return new Date(tsStr).getTime() || null;
 }
 
-function copyEntries(btn, entries) {
-  const text = buildLogText(entries);
-  navigator.clipboard.writeText(text).then(() => {
-    btn.textContent = 'Скопировано';
-    btn.classList.add('copied');
-    setTimeout(() => {
-      btn.textContent = 'Скопировать';
-      btn.classList.remove('copied');
-    }, 2000);
-  }).catch(() => {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    ta.style.position = 'fixed'; ta.style.opacity = '0';
-    document.body.appendChild(ta);
-    ta.select(); document.execCommand('copy');
-    document.body.removeChild(ta);
-    btn.textContent = 'Скопировано';
-    btn.classList.add('copied');
-    setTimeout(() => { btn.textContent = 'Скопировать'; btn.classList.remove('copied'); }, 2000);
+function buildTreeNodes(cycle) {
+  const sm = cycle.summary || {};
+  const entries = cycle.entries || [];
+  const cycleStatus = cycle.status;
+
+  // Parse done timestamps for each stage (null = not done)
+  const stageDoneTsMs = STAGE_DEFS.map(s => tsToMs(sm[s.doneKey]));
+
+  // Find index of last completed stage (-1 if none)
+  const lastDoneIdx = stageDoneTsMs.reduce((acc, ts, i) => ts !== null ? i : acc, -1);
+
+  // Determine each stage status
+  function stageStatus(i) {
+    if (stageDoneTsMs[i] !== null) return 'ok';
+    if (cycleStatus === 'error') {
+      if (i === lastDoneIdx + 1) return 'error';
+      return 'pending';
+    }
+    if (cycleStatus === 'running') {
+      if (i === lastDoneIdx + 1) return 'running';
+      return 'pending';
+    }
+    return 'pending';
+  }
+
+  // Stage windows (prevDone exclusive, thisDone inclusive):
+  //   story: (cycleStart, story_done]; video: (story_done, video_done]
+  //   transcoding: (video_done, transcoded_done]; publish: (transcoded_done, +Inf)
+  // Entries outside all windows → Инициализация; if !anyDone → all entries → Инициализация.
+  // cycle.started and entry.ts share the same Moscow-time string format.
+  const cycleStartMs = tsToMs(cycle.started);
+
+  const anyDone = stageDoneTsMs.some(t => t !== null);
+
+  const stageBuckets = STAGE_DEFS.map(() => []);
+  const initBucket = [];
+
+  entries.forEach(e => {
+    const eMs = tsToMs(e.ts);
+
+    // If no stage is done, all entries are pre-pipeline → Инициализация
+    if (!anyDone) {
+      initBucket.push(e);
+      return;
+    }
+
+    // Try to assign entry to a stage window: (prevDone, thisDone]
+    // Stage 0's prevDone = cycleStartMs (inclusive lower bound for init check)
+    let assigned = false;
+    for (let i = 0; i < STAGE_DEFS.length; i++) {
+      const prevDone = i === 0 ? cycleStartMs : stageDoneTsMs[i - 1];
+      // Last stage (publish) has no upper bound — captures all trailing entries
+      const isLastStage = i === STAGE_DEFS.length - 1;
+      const thisDone = isLastStage ? null : stageDoneTsMs[i];
+
+      // prevDone=null means cycleStartMs is unknown → no lower bound for stage 0
+      const afterPrev = prevDone === null
+        ? true
+        : (eMs !== null && eMs > prevDone);
+
+      // thisDone=null: stage is open (active/running) or last stage → captures to +Inf
+      const atOrBeforeThis = thisDone === null
+        ? true
+        : (eMs !== null && eMs <= thisDone);
+
+      if (afterPrev && atOrBeforeThis) {
+        stageBuckets[i].push(e);
+        assigned = true;
+        break;
+      }
+    }
+
+    // Entries not matching any stage window → Инициализация
+    if (!assigned) {
+      initBucket.push(e);
+    }
   });
+
+  // Build nodes array
+  const nodes = [];
+
+  // Init node only shown when it has entries
+  if (initBucket.length > 0) {
+    nodes.push({
+      key: '__init__',
+      label: 'Инициализация',
+      model: null,
+      meta: null,
+      status: 'ok',
+      entries: initBucket,
+    });
+  }
+
+  STAGE_DEFS.forEach((s, i) => {
+    nodes.push({
+      key: s.key,
+      label: s.label,
+      model: s.modelKey ? sm[s.modelKey] : null,
+      meta: sm[s.doneKey] || null,
+      status: stageStatus(i),
+      entries: stageBuckets[i],
+    });
+  });
+
+  return nodes;
+}
+
+// ── Tree rendering ──
+
+function renderEntryEl(e) {
+  const row = document.createElement('div');
+  row.className = 'log-entry';
+  row.innerHTML = `<span class="log-ts">${e.ts}</span><span class="log-msg ${levelClass(e.level)}">${escHtml(e.msg)}</span>`;
+  return row;
+}
+
+function buildTreeHtml(nodes, activeStageKey) {
+  const wrap = document.createElement('div');
+  wrap.className = 'tree-log';
+
+  nodes.forEach(node => {
+    const isOpen = node.key === activeStageKey;
+    const stageDiv = document.createElement('div');
+    stageDiv.className = `tree-stage st-${node.status}${isOpen ? ' open' : ''}`;
+    stageDiv.dataset.stageKey = node.key;
+
+    let metaHtml = '';
+    if (node.model) metaHtml += `<span class="tree-stage-meta">${escHtml(node.model)}</span>`;
+    if (node.meta)  metaHtml += `<span class="tree-stage-meta" style="margin-left:6px">${escHtml(node.meta)}</span>`;
+
+    const header = document.createElement('div');
+    header.className = 'tree-stage-header';
+    header.innerHTML = `
+      <div class="tree-stage-dot"></div>
+      <div class="tree-stage-name">${escHtml(node.label)}</div>
+      ${metaHtml}
+      <div class="tree-stage-arrow">▾</div>
+    `;
+    header.addEventListener('click', () => stageDiv.classList.toggle('open'));
+
+    const children = document.createElement('div');
+    children.className = 'tree-children';
+    const inner = document.createElement('div');
+    inner.className = 'tree-children-inner';
+    if (node.entries.length === 0) {
+      const empty = document.createElement('div');
+      empty.style.cssText = 'color:#333;padding:4px 0;font-size:11px;';
+      empty.textContent = 'Нет записей';
+      inner.appendChild(empty);
+    } else {
+      node.entries.forEach(e => inner.appendChild(renderEntryEl(e)));
+    }
+    children.appendChild(inner);
+
+    stageDiv.appendChild(header);
+    stageDiv.appendChild(children);
+    wrap.appendChild(stageDiv);
+  });
+
+  return wrap;
+}
+
+function activeStageKey(cycle) {
+  const sm = cycle.summary || {};
+  const DONE_KEYS = ['story_generated_at', 'video_generated_at', 'transcoded_at', 'published_at'];
+  const STAGE_KEYS = ['story', 'video', 'transcoding', 'publish'];
+  if (cycle.status === 'running' || cycle.status === 'error') {
+    // If no stage is done yet, the active node is Инициализация
+    const anyDone = DONE_KEYS.some(k => sm[k]);
+    if (!anyDone) return '__init__';
+    for (let i = 0; i < DONE_KEYS.length; i++) {
+      if (!sm[DONE_KEYS[i]]) return STAGE_KEYS[i];
+    }
+  }
+  // Completed: show last stage
+  return STAGE_KEYS[STAGE_KEYS.length - 1];
+}
+
+// Build tree text for clipboard
+function buildTreeText(nodes) {
+  const lines = [];
+  nodes.forEach(node => {
+    lines.push(`[${node.label}${node.model ? ' / ' + node.model : ''}${node.meta ? '  ' + node.meta : ''}]`);
+    node.entries.forEach(e => lines.push(`  ${e.ts}  ${e.msg}`));
+  });
+  return lines.join('\n');
+}
+
+// Floating buttons SVGs
+const SVG_EXPAND = `<svg viewBox="0 0 16 16"><polyline points="2,6 2,2 6,2"/><polyline points="10,2 14,2 14,6"/><polyline points="14,10 14,14 10,14"/><polyline points="6,14 2,14 2,10"/></svg>`;
+const SVG_COPY   = `<svg viewBox="0 0 16 16"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11V3a1 1 0 0 1 1-1h8"/></svg>`;
+
+function buildFloatBtns(cycleIdx) {
+  const wrap = document.createElement('div');
+  wrap.className = 'cycle-float-btns';
+
+  const expandBtn = document.createElement('button');
+  expandBtn.className = 'cycle-float-btn';
+  expandBtn.innerHTML = SVG_EXPAND;
+  expandBtn.title = 'Развернуть все';
+  expandBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    const body = expandBtn.closest('.cycle-body');
+    if (!body) return;
+    body.querySelectorAll('.tree-stage').forEach(s => s.classList.add('open'));
+  });
+
+  const copyBtn = document.createElement('button');
+  copyBtn.className = 'cycle-float-btn';
+  copyBtn.innerHTML = SVG_COPY;
+  copyBtn.title = 'Копировать лог';
+  copyBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    const cycle = cycleData[cycleIdx];
+    if (!cycle) return;
+    const nodes = buildTreeNodes(cycle);
+    const text = buildTreeText(nodes);
+    const doFlash = () => {
+      copyBtn.classList.add('copied');
+      setTimeout(() => copyBtn.classList.remove('copied'), 2000);
+    };
+    navigator.clipboard.writeText(text).then(doFlash).catch(() => {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.cssText = 'position:fixed;opacity:0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      doFlash();
+    });
+  });
+
+  wrap.appendChild(expandBtn);
+  wrap.appendChild(copyBtn);
+  return wrap;
+}
+
+function buildBodyContent(cycle, idx) {
+  const nodes = buildTreeNodes(cycle);
+  const active = activeStageKey(cycle);
+  const frag = document.createDocumentFragment();
+  frag.appendChild(buildFloatBtns(idx));
+  frag.appendChild(buildTreeHtml(nodes, active));
+  return frag;
 }
 
 function buildCycleCard(cycle, idx) {
@@ -1307,7 +1639,6 @@ function buildCycleCard(cycle, idx) {
   const entryCount = cycle.entries.length;
   const sm = cycle.summary || {};
 
-  // Header subtitle: last log line or summary prompt
   let headerSub = '';
   if (entryCount > 0) {
     const last = cycle.entries[cycle.entries.length - 1].msg;
@@ -1322,34 +1653,24 @@ function buildCycleCard(cycle, idx) {
 
   const iconColor = statusColor(cycle.status);
 
-  // Detailed log (only if entries exist)
-  let detailHtml = '';
-  if (entryCount > 0) {
-    const entriesHtml = cycle.entries.map(e =>
-      `<div class="log-entry"><span class="log-ts">${e.ts}</span><span class="log-msg ${levelClass(e.level)}">${escHtml(e.msg)}</span></div>`
-    ).join('');
-    detailHtml = `
-      <div class="cycle-actions">
-        <button class="btn-copy" onclick="copyEntries(this, cycleData[${idx}].entries)">Скопировать</button>
-      </div>
-      <div class="log-box">${entriesHtml}</div>`;
-  } else {
-    detailHtml = `<div style="color:#333;text-align:center;padding:16px 0;font-size:12px;">Нет записей</div>`;
-  }
-
-  card.innerHTML = `
-    <div class="cycle-header" onclick="toggleCycle(this.closest('.cycle-card'))">
-      <div class="cycle-icon" style="color:${iconColor}">${statusIcon(cycle.status)}</div>
-      <div class="cycle-meta">
-        <div class="cycle-started">${escHtml(cycle.started)}</div>
-        <div class="cycle-subtitle">${escHtml(headerSub)}</div>
-      </div>
-      <div class="cycle-arrow">▾</div>
+  const header = document.createElement('div');
+  header.className = 'cycle-header';
+  header.innerHTML = `
+    <div class="cycle-icon" style="color:${iconColor}">${statusIcon(cycle.status)}</div>
+    <div class="cycle-meta">
+      <div class="cycle-started">${escHtml(cycle.started)}</div>
+      <div class="cycle-subtitle">${escHtml(headerSub)}</div>
     </div>
-    <div class="cycle-body">
-      ${detailHtml}
-    </div>
+    <div class="cycle-arrow">▾</div>
   `;
+  header.addEventListener('click', () => toggleCycle(card));
+
+  const body = document.createElement('div');
+  body.className = 'cycle-body';
+  body.appendChild(buildBodyContent(cycle, idx));
+
+  card.appendChild(header);
+  card.appendChild(body);
   return card;
 }
 
@@ -1371,10 +1692,9 @@ function getCardKey(cycle) {
 }
 
 function updateExistingCard(card, cycle, idx) {
-  const isRunning = cycle.status === 'running';
   const sm = cycle.summary || {};
 
-  // Update status class
+  // Update status class (preserve open state)
   card.className = `cycle-card ${cycle.status}${card.classList.contains('open') ? ' open' : ''}`;
 
   // Update icon color and symbol
@@ -1397,42 +1717,20 @@ function updateExistingCard(card, cycle, idx) {
     subtitleEl.textContent = headerSub;
   }
 
-  // Append only NEW log entries to log-box (preserve scroll)
+  // Rebuild tree body (preserves scroll position by replacing content)
   const body = card.querySelector('.cycle-body');
-  if (cycle.entries.length > 0 && body) {
-    let logBox = body.querySelector('.log-box');
-    const existingCount = logBox ? logBox.querySelectorAll('.log-entry').length : 0;
-    const newEntries = cycle.entries.slice(existingCount);
+  if (body) {
+    // Remember scroll position in tree-log
+    const treeLog = body.querySelector('.tree-log');
+    const scrollTop = treeLog ? treeLog.scrollTop : 0;
 
-    if (!logBox && newEntries.length > 0) {
-      // Create actions + log-box fresh
-      const actionsDiv = document.createElement('div');
-      actionsDiv.className = 'cycle-actions';
-      actionsDiv.innerHTML = `<button class="btn-copy" onclick="copyEntries(this, cycleData[${idx}].entries)">Скопировать</button>`;
-      body.appendChild(actionsDiv);
-      logBox = document.createElement('div');
-      logBox.className = 'log-box';
-      body.appendChild(logBox);
-    }
+    // Clear and rebuild
+    body.innerHTML = '';
+    body.appendChild(buildBodyContent(cycle, idx));
 
-    if (logBox && newEntries.length > 0) {
-      const atBottom = logBox.scrollHeight - logBox.scrollTop - logBox.clientHeight < 32;
-      newEntries.forEach(e => {
-        const row = document.createElement('div');
-        row.className = 'log-entry';
-        row.innerHTML = `<span class="log-ts">${e.ts}</span><span class="log-msg ${levelClass(e.level)}">${escHtml(e.msg)}</span>`;
-        logBox.appendChild(row);
-      });
-      if (atBottom) logBox.scrollTop = logBox.scrollHeight;
-    }
-
-    // Add copy button if just finished and was missing
-    if (!isRunning && !body.querySelector('.btn-copy') && logBox) {
-      const actionsDiv = document.createElement('div');
-      actionsDiv.className = 'cycle-actions';
-      actionsDiv.innerHTML = `<button class="btn-copy" onclick="copyEntries(this, cycleData[${idx}].entries)">Скопировать</button>`;
-      body.insertBefore(actionsDiv, logBox);
-    }
+    // Restore scroll
+    const newTreeLog = body.querySelector('.tree-log');
+    if (newTreeLog && scrollTop) newTreeLog.scrollTop = scrollTop;
   }
 }
 
