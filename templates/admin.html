@@ -554,8 +554,6 @@
         </div>
       </div>
 
-      <input type="hidden" name="video_duration" id="pip_h_video_duration" value="{{ video_duration }}">
-
       <!-- Публикация ВК — скрытые дубликаты (реальные переключатели на вкладке "Публикация") -->
       <input type="hidden" name="vk_publish_story" id="vk_story_hidden" value="{{ '1' if vk_publish_story else '0' }}">
       <input type="hidden" name="vk_publish_wall" id="vk_wall_hidden" value="{{ '1' if vk_publish_wall else '0' }}">
@@ -604,8 +602,7 @@
       <div class="card-title">Продолжительность видео</div>
       <div class="hint">Длина генерируемого видео в секундах.</div>
       <div class="lead-row">
-        <input type="number" name="video_duration" id="video_duration" value="{{ video_duration }}" min="1" max="60" step="1"
-               oninput="document.getElementById('pip_h_video_duration').value=this.value; document.getElementById('pub_h_video_duration').value=this.value; document.getElementById('svc_h_video_duration').value=this.value;">
+        <input type="number" name="video_duration" id="video_duration" value="{{ video_duration }}" min="1" max="60" step="1">
         <span class="lead-unit">секунд</span>
       </div>
     </div>
@@ -629,7 +626,6 @@
       <input type="hidden" name="system_prompt" id="pub_h_system_prompt" value="{{ system_prompt }}">
       <input type="hidden" name="publish_time" id="pub_h_publish_time" value="{{ publish_time_msk }}">
       <input type="hidden" name="lead_time_mins" id="pub_h_lead_time_mins" value="{{ lead_time_mins }}">
-      <input type="hidden" name="video_duration" id="pub_h_video_duration" value="{{ video_duration }}">
       <input type="hidden" name="notify_email" id="pub_h_notify_email" value="{{ notify_email }}">
       <input type="hidden" name="notify_phone" id="pub_h_notify_phone" value="{{ notify_phone }}">
       <input type="hidden" name="history_days" id="pub_h_history_days" value="{{ history_days }}">
@@ -708,7 +704,6 @@
       <input type="hidden" name="vk_publish_wall" id="h_vk_wall" value="{{ '1' if vk_publish_wall else '0' }}">
       <input type="hidden" name="aspect_ratio_x" id="svc_h_ar_x" value="{{ aspect_ratio_x }}">
       <input type="hidden" name="aspect_ratio_y" id="svc_h_ar_y" value="{{ aspect_ratio_y }}">
-      <input type="hidden" name="video_duration" id="svc_h_video_duration" value="{{ video_duration }}">
 
       <div class="card">
         <div class="card-title">Уведомление о сбое</div>
@@ -961,6 +956,8 @@ function savePipelineSettings() {
   if (!form) return;
   const data = new FormData(form);
   data.set('active_tab', 'pipeline');
+  const dur = document.getElementById('video_duration');
+  if (dur) data.set('video_duration', dur.value);
   fetch('/save', { method: 'POST', body: data }).catch(() => {});
 }
 

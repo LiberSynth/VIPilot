@@ -1348,11 +1348,13 @@ def save():
     db_set("aspect_ratio_x", str(ar_x))
     db_set("aspect_ratio_y", str(ar_y))
 
-    try:
-        vid_dur = max(1, min(60, int(request.form.get("video_duration", "6"))))
-    except (ValueError, TypeError):
-        vid_dur = 6
-    db_set("video_duration", str(vid_dur))
+    vid_dur_str = request.form.get("video_duration")
+    if vid_dur_str is not None:
+        try:
+            vid_dur = max(1, min(60, int(vid_dur_str)))
+        except (ValueError, TypeError):
+            vid_dur = 6
+        db_set("video_duration", str(vid_dur))
 
     active_tab = request.form.get("active_tab", "pipeline")
     return redirect(url_for("admin") + f"?tab={active_tab}")
