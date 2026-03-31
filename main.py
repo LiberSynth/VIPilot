@@ -235,7 +235,7 @@ def init_db():
                 for _name, _url, _order, _active in [
                     ("qwen3.6-plus-preview", "qwen/qwen3.6-plus-preview:free", 1, True),
                     ("llama-3.1-8b-instruct", "meta-llama/llama-3.1-8b-instruct:free", 2, False),
-                    ("mistral-small-3.1-24b-instruct", "mistralai/mistral-small-3.1-24b-instruct:free", 3, False),
+                    ("mistral-7b-instruct", "mistralai/mistral-7b-instruct:free", 3, False),
                 ]:
                     cur.execute("SELECT COUNT(*) FROM models WHERE name = %s", (_name,))
                     if cur.fetchone()[0] == 0:
@@ -245,6 +245,13 @@ def init_db():
                             "(SELECT id FROM ai_platforms WHERE name = 'OpenRouter'))",
                             (_name, _url, _text_body, _order, _active),
                         )
+
+                # Миграция: переименование mistral-small-3.1-24b-instruct → mistral-7b-instruct
+                cur.execute(
+                    "UPDATE models SET name = 'mistral-7b-instruct', url = 'mistralai/mistral-7b-instruct:free' "
+                    "WHERE id = '6345fd09-349f-4bcf-9b07-37f20fe6bed3' "
+                    "AND name = 'mistral-small-3.1-24b-instruct'"
+                )
 
             conn.commit()
         print("[DB] Инициализация выполнена")
