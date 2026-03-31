@@ -175,6 +175,21 @@ def init_db():
                 if old_table_exists and not new_table_exists:
                     cur.execute("ALTER TABLE models RENAME TO video_models")
                 cur.execute("""
+                    CREATE TABLE IF NOT EXISTS ai_platforms (
+                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                        name VARCHAR(200) NOT NULL,
+                        url VARCHAR(500) NOT NULL
+                    )
+                """)
+                cur.execute("""
+                    INSERT INTO ai_platforms (name, url)
+                    SELECT * FROM (VALUES
+                        ('OpenRouter', 'https://openrouter.ai/api/v1/chat/completions'),
+                        ('fal', 'https://queue.fal.run/fal-ai')
+                    ) AS v(name, url)
+                    WHERE NOT EXISTS (SELECT 1 FROM ai_platforms WHERE name = v.name)
+                """)
+                cur.execute("""
                     CREATE TABLE IF NOT EXISTS video_models (
                         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                         name VARCHAR(200) NOT NULL,
@@ -188,6 +203,15 @@ def init_db():
                 cur.execute("""
                     ALTER TABLE video_models ADD COLUMN IF NOT EXISTS
                     platform_url VARCHAR(500) NOT NULL DEFAULT 'https://queue.fal.run/fal-ai'
+                """)
+                cur.execute("""
+                    ALTER TABLE video_models ADD COLUMN IF NOT EXISTS
+                    ai_platform_id UUID REFERENCES ai_platforms(id)
+                """)
+                cur.execute("""
+                    UPDATE video_models
+                    SET ai_platform_id = (SELECT id FROM ai_platforms WHERE name = 'fal')
+                    WHERE ai_platform_id IS NULL
                 """)
                 import json as _json
 
@@ -548,7 +572,13 @@ def get_active_model():
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
-                cur.execute("SELECT platform_url, url, body FROM video_models WHERE active = TRUE LIMIT 1")
+                cur.execute("""
+                    SELECT p.url, vm.url, vm.body
+                    FROM video_models vm
+                    JOIN ai_platforms p ON p.id = vm.ai_platform_id
+                    WHERE vm.active = TRUE
+                    LIMIT 1
+                """)
                 row = cur.fetchone()
         if not row:
             return None, None, None
