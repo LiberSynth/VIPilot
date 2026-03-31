@@ -1405,6 +1405,65 @@ def api_models_reorder():
         return jsonify({"error": str(e)}), 500
 
 
+@flask_app.route("/api/text-models", methods=["GET"])
+def api_text_models():
+    if not session.get("logged_in"):
+        return jsonify({"error": "unauthorized"}), 401
+    try:
+        with get_db() as conn:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute("""
+                    SELECT m.id, m.name, m.url, m.body, m."order", m.active,
+                           p.name AS platform_name
+                    FROM models m
+                    LEFT JOIN ai_platforms p ON p.id = m.ai_platform_id
+                    WHERE m.type = 1
+                    ORDER BY m."order" ASC
+                """)
+                rows = cur.fetchall()
+        return jsonify([dict(r) for r in rows])
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@flask_app.route("/api/text-models/<model_id>/activate", methods=["POST"])
+def api_text_model_activate(model_id):
+    if not session.get("logged_in"):
+        return jsonify({"error": "unauthorized"}), 401
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("UPDATE models SET active = FALSE WHERE type = 1")
+                cur.execute(
+                    "UPDATE models SET active = TRUE WHERE id = %s", (model_id,)
+                )
+            conn.commit()
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@flask_app.route("/api/text-models/reorder", methods=["POST"])
+def api_text_models_reorder():
+    if not session.get("logged_in"):
+        return jsonify({"error": "unauthorized"}), 401
+    data = request.get_json(silent=True) or {}
+    ids = data.get("ids", [])
+    if not ids or not isinstance(ids, list):
+        return jsonify({"error": "ids required"}), 400
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                for idx, model_id in enumerate(ids, start=1):
+                    cur.execute(
+                        'UPDATE models SET "order" = %s WHERE id = %s', (idx, model_id)
+                    )
+            conn.commit()
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @flask_app.route("/logout")
 def logout():
     session.clear()

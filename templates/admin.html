@@ -587,6 +587,13 @@
         <div class="char-count" id="charcount"></div>
       </div>
     </form>
+
+    <div class="card" style="margin-top:12px">
+      <div class="card-title">Модели</div>
+      <div class="model-list" id="text-model-list">
+        <div class="model-loading">Загрузка...</div>
+      </div>
+    </div>
   </div>
 
   <!-- ══ ГЕНЕРАЦИЯ ВИДЕО ══ -->
@@ -789,6 +796,10 @@ function switchPanel(name) {
   // Load models when switching to request panel
   if (name === 'request') {
     if (typeof loadModels === 'function') loadModels();
+  }
+  // Load text models when switching to story panel
+  if (name === 'story') {
+    if (typeof loadTextModels === 'function') loadTextModels();
   }
 }
 
@@ -1110,6 +1121,128 @@ updateAR();
     const requestPanel = document.getElementById('panel-request');
     if (requestPanel && requestPanel.classList.contains('active')) {
       loadModels();
+    }
+  })();
+})();
+
+// ── Text models list with drag-and-drop ──
+(function() {
+  var dragSrcId = null;
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function renderTextModels(list) {
+    const container = document.getElementById('text-model-list');
+    if (!container) return;
+    if (!list || list.length === 0) {
+      container.innerHTML = '<div class="model-loading">Нет моделей</div>';
+      return;
+    }
+    container.innerHTML = '';
+    list.forEach(function(m) {
+      const item = document.createElement('div');
+      item.className = 'model-item' + (m.active ? ' model-active' : '');
+      item.dataset.id = m.id;
+      item.draggable = true;
+      var caption = m.platform_name ? escHtml(m.platform_name) + ': ' + escHtml(m.name) : escHtml(m.name);
+      item.innerHTML =
+        '<div class="model-radio" onclick="activateTextModel(\'' + m.id + '\')">' +
+          '<div class="model-radio-dot"></div>' +
+        '</div>' +
+        '<div class="model-name">' + caption + '</div>' +
+        '<div class="model-drag-handle" title="Перетащить">⠿</div>';
+
+      item.addEventListener('dragstart', function(e) {
+        dragSrcId = m.id;
+        item.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', m.id);
+      });
+      item.addEventListener('dragend', function() {
+        item.classList.remove('dragging');
+        container.querySelectorAll('.model-item').forEach(function(el) {
+          el.classList.remove('drag-over-top', 'drag-over-bottom');
+        });
+      });
+      item.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        if (dragSrcId === m.id) return;
+        const rect = item.getBoundingClientRect();
+        const mid = rect.top + rect.height / 2;
+        container.querySelectorAll('.model-item').forEach(function(el) {
+          el.classList.remove('drag-over-top', 'drag-over-bottom');
+        });
+        if (e.clientY < mid) {
+          item.classList.add('drag-over-top');
+        } else {
+          item.classList.add('drag-over-bottom');
+        }
+      });
+      item.addEventListener('dragleave', function() {
+        item.classList.remove('drag-over-top', 'drag-over-bottom');
+      });
+      item.addEventListener('drop', function(e) {
+        e.preventDefault();
+        if (dragSrcId === null || dragSrcId === m.id) return;
+        container.querySelectorAll('.model-item').forEach(function(el) {
+          el.classList.remove('drag-over-top', 'drag-over-bottom');
+        });
+        const rect = item.getBoundingClientRect();
+        const mid = rect.top + rect.height / 2;
+        const insertBefore = e.clientY < mid;
+        const items = Array.from(container.querySelectorAll('.model-item'));
+        const ids = items.map(function(el) { return el.dataset.id; });
+        const srcIdx = ids.indexOf(dragSrcId);
+        ids.splice(srcIdx, 1);
+        var destIdx = ids.indexOf(m.id);
+        if (!insertBefore) destIdx += 1;
+        ids.splice(destIdx, 0, dragSrcId);
+        dragSrcId = null;
+        saveTextOrder(ids);
+      });
+
+      container.appendChild(item);
+    });
+  }
+
+  function saveTextOrder(ids) {
+    fetch('/api/text-models/reorder', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ids: ids})
+    })
+      .then(function(r) { return r.json(); })
+      .then(function() { loadTextModels(); })
+      .catch(function(e) { console.error('text reorder error', e); });
+  }
+
+  window.activateTextModel = function(id) {
+    fetch('/api/text-models/' + id + '/activate', {method: 'POST'})
+      .then(function(r) { return r.json(); })
+      .then(function() { loadTextModels(); })
+      .catch(function(e) { console.error('text activate error', e); });
+  };
+
+  function loadTextModels() {
+    fetch('/api/text-models')
+      .then(function(r) { return r.json(); })
+      .then(function(data) { renderTextModels(data); })
+      .catch(function() {
+        const c = document.getElementById('text-model-list');
+        if (c) c.innerHTML = '<div class="model-loading">Ошибка загрузки</div>';
+      });
+  }
+
+  window.loadTextModels = loadTextModels;
+
+  // Load immediately if story panel is active on page load
+  (function() {
+    const storyPanel = document.getElementById('panel-story');
+    if (storyPanel && storyPanel.classList.contains('active')) {
+      loadTextModels();
     }
   })();
 })();
