@@ -160,12 +160,39 @@ def init_db():
                     CREATE TABLE IF NOT EXISTS generated_stories (
                         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                         created_at FLOAT NOT NULL,
-                        model_name VARCHAR(200) NOT NULL,
+                        model_id UUID NOT NULL REFERENCES models(id),
                         result TEXT NOT NULL
                     )
                 """)
                 cur.execute("ALTER TABLE generated_stories DROP COLUMN IF EXISTS system_prompt")
                 cur.execute("ALTER TABLE generated_stories DROP COLUMN IF EXISTS user_prompt")
+                # Migration: replace model_name with model_id FK
+                cur.execute("""
+                    DO $$
+                    BEGIN
+                        IF EXISTS (
+                            SELECT 1 FROM information_schema.columns
+                            WHERE table_name = 'generated_stories' AND column_name = 'model_name'
+                        ) THEN
+                            ALTER TABLE generated_stories ADD COLUMN IF NOT EXISTS model_id UUID;
+                            UPDATE generated_stories gs
+                            SET model_id = m.id
+                            FROM models m
+                            WHERE m.name = gs.model_name AND gs.model_id IS NULL;
+                            ALTER TABLE generated_stories ALTER COLUMN model_id SET NOT NULL;
+                            IF NOT EXISTS (
+                                SELECT 1 FROM information_schema.table_constraints
+                                WHERE table_name = 'generated_stories'
+                                AND constraint_name = 'fk_generated_stories_model'
+                            ) THEN
+                                ALTER TABLE generated_stories
+                                ADD CONSTRAINT fk_generated_stories_model
+                                FOREIGN KEY (model_id) REFERENCES models(id);
+                            END IF;
+                            ALTER TABLE generated_stories DROP COLUMN model_name;
+                        END IF;
+                    END$$;
+                """)
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS cycles (
                         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -471,12 +498,12 @@ def get_active_model():
 
 
 def get_active_text_model():
-    """Returns (api_url, model_id, body_tpl, model_name) for the active text model, or (None,None,None,None)."""
+    """Returns (api_url, model_id, body_tpl, model_name, model_uuid) for the active text model, or (None,None,None,None,None)."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                    SELECT p.url, m.url, m.body, m.name
+                    SELECT p.url, m.url, m.body, m.name, m.id
                     FROM models m
                     JOIN ai_platforms p ON p.id = m.ai_platform_id
                     WHERE m.active = TRUE AND m.type = 1
@@ -484,15 +511,16 @@ def get_active_text_model():
                 """)
                 row = cur.fetchone()
         if not row:
-            return None, None, None, None
+            return None, None, None, None, None
         api_url = row[0]
         model_id = row[1]
         body_tpl = row[2] if isinstance(row[2], dict) else {}
         model_name = row[3]
-        return api_url, model_id, body_tpl, model_name
+        model_uuid = row[4]
+        return api_url, model_id, body_tpl, model_name, model_uuid
     except Exception as e:
         log_msg(f"[DB] Ошибка получения активной текстовой модели: {e}", "error")
-        return None, None, None, None
+        return None, None, None, None, None
 
 
 def build_fal_body(body_tpl, prompt):
@@ -584,15 +612,15 @@ def transcode_video():
     return True
 
 
-def db_save_story(model_name, result):
+def db_save_story(model_uuid, result):
     """Save a generated story to the generated_stories table. Returns the new UUID or None."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "INSERT INTO generated_stories (created_at, model_name, result) "
+                    "INSERT INTO generated_stories (created_at, model_id, result) "
                     "VALUES (%s, %s, %s) RETURNING id",
-                    (time.time(), model_name, result),
+                    (time.time(), model_uuid, result),
                 )
                 row = cur.fetchone()
             conn.commit()
@@ -606,7 +634,7 @@ def generate_story():
     """Generate a story via active OpenRouter text model.
     Returns (True, story_text) on success, (False, None) on any failure.
     """
-    api_url, model_id, body_tpl, model_name = get_active_text_model()
+    api_url, model_id, body_tpl, model_name, model_uuid = get_active_text_model()
     if not api_url:
         log_msg(
             "Нет активной текстовой модели — генерация сюжета пропущена, "
@@ -696,7 +724,7 @@ def generate_story():
         app_state["current_cycle"]["summary"]["story"] = story
         app_state["current_cycle"]["summary"]["story_model"] = model_name
 
-    db_save_story(model_name, story)
+    db_save_story(model_uuid, story)
     return True, story
 
 
