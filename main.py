@@ -421,6 +421,7 @@ def db_trim_cycles(keep=20):
 
 
 def db_trim_cycles_by_age():
+    """Delete cycle rows older than short_log_days from DB and in-memory state."""
     days = parse_short_log_days(db_get("short_log_days", "365"))
     cutoff = time.time() - days * 86400
     try:
@@ -436,6 +437,30 @@ def db_trim_cycles_by_age():
             app_state["cycles"].remove(c)
         except ValueError:
             pass
+
+
+def db_clear_old_entries():
+    """Clear entries[] for cycles older than history_days, keeping summary intact."""
+    days = parse_history_days(db_get("history_days", "7"))
+    cutoff = time.time() - days * 86400
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE cycles SET entries = '[]'::jsonb
+                    WHERE started_ts < %s
+                      AND entries != '[]'::jsonb
+                    """,
+                    (cutoff,),
+                )
+            conn.commit()
+    except Exception as e:
+        print(f"[DB] Ошибка очистки детального лога: {e}")
+    # Also clear entries in the in-memory deque
+    for c in app_state["cycles"]:
+        if c.get("started_ts", 0) < cutoff:
+            c["entries"] = []
 
 
 app_state = {
@@ -483,6 +508,7 @@ def end_cycle(ok):
     db_save_cycle(completed)
     db_trim_cycles(keep=20)
     db_trim_cycles_by_age()
+    db_clear_old_entries()
 
 
 def log_msg(msg, level="info"):
