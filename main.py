@@ -1407,7 +1407,7 @@ def api_models_reorder():
 
 @flask_app.route("/api/text-models", methods=["GET"])
 def api_text_models():
-    if not session.get("logged_in"):
+    if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
     try:
         with get_db() as conn:
@@ -1428,7 +1428,7 @@ def api_text_models():
 
 @flask_app.route("/api/text-models/<model_id>/activate", methods=["POST"])
 def api_text_model_activate(model_id):
-    if not session.get("logged_in"):
+    if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
     try:
         with get_db() as conn:
@@ -1445,7 +1445,7 @@ def api_text_model_activate(model_id):
 
 @flask_app.route("/api/text-models/reorder", methods=["POST"])
 def api_text_models_reorder():
-    if not session.get("logged_in"):
+    if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
     data = request.get_json(silent=True) or {}
     ids = data.get("ids", [])
