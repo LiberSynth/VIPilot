@@ -1105,7 +1105,17 @@ def scheduler_loop():
             and not app_state["running"]
             and time.time() >= next_retry_after
         ):
-            gen_ok, pub_ok = run_full_cycle()
+            try:
+                gen_ok, pub_ok = run_full_cycle()
+            except Exception as e:
+                gen_ok, pub_ok = False, False
+                entries = (
+                    list(app_state["current_cycle"]["entries"])
+                    if app_state["current_cycle"]
+                    else []
+                )
+                log_msg(f"[scheduler] Критическая ошибка цикла: {e}", "error")
+                notify_failure(f"необработанное исключение: {e}", log_entries=entries)
             generated_today = gen_ok
             published_today = pub_ok
             if not gen_ok:
@@ -1126,6 +1136,13 @@ def scheduler_loop():
                 wall_ok = publish_to_wall() if do_wall else False
                 published_today = story_ok or wall_ok
                 end_cycle(published_today)
+                if not published_today:
+                    entries = (
+                        list(app_state["current_cycle"]["entries"])
+                        if app_state["current_cycle"]
+                        else []
+                    )
+                    notify_failure("ошибка публикации в VK (повторная попытка)", log_entries=entries)
 
         time.sleep(30)
 
