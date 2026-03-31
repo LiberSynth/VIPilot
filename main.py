@@ -1496,23 +1496,19 @@ def log_data():
     if not is_authenticated():
         return jsonify({})
 
-    history_days = parse_history_days(db_get("history_days", "7"))
-    cutoff_ts = time.time() - history_days * 86400
-
-    def serialize_cycle(c, is_current=False):
-        age_ok = is_current or c.get("started_ts", 0) >= cutoff_ts
+    def serialize_cycle(c):
         return {
             "started": c["started"],
             "started_ts": c.get("started_ts", 0),
             "status": c["status"],
             "summary": c.get("summary", {}),
-            "entries": c["entries"] if age_ok else [],
+            "entries": c["entries"],
         }
 
     cycles = [serialize_cycle(c) for c in app_state["cycles"]]
     current = app_state["current_cycle"]
     if current:
-        cycles = [serialize_cycle(current, is_current=True)] + cycles
+        cycles = [serialize_cycle(current)] + cycles
 
     return jsonify(
         {
