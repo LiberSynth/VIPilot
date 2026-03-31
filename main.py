@@ -904,7 +904,7 @@ def publish_story():
         if "response" in save:
             story_id = save["response"]["items"][0]["id"]
             ts = msk_ts()
-            log_msg(f"✓ История опубликована! ID: {story_id}", "ok")
+            log_msg(f"✓ История опубликована. ID: {story_id}", "ok")
             app_state["last_published"] = ts
             app_state["last_ok"] = True
             if app_state["current_cycle"] is not None:
@@ -962,7 +962,7 @@ def publish_to_wall():
 
         if "response" in post_resp:
             post_id = post_resp["response"]["post_id"]
-            log_msg(f"✓ Видео опубликовано на стене! post_id: {post_id}", "ok")
+            log_msg(f"✓ Видео опубликовано на стене. post_id: {post_id}", "ok")
             return True
         else:
             log_msg(f"Ошибка wall.post: {post_resp}", "error")
