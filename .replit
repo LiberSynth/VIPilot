@@ -55,3 +55,7 @@ externalPort = 80
 SMTP_HOST = "smtp.mail.ru"
 SMTP_PORT = "587"
 SMTP_FROM = "red-brick@internet.ru"
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 60000
