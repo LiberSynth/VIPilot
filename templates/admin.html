@@ -357,7 +357,6 @@
     background: #07070a; border-top: 1px solid #151520;
     font-family: 'SF Mono', 'Fira Code', monospace;
     font-size: 12px;
-    max-height: 400px; overflow-y: auto;
   }
 
   /* Stage (root node) */
@@ -1426,28 +1425,40 @@ function buildTreeNodes(cycle) {
   }
 
   // Bucket entries into stages.
-  // Stage i window: (stageDoneTsMs[i-1], stageDoneTsMs[i]]
-  // Stage 0 starts from cycle start (or -Inf if unknown).
+  // Summary timestamps have minute precision ("HH:MM МСК" → HH:MM:00).
+  // Entries have second precision ("DD.MM HH:MM:SS").
+  // To avoid misclassification caused by sub-minute drift we:
+  //   - extend each stage's UPPER bound by 59 s (catches entries logged just
+  //     after the stored minute mark, e.g. "Транскодирование завершено")
+  //   - start each stage's LOWER bound from the beginning of the NEXT minute
+  //     after the previous stage completed (prevMs + 60 s), so entries that
+  //     are logged in the same minute as the previous stage's completion still
+  //     belong to that previous stage.
+  // Stage 0 starts from the cycle's own start time (no lower adjustment).
   // Last stage (publish) has no upper bound.
+  const MINUTE = 60000;
   const cycleStartMs = tsToMs(cycle.started, yearHint);
   const stageBuckets = STAGE_DEFS.map(() => []);
 
   entries.forEach(e => {
     const eMs = tsToMs(e.ts, yearHint);
+    if (eMs === null) { stageBuckets[0].push(e); return; }
 
     for (let i = 0; i < STAGE_DEFS.length; i++) {
-      const prevMs = i === 0 ? (cycleStartMs ?? -Infinity) : stageDoneTsMs[i - 1];
-      const nextMs = i === STAGE_DEFS.length - 1 ? null : stageDoneTsMs[i];
+      const rawPrev = i === 0 ? cycleStartMs : stageDoneTsMs[i - 1];
+      const rawNext = stageDoneTsMs[i];                 // null for last stage
+      const isLast  = i === STAGE_DEFS.length - 1;
 
-      const afterPrev = prevMs === null ? true : (eMs !== null && eMs >= prevMs);
-      const beforeNext = nextMs === null ? true : (eMs !== null && eMs <= nextMs);
+      // Lower bound: for stage 0 use cycleStart; for others use prevDone + 60 s
+      const lowerMs = i === 0 ? (rawPrev ?? -Infinity) : (rawPrev !== null ? rawPrev + MINUTE : -Infinity);
+      // Upper bound: current stage's done time + 59 s (covers the whole minute)
+      const upperMs = isLast ? Infinity : (rawNext !== null ? rawNext + MINUTE - 1 : Infinity);
 
-      if (afterPrev && beforeNext) {
+      if (eMs >= lowerMs && eMs <= upperMs) {
         stageBuckets[i].push(e);
         break;
       }
     }
-    // Entries that don't fit any window (shouldn't happen) → first stage
   });
 
   // Build nodes: only stages with a doneKey in summary OR currently active/running
