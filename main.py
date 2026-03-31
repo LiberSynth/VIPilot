@@ -1340,6 +1340,7 @@ def save():
 
     metaprompt = request.form.get("metaprompt", "").strip()
     if not metaprompt:
+        log_msg("[SAVE] Попытка сохранить пустой мета-промпт — отклонено", "error")
         flash("Мета-промпт не может быть пустым", "error")
         return redirect(url_for("admin"))
     db_set("metaprompt", metaprompt)

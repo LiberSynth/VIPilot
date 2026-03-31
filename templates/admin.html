@@ -685,7 +685,7 @@
     <form method="post" action="/save">
       <input type="hidden" name="active_tab" value="service">
       <!-- Пайплайн-поля — скрытые дубликаты -->
-      <input type="hidden" name="metaprompt" id="h_metaprompt" value="">
+      <input type="hidden" name="metaprompt" id="svc_h_metaprompt" value="">
       <input type="hidden" name="system_prompt" id="svc_h_system_prompt" value="{{ system_prompt }}">
       <input type="hidden" name="publish_time" id="h_publish_time" value="{{ publish_time_msk }}">
       <input type="hidden" name="lead_time_mins" id="h_lead_time_mins" value="{{ lead_time_mins }}">
@@ -855,10 +855,12 @@ if (taSys) { taSys.addEventListener('input', updateSysCount); updateSysCount(); 
 // Синхронизация textarea метапромпта в скрытые поля других форм
 const hMeta = document.getElementById('h_metaprompt');
 const pubHMeta = document.getElementById('pub_h_metaprompt');
+const svcHMeta = document.getElementById('svc_h_metaprompt');
 function syncMeta() {
   if (!ta) return;
   if (hMeta) hMeta.value = ta.value;
   if (pubHMeta) pubHMeta.value = ta.value;
+  if (svcHMeta) svcHMeta.value = ta.value;
 }
 if (ta) { syncMeta(); ta.addEventListener('input', syncMeta); }
 
@@ -987,8 +989,7 @@ function scheduleStorySave() {
 (function() {
   if (ta) {
     ta.addEventListener('input', function() {
-      const hidden = document.getElementById('h_metaprompt');
-      if (hidden) hidden.value = ta.value;
+      syncMeta();
       scheduleStorySave();
     });
     ta.addEventListener('change', scheduleStorySave);
