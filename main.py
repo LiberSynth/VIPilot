@@ -278,6 +278,12 @@ def init_db():
                     """UPDATE models SET body = jsonb_set(body, '{duration}', '"{int}"') WHERE name = 'sora-2' AND body->>'duration' != '{int}'""",
                 )
 
+                # Миграция: убрать суффикс 's' из duration для kling (принимает только "5" или "10")
+                cur.execute(
+                    """UPDATE models SET body = jsonb_set(body, '{duration}', '"{:d}"')
+                       WHERE name LIKE 'kling%' AND body->>'duration' = '{:d}s'""",
+                )
+
                 # Добавить текстовые модели OpenRouter, если ещё нет
                 _text_body_tpl = _json.dumps({
                     "messages": [
