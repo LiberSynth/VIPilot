@@ -24,7 +24,6 @@
 
 ## Настройки (хранятся в таблице settings)
 
-- `publish_time` — время публикации (МСК)
 - `lead_time_mins` — упреждение генерации (минуты)
 - `video_duration` — длительность видео (секунды, 1–60)
 - `aspect_ratio_x` / `aspect_ratio_y` — соотношение сторон (например 9:16)
@@ -35,6 +34,7 @@
 ## Таблицы БД
 
 - `settings` — ключ/значение настроек (PK: key VARCHAR)
+- `publish_times` — времена публикации (UUID PK, поле: time_utc VARCHAR)
 - `models` — модели fal.ai (UUID PK, поля: name, url, body JSONB, order, active)
 - `cycles` — история запусков пайплайна (UUID PK)
 - `video_urls` — URL ранее сгенерированных видео для эмуляции (UUID PK)

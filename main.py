@@ -71,6 +71,46 @@ def db_set(key, value):
         log_msg(f"[DB] Ошибка записи {key}: {e}", "error")
 
 
+def db_get_publish_times():
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT id, time_utc FROM publish_times ORDER BY time_utc")
+                rows = cur.fetchall()
+        return [{"id": str(row[0]), "time_utc": row[1]} for row in rows]
+    except Exception as e:
+        print(f"[DB] Ошибка получения времён публикации: {e}")
+        return []
+
+
+def db_add_publish_time(time_utc):
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO publish_times (time_utc) VALUES (%s) RETURNING id",
+                    (time_utc,),
+                )
+                row = cur.fetchone()
+            conn.commit()
+        return str(row[0])
+    except Exception as e:
+        print(f"[DB] Ошибка добавления времени публикации: {e}")
+        return None
+
+
+def db_delete_publish_time(time_id):
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM publish_times WHERE id = %s", (time_id,))
+            conn.commit()
+        return True
+    except Exception as e:
+        print(f"[DB] Ошибка удаления времени публикации: {e}")
+        return False
+
+
 def parse_hhmm(s):
     try:
         h, m = s.strip().split(":")
@@ -149,6 +189,19 @@ def init_db():
                         ('video_duration', '6')
                     ON CONFLICT (key) DO NOTHING
                 """)
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS publish_times (
+                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                        time_utc VARCHAR(5) NOT NULL
+                    )
+                """)
+                cur.execute("SELECT COUNT(*) FROM publish_times")
+                if cur.fetchone()[0] == 0:
+                    cur.execute("SELECT value FROM settings WHERE key = 'publish_time'")
+                    _pt_row = cur.fetchone()
+                    _default_pt = _pt_row[0] if _pt_row else "03:00"
+                    cur.execute("INSERT INTO publish_times (time_utc) VALUES (%s)", (_default_pt,))
+
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS video_urls (
                         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -1138,85 +1191,90 @@ def run_full_cycle():
 
 
 def scheduler_loop():
-    generated_today = False
-    published_today = False
+    # Per-slot state: time_utc -> {"gen_ok": bool, "pub_ok": bool, "next_retry": float}
+    slots_state = {}
     last_date = None
-    next_retry_after = 0
 
     while True:
-        pub_h, pub_m = parse_hhmm(db_get("publish_time", "03:00"))
         lead_mins = parse_lead_mins(db_get("lead_time_mins", "120"))
-
-        gen_total = (pub_h * 60 + pub_m - lead_mins) % 1440
-        gen_h = gen_total // 60
-        gen_m = gen_total % 60
+        publish_times = db_get_publish_times()
 
         now_utc = datetime.now(timezone.utc)
         today = now_utc.date()
 
         if today != last_date:
-            generated_today = False
-            published_today = False
+            slots_state = {}
             last_date = today
-            next_retry_after = 0
-            pub_h_msk, pub_m_msk = to_msk(pub_h, pub_m)
-            gen_h_msk, gen_m_msk = to_msk(gen_h, gen_m)
-            print(
-                f"[{now_utc.strftime('%d.%m %H:%M:%S')} UTC] "
-                f"Новый день. Генерация в {gen_h_msk:02d}:{gen_m_msk:02d} МСК, "
-                f"публикация в {pub_h_msk:02d}:{pub_m_msk:02d} МСК "
-                f"(упреждение {lead_mins} мин)."
-            )
+            for slot in publish_times:
+                pub_h, pub_m = parse_hhmm(slot["time_utc"])
+                gen_total = (pub_h * 60 + pub_m - lead_mins) % 1440
+                gen_h, gen_m = gen_total // 60, gen_total % 60
+                pub_h_msk, pub_m_msk = to_msk(pub_h, pub_m)
+                gen_h_msk, gen_m_msk = to_msk(gen_h, gen_m)
+                print(
+                    f"[{now_utc.strftime('%d.%m %H:%M:%S')} UTC] "
+                    f"Новый день. Слот {pub_h_msk:02d}:{pub_m_msk:02d} МСК: "
+                    f"генерация в {gen_h_msk:02d}:{gen_m_msk:02d} МСК "
+                    f"(упреждение {lead_mins} мин)."
+                )
 
         now_mins = now_utc.hour * 60 + now_utc.minute
-        pub_mins = pub_h * 60 + pub_m
-        mins_to_pub = (pub_mins - now_mins) % 1440
-        should_generate = mins_to_pub <= lead_mins
 
-        if (
-            should_generate
-            and not generated_today
-            and not app_state["running"]
-            and time.time() >= next_retry_after
-        ):
-            try:
-                gen_ok, pub_ok = run_full_cycle()
-            except Exception as e:
-                gen_ok, pub_ok = False, False
-                entries = (
-                    list(app_state["current_cycle"]["entries"])
-                    if app_state["current_cycle"]
-                    else []
-                )
-                log_msg(f"[scheduler] Критическая ошибка цикла: {e}", "error")
-                notify_failure(f"необработанное исключение: {e}", log_entries=entries)
-            generated_today = gen_ok
-            published_today = pub_ok
-            if not gen_ok:
-                next_retry_after = time.time() + 1800
-                print(
-                    "[scheduler] Генерация не удалась. Следующая попытка через 30 минут."
-                )
-        elif generated_today and not published_today:
-            now_mins_fresh = (
-                datetime.now(timezone.utc).hour * 60 + datetime.now(timezone.utc).minute
-            )
-            mins_past_pub = (now_mins_fresh - pub_mins) % 1440
-            if mins_past_pub < 720:
-                start_cycle()
-                do_story = db_get("vk_publish_story", "1") == "1"
-                do_wall = db_get("vk_publish_wall", "1") == "1"
-                story_ok = publish_story() if do_story else False
-                wall_ok = publish_to_wall() if do_wall else False
-                published_today = story_ok or wall_ok
-                end_cycle(published_today)
-                if not published_today:
+        for slot in publish_times:
+            time_utc = slot["time_utc"]
+            pub_h, pub_m = parse_hhmm(time_utc)
+            pub_mins = pub_h * 60 + pub_m
+            mins_to_pub = (pub_mins - now_mins) % 1440
+            should_generate = mins_to_pub <= lead_mins
+
+            state = slots_state.get(time_utc, {"gen_ok": False, "pub_ok": False, "next_retry": 0})
+
+            if (
+                should_generate
+                and not state["gen_ok"]
+                and not app_state["running"]
+                and time.time() >= state["next_retry"]
+            ):
+                try:
+                    gen_ok, pub_ok = run_full_cycle()
+                except Exception as e:
+                    gen_ok, pub_ok = False, False
                     entries = (
                         list(app_state["current_cycle"]["entries"])
                         if app_state["current_cycle"]
                         else []
                     )
-                    notify_failure("ошибка публикации в VK (повторная попытка)", log_entries=entries)
+                    log_msg(f"[scheduler] Критическая ошибка цикла: {e}", "error")
+                    notify_failure(f"необработанное исключение: {e}", log_entries=entries)
+                state["gen_ok"] = gen_ok
+                state["pub_ok"] = pub_ok
+                if not gen_ok:
+                    state["next_retry"] = time.time() + 1800
+                    print("[scheduler] Генерация не удалась. Следующая попытка через 30 минут.")
+                slots_state[time_utc] = state
+                break  # один цикл за раз
+
+            elif state["gen_ok"] and not state["pub_ok"] and not app_state["running"]:
+                now_mins_fresh = datetime.now(timezone.utc).hour * 60 + datetime.now(timezone.utc).minute
+                mins_past_pub = (now_mins_fresh - pub_mins) % 1440
+                if mins_past_pub < 720:
+                    start_cycle()
+                    do_story = db_get("vk_publish_story", "1") == "1"
+                    do_wall = db_get("vk_publish_wall", "1") == "1"
+                    story_ok = publish_story() if do_story else False
+                    wall_ok = publish_to_wall() if do_wall else False
+                    pub_ok = story_ok or wall_ok
+                    state["pub_ok"] = pub_ok
+                    end_cycle(pub_ok)
+                    if not pub_ok:
+                        entries = (
+                            list(app_state["current_cycle"]["entries"])
+                            if app_state["current_cycle"]
+                            else []
+                        )
+                        notify_failure("ошибка публикации в VK (повторная попытка)", log_entries=entries)
+                    slots_state[time_utc] = state
+                    break
 
         time.sleep(30)
 
@@ -1288,15 +1346,7 @@ def admin():
         return redirect(url_for("login"))
     metaprompt = db_get("metaprompt", "")
     system_prompt = db_get("system_prompt", "")
-    pub_h_utc, pub_m_utc = parse_hhmm(db_get("publish_time", "03:00"))
     lead_mins = parse_lead_mins(db_get("lead_time_mins", "120"))
-
-    gen_total = (pub_h_utc * 60 + pub_m_utc - lead_mins) % 1440
-    gen_h_utc = gen_total // 60
-    gen_m_utc = gen_total % 60
-
-    pub_h_msk, pub_m_msk = to_msk(pub_h_utc, pub_m_utc)
-    gen_h_msk, gen_m_msk = to_msk(gen_h_utc, gen_m_utc)
 
     history_days = parse_history_days(db_get("history_days", "7"))
     short_log_days = parse_short_log_days(db_get("short_log_days", "365"))
@@ -1313,8 +1363,6 @@ def admin():
         "admin.html",
         metaprompt=metaprompt,
         system_prompt=system_prompt,
-        publish_time_msk=f"{pub_h_msk:02d}:{pub_m_msk:02d}",
-        generate_time_msk=f"{gen_h_msk:02d}:{gen_m_msk:02d}",
         lead_time_mins=lead_mins,
         history_days=history_days,
         short_log_days=short_log_days,
@@ -1344,12 +1392,6 @@ def save():
         flash("Мета-промпт не может быть пустым", "error")
         return redirect(url_for("admin"))
     db_set("metaprompt", metaprompt)
-
-    pub_time_msk = request.form.get("publish_time", "").strip()
-    if pub_time_msk:
-        h_msk, m_msk = parse_hhmm(pub_time_msk)
-        h_utc, m_utc = to_utc_from_msk(h_msk, m_msk)
-        db_set("publish_time", f"{h_utc:02d}:{m_utc:02d}")
 
     lead_raw = request.form.get("lead_time_mins", "").strip()
     if lead_raw:
@@ -1465,6 +1507,44 @@ def test_notify():
     notify_failure("тестовый сбой (проверка уведомлений)")
     flash("Тестовое уведомление отправлено", "success")
     return redirect(url_for("admin"))
+
+
+@flask_app.route("/api/publish-times", methods=["GET"])
+def api_get_publish_times():
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    times = db_get_publish_times()
+    result = []
+    for t in times:
+        h, m = parse_hhmm(t["time_utc"])
+        mh, mm = to_msk(h, m)
+        result.append({"id": t["id"], "time_msk": f"{mh:02d}:{mm:02d}"})
+    return jsonify(result)
+
+
+@flask_app.route("/api/publish-times", methods=["POST"])
+def api_add_publish_time():
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    data = request.get_json()
+    time_msk = (data or {}).get("time", "").strip()
+    if not time_msk:
+        return jsonify({"error": "time required"}), 400
+    h_msk, m_msk = parse_hhmm(time_msk)
+    h_utc, m_utc = to_utc_from_msk(h_msk, m_msk)
+    time_utc = f"{h_utc:02d}:{m_utc:02d}"
+    new_id = db_add_publish_time(time_utc)
+    if new_id is None:
+        return jsonify({"error": "db error"}), 500
+    return jsonify({"id": new_id, "time_msk": f"{h_msk:02d}:{m_msk:02d}"})
+
+
+@flask_app.route("/api/publish-times/<time_id>", methods=["DELETE"])
+def api_delete_publish_time(time_id):
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    ok = db_delete_publish_time(time_id)
+    return jsonify({"ok": ok})
 
 
 @flask_app.route("/api/models")

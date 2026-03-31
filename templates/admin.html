@@ -437,6 +437,42 @@
   }
   .ar-preset:hover { border-color: #4a7cf7; color: #4a7cf7; }
   .ar-preset.active { border-color: #4a7cf7; color: #4a7cf7; background: rgba(74,124,247,.1); }
+
+  /* ── Publish times list ── */
+  .pt-row {
+    display: flex; align-items: center; gap: 10px;
+    background: #0f0f13; border: 1px solid #1e1e2e;
+    border-radius: 10px; padding: 10px 14px;
+  }
+  .pt-val {
+    flex: 1; font-size: 22px; font-weight: 700; color: #fff;
+    letter-spacing: 2px; font-variant-numeric: tabular-nums;
+  }
+  .pt-btn-remove {
+    background: none; border: 1px solid rgba(255,80,80,.3); border-radius: 8px;
+    color: #ff6060; font-size: 14px; padding: 5px 10px;
+    cursor: pointer; font-family: inherit; line-height: 1;
+    transition: background .15s, border-color .15s;
+    flex-shrink: 0;
+  }
+  .pt-btn-remove:active { background: rgba(255,80,80,.12); }
+  .pt-add-row { display: flex; gap: 10px; align-items: center; }
+  .pt-time-input {
+    flex: 1; padding: 14px 16px;
+    background: #0f0f13; border: 1px solid #2a2a38; border-radius: 11px;
+    color: #fff; font-size: 22px; font-family: inherit;
+    font-variant-numeric: tabular-nums; appearance: none; -webkit-appearance: none;
+    outline: none; transition: border-color .2s; letter-spacing: 2px;
+  }
+  .pt-time-input:focus { border-color: #4a7cf7; }
+  .pt-btn-add {
+    background: rgba(74,124,247,.15); border: 1px solid rgba(74,124,247,.4);
+    border-radius: 11px; color: #4a7cf7; font-size: 14px; font-weight: 600;
+    padding: 0 18px; height: 54px; cursor: pointer; font-family: inherit;
+    white-space: nowrap; transition: background .15s;
+    flex-shrink: 0;
+  }
+  .pt-btn-add:active { background: rgba(74,124,247,.3); }
 </style>
 </head>
 <body>
@@ -527,8 +563,12 @@
     <form id="settings-form" style="margin-top:0">
       <div class="card" style="margin-top:12px">
         <div class="card-title">Время публикации <span class="tz-badge">МСК</span></div>
-        <div class="hint">Видео публикуется в это время по Москве.</div>
-        <input type="time" id="publish_time" name="publish_time" value="{{ publish_time_msk }}">
+        <div class="hint">Видео публикуется в указанные моменты по Москве. Можно задать несколько.</div>
+        <div id="publish-times-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px;"></div>
+        <div class="pt-add-row">
+          <input type="time" id="new-publish-time" class="pt-time-input">
+          <button type="button" class="pt-btn-add" onclick="addPublishTime()">Добавить</button>
+        </div>
       </div>
 
       <div class="card">
@@ -818,7 +858,6 @@ function collectAllSettings(activeTab) {
   const v = id => { const el = document.getElementById(id); return el ? el.value : ''; };
   data.set('metaprompt',      ta      ? ta.value      : '');
   data.set('system_prompt',   taSys   ? taSys.value   : '');
-  data.set('publish_time',    v('publish_time'));
   data.set('lead_time_mins',  v('lead_time_mins'));
   data.set('video_duration',  v('video_duration'));
   data.set('vk_publish_story', v('vk_story_pub_hidden'));
@@ -860,7 +899,6 @@ function schedulePipelineSave() {
 
 (function() {
   const fields = [
-    document.getElementById('publish_time'),
     document.getElementById('lead_time_mins'),
     document.getElementById('video_duration'),
   ].filter(Boolean);
@@ -1473,6 +1511,76 @@ async function refreshLog() {
 
 refreshLog();
 setInterval(refreshLog, 4000);
+
+// ── Publish times management ──
+(function() {
+  function renderPublishTimes(times) {
+    const list = document.getElementById('publish-times-list');
+    if (!list) return;
+    list.innerHTML = '';
+    if (!times || times.length === 0) {
+      list.innerHTML = '<div style="font-size:13px;color:#555;padding:4px 0;">Нет добавленных времён</div>';
+      return;
+    }
+    times.forEach(function(t) {
+      const row = document.createElement('div');
+      row.className = 'pt-row';
+      row.dataset.id = t.id;
+      row.innerHTML =
+        '<div class="pt-val">' + t.time_msk + '</div>' +
+        '<button type="button" class="pt-btn-remove" onclick="deletePublishTime(\'' + t.id + '\')">Удалить</button>';
+      list.appendChild(row);
+    });
+  }
+
+  function loadPublishTimes() {
+    fetch('/api/publish-times')
+      .then(function(r) { return r.json(); })
+      .then(renderPublishTimes)
+      .catch(function() {});
+  }
+
+  window.addPublishTime = function() {
+    const input = document.getElementById('new-publish-time');
+    if (!input || !input.value) return;
+    const btn = document.querySelector('.pt-btn-add');
+    if (btn) btn.disabled = true;
+    fetch('/api/publish-times', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({time: input.value})
+    })
+      .then(function(r) { return r.json(); })
+      .then(function() {
+        input.value = '';
+        loadPublishTimes();
+      })
+      .catch(function() {})
+      .finally(function() { if (btn) btn.disabled = false; });
+  };
+
+  window.deletePublishTime = function(id) {
+    fetch('/api/publish-times/' + id, {method: 'DELETE'})
+      .then(function(r) { return r.json(); })
+      .then(function() { loadPublishTimes(); })
+      .catch(function() {});
+  };
+
+  // Load on page load if pipeline panel is active
+  (function() {
+    const panel = document.getElementById('panel-pipeline');
+    if (panel && panel.classList.contains('active')) {
+      loadPublishTimes();
+    }
+  })();
+
+  // Reload when switching to pipeline tab
+  var _origSwitchPanel = window.switchPanel;
+  window.switchPanel = function(name) {
+    if (_origSwitchPanel) _origSwitchPanel(name);
+    if (name === 'pipeline') loadPublishTimes();
+  };
+})();
 </script>
 </body>
 </html>
