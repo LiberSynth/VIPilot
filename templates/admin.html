@@ -1425,18 +1425,11 @@ function buildTreeNodes(cycle) {
   }
 
   // Bucket entries into stages.
-  // Summary timestamps have minute precision ("HH:MM МСК" → HH:MM:00).
-  // Entries have second precision ("DD.MM HH:MM:SS").
-  // To avoid misclassification caused by sub-minute drift we:
-  //   - extend each stage's UPPER bound by 59 s (catches entries logged just
-  //     after the stored minute mark, e.g. "Транскодирование завершено")
-  //   - start each stage's LOWER bound from the beginning of the NEXT minute
-  //     after the previous stage completed (prevMs + 60 s), so entries that
-  //     are logged in the same minute as the previous stage's completion still
-  //     belong to that previous stage.
-  // Stage 0 starts from the cycle's own start time (no lower adjustment).
-  // Last stage (publish) has no upper bound.
-  const MINUTE = 60000;
+  // Summary _at timestamps now have second precision ("HH:MM:SS МСК"),
+  // same as entry timestamps — so simple boundary checks are exact.
+  // Stage i window: [prevDone, thisDone]  (inclusive on both ends)
+  // Stage 0 lower bound: cycle start.
+  // Last stage upper bound: +∞.
   const cycleStartMs = tsToMs(cycle.started, yearHint);
   const stageBuckets = STAGE_DEFS.map(() => []);
 
@@ -1445,16 +1438,10 @@ function buildTreeNodes(cycle) {
     if (eMs === null) { stageBuckets[0].push(e); return; }
 
     for (let i = 0; i < STAGE_DEFS.length; i++) {
-      const rawPrev = i === 0 ? cycleStartMs : stageDoneTsMs[i - 1];
-      const rawNext = stageDoneTsMs[i];                 // null for last stage
-      const isLast  = i === STAGE_DEFS.length - 1;
+      const prevMs = i === 0 ? (cycleStartMs ?? -Infinity) : (stageDoneTsMs[i - 1] ?? -Infinity);
+      const nextMs = i === STAGE_DEFS.length - 1 ? Infinity : (stageDoneTsMs[i] ?? Infinity);
 
-      // Lower bound: for stage 0 use cycleStart; for others use prevDone + 60 s
-      const lowerMs = i === 0 ? (rawPrev ?? -Infinity) : (rawPrev !== null ? rawPrev + MINUTE : -Infinity);
-      // Upper bound: current stage's done time + 59 s (covers the whole minute)
-      const upperMs = isLast ? Infinity : (rawNext !== null ? rawNext + MINUTE - 1 : Infinity);
-
-      if (eMs >= lowerMs && eMs <= upperMs) {
+      if (eMs >= prevMs && eMs <= nextMs) {
         stageBuckets[i].push(e);
         break;
       }

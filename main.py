@@ -449,7 +449,7 @@ app_state = {
 
 
 def msk_ts():
-    return (datetime.now(timezone.utc) + MSK_OFFSET).strftime("%d.%m.%Y %H:%M МСК")
+    return (datetime.now(timezone.utc) + MSK_OFFSET).strftime("%d.%m.%Y %H:%M:%S МСК")
 
 
 def start_cycle():
