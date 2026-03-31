@@ -1259,35 +1259,6 @@ updateAR();
   })();
 })();
 
-// Автосохранение панели «Служебные»
-var _serviceSaveTimer = null;
-
-function saveServiceSettings() {
-  const form = document.querySelector('#panel-service form');
-  if (!form) return;
-  const data = new FormData(form);
-  fetch('/save', { method: 'POST', body: data }).catch(() => {});
-}
-
-function scheduleServiceSave() {
-  clearTimeout(_serviceSaveTimer);
-  _serviceSaveTimer = setTimeout(saveServiceSettings, 600);
-}
-
-(function() {
-  const fields = [
-    document.getElementById('notify_email'),
-    document.getElementById('notify_phone'),
-    document.getElementById('short_log_days'),
-    document.getElementById('history_days'),
-  ].filter(Boolean);
-  const emulCheck = document.getElementById('emulation_check');
-  fields.forEach(f => {
-    f.addEventListener('input', scheduleServiceSave);
-    f.addEventListener('change', scheduleServiceSave);
-  });
-  if (emulCheck) emulCheck.addEventListener('change', scheduleServiceSave);
-})();
 
 function levelClass(l) {
   return l === 'error' ? 'error' : l === 'ok' ? 'ok' : '';
