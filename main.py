@@ -761,6 +761,17 @@ def generate_video(prompt):
                             headers={"Authorization": f"Key {FAL_KEY}"},
                             timeout=10,
                         ).json()
+                        # Проверка на нарушение политики контента
+                        detail = result.get("detail")
+                        if detail:
+                            types = [d.get("type", "") for d in detail] if isinstance(detail, list) else []
+                            if any("content_policy" in t for t in types):
+                                log_msg(
+                                    "fal.ai отклонил промпт: нарушение политики контента. "
+                                    "Будет сгенерирован новый сюжет.",
+                                    "warn",
+                                )
+                                return "content_policy"
                         video_url = result.get("video", {}).get("url")
                         if not video_url:
                             log_msg(f"Нет URL видео в ответе: {result}", "error")
@@ -1025,7 +1036,28 @@ def run_full_cycle():
     start_cycle()
     try:
         story_ok, story_text = generate_story()
-        gen_ok = generate_video(prompt=story_text) if story_ok else False
+        gen_ok = False
+        content_policy_exhausted = False
+        _MAX_CP_RETRIES = 2
+        for _cp_attempt in range(_MAX_CP_RETRIES + 1):
+            if not story_ok:
+                break
+            _result = generate_video(prompt=story_text)
+            if _result == "content_policy":
+                if _cp_attempt < _MAX_CP_RETRIES:
+                    log_msg(
+                        f"[СЮЖЕТ] Перегенерация сюжета "
+                        f"(попытка {_cp_attempt + 2} из {_MAX_CP_RETRIES + 1})...",
+                        "warn",
+                    )
+                    story_ok, story_text = generate_story()
+                    continue
+                else:
+                    content_policy_exhausted = True
+                    break
+            else:
+                gen_ok = bool(_result)
+                break
         pub_ok = False
         do_story = do_wall = story_ok_vk = wall_ok = False
         if gen_ok:
@@ -1045,6 +1077,8 @@ def run_full_cycle():
         if not success:
             if not story_ok:
                 reason = "ошибка генерации сюжета"
+            elif content_policy_exhausted:
+                reason = f"fal.ai отклоняет промпт (нарушение политики контента, {_MAX_CP_RETRIES + 1} попытки исчерпаны)"
             elif not gen_ok:
                 reason = "ошибка генерации видео"
             else:
