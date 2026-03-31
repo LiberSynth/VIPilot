@@ -1,6 +1,5 @@
 import os
 import time
-import random
 import threading
 import requests
 import subprocess
@@ -466,121 +465,6 @@ def log_msg(msg, level="info"):
     print(f"[{ts} МСК] {msg}")
 
 
-SUBJECTS = [
-    "Стая рыб выпрыгивает из реки",
-    "Снежинки падают с неба",
-    "Осенние листья кружатся в воздухе",
-    "Волны океана накатывают на берег",
-    "Молнии бьют в землю",
-    "Пузырьки поднимаются со дна озера",
-    "Стая птиц летит над полем",
-    "Бабочки порхают над цветами",
-    "Капли дождя падают в лужу",
-    "Льдинки тают на солнце",
-    "Лепестки роз кружатся по ветру",
-    "Искры вылетают из костра",
-    "Муравьи несут крошки по тропинке",
-    "Пчёлы роятся над ульем",
-    "Листья берёзы падают в реку",
-    "Семена одуванчика летят по ветру",
-    "Огонь в камине догорает",
-    "Дым поднимается спиралью вверх",
-    "Снежный ком катится с горы",
-    "Мыльные пузыри поднимаются в воздух",
-    "Стая скворцов кружится в небе",
-    "Кленовые вертолётики падают с дерева",
-    "Горная лавина несётся вниз",
-    "Звёзды падают с ночного неба",
-    "Лавовый поток течёт по горе",
-]
-
-TRANSFORMATIONS = [
-    "и превращаются в {material}, из которых {builds}",
-    "и на лету трансформируются в {material} — {builds} словно сам собой",
-    "и вдруг застывают, превращаясь в {material}, и {builds}",
-    "и, коснувшись земли, становятся {material}, из которых {builds}",
-    "и складываются в {material} — из них {builds}",
-    "и рассыпаются {material}ом, который сам собой {builds}",
-    "и в замедленной съёмке превращаются в {material}, {builds}",
-    "и взрываются облаком {material}, из которого {builds}",
-]
-
-MATERIALS = [
-    "кирпичи",
-    "деревянные доски",
-    "керамическую плитку",
-    "стеклянные блоки",
-    "бетонные панели",
-    "черепицу",
-    "мраморные плиты",
-    "металлические балки",
-    "рулоны утеплителя",
-    "брёвна",
-    "гранитный щебень",
-    "листы фанеры",
-    "рулоны рубероида",
-    "арматурные прутья",
-    "сайдинг",
-]
-
-BUILDS = [
-    "вырастает красивый коттедж",
-    "складывается уютный деревянный дом",
-    "появляется кирпичный особняк",
-    "строится загородный дом",
-    "возникает терраса с видом на лес",
-    "строится забор вокруг сада",
-    "появляется крыша над головой",
-    "складывается камин в гостиной",
-    "вырастает стена дома",
-    "строится дорожка к дому",
-    "появляется веранда",
-    "складывается гараж",
-    "вырастает баня",
-    "строится беседка в саду",
-]
-
-SETTINGS = [
-    "на фоне заката над лесом",
-    "в осеннем лесу",
-    "у тихой реки на рассвете",
-    "в заснеженном поле",
-    "в летнем саду",
-    "на берегу озера",
-    "среди зелёных холмов",
-    "в хвойном лесу",
-    "на фоне грозового неба",
-    "в золотой час заката",
-]
-
-STYLES = [
-    "Кинематографическая съёмка, тёплый свет, 4K.",
-    "Магический реализм, яркие насыщенные цвета.",
-    "Художественная съёмка, мягкое освещение, сюрреализм.",
-    "Визуальный аттракцион, замедленная съёмка, кинематограф.",
-    "Эпичная широкоугольная съёмка, золотой закат.",
-]
-
-
-def generate_prompt():
-    subject = random.choice(SUBJECTS)
-    transform_template = random.choice(TRANSFORMATIONS)
-    material = random.choice(MATERIALS)
-    build = random.choice(BUILDS)
-    setting = random.choice(SETTINGS)
-    style = random.choice(STYLES)
-
-    transform = transform_template.format(material=material, builds=build)
-    scene = f"{subject} {transform}, {setting}."
-    full_prompt = f"{scene} {style}"
-
-    app_state["current_prompt"] = scene
-    if app_state["current_cycle"] is not None:
-        app_state["current_cycle"]["summary"]["prompt"] = scene
-    log_msg(f"Сюжет: {scene}")
-    return full_prompt
-
-
 def is_emulation():
     return db_get("emulation_mode", "0") == "1"
 
@@ -800,12 +684,15 @@ def generate_story():
         return False, None
 
     system_prompt = db_get("system_prompt", "")
-    user_prompt = generate_prompt()
+    user_prompt = db_get("metaprompt", "")
     try:
         dur = max(1, min(60, int(db_get("video_duration", "6"))))
     except (ValueError, TypeError):
         dur = 6
     user_prompt = f"{user_prompt}\n\nПродолжительность {dur:d} секунд."
+    app_state["current_prompt"] = user_prompt
+    if app_state["current_cycle"] is not None:
+        app_state["current_cycle"]["summary"]["prompt"] = user_prompt
 
     body = dict(body_tpl)
     if "messages" in body:
@@ -876,7 +763,7 @@ def generate_story():
 
 def generate_video(prompt=None):
     if prompt is None:
-        prompt = generate_prompt()
+        prompt = db_get("metaprompt", "")
     app_state["running"] = True
 
     if is_emulation():
