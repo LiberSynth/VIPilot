@@ -1162,10 +1162,14 @@ updateAR();
   }
 
   window.activateModel = function(id) {
+    var container = document.getElementById('model-list');
+    if (container) {
+      container.querySelectorAll('.model-item').forEach(function(el) {
+        el.classList.toggle('model-active', el.dataset.id === id);
+      });
+    }
     fetch('/api/models/' + id + '/activate', {method: 'POST'})
-      .then(function(r) { return r.json(); })
-      .then(function() { loadModels(); })
-      .catch(function(e) { console.error('activate error', e); });
+      .catch(function(e) { console.error('activate error', e); loadModels(); });
   };
 
   function loadModels() {
@@ -1285,10 +1289,14 @@ updateAR();
   }
 
   window.activateTextModel = function(id) {
+    var container = document.getElementById('text-model-list');
+    if (container) {
+      container.querySelectorAll('.model-item').forEach(function(el) {
+        el.classList.toggle('model-active', el.dataset.id === id);
+      });
+    }
     fetch('/api/text-models/' + id + '/activate', {method: 'POST'})
-      .then(function(r) { return r.json(); })
-      .then(function() { loadTextModels(); })
-      .catch(function(e) { console.error('text activate error', e); });
+      .catch(function(e) { console.error('text activate error', e); loadTextModels(); });
   };
 
   function loadTextModels() {
