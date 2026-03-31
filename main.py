@@ -264,6 +264,14 @@ def init_db():
                 )
 
                 # Добавить текстовые модели OpenRouter, если ещё нет
+                _text_body_tpl = _json.dumps({
+                    "messages": [
+                        {"role": "system", "content": "{}"},
+                        {"role": "user", "content": "{}"},
+                    ],
+                    "temperature": 0.9,
+                    "max_tokens": 300,
+                })
                 _text_models = [
                     ("qwen3.6-plus-preview", "qwen/qwen3.6-plus-preview:free", 1, True),
                     ("llama-3.1-8b-instruct", "meta-llama/llama-3.1-8b-instruct:free", 2, False),
@@ -273,10 +281,16 @@ def init_db():
                     if cur.fetchone()[0] == 0:
                         cur.execute(
                             'INSERT INTO models (name, url, body, "order", active, type, ai_platform_id) '
-                            "VALUES (%s, %s, '\"\"'::jsonb, %s, %s, 1, "
+                            "VALUES (%s, %s, %s::jsonb, %s, %s, 1, "
                             "(SELECT id FROM ai_platforms WHERE name = 'OpenRouter'))",
-                            (_tm_name, _tm_url, _tm_order, _tm_active),
+                            (_tm_name, _tm_url, _text_body_tpl, _tm_order, _tm_active),
                         )
+
+                # Миграция: обновить body для текстовых моделей, если ещё нет поля messages
+                cur.execute(
+                    "UPDATE models SET body = %s::jsonb WHERE type = 1 AND (body -> 'messages') IS NULL",
+                    (_text_body_tpl,),
+                )
 
                 # Установить дефолтный системный промпт, если ещё пустой
                 _default_sys = (
