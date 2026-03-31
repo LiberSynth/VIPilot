@@ -193,7 +193,6 @@ def init_db():
                     CREATE TABLE IF NOT EXISTS video_models (
                         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                         name VARCHAR(200) NOT NULL,
-                        platform_url VARCHAR(500) NOT NULL DEFAULT 'https://queue.fal.run/fal-ai',
                         url VARCHAR(500) NOT NULL,
                         body JSONB NOT NULL DEFAULT '{}',
                         "order" INTEGER NOT NULL DEFAULT 0,
@@ -202,11 +201,10 @@ def init_db():
                 """)
                 cur.execute("""
                     ALTER TABLE video_models ADD COLUMN IF NOT EXISTS
-                    platform_url VARCHAR(500) NOT NULL DEFAULT 'https://queue.fal.run/fal-ai'
+                    ai_platform_id UUID REFERENCES ai_platforms(id)
                 """)
                 cur.execute("""
-                    ALTER TABLE video_models ADD COLUMN IF NOT EXISTS
-                    ai_platform_id UUID REFERENCES ai_platforms(id)
+                    ALTER TABLE video_models DROP COLUMN IF EXISTS platform_url
                 """)
                 cur.execute("""
                     UPDATE video_models
