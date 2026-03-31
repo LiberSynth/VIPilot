@@ -846,9 +846,7 @@
 
   <!-- ══ ИСТОРИЯ ══ -->
   <div id="panel-log" class="tab-panel">
-    <div id="cycle-list" class="cycle-list">
-      <div class="log-empty-cycles">Нет запусков</div>
-    </div>
+    <div id="cycle-list" class="cycle-list"></div>
   </div>
 
 </div>
@@ -1765,7 +1763,7 @@ async function refreshLog() {
 
     const container = document.getElementById('cycle-list');
     if (cycleData.length === 0) {
-      container.innerHTML = '<div class="log-empty-cycles">Нет запусков</div>';
+      container.innerHTML = '';
       return;
     }
 
