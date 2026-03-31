@@ -28,6 +28,12 @@ GROUP_ID = 236929597
 FAL_QUEUE_BASE = "https://queue.fal.run/fal-ai"
 FAL_HEADERS = {"Authorization": f"Key {FAL_KEY}", "Content-Type": "application/json"}
 
+OPENROUTER_KEY = os.environ.get("OPENROUTER_API_KEY", "")
+OPENROUTER_HEADERS = {
+    "Authorization": f"Bearer {OPENROUTER_KEY}",
+    "Content-Type": "application/json",
+}
+
 VIDEO_PATH = "/tmp/story_raw.mp4"
 VIDEO_VK_PATH = "/tmp/story_vk.mp4"
 
@@ -153,6 +159,16 @@ def init_db():
                         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                         url TEXT NOT NULL UNIQUE,
                         created_at FLOAT NOT NULL
+                    )
+                """)
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS generated_stories (
+                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                        created_at FLOAT NOT NULL,
+                        model_name VARCHAR(200) NOT NULL,
+                        system_prompt TEXT NOT NULL DEFAULT '',
+                        user_prompt TEXT NOT NULL DEFAULT '',
+                        result TEXT NOT NULL
                     )
                 """)
                 cur.execute("""
@@ -630,6 +646,31 @@ def get_active_model():
         return None, None, None
 
 
+def get_active_text_model():
+    """Returns (api_url, model_id, body_tpl, model_name) for the active text model, or (None,None,None,None)."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT p.url, m.url, m.body, m.name
+                    FROM models m
+                    JOIN ai_platforms p ON p.id = m.ai_platform_id
+                    WHERE m.active = TRUE AND m.type = 1
+                    LIMIT 1
+                """)
+                row = cur.fetchone()
+        if not row:
+            return None, None, None, None
+        api_url = row[0]
+        model_id = row[1]
+        body_tpl = row[2] if isinstance(row[2], dict) else {}
+        model_name = row[3]
+        return api_url, model_id, body_tpl, model_name
+    except Exception as e:
+        log_msg(f"[DB] Ошибка получения активной текстовой модели: {e}", "error")
+        return None, None, None, None
+
+
 def build_fal_body(body_tpl, prompt):
     """Fill body template with current settings values using template format strings."""
     body = dict(body_tpl)
@@ -719,8 +760,118 @@ def transcode_video():
     return True
 
 
-def generate_video():
-    prompt = generate_prompt()
+def db_save_story(model_name, system_prompt, user_prompt, result):
+    """Save a generated story to the generated_stories table. Returns the new UUID or None."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO generated_stories "
+                    "(created_at, model_name, system_prompt, user_prompt, result) "
+                    "VALUES (%s, %s, %s, %s, %s) RETURNING id",
+                    (time.time(), model_name, system_prompt, user_prompt, result),
+                )
+                row = cur.fetchone()
+            conn.commit()
+        return row[0] if row else None
+    except Exception as e:
+        log_msg(f"[DB] Ошибка сохранения сюжета: {e}", "error")
+        return None
+
+
+def generate_story():
+    """Generate a story via active OpenRouter text model.
+    Returns (True, story_text) on success, (False, None) on any failure.
+    """
+    api_url, model_id, body_tpl, model_name = get_active_text_model()
+    if not api_url:
+        log_msg(
+            "Нет активной текстовой модели — генерация сюжета пропущена, "
+            "будет использован случайный промпт.",
+            "warn",
+        )
+        return False, None
+
+    if not OPENROUTER_KEY:
+        log_msg(
+            "OPENROUTER_API_KEY не задан — генерация сюжета пропущена.",
+            "error",
+        )
+        return False, None
+
+    system_prompt = db_get("system_prompt", "")
+    user_prompt = generate_prompt()
+
+    body = dict(body_tpl)
+    if "messages" in body:
+        messages = []
+        for msg in body["messages"]:
+            m = dict(msg)
+            if m.get("role") == "system":
+                m["content"] = str(m["content"]).format(system_prompt)
+            elif m.get("role") == "user":
+                m["content"] = str(m["content"]).format(user_prompt)
+            messages.append(m)
+        body["messages"] = messages
+    body["model"] = model_id
+
+    log_msg(
+        f"[СЮЖЕТ] Запрос к OpenRouter: модель={model_name}, "
+        f"промпт={user_prompt[:80]}{'...' if len(user_prompt) > 80 else ''}"
+    )
+
+    try:
+        resp = requests.post(
+            api_url, headers=OPENROUTER_HEADERS, json=body, timeout=60
+        )
+    except requests.exceptions.Timeout:
+        log_msg("[СЮЖЕТ] Таймаут запроса к OpenRouter (60 сек)", "error")
+        return False, None
+    except requests.exceptions.RequestException as e:
+        log_msg(f"[СЮЖЕТ] Ошибка соединения с OpenRouter: {e}", "error")
+        return False, None
+
+    try:
+        data = resp.json()
+    except ValueError:
+        log_msg(
+            f"[СЮЖЕТ] OpenRouter вернул не-JSON ответ "
+            f"(HTTP {resp.status_code}): {resp.text[:500]}",
+            "error",
+        )
+        return False, None
+
+    if resp.status_code >= 400:
+        err_msg = data.get("error", {})
+        if isinstance(err_msg, dict):
+            err_msg = err_msg.get("message", data)
+        log_msg(f"[СЮЖЕТ] OpenRouter HTTP {resp.status_code}: {err_msg}", "error")
+        return False, None
+
+    choices = data.get("choices")
+    if not choices:
+        log_msg(f"[СЮЖЕТ] OpenRouter: нет поля choices в ответе: {data}", "error")
+        return False, None
+
+    story = (choices[0].get("message") or {}).get("content", "").strip()
+    if not story:
+        log_msg(f"[СЮЖЕТ] OpenRouter вернул пустой текст: {data}", "error")
+        return False, None
+
+    log_msg(
+        f"[СЮЖЕТ] Получен: {story[:120]}{'...' if len(story) > 120 else ''}"
+    )
+    if app_state["current_cycle"] is not None:
+        app_state["current_cycle"]["summary"]["story"] = story
+        app_state["current_cycle"]["summary"]["story_model"] = model_name
+
+    db_save_story(model_name, system_prompt, user_prompt, story)
+    return True, story
+
+
+def generate_video(prompt=None):
+    if prompt is None:
+        prompt = generate_prompt()
     app_state["running"] = True
 
     if is_emulation():
@@ -1055,16 +1206,18 @@ def notify_failure(reason, log_entries=None, partial=False):
 def run_full_cycle():
     start_cycle()
     try:
-        gen_ok = generate_video()
+        story_ok, story_text = generate_story()
+        video_prompt = story_text if story_ok else None
+        gen_ok = generate_video(prompt=video_prompt)
         pub_ok = False
-        do_story = do_wall = story_ok = wall_ok = False
+        do_story = do_wall = story_ok_vk = wall_ok = False
         if gen_ok:
             do_story = db_get("vk_publish_story", "1") == "1"
             do_wall = db_get("vk_publish_wall", "1") == "1"
-            story_ok = publish_story() if do_story else False
+            story_ok_vk = publish_story() if do_story else False
             wall_ok = publish_to_wall() if do_wall else False
-            pub_ok = story_ok or wall_ok
-        story_partial_fail = gen_ok and do_story and not story_ok and wall_ok
+            pub_ok = story_ok_vk or wall_ok
+        story_partial_fail = gen_ok and do_story and not story_ok_vk and wall_ok
         success = pub_ok if gen_ok else False
         entries = (
             list(app_state["current_cycle"]["entries"])
