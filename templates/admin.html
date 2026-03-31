@@ -840,15 +840,16 @@ if (taSys) { taSys.addEventListener('input', updateSysCount); updateSysCount(); 
     document.cookie = name + '=' + encodeURIComponent(value) + '; max-age=31536000; path=/; SameSite=Lax';
   }
   function applyHeight(el, cookieName, defaultPx) {
-    const saved = getCookie(cookieName);
-    el.style.height = (saved ? parseInt(saved, 10) : defaultPx) + 'px';
+    const saved = parseInt(getCookie(cookieName), 10);
+    el.style.height = (saved > 0 ? saved : defaultPx) + 'px';
   }
   function watchHeight(el, cookieName) {
     var saveTimer = null;
     new ResizeObserver(function() {
       clearTimeout(saveTimer);
       saveTimer = setTimeout(function() {
-        setCookie(cookieName, Math.round(el.offsetHeight));
+        var h = Math.round(el.offsetHeight);
+        if (h > 0) setCookie(cookieName, h);
       }, 300);
     }).observe(el);
   }
