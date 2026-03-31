@@ -1407,11 +1407,15 @@ def save():
         db_set("system_prompt", system_prompt_val)
 
     metaprompt = request.form.get("metaprompt", "").strip()
+    active_tab = request.form.get("active_tab", "pipeline")
     if not metaprompt:
-        log_msg("[SAVE] Попытка сохранить пустой мета-промпт — отклонено", "error")
-        flash("Мета-промпт не может быть пустым", "error")
-        return redirect(url_for("admin"))
-    db_set("metaprompt", metaprompt)
+        if active_tab == "story":
+            log_msg("[SAVE] Попытка сохранить пустой мета-промпт — отклонено", "error")
+            flash("Мета-промпт не может быть пустым", "error")
+            return redirect(url_for("admin"))
+        # для остальных вкладок просто не перезаписываем метапромпт
+    else:
+        db_set("metaprompt", metaprompt)
 
     lead_raw = request.form.get("lead_time_mins", "").strip()
     if lead_raw:
@@ -1458,7 +1462,6 @@ def save():
             vid_dur = 6
         db_set("video_duration", str(vid_dur))
 
-    active_tab = request.form.get("active_tab", "pipeline")
     return redirect(url_for("admin") + f"?tab={active_tab}")
 
 
