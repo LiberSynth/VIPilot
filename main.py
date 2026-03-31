@@ -164,16 +164,6 @@ def init_db():
                         summary JSONB NOT NULL DEFAULT '{}'
                     )
                 """)
-                cur.execute(
-                    "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'models'"
-                )
-                old_table_exists = cur.fetchone()[0] > 0
-                cur.execute(
-                    "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'video_models'"
-                )
-                new_table_exists = cur.fetchone()[0] > 0
-                if old_table_exists and not new_table_exists:
-                    cur.execute("ALTER TABLE models RENAME TO video_models")
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS ai_platforms (
                         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -189,25 +179,33 @@ def init_db():
                     ) AS v(name, url)
                     WHERE NOT EXISTS (SELECT 1 FROM ai_platforms WHERE name = v.name)
                 """)
+                # Миграция: models -> video_models -> models
+                cur.execute(
+                    "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'video_models'"
+                )
+                if cur.fetchone()[0] > 0:
+                    cur.execute("ALTER TABLE video_models RENAME TO models")
                 cur.execute("""
-                    CREATE TABLE IF NOT EXISTS video_models (
+                    CREATE TABLE IF NOT EXISTS models (
                         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                         name VARCHAR(200) NOT NULL,
                         url VARCHAR(500) NOT NULL,
                         body JSONB NOT NULL DEFAULT '{}',
                         "order" INTEGER NOT NULL DEFAULT 0,
-                        active BOOLEAN NOT NULL DEFAULT FALSE
+                        active BOOLEAN NOT NULL DEFAULT FALSE,
+                        type SMALLINT NOT NULL DEFAULT 0
                     )
                 """)
                 cur.execute("""
-                    ALTER TABLE video_models ADD COLUMN IF NOT EXISTS
+                    ALTER TABLE models ADD COLUMN IF NOT EXISTS
                     ai_platform_id UUID REFERENCES ai_platforms(id)
                 """)
+                cur.execute("ALTER TABLE models DROP COLUMN IF EXISTS platform_url")
                 cur.execute("""
-                    ALTER TABLE video_models DROP COLUMN IF EXISTS platform_url
+                    ALTER TABLE models ADD COLUMN IF NOT EXISTS type SMALLINT NOT NULL DEFAULT 0
                 """)
                 cur.execute("""
-                    UPDATE video_models
+                    UPDATE models
                     SET ai_platform_id = (SELECT id FROM ai_platforms WHERE name = 'fal')
                     WHERE ai_platform_id IS NULL
                 """)
@@ -222,10 +220,10 @@ def init_db():
                 )
                 # Миграция: обновить body для строк, где шаблон ещё не применён
                 cur.execute(
-                    "UPDATE video_models SET body = %s::jsonb WHERE body->>'prompt' IS DISTINCT FROM '{}'",
+                    "UPDATE models SET body = %s::jsonb WHERE body->>'prompt' IS DISTINCT FROM '{}'",
                     (_body_tpl,),
                 )
-                cur.execute("SELECT COUNT(*) FROM video_models")
+                cur.execute("SELECT COUNT(*) FROM models")
                 if cur.fetchone()[0] == 0:
                     models_seed = [
                         ("veo2", "veo2", _body_tpl, 1, True),
@@ -239,7 +237,7 @@ def init_db():
                         ),
                     ]
                     cur.executemany(
-                        'INSERT INTO video_models (name, url, body, "order", active) VALUES (%s, %s, %s, %s, %s)',
+                        'INSERT INTO models (name, url, body, "order", active) VALUES (%s, %s, %s, %s, %s)',
                         models_seed,
                     )
 
@@ -251,16 +249,16 @@ def init_db():
                         "aspect_ratio": "{:d}:{:d}",
                     }
                 )
-                cur.execute("SELECT COUNT(*) FROM video_models WHERE name = 'sora-2'")
+                cur.execute("SELECT COUNT(*) FROM models WHERE name = 'sora-2'")
                 if cur.fetchone()[0] == 0:
                     cur.execute(
-                        'INSERT INTO video_models (name, url, body, "order", active) VALUES (%s, %s, %s::jsonb, %s, %s)',
+                        'INSERT INTO models (name, url, body, "order", active) VALUES (%s, %s, %s::jsonb, %s, %s)',
                         ("sora-2", "sora-2/text-to-video", _sora_body_tpl, 4, False),
                     )
 
                 # Миграция: обновить duration для sora-2 на "{int}"
                 cur.execute(
-                    """UPDATE video_models SET body = jsonb_set(body, '{duration}', '"{int}"') WHERE name = 'sora-2' AND body->>'duration' != '{int}'""",
+                    """UPDATE models SET body = jsonb_set(body, '{duration}', '"{int}"') WHERE name = 'sora-2' AND body->>'duration' != '{int}'""",
                 )
             conn.commit()
         print("[DB] Инициализация выполнена")
@@ -572,7 +570,7 @@ def get_active_model():
             with conn.cursor() as cur:
                 cur.execute("""
                     SELECT p.url, vm.url, vm.body
-                    FROM video_models vm
+                    FROM models vm
                     JOIN ai_platforms p ON p.id = vm.ai_platform_id
                     WHERE vm.active = TRUE
                     LIMIT 1
@@ -1342,8 +1340,9 @@ def api_models():
                 cur.execute("""
                     SELECT vm.id, vm.name, vm.url, vm.body, vm."order", vm.active,
                            p.name AS platform_name
-                    FROM video_models vm
+                    FROM models vm
                     LEFT JOIN ai_platforms p ON p.id = vm.ai_platform_id
+                    WHERE vm.type = 0
                     ORDER BY vm."order" ASC
                 """)
                 rows = cur.fetchall()
@@ -1359,9 +1358,9 @@ def api_model_activate(model_id):
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
-                cur.execute("UPDATE video_models SET active = FALSE")
+                cur.execute("UPDATE models SET active = FALSE WHERE type = 0")
                 cur.execute(
-                    "UPDATE video_models SET active = TRUE WHERE id = %s", (model_id,)
+                    "UPDATE models SET active = TRUE WHERE id = %s", (model_id,)
                 )
             conn.commit()
         return jsonify({"ok": True})
@@ -1382,7 +1381,7 @@ def api_models_reorder():
             with conn.cursor() as cur:
                 for idx, model_id in enumerate(ids, start=1):
                     cur.execute(
-                        'UPDATE video_models SET "order" = %s WHERE id = %s', (idx, model_id)
+                        'UPDATE models SET "order" = %s WHERE id = %s', (idx, model_id)
                     )
             conn.commit()
         return jsonify({"ok": True})
