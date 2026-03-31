@@ -761,9 +761,7 @@ def generate_story():
     return True, story
 
 
-def generate_video(prompt=None):
-    if prompt is None:
-        prompt = db_get("metaprompt", "")
+def generate_video(prompt):
     app_state["running"] = True
 
     if is_emulation():
@@ -1099,8 +1097,7 @@ def run_full_cycle():
     start_cycle()
     try:
         story_ok, story_text = generate_story()
-        video_prompt = story_text if story_ok else None
-        gen_ok = generate_video(prompt=video_prompt)
+        gen_ok = generate_video(prompt=story_text) if story_ok else False
         pub_ok = False
         do_story = do_wall = story_ok_vk = wall_ok = False
         if gen_ok:
@@ -1118,7 +1115,12 @@ def run_full_cycle():
         )
         end_cycle(success)
         if not success:
-            reason = "ошибка генерации видео" if not gen_ok else "ошибка публикации в VK"
+            if not story_ok:
+                reason = "ошибка генерации сюжета"
+            elif not gen_ok:
+                reason = "ошибка генерации видео"
+            else:
+                reason = "ошибка публикации в VK"
             notify_failure(reason, log_entries=entries)
         elif story_partial_fail:
             notify_failure(
