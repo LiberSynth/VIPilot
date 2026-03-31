@@ -554,15 +554,7 @@
         </div>
       </div>
 
-      <div class="card">
-        <div class="card-title">Продолжительность видео</div>
-        <div class="hint">Длина генерируемого видео в секундах.</div>
-        <div class="lead-row">
-          <input type="number" name="video_duration" id="video_duration" value="{{ video_duration }}" min="1" max="60" step="1"
-                 oninput="document.getElementById('pub_h_video_duration').value=this.value; document.getElementById('svc_h_video_duration').value=this.value;">
-          <span class="lead-unit">секунд</span>
-        </div>
-      </div>
+      <input type="hidden" name="video_duration" id="pip_h_video_duration" value="{{ video_duration }}">
 
       <!-- Публикация ВК — скрытые дубликаты (реальные переключатели на вкладке "Публикация") -->
       <input type="hidden" name="vk_publish_story" id="vk_story_hidden" value="{{ '1' if vk_publish_story else '0' }}">
@@ -607,6 +599,16 @@
 
   <!-- ══ ГЕНЕРАЦИЯ ВИДЕО ══ -->
   <div id="panel-request" class="tab-panel">
+
+    <div class="card" style="margin-top:12px">
+      <div class="card-title">Продолжительность видео</div>
+      <div class="hint">Длина генерируемого видео в секундах.</div>
+      <div class="lead-row">
+        <input type="number" name="video_duration" id="video_duration" value="{{ video_duration }}" min="1" max="60" step="1"
+               oninput="document.getElementById('pip_h_video_duration').value=this.value; document.getElementById('pub_h_video_duration').value=this.value; document.getElementById('svc_h_video_duration').value=this.value;">
+        <span class="lead-unit">секунд</span>
+      </div>
+    </div>
 
     <div class="card" style="margin-top:12px">
       <div class="card-title">Модели</div>
@@ -971,7 +973,7 @@ function schedulePipelineSave() {
   const fields = [
     document.querySelector('#settings-form input[name="publish_time"]'),
     document.querySelector('#settings-form input[name="lead_time_mins"]'),
-    document.querySelector('#settings-form input[name="video_duration"]'),
+    document.getElementById('video_duration'),
   ].filter(Boolean);
   fields.forEach(f => {
     f.addEventListener('input', schedulePipelineSave);
