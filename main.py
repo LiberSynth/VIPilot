@@ -1688,6 +1688,11 @@ def api_text_models_reorder():
         return jsonify({"error": str(e)}), 500
 
 
+@flask_app.route("/healthz")
+def healthz():
+    return "ok", 200
+
+
 @flask_app.route("/logout")
 def logout():
     session.clear()
