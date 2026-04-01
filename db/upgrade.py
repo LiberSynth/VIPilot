@@ -14,6 +14,8 @@ def run_upgrades():
     _create_batches()
     _create_log()
     _create_log_entries()
+    _add_loop_interval()
+    _log_batch_id_nullable()
 
 
 def _add_emulation_mode():
@@ -159,3 +161,32 @@ def _create_log_entries():
             conn.commit()
     except Exception as e:
         print(f"[DB] Ошибка миграции _create_log_entries: {e}")
+
+
+def _add_loop_interval():
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO settings (key, value) VALUES ('loop_interval', '5')
+                    ON CONFLICT (key) DO NOTHING
+                """)
+            conn.commit()
+    except Exception as e:
+        print(f"[DB] Ошибка миграции _add_loop_interval: {e}")
+
+
+def _log_batch_id_nullable():
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT is_nullable FROM information_schema.columns
+                    WHERE table_name = 'log' AND column_name = 'batch_id'
+                """)
+                row = cur.fetchone()
+                if row and row[0] == 'NO':
+                    cur.execute("ALTER TABLE log ALTER COLUMN batch_id DROP NOT NULL")
+            conn.commit()
+    except Exception as e:
+        print(f"[DB] Ошибка миграции _log_batch_id_nullable: {e}")

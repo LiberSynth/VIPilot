@@ -101,6 +101,26 @@ def db_delete_schedule_slot(slot_id):
 
 
 # ---------------------------------------------------------------------------
+# Лог уровня приложения (без батча)
+# ---------------------------------------------------------------------------
+
+def db_log_root(message, status='info'):
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO log (batch_id, pipeline, message, status)
+                    VALUES (NULL, 'root', %s, %s)
+                    """,
+                    (message, status),
+                )
+            conn.commit()
+    except Exception as e:
+        print(f"[DB] Ошибка db_log_root: {e}")
+
+
+# ---------------------------------------------------------------------------
 # Циклы
 # ---------------------------------------------------------------------------
 

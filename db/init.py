@@ -42,7 +42,8 @@ def init_db():
                         ('aspect_ratio_x', '9'),
                         ('aspect_ratio_y', '16'),
                         ('video_duration', '6'),
-                        ('buffer_hours', '24')
+                        ('buffer_hours', '24'),
+                        ('loop_interval', '5')
                     ON CONFLICT (key) DO NOTHING
                 """)
                 cur.execute("""
@@ -171,7 +172,7 @@ def init_db():
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS log (
                         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                        batch_id UUID NOT NULL REFERENCES batches(id),
+                        batch_id UUID REFERENCES batches(id),
                         pipeline VARCHAR(30) NOT NULL,
                         message TEXT,
                         status VARCHAR(20),

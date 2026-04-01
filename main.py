@@ -26,6 +26,7 @@ from db import (
     db_get_schedule,
     db_add_schedule_slot,
     db_delete_schedule_slot,
+    db_log_root,
     db_save_cycle,
     db_load_cycles,
     db_trim_cycles,
@@ -38,6 +39,7 @@ from db import (
     get_active_text_model,
 )
 from db.init import get_db
+from pipelines import planning
 
 FAL_KEY = os.environ["FAL_API_KEY"]
 VK_TOKEN = os.environ["VK_USER_TOKEN"]
@@ -769,93 +771,13 @@ def run_full_cycle():
         raise
 
 
-def scheduler_loop():
-    # Per-slot state: time_utc -> {"gen_ok": bool, "pub_ok": bool, "next_retry": float}
-    slots_state = {}
-    last_date = None
-
-    while True:
-        lead_mins = parse_lead_mins(db_get("lead_time_mins", "120"))
-        publish_times = db_get_schedule()
-
-        now_utc = datetime.now(timezone.utc)
-        today = now_utc.date()
-
-        if today != last_date:
-            slots_state = {}
-            last_date = today
-            for slot in publish_times:
-                pub_h, pub_m = parse_hhmm(slot["time_utc"])
-                gen_total = (pub_h * 60 + pub_m - lead_mins) % 1440
-                gen_h, gen_m = gen_total // 60, gen_total % 60
-                pub_h_msk, pub_m_msk = to_msk(pub_h, pub_m)
-                gen_h_msk, gen_m_msk = to_msk(gen_h, gen_m)
-                print(
-                    f"[{now_utc.strftime('%d.%m %H:%M:%S')} UTC] "
-                    f"Новый день. Слот {pub_h_msk:02d}:{pub_m_msk:02d} МСК: "
-                    f"генерация в {gen_h_msk:02d}:{gen_m_msk:02d} МСК "
-                    f"(упреждение {lead_mins} мин)."
-                )
-
-        now_mins = now_utc.hour * 60 + now_utc.minute
-
-        for slot in publish_times:
-            time_utc = slot["time_utc"]
-            pub_h, pub_m = parse_hhmm(time_utc)
-            pub_mins = pub_h * 60 + pub_m
-            mins_to_pub = (pub_mins - now_mins) % 1440
-            should_generate = mins_to_pub <= lead_mins
-
-            state = slots_state.get(time_utc, {"gen_ok": False, "pub_ok": False, "next_retry": 0})
-
-            if (
-                should_generate
-                and not state["gen_ok"]
-                and not app_state["running"]
-                and time.time() >= state["next_retry"]
-            ):
-                try:
-                    gen_ok, pub_ok = run_full_cycle()
-                except Exception as e:
-                    gen_ok, pub_ok = False, False
-                    entries = (
-                        list(app_state["current_cycle"]["entries"])
-                        if app_state["current_cycle"]
-                        else []
-                    )
-                    log_msg(f"[scheduler] Критическая ошибка цикла: {e}", "error")
-                    notify_failure(f"необработанное исключение: {e}", log_entries=entries)
-                state["gen_ok"] = gen_ok
-                state["pub_ok"] = pub_ok
-                if not gen_ok:
-                    state["next_retry"] = time.time() + 1800
-                    print("[scheduler] Генерация не удалась. Следующая попытка через 30 минут.")
-                slots_state[time_utc] = state
-                break  # один цикл за раз
-
-            elif state["gen_ok"] and not state["pub_ok"] and not app_state["running"]:
-                now_mins_fresh = datetime.now(timezone.utc).hour * 60 + datetime.now(timezone.utc).minute
-                mins_past_pub = (now_mins_fresh - pub_mins) % 1440
-                if mins_past_pub < 720:
-                    start_cycle()
-                    do_story = db_get("vk_publish_story", "1") == "1"
-                    do_wall = db_get("vk_publish_wall", "1") == "1"
-                    story_ok = publish_story() if do_story else False
-                    wall_ok = publish_to_wall() if do_wall else False
-                    pub_ok = story_ok or wall_ok
-                    state["pub_ok"] = pub_ok
-                    end_cycle(pub_ok)
-                    if not pub_ok:
-                        entries = (
-                            list(app_state["current_cycle"]["entries"])
-                            if app_state["current_cycle"]
-                            else []
-                        )
-                        notify_failure("ошибка публикации в VK (повторная попытка)", log_entries=entries)
-                    slots_state[time_utc] = state
-                    break
-
-        time.sleep(30)
+# def scheduler_loop():
+#     # УСТАРЕЛО: заменено новым main_loop с пайплайнами
+#     slots_state = {}
+#     last_date = None
+#     while True:
+#         ...
+#     time.sleep(30)
 
 
 flask_app = Flask(__name__, static_folder=".")
@@ -1254,13 +1176,60 @@ def logout():
     return redirect(url_for("login"))
 
 
-_scheduler_started = False
+def main_loop():
+    _threads = {
+        'planning':    None,
+        # 'story':       None,  # Pipeline 2 — генерация сюжетов
+        # 'video':       None,  # Pipeline 3 — генерация видео
+        # 'transcoding': None,  # Pipeline 4 — транскодирование
+        # 'publishing':  None,  # Pipeline 5 — публикация
+    }
+
+    while True:
+        try:
+            interval = int(db_get('loop_interval', '5'))
+
+            # Pipeline 1: Планирование
+            if _threads['planning'] is None or not _threads['planning'].is_alive():
+                _threads['planning'] = threading.Thread(
+                    target=planning.run, daemon=True
+                )
+                _threads['planning'].start()
+
+            # Pipeline 2: Генерация сюжетов (заготовка)
+            # if _threads['story'] is None or not _threads['story'].is_alive():
+            #     _threads['story'] = threading.Thread(target=story.run, daemon=True)
+            #     _threads['story'].start()
+
+            # Pipeline 3: Генерация видео (заготовка)
+            # if _threads['video'] is None or not _threads['video'].is_alive():
+            #     _threads['video'] = threading.Thread(target=video.run, daemon=True)
+            #     _threads['video'].start()
+
+            # Pipeline 4: Транскодирование (заготовка)
+            # if _threads['transcoding'] is None or not _threads['transcoding'].is_alive():
+            #     _threads['transcoding'] = threading.Thread(target=transcoding.run, daemon=True)
+            #     _threads['transcoding'].start()
+
+            # Pipeline 5: Публикация (заготовка)
+            # if _threads['publishing'] is None or not _threads['publishing'].is_alive():
+            #     _threads['publishing'] = threading.Thread(target=publishing.run, daemon=True)
+            #     _threads['publishing'].start()
+
+        except Exception as e:
+            db_log_root(f"Ошибка главного цикла: {e}", status='error')
+            print(f"[main_loop] Ошибка: {e}")
+
+        time.sleep(interval)
 
 
-def start_scheduler():
-    global _scheduler_started
-    if not _scheduler_started:
-        _scheduler_started = True
+_main_loop_started = False
+
+
+def start_main_loop():
+    global _main_loop_started
+    if not _main_loop_started:
+        _main_loop_started = True
         init_db()
         run_upgrades()
         saved = db_load_cycles()
@@ -1272,11 +1241,11 @@ def start_scheduler():
                 app_state["last_published"] = last["summary"]["published_at"]
                 app_state["last_ok"] = last["status"] == "ok"
         print(f"[DB] Загружено циклов из БД: {len(saved)}")
-        t = threading.Thread(target=scheduler_loop, daemon=True)
+        t = threading.Thread(target=main_loop, daemon=True)
         t.start()
 
 
-start_scheduler()
+start_main_loop()
 
 app = flask_app
 
