@@ -39,6 +39,23 @@ def db_log_entry(log_id, message, level='info'):
         print(f"[DB] Ошибка db_log_entry: {e}")
 
 
+def db_log_interrupt_running(pipeline):
+    """Переводит все незавершённые записи пайплайна из 'running' в 'прервана'."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE log SET status = 'прервана' WHERE pipeline = %s AND status = 'running'",
+                    (pipeline,),
+                )
+                count = cur.rowcount
+            conn.commit()
+        if count:
+            print(f"[log] {pipeline}: {count} незавершённых записей → прервана")
+    except Exception as e:
+        print(f"[DB] Ошибка db_log_interrupt_running: {e}")
+
+
 def db_log_update(log_id, message, status):
     """Обновляет message и status существующей записи лога."""
     try:

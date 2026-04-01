@@ -14,7 +14,7 @@ from db import (
     db_create_story,
     db_set_batch_story,
 )
-from log import db_log_pipeline, db_log_entry, db_log_update
+from log import db_log_pipeline, db_log_entry, db_log_update, db_log_interrupt_running
 
 _API_KEY = os.environ.get('OPENROUTER_API_KEY', '')
 
@@ -44,6 +44,8 @@ def _build_body(body_tpl, model_url, system_prompt, user_prompt):
 
 def run():
     try:
+        db_log_interrupt_running('story')
+
         batch = db_get_pending_batch()
         if not batch:
             return
