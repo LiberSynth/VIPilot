@@ -126,7 +126,7 @@ def db_get_active_targets():
 # ---------------------------------------------------------------------------
 
 def db_ensure_batch(scheduled_at, target_id):
-    """Создаёт батч если не существует. Возвращает True если создан, False если уже был."""
+    """Создаёт батч если не существует. Возвращает UUID нового батча или None если уже был."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
@@ -139,17 +139,34 @@ def db_ensure_batch(scheduled_at, target_id):
                     """,
                     (scheduled_at, target_id),
                 )
-                created = cur.fetchone() is not None
+                row = cur.fetchone()
             conn.commit()
-        return created
+        return str(row[0]) if row else None
     except Exception as e:
         print(f"[DB] Ошибка db_ensure_batch: {e}")
-        return False
+        return None
 
 
 # ---------------------------------------------------------------------------
 # Лог уровня приложения (без батча)
 # ---------------------------------------------------------------------------
+
+def db_log_pipeline(pipeline, message, status='info', batch_id=None):
+    """Запись в лог от имени конкретного пайплайна, опционально привязанная к батчу."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO log (batch_id, pipeline, message, status)
+                    VALUES (%s, %s, %s, %s)
+                    """,
+                    (batch_id, pipeline, message, status),
+                )
+            conn.commit()
+    except Exception as e:
+        print(f"[DB] Ошибка db_log_pipeline: {e}")
+
 
 def db_log_root(message, status='info'):
     try:
