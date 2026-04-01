@@ -49,7 +49,7 @@ def run():
                             )
                             if log_id:
                                 dt_msk = dt.astimezone(MSK)
-                                db_log_entry(log_id, f"Публикация: {dt_msk.strftime('%d.%m.%Y %H:%M')} МСК")
+                                db_log_entry(log_id, f"Запланирована публикация: {dt_msk.strftime('%d.%m.%Y %H:%M')} МСК")
                                 db_log_entry(log_id, f"Таргет: {target['name']}  ({target['aspect_ratio_x']}:{target['aspect_ratio_y']})")
                                 db_log_entry(log_id, f"Горизонт планирования: {buffer_hours} ч")
                             print(
