@@ -162,7 +162,12 @@ def db_get_pending_batch():
                            t.aspect_ratio_x, t.aspect_ratio_y
                     FROM batches b
                     JOIN targets t ON t.id = b.target_id
-                    WHERE b.status = 'pending' AND b.story_id IS NULL
+                    WHERE b.status = 'pending'
+                      AND b.story_id IS NULL
+                      AND EXISTS (
+                          SELECT 1 FROM schedule
+                          WHERE time_utc = to_char(b.scheduled_at AT TIME ZONE 'UTC', 'HH24:MI')
+                      )
                     ORDER BY b.scheduled_at
                     LIMIT 1
                 """)
@@ -253,6 +258,10 @@ def db_get_story_ready_batch():
                     FROM batches b
                     JOIN targets t ON t.id = b.target_id
                     WHERE b.status = 'story_ready'
+                      AND EXISTS (
+                          SELECT 1 FROM schedule
+                          WHERE time_utc = to_char(b.scheduled_at AT TIME ZONE 'UTC', 'HH24:MI')
+                      )
                     ORDER BY b.scheduled_at
                     LIMIT 1
                 """)
@@ -275,7 +284,12 @@ def db_get_video_pending_batch():
                            t.aspect_ratio_x, t.aspect_ratio_y
                     FROM batches b
                     JOIN targets t ON t.id = b.target_id
-                    WHERE b.status = 'video_pending' AND b.fal_request_id IS NOT NULL
+                    WHERE b.status = 'video_pending'
+                      AND b.fal_request_id IS NOT NULL
+                      AND EXISTS (
+                          SELECT 1 FROM schedule
+                          WHERE time_utc = to_char(b.scheduled_at AT TIME ZONE 'UTC', 'HH24:MI')
+                      )
                     ORDER BY b.scheduled_at
                     LIMIT 1
                 """)
