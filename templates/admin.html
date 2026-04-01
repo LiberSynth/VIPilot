@@ -344,11 +344,14 @@
 
   .monitor-batch-body { display: none; }
   .monitor-batch.open .monitor-batch-body { display: block; }
-  .monitor-batch-body .cycle-float-btns {
-    position: static;
-    padding: 8px 10px 4px;
-    justify-content: flex-end;
+
+  /* Action buttons in batch/sysgroup headers */
+  .monitor-hdr-actions {
+    display: none; gap: 4px; flex-shrink: 0; align-items: center;
   }
+  .monitor-batch.open .monitor-hdr-actions,
+  .monitor-sysgroup.open .monitor-hdr-actions { display: flex; }
+  .monitor-hdr-actions .cycle-float-btn { width: 26px; height: 26px; }
 
   /* Log entries inside batch */
   .monitor-log-list {
@@ -2083,23 +2086,24 @@ setInterval(refreshLog, 4000);
 
     const logHtml = '<div class="monitor-log-list">' + logs.map(renderLogItem).join('') + '</div>';
 
-    const floatBtns =
-      '<div class="cycle-float-btns" onclick="event.stopPropagation()">' +
+    const hdrActions =
+      '<div class="monitor-hdr-actions" onclick="event.stopPropagation()">' +
         '<button class="cycle-float-btn" title="Развернуть все" onclick="monitorExpandAll(this)">' + MON_SVG_EXPAND   + '</button>' +
         '<button class="cycle-float-btn" title="Свернуть все"   onclick="monitorCollapseAll(this)">' + MON_SVG_COLLAPSE + '</button>' +
-        '<button class="cycle-float-btn" title="Скопировать"    onclick="monitorCopy(this,\'' + esc(batch.batch_id) + '\')">' + MON_SVG_COPY + '</button>' +
+        '<button class="cycle-float-btn" title="Скопировать"    onclick="monitorCopy(this)">'         + MON_SVG_COPY + '</button>' +
       '</div>';
 
     return '<div class="monitor-batch bs-' + esc(bs) + '" data-bid="' + esc(batch.batch_id) + '" onclick="monitorToggleBatch(event,this)">' +
       '<div class="monitor-batch-header">' +
         '<span class="monitor-dot"></span>' +
         '<div class="monitor-batch-meta">' +
-          '<div class="monitor-batch-title">' + fmtMskShort(headTime) + '</div>' +
-          '<div class="monitor-batch-sub">'   + esc(sub)              + '</div>' +
+          '<div class="monitor-batch-title">' + fmtMsk(headTime) + '</div>' +
+          '<div class="monitor-batch-sub">'   + esc(sub)         + '</div>' +
         '</div>' +
+        hdrActions +
         '<span class="monitor-batch-arrow">▼</span>' +
       '</div>' +
-      '<div class="monitor-batch-body">' + floatBtns + logHtml + '</div>' +
+      '<div class="monitor-batch-body">' + logHtml + '</div>' +
     '</div>';
   }
 
@@ -2118,13 +2122,19 @@ setInterval(refreshLog, 4000);
       '</div>';
     }).join('');
 
+    const sysActions =
+      '<div class="monitor-hdr-actions" onclick="event.stopPropagation()">' +
+        '<button class="cycle-float-btn" title="Скопировать" onclick="monitorSysCopy(this)">' + MON_SVG_COPY + '</button>' +
+      '</div>';
+
     return '<div class="monitor-sysgroup" data-sg-key="' + esc(key) + '" onclick="monitorToggleSys(event,this)">' +
       '<div class="monitor-sysgroup-header">' +
         '<span class="monitor-sysgroup-dot"></span>' +
         '<div class="monitor-sysgroup-meta">' +
-          '<div class="monitor-sysgroup-title">' + fmtMskShort(headTime) + '</div>' +
-          '<div class="monitor-sysgroup-sub">'   + esc(sub)              + '</div>' +
+          '<div class="monitor-sysgroup-title">' + fmtMsk(headTime) + '</div>' +
+          '<div class="monitor-sysgroup-sub">'   + esc(sub)         + '</div>' +
         '</div>' +
+        sysActions +
         '<span class="monitor-sysgroup-arrow">▼</span>' +
       '</div>' +
       '<div class="monitor-sysgroup-body"><div class="monitor-sysgroup-items">' + rows + '</div></div>' +
@@ -2213,23 +2223,47 @@ setInterval(refreshLog, 4000);
   };
 
   window.monitorExpandAll = function(btn) {
-    const body = btn.closest('.monitor-batch-body');
-    if (!body) return;
-    body.querySelectorAll('.monitor-log-item').forEach(function(item) {
+    const batch = btn.closest('.monitor-batch');
+    if (!batch) return;
+    batch.querySelectorAll('.monitor-log-item').forEach(function(item) {
       if (item.querySelector('.monitor-entries')) item.classList.add('open');
     });
   };
 
   window.monitorCollapseAll = function(btn) {
-    const body = btn.closest('.monitor-batch-body');
-    if (!body) return;
-    body.querySelectorAll('.monitor-log-item.open').forEach(function(item) {
+    const batch = btn.closest('.monitor-batch');
+    if (!batch) return;
+    batch.querySelectorAll('.monitor-log-item.open').forEach(function(item) {
       item.classList.remove('open');
     });
   };
 
-  window.monitorCopy = function(btn, batchId) {
-    const body = btn.closest('.monitor-batch-body');
+  window.monitorSysCopy = function(btn) {
+    const sg = btn.closest('.monitor-sysgroup');
+    if (!sg) return;
+    var lines = [];
+    sg.querySelectorAll('.monitor-sysgroup-item').forEach(function(item) {
+      const ts  = item.querySelector('.monitor-sysgroup-ts')  ? item.querySelector('.monitor-sysgroup-ts').textContent.trim()  : '';
+      const pip = item.querySelector('.monitor-sysgroup-pip') ? item.querySelector('.monitor-sysgroup-pip').textContent.trim() : '';
+      const msg = item.querySelector('.monitor-sysgroup-msg') ? item.querySelector('.monitor-sysgroup-msg').textContent.trim() : '';
+      lines.push('[' + ts + '] ' + pip + ' ' + msg);
+    });
+    const text = lines.join('\n');
+    const doFlash = function() {
+      btn.classList.add('copied');
+      setTimeout(function() { btn.classList.remove('copied'); }, 2000);
+    };
+    navigator.clipboard.writeText(text).then(doFlash).catch(function() {
+      var ta = document.createElement('textarea');
+      ta.value = text; ta.style.cssText = 'position:fixed;opacity:0';
+      document.body.appendChild(ta); ta.select();
+      document.execCommand('copy'); document.body.removeChild(ta);
+      doFlash();
+    });
+  };
+
+  window.monitorCopy = function(btn) {
+    const body = btn.closest('.monitor-batch').querySelector('.monitor-batch-body');
     if (!body) return;
     var lines = [];
     body.querySelectorAll('.monitor-log-item').forEach(function(item) {
