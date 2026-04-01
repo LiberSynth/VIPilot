@@ -3,8 +3,6 @@ import time
 import threading
 import requests
 import subprocess
-import psycopg2
-import psycopg2.extras
 from collections import deque
 from datetime import datetime, timezone, timedelta
 from flask import (
@@ -18,6 +16,28 @@ from flask import (
     jsonify,
 )
 import hashlib
+import psycopg2.extras
+
+from db import (
+    init_db,
+    run_upgrades,
+    db_get,
+    db_set,
+    db_get_publish_times,
+    db_add_publish_time,
+    db_delete_publish_time,
+    db_save_cycle,
+    db_load_cycles,
+    db_trim_cycles,
+    db_trim_cycles_by_age,
+    db_clear_old_entries,
+    db_save_video_url,
+    db_get_random_video_url,
+    db_save_story,
+    get_active_model,
+    get_active_text_model,
+)
+from db.init import get_db
 
 FAL_KEY = os.environ["FAL_API_KEY"]
 VK_TOKEN = os.environ["VK_USER_TOKEN"]
@@ -38,77 +58,6 @@ VIDEO_VK_PATH = "/tmp/story_vk.mp4"
 
 MSK_OFFSET = timedelta(hours=3)
 
-
-def get_db():
-    return psycopg2.connect(os.environ["DATABASE_URL"])
-
-
-def db_get(key, default=""):
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT value FROM settings WHERE key = %s", (key,))
-                row = cur.fetchone()
-                return row[0] if row else default
-    except Exception as e:
-        log_msg(f"[DB] Ошибка чтения {key}: {e}", "error")
-        return default
-
-
-def db_set(key, value):
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    INSERT INTO settings (key, value) VALUES (%s, %s)
-                    ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
-                """,
-                    (key, value),
-                )
-            conn.commit()
-    except Exception as e:
-        log_msg(f"[DB] Ошибка записи {key}: {e}", "error")
-
-
-def db_get_publish_times():
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT id, time_utc FROM publish_times ORDER BY time_utc")
-                rows = cur.fetchall()
-        return [{"id": str(row[0]), "time_utc": row[1]} for row in rows]
-    except Exception as e:
-        print(f"[DB] Ошибка получения времён публикации: {e}")
-        return []
-
-
-def db_add_publish_time(time_utc):
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "INSERT INTO publish_times (time_utc) VALUES (%s) RETURNING id",
-                    (time_utc,),
-                )
-                row = cur.fetchone()
-            conn.commit()
-        return str(row[0])
-    except Exception as e:
-        print(f"[DB] Ошибка добавления времени публикации: {e}")
-        return None
-
-
-def db_delete_publish_time(time_id):
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute("DELETE FROM publish_times WHERE id = %s", (time_id,))
-            conn.commit()
-        return True
-    except Exception as e:
-        print(f"[DB] Ошибка удаления времени публикации: {e}")
-        return False
 
 
 def parse_hhmm(s):
@@ -149,265 +98,6 @@ def to_utc_from_msk(h, m):
     total = (h * 60 + m - 180) % 1440
     return total // 60, total % 60
 
-
-def init_db():
-    import json as _json
-
-    _fal_body = _json.dumps({"prompt": "{}", "duration": "{:d}s", "aspect_ratio": "{:d}:{:d}"})
-    _kling_body = _json.dumps({"prompt": "{}", "duration": "{:d}", "aspect_ratio": "{:d}:{:d}"})
-    _sora_body = _json.dumps({"prompt": "{}", "duration": "{int}", "aspect_ratio": "{:d}:{:d}"})
-    _text_body = _json.dumps({
-        "messages": [
-            {"role": "system", "content": "{}"},
-            {"role": "user", "content": "{}"},
-        ],
-        "temperature": 0.9,
-        "max_tokens": 300,
-    })
-
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    CREATE TABLE IF NOT EXISTS settings (
-                        key VARCHAR(100) PRIMARY KEY,
-                        value TEXT NOT NULL
-                    )
-                """)
-                cur.execute("""
-                    INSERT INTO settings (key, value) VALUES
-                        ('metaprompt', ''),
-                        ('system_prompt', ''),
-                        ('publish_time', '03:00'),
-                        ('lead_time_mins', '60'),
-                        ('notify_email', ''),
-                        ('notify_phone', ''),
-                        ('vk_publish_story', '1'),
-                        ('vk_publish_wall', '1'),
-                        ('aspect_ratio_x', '9'),
-                        ('aspect_ratio_y', '16'),
-                        ('video_duration', '6')
-                    ON CONFLICT (key) DO NOTHING
-                """)
-                cur.execute("""
-                    CREATE TABLE IF NOT EXISTS publish_times (
-                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                        time_utc VARCHAR(5) NOT NULL
-                    )
-                """)
-                cur.execute("SELECT COUNT(*) FROM publish_times")
-                if cur.fetchone()[0] == 0:
-                    cur.execute("SELECT value FROM settings WHERE key = 'publish_time'")
-                    _pt_row = cur.fetchone()
-                    _default_pt = _pt_row[0] if _pt_row else "03:00"
-                    cur.execute("INSERT INTO publish_times (time_utc) VALUES (%s)", (_default_pt,))
-
-                cur.execute("""
-                    CREATE TABLE IF NOT EXISTS video_urls (
-                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                        url TEXT NOT NULL UNIQUE,
-                        created_at FLOAT NOT NULL
-                    )
-                """)
-                cur.execute("""
-                    CREATE TABLE IF NOT EXISTS generated_stories (
-                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                        created_at FLOAT NOT NULL,
-                        model_id UUID NOT NULL REFERENCES models(id),
-                        result TEXT NOT NULL
-                    )
-                """)
-                cur.execute("""
-                    CREATE TABLE IF NOT EXISTS cycles (
-                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                        started TEXT NOT NULL,
-                        started_ts FLOAT NOT NULL,
-                        status TEXT NOT NULL,
-                        entries JSONB NOT NULL DEFAULT '[]',
-                        summary JSONB NOT NULL DEFAULT '{}'
-                    )
-                """)
-                cur.execute("""
-                    CREATE TABLE IF NOT EXISTS ai_platforms (
-                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                        name VARCHAR(200) NOT NULL,
-                        url VARCHAR(500) NOT NULL
-                    )
-                """)
-                cur.execute("""
-                    INSERT INTO ai_platforms (name, url)
-                    SELECT * FROM (VALUES
-                        ('OpenRouter', 'https://openrouter.ai/api/v1/chat/completions'),
-                        ('fal', 'https://queue.fal.run/fal-ai')
-                    ) AS v(name, url)
-                    WHERE NOT EXISTS (SELECT 1 FROM ai_platforms WHERE name = v.name)
-                """)
-                cur.execute("""
-                    CREATE TABLE IF NOT EXISTS models (
-                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                        name VARCHAR(200) NOT NULL,
-                        url VARCHAR(500) NOT NULL,
-                        body JSONB NOT NULL DEFAULT '{}',
-                        "order" INTEGER NOT NULL DEFAULT 0,
-                        active BOOLEAN NOT NULL DEFAULT FALSE,
-                        type SMALLINT NOT NULL DEFAULT 0,
-                        ai_platform_id UUID REFERENCES ai_platforms(id)
-                    )
-                """)
-                # Seed: видео-модели
-                cur.execute("SELECT COUNT(*) FROM models WHERE type = 0")
-                if cur.fetchone()[0] == 0:
-                    cur.executemany(
-                        'INSERT INTO models (name, url, body, "order", active, type, ai_platform_id) '
-                        "VALUES (%s, %s, %s::jsonb, %s, %s, 0, "
-                        "(SELECT id FROM ai_platforms WHERE name = 'fal'))",
-                        [
-                            ("veo2", "veo2", _fal_body, 1, True),
-                            ("minimax/video-01", "minimax/video-01", _fal_body, 2, False),
-                            ("kling-video/v1.6/standard", "kling-video/v1.6/standard/text-to-video", _kling_body, 3, False),
-                            ("sora-2", "sora-2/text-to-video", _sora_body, 4, False),
-                        ],
-                    )
-
-                # Seed: текстовые модели OpenRouter
-                for _name, _url, _order, _active in [
-                    ("qwen3.6-plus-preview", "qwen/qwen3.6-plus-preview:free", 1, True),
-                    ("llama-3.1-8b-instruct", "meta-llama/llama-3.1-8b-instruct:free", 2, False),
-                    ("mistral-7b-instruct", "mistralai/mistral-7b-instruct:free", 3, False),
-                ]:
-                    cur.execute("SELECT COUNT(*) FROM models WHERE name = %s", (_name,))
-                    if cur.fetchone()[0] == 0:
-                        cur.execute(
-                            'INSERT INTO models (name, url, body, "order", active, type, ai_platform_id) '
-                            "VALUES (%s, %s, %s::jsonb, %s, %s, 1, "
-                            "(SELECT id FROM ai_platforms WHERE name = 'OpenRouter'))",
-                            (_name, _url, _text_body, _order, _active),
-                        )
-
-            conn.commit()
-        print("[DB] Инициализация выполнена")
-    except Exception as e:
-        print(f"[DB] Ошибка инициализации: {e}")
-
-
-def db_save_cycle(cycle):
-    import json
-
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    INSERT INTO cycles (started, started_ts, status, entries, summary)
-                    VALUES (%s, %s, %s, %s, %s)
-                    RETURNING id
-                """,
-                    (
-                        cycle["started"],
-                        cycle["started_ts"],
-                        cycle["status"],
-                        json.dumps(cycle["entries"], ensure_ascii=False),
-                        json.dumps(cycle.get("summary", {}), ensure_ascii=False),
-                    ),
-                )
-                row = cur.fetchone()
-                cycle["db_id"] = row[0]
-            conn.commit()
-    except Exception as e:
-        log_msg(f"[DB] Ошибка сохранения цикла: {e}", "error")
-
-
-def db_load_cycles():
-    import json
-
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT id, started, started_ts, status, entries, summary
-                    FROM cycles ORDER BY started_ts DESC LIMIT 20
-                """)
-                rows = cur.fetchall()
-        result = []
-        for row in rows:
-            result.append(
-                {
-                    "db_id": row[0],
-                    "started": row[1],
-                    "started_ts": row[2],
-                    "status": row[3],
-                    "entries": row[4]
-                    if isinstance(row[4], list)
-                    else json.loads(row[4] or "[]"),
-                    "summary": row[5]
-                    if isinstance(row[5], dict)
-                    else json.loads(row[5] or "{}"),
-                }
-            )
-        return result
-    except Exception as e:
-        print(f"[DB] Ошибка загрузки циклов: {e}")
-        return []
-
-
-def db_trim_cycles(keep=20):
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    DELETE FROM cycles WHERE id NOT IN (
-                        SELECT id FROM cycles ORDER BY started_ts DESC LIMIT %s
-                    )
-                """,
-                    (keep,),
-                )
-            conn.commit()
-    except Exception as e:
-        print(f"[DB] Ошибка обрезки циклов: {e}")
-
-
-def db_trim_cycles_by_age():
-    """Delete cycle rows older than short_log_days from DB and in-memory state."""
-    days = parse_short_log_days(db_get("short_log_days", "365"))
-    cutoff = time.time() - days * 86400
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute("DELETE FROM cycles WHERE started_ts < %s", (cutoff,))
-            conn.commit()
-    except Exception as e:
-        print(f"[DB] Ошибка очистки краткого лога: {e}")
-    to_remove = [c for c in app_state["cycles"] if c.get("started_ts", 0) < cutoff]
-    for c in to_remove:
-        try:
-            app_state["cycles"].remove(c)
-        except ValueError:
-            pass
-
-
-def db_clear_old_entries():
-    """Clear entries[] for cycles older than history_days, keeping summary intact."""
-    days = parse_history_days(db_get("history_days", "7"))
-    cutoff = time.time() - days * 86400
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    UPDATE cycles SET entries = '[]'::jsonb
-                    WHERE started_ts < %s
-                      AND entries != '[]'::jsonb
-                    """,
-                    (cutoff,),
-                )
-            conn.commit()
-    except Exception as e:
-        print(f"[DB] Ошибка очистки детального лога: {e}")
-    # Also clear entries in the in-memory deque
-    for c in app_state["cycles"]:
-        if c.get("started_ts", 0) < cutoff:
-            c["entries"] = []
 
 
 app_state = {
@@ -454,8 +144,8 @@ def end_cycle(ok):
     app_state["current_cycle"] = None
     db_save_cycle(completed)
     db_trim_cycles(keep=20)
-    db_trim_cycles_by_age()
-    db_clear_old_entries()
+    db_trim_cycles_by_age(app_state["cycles"])
+    db_clear_old_entries(app_state["cycles"])
 
 
 def log_msg(msg, level="info"):
@@ -469,93 +159,6 @@ def log_msg(msg, level="info"):
 def is_emulation():
     return db_get("emulation_mode", "0") == "1"
 
-
-def db_save_video_url(url):
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT 1 FROM video_urls WHERE url = %s", (url,))
-                if cur.fetchone():
-                    return
-                cur.execute(
-                    "INSERT INTO video_urls (url, created_at) VALUES (%s, %s)",
-                    (url, time.time()),
-                )
-                cur.execute("SELECT COUNT(*) FROM video_urls")
-                count = cur.fetchone()[0]
-                if count > 50:
-                    cur.execute(
-                        "DELETE FROM video_urls WHERE id IN "
-                        "(SELECT id FROM video_urls ORDER BY created_at ASC LIMIT %s)",
-                        (count - 50,),
-                    )
-            conn.commit()
-    except Exception as e:
-        log_msg(f"[DB] Ошибка сохранения URL видео: {e}", "error")
-
-
-def db_get_random_video_url():
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT url FROM video_urls ORDER BY RANDOM() LIMIT 1")
-                row = cur.fetchone()
-                return row[0] if row else None
-    except Exception as e:
-        print(f"[DB] Ошибка получения URL видео: {e}")
-        return None
-
-
-def get_active_model():
-    """Returns (submit_url, body_template, platform_url, model_name) for the active video model, or (None, None, None, None)."""
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT p.url, vm.url, vm.body, vm.name
-                    FROM models vm
-                    JOIN ai_platforms p ON p.id = vm.ai_platform_id
-                    WHERE vm.active = TRUE AND vm.type = 0
-                    LIMIT 1
-                """)
-                row = cur.fetchone()
-        if not row:
-            return None, None, None, None
-        platform_url = row[0]
-        model_url = row[1]
-        body_tpl = row[2] if isinstance(row[2], dict) else {}
-        model_name = row[3]
-        submit_url = f"{platform_url}/{model_url}"
-        return submit_url, body_tpl, platform_url, model_name
-    except Exception as e:
-        log_msg(f"[DB] Ошибка получения активной модели: {e}", "error")
-        return None, None, None, None
-
-
-def get_active_text_model():
-    """Returns (api_url, model_id, body_tpl, model_name, model_uuid) for the active text model, or (None,None,None,None,None)."""
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT p.url, m.url, m.body, m.name, m.id
-                    FROM models m
-                    JOIN ai_platforms p ON p.id = m.ai_platform_id
-                    WHERE m.active = TRUE AND m.type = 1
-                    LIMIT 1
-                """)
-                row = cur.fetchone()
-        if not row:
-            return None, None, None, None, None
-        api_url = row[0]
-        model_id = row[1]
-        body_tpl = row[2] if isinstance(row[2], dict) else {}
-        model_name = row[3]
-        model_uuid = row[4]
-        return api_url, model_id, body_tpl, model_name, model_uuid
-    except Exception as e:
-        log_msg(f"[DB] Ошибка получения активной текстовой модели: {e}", "error")
-        return None, None, None, None, None
 
 
 def build_fal_body(body_tpl, prompt):
@@ -647,23 +250,6 @@ def transcode_video():
         app_state["current_cycle"]["summary"]["transcoded_at"] = msk_ts()
     return True
 
-
-def db_save_story(model_uuid, result):
-    """Save a generated story to the generated_stories table. Returns the new UUID or None."""
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "INSERT INTO generated_stories (created_at, model_id, result) "
-                    "VALUES (%s, %s, %s) RETURNING id",
-                    (time.time(), model_uuid, result),
-                )
-                row = cur.fetchone()
-            conn.commit()
-        return row[0] if row else None
-    except Exception as e:
-        log_msg(f"[DB] Ошибка сохранения сюжета: {e}", "error")
-        return None
 
 
 def generate_story():
@@ -1676,6 +1262,7 @@ def start_scheduler():
     if not _scheduler_started:
         _scheduler_started = True
         init_db()
+        run_upgrades()
         saved = db_load_cycles()
         for c in saved:
             app_state["cycles"].append(c)
