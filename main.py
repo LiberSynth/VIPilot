@@ -29,6 +29,7 @@ from db import (
     db_delete_schedule_slot,
     db_log_root,
     db_get_log,
+    db_get_monitor,
     db_save_cycle,
     db_load_cycles,
     db_trim_cycles,
@@ -981,6 +982,13 @@ def api_log():
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
     return jsonify(db_get_log())
+
+
+@flask_app.route("/api/monitor")
+def api_monitor():
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    return jsonify(db_get_monitor())
 
 
 @flask_app.route("/run-now", methods=["POST"])

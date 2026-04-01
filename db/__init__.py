@@ -8,8 +8,6 @@ from .db import (
     db_delete_schedule_slot,
     db_get_active_targets,
     db_ensure_batch,
-    db_log_root,
-    db_get_log,
     db_save_cycle,
     db_load_cycles,
     db_trim_cycles,
@@ -20,4 +18,11 @@ from .db import (
     db_save_story,
     get_active_model,
     get_active_text_model,
+)
+from log import (
+    db_log_pipeline,
+    db_log_entry,
+    db_log_root,
+    db_get_log,
+    db_get_monitor,
 )
