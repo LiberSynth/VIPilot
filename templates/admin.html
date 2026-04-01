@@ -261,7 +261,31 @@
     padding: 10px 0 6px; border-top: 1px solid #1e1e28;
     margin-top: 4px;
   }
+  .monitor-timeline { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
   .monitor-batch-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+
+  /* Системные события в ленте */
+  .monitor-sysgroup {
+    background: #111118;
+    border: 1px solid #1e1e2c;
+    border-radius: 10px;
+    overflow: hidden;
+    padding: 4px 0;
+  }
+  .monitor-sysgroup-item {
+    display: flex; align-items: baseline; gap: 8px;
+    padding: 4px 12px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 11px;
+  }
+  .monitor-sysgroup-item:not(:last-child) {
+    border-bottom: 1px solid #18181f;
+  }
+  .monitor-sysgroup-ts  { color: #444460; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+  .monitor-sysgroup-pip { color: #555570; flex-shrink: 0; }
+  .monitor-sysgroup-msg { color: #888898; flex: 1; word-break: break-word; }
+  .monitor-sysgroup-msg.error { color: #cc4040; }
+  .monitor-sysgroup-msg.ok    { color: #2a9e6a; }
   .monitor-batch {
     background: #1a1a24;
     border: 1px solid #2a2a38;
@@ -953,9 +977,7 @@
 
   <!-- ══ ИСТОРИЯ ══ -->
   <div id="panel-log" class="tab-panel">
-    <div id="monitor-batch-list" class="monitor-batch-list"></div>
-    <div class="monitor-section-label">Системные события</div>
-    <div id="monitor-sys-list" class="monitor-sys-list"></div>
+    <div id="monitor-timeline" class="monitor-timeline"></div>
     <div class="app-log-separator">Предыдущие циклы (старый формат)</div>
     <div id="cycle-list" class="cycle-list"></div>
   </div>
@@ -2017,40 +2039,60 @@ setInterval(refreshLog, 4000);
     '</div>';
   }
 
-  function renderSys(items) {
-    const el = document.getElementById('monitor-sys-list');
-    if (!el) return;
-    if (!items || items.length === 0) {
-      el.innerHTML = '<div style="font-size:12px;color:#444;padding:4px 0">Нет записей</div>';
-      return;
-    }
-    el.innerHTML = items.map(function(e) {
-      const st = e.status || 'info';
-      return '<div class="monitor-sys-item">' +
-        '<span class="monitor-sys-ts">'  + fmtTime(e.time_point) + '</span>' +
-        '<span class="monitor-sys-pip">' + esc(PIPELINE_LABELS[e.pipeline] || e.pipeline) + '</span>' +
-        '<span class="monitor-sys-msg ' + esc(st) + '">' + esc(e.message || '') + '</span>' +
-      '</div>';
-    }).join('');
+  function renderSysGroup(items) {
+    return '<div class="monitor-sysgroup">' +
+      items.map(function(e) {
+        const st = e.status || 'info';
+        return '<div class="monitor-sysgroup-item">' +
+          '<span class="monitor-sysgroup-ts">'  + fmtTime(e.time_point)                               + '</span>' +
+          '<span class="monitor-sysgroup-pip">' + esc(PIPELINE_LABELS[e.pipeline] || e.pipeline)      + '</span>' +
+          '<span class="monitor-sysgroup-msg '  + esc(st) + '">' + esc(e.message || '')               + '</span>' +
+        '</div>';
+      }).join('') +
+    '</div>';
   }
 
-  function renderBatches(batches) {
-    const el = document.getElementById('monitor-batch-list');
+  function buildTimeline(batches, system) {
+    var items = [];
+    (batches || []).forEach(function(b) {
+      items.push({ type: 'batch', time: b.created_at, data: b });
+    });
+    (system || []).forEach(function(s) {
+      items.push({ type: 'sys', time: s.time_point, data: s });
+    });
+    items.sort(function(a, b) { return new Date(b.time) - new Date(a.time); });
+
+    var groups = [];
+    var sysAccum = null;
+    items.forEach(function(item) {
+      if (item.type === 'sys') {
+        if (!sysAccum) { sysAccum = []; groups.push({ type: 'sysgroup', items: sysAccum }); }
+        sysAccum.push(item.data);
+      } else {
+        sysAccum = null;
+        groups.push({ type: 'batch', data: item.data });
+      }
+    });
+    return groups;
+  }
+
+  function renderTimeline(data) {
+    var el = document.getElementById('monitor-timeline');
     if (!el) return;
-    if (!batches || batches.length === 0) {
-      el.innerHTML = '<div style="font-size:12px;color:#444;padding:4px 0">Нет батчей</div>';
+    var groups = buildTimeline(data.batches, data.system);
+    if (groups.length === 0) {
+      el.innerHTML = '<div style="font-size:12px;color:#444;padding:4px 0">Нет данных</div>';
       return;
     }
-    el.innerHTML = batches.map(renderBatch).join('');
+    el.innerHTML = groups.map(function(g) {
+      return g.type === 'batch' ? renderBatch(g.data) : renderSysGroup(g.items);
+    }).join('');
   }
 
   function refreshMonitor() {
     fetch('/api/monitor')
       .then(function(r) { return r.json(); })
-      .then(function(data) {
-        renderBatches(data.batches);
-        renderSys(data.system);
-      })
+      .then(renderTimeline)
       .catch(function() {});
   }
 
