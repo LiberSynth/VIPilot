@@ -40,7 +40,7 @@ from db import (
 )
 from log import db_log_root, db_get_log, db_get_monitor
 from db.init import get_db
-from pipelines import planning
+from pipelines import planning, story
 
 FAL_KEY = os.environ["FAL_API_KEY"]
 VK_TOKEN = os.environ["VK_USER_TOKEN"]
@@ -1194,7 +1194,7 @@ def logout():
 def main_loop():
     _threads = {
         'planning':    None,
-        # 'story':       None,  # Pipeline 2 — генерация сюжетов
+        'story':       None,   # Pipeline 2 — генерация сюжетов
         # 'video':       None,  # Pipeline 3 — генерация видео
         # 'transcoding': None,  # Pipeline 4 — транскодирование
         # 'publishing':  None,  # Pipeline 5 — публикация
@@ -1212,10 +1212,12 @@ def main_loop():
                 )
                 _threads['planning'].start()
 
-            # Pipeline 2: Генерация сюжетов (заготовка)
-            # if _threads['story'] is None or not _threads['story'].is_alive():
-            #     _threads['story'] = threading.Thread(target=story.run, daemon=True)
-            #     _threads['story'].start()
+            # Pipeline 2: Генерация сюжетов
+            if _threads['story'] is None or not _threads['story'].is_alive():
+                _threads['story'] = threading.Thread(
+                    target=story.run, daemon=True
+                )
+                _threads['story'].start()
 
             # Pipeline 3: Генерация видео (заготовка)
             # if _threads['video'] is None or not _threads['video'].is_alive():

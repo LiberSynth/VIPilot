@@ -39,6 +39,20 @@ def db_log_entry(log_id, message, level='info'):
         print(f"[DB] Ошибка db_log_entry: {e}")
 
 
+def db_log_update(log_id, message, status):
+    """Обновляет message и status существующей записи лога."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE log SET message = %s, status = %s WHERE id = %s",
+                    (message, status, log_id),
+                )
+            conn.commit()
+    except Exception as e:
+        print(f"[DB] Ошибка db_log_update: {e}")
+
+
 def db_log_root(message, status='info'):
     """Системная запись уровня приложения (pipeline='root', без батча)."""
     return db_log_pipeline('root', message, status=status, batch_id=None)

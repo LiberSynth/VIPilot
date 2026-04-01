@@ -148,6 +148,96 @@ def db_ensure_batch(scheduled_at, target_id):
 
 
 # ---------------------------------------------------------------------------
+# Батчи — пайплайновые функции
+# ---------------------------------------------------------------------------
+
+def db_get_pending_batch():
+    """Возвращает первый батч со status='pending' и story_id IS NULL, или None."""
+    try:
+        with get_db() as conn:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute("""
+                    SELECT b.id, b.scheduled_at, b.target_id,
+                           t.name AS target_name,
+                           t.aspect_ratio_x, t.aspect_ratio_y
+                    FROM batches b
+                    JOIN targets t ON t.id = b.target_id
+                    WHERE b.status = 'pending' AND b.story_id IS NULL
+                    ORDER BY b.scheduled_at
+                    LIMIT 1
+                """)
+                row = cur.fetchone()
+        return dict(row) if row else None
+    except Exception as e:
+        print(f"[DB] Ошибка db_get_pending_batch: {e}")
+        return None
+
+
+def db_set_batch_story(batch_id, story_id):
+    """Привязывает story к батчу и переводит статус в 'story_ready'."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE batches SET story_id = %s, status = 'story_ready' WHERE id = %s",
+                    (story_id, batch_id),
+                )
+            conn.commit()
+        return True
+    except Exception as e:
+        print(f"[DB] Ошибка db_set_batch_story: {e}")
+        return False
+
+
+# ---------------------------------------------------------------------------
+# Истории (stories)
+# ---------------------------------------------------------------------------
+
+def db_create_story(model_id, result):
+    """Сохраняет сгенерированный сюжет в таблицу stories. Возвращает UUID или None."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO stories (model_id, result) VALUES (%s, %s) RETURNING id",
+                    (model_id, result),
+                )
+                row = cur.fetchone()
+            conn.commit()
+        return str(row[0]) if row else None
+    except Exception as e:
+        print(f"[DB] Ошибка db_create_story: {e}")
+        return None
+
+
+# ---------------------------------------------------------------------------
+# AI-модели (ai_models)
+# ---------------------------------------------------------------------------
+
+def db_get_active_text_model():
+    """Возвращает (platform_url, model_url, body_tpl, model_name, model_id)
+    для активной text-модели из таблицы ai_models, или все None."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT p.url, m.url, m.body, m.name, m.id
+                    FROM ai_models m
+                    JOIN ai_platforms p ON p.id = m.platform_id
+                    WHERE m.active = TRUE AND m.type = 'text'
+                    ORDER BY m."order"
+                    LIMIT 1
+                """)
+                row = cur.fetchone()
+        if not row:
+            return None, None, None, None, None
+        return row[0], row[1], row[2] if isinstance(row[2], dict) else {}, row[3], str(row[4])
+    except Exception as e:
+        print(f"[DB] Ошибка db_get_active_text_model: {e}")
+        return None, None, None, None, None
+
+
+# ---------------------------------------------------------------------------
 # Циклы
 # ---------------------------------------------------------------------------
 
