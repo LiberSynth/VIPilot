@@ -55,10 +55,10 @@ def run():
         batch_id = str(batch['id'])
         target   = batch['target_name']
 
-        if not db_is_batch_scheduled(batch['scheduled_at']):
+        if not db_is_batch_scheduled(batch['scheduled_at'], batch['target_id']):
             db_set_batch_obsolete(batch_id)
-            log_id = db_log_pipeline('story', 'Батч устарел — слот удалён из расписания',
-                                     status='прервана', batch_id=batch_id)
+            db_log_pipeline('story', 'Батч устарел — слот удалён из расписания или таргет отключён',
+                            status='прервана', batch_id=batch_id)
             print(f"[story] Батч {batch_id[:8]}… устарел, пропускаю")
             return
 

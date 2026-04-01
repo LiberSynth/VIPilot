@@ -136,9 +136,9 @@ def run():
         ar_y     = batch['aspect_ratio_y']
         story_id = str(batch['story_id'])
 
-        if not db_is_batch_scheduled(batch['scheduled_at']):
+        if not db_is_batch_scheduled(batch['scheduled_at'], batch['target_id']):
             db_set_batch_obsolete(batch_id)
-            db_log_pipeline('video', 'Батч устарел — слот удалён из расписания',
+            db_log_pipeline('video', 'Батч устарел — слот удалён из расписания или таргет отключён',
                             status='прервана', batch_id=batch_id)
             print(f"[video] Батч {batch_id[:8]}… устарел, пропускаю")
             return

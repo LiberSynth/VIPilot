@@ -287,22 +287,29 @@ def db_get_video_pending_batch():
         return None
 
 
-def db_is_batch_scheduled(scheduled_at):
-    """Проверяет, есть ли в расписании слот, совпадающий по времени с батчем.
-    scheduled_at — datetime или строка ISO (UTC). Возвращает True/False."""
+def db_is_batch_scheduled(scheduled_at, target_id):
+    """Проверяет актуальность батча: слот расписания существует И таргет активен.
+    Возвращает True если оба условия выполнены, False если хотя бы одно нарушено."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    SELECT EXISTS (
-                        SELECT 1 FROM schedule
-                        WHERE time_utc = to_char(%s::timestamptz AT TIME ZONE 'UTC', 'HH24:MI')
-                    )
+                    SELECT
+                        EXISTS (
+                            SELECT 1 FROM schedule
+                            WHERE time_utc = to_char(%s::timestamptz AT TIME ZONE 'UTC', 'HH24:MI')
+                        ) AS slot_ok,
+                        EXISTS (
+                            SELECT 1 FROM targets
+                            WHERE id = %s AND active = TRUE
+                        ) AS target_ok
                     """,
-                    (scheduled_at,),
+                    (scheduled_at, target_id),
                 )
-                return cur.fetchone()[0]
+                row = cur.fetchone()
+                slot_ok, target_ok = row
+                return slot_ok and target_ok
     except Exception as e:
         print(f"[DB] Ошибка db_is_batch_scheduled: {e}")
         return True  # безопасный fallback: не блокируем работу
