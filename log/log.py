@@ -175,7 +175,7 @@ def db_get_monitor(batch_limit=50):
                     WHERE l.batch_id IS NOT NULL
                     GROUP BY b.id, b.scheduled_at, b.status, b.created_at,
                              t.name, t.aspect_ratio_x, t.aspect_ratio_y
-                    ORDER BY MAX(l.time_point) DESC
+                    ORDER BY b.created_at DESC
                     LIMIT %s
                     """,
                     (batch_limit,),

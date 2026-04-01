@@ -2090,7 +2090,7 @@ setInterval(refreshLog, 4000);
     const bs   = batch.batch_status || 'pending';
     const logs = batch.logs || [];
 
-    const headTime = batch.last_event_at || batch.created_at;
+    const headTime = batch.created_at;
     const ratio = (batch.aspect_ratio_x && batch.aspect_ratio_y)
       ? batch.aspect_ratio_x + ':' + batch.aspect_ratio_y : '';
     const schedStr = fmtMskShort(batch.scheduled_at);
