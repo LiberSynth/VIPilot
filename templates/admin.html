@@ -806,41 +806,44 @@
         </div>
       </div>
 
-      <div class="service-section-label">Сроки хранения</div>
-
       <div class="card">
-        <div class="card-title">Подробный лог устаревает через</div>
-        <div class="hint">Подробные записи шагов пайплайна. Не может быть больше срока краткого лога.</div>
-        <div class="lead-row">
-          <input type="number" name="log_lifetime" id="log_lifetime" value="{{ log_lifetime }}" min="1" max="3650" step="1">
-          <span class="lead-unit">дней</span>
+        <div class="card-title">Сроки хранения</div>
+        <div class="hint">Насколько долго хранятся данные до автоматической очистки. Соблюдайте иерархию: подробный лог ≤ краткий лог ≤ история батчей.</div>
+
+        <div style="margin-top:14px">
+          <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block">Подробный лог</label>
+          <div class="lead-row">
+            <input type="number" name="log_lifetime" id="log_lifetime" value="{{ log_lifetime }}" min="1" max="3650" step="1">
+            <span class="lead-unit">дней</span>
+          </div>
+          <div class="hint" style="margin-top:5px">Подробные записи шагов пайплайна.</div>
         </div>
-      </div>
 
-      <div class="card">
-        <div class="card-title">Краткий лог устаревает через</div>
-        <div class="hint">Заголовки запусков пайплайна. Не меньше подробного и не больше срока истории батчей.</div>
-        <div class="lead-row">
-          <input type="number" name="short_log_lifetime" id="short_log_lifetime" value="{{ short_log_lifetime }}" min="1" max="3650" step="1">
-          <span class="lead-unit">дней</span>
+        <div style="margin-top:14px">
+          <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block">Краткий лог</label>
+          <div class="lead-row">
+            <input type="number" name="short_log_lifetime" id="short_log_lifetime" value="{{ short_log_lifetime }}" min="1" max="3650" step="1">
+            <span class="lead-unit">дней</span>
+          </div>
+          <div class="hint" style="margin-top:5px">Заголовки запусков пайплайна.</div>
         </div>
-      </div>
 
-      <div class="card">
-        <div class="card-title">История батчей устаревает через</div>
-        <div class="hint">Опубликованные и устаревшие батчи со связанными сюжетами. Не меньше срока краткого лога.</div>
-        <div class="lead-row">
-          <input type="number" name="batch_lifetime" id="batch_lifetime" value="{{ batch_lifetime }}" min="1" max="365" step="1">
-          <span class="lead-unit">дней</span>
+        <div style="margin-top:14px">
+          <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block">История батчей</label>
+          <div class="lead-row">
+            <input type="number" name="batch_lifetime" id="batch_lifetime" value="{{ batch_lifetime }}" min="1" max="365" step="1">
+            <span class="lead-unit">дней</span>
+          </div>
+          <div class="hint" style="margin-top:5px">Опубликованные и устаревшие батчи со связанными сюжетами.</div>
         </div>
-      </div>
 
-      <div class="card">
-        <div class="card-title">Файлы устаревают через</div>
-        <div class="hint">Перекодированные видеофайлы удаляются с диска через указанный срок после публикации.</div>
-        <div class="lead-row">
-          <input type="number" name="file_lifetime" id="file_lifetime" value="{{ file_lifetime }}" min="1" max="365" step="1">
-          <span class="lead-unit">дней</span>
+        <div style="margin-top:14px">
+          <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block">Видеофайлы на диске</label>
+          <div class="lead-row">
+            <input type="number" name="file_lifetime" id="file_lifetime" value="{{ file_lifetime }}" min="1" max="365" step="1">
+            <span class="lead-unit">дней</span>
+          </div>
+          <div class="hint" style="margin-top:5px">Перекодированные файлы удаляются с диска после публикации.</div>
         </div>
       </div>
 
