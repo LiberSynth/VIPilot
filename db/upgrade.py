@@ -16,6 +16,7 @@ def run_upgrades():
     _add_loop_interval()
     _log_batch_id_nullable()
     _batches_unique_constraint()
+    _rename_lifetime_settings()
 
 
 def _add_emulation_mode():
@@ -195,3 +196,30 @@ def _batches_unique_constraint():
             conn.commit()
     except Exception as e:
         print(f"[DB] Ошибка миграции _batches_unique_constraint: {e}")
+
+
+def _rename_lifetime_settings():
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE settings SET key = 'batch_lifetime'
+                    WHERE key = 'history_days'
+                      AND NOT EXISTS (SELECT 1 FROM settings WHERE key = 'batch_lifetime')
+                """)
+                cur.execute("""
+                    UPDATE settings SET key = 'short_log_lifetime'
+                    WHERE key = 'short_log_days'
+                      AND NOT EXISTS (SELECT 1 FROM settings WHERE key = 'short_log_lifetime')
+                """)
+                cur.execute("""
+                    INSERT INTO settings (key, value) VALUES ('log_lifetime', '30')
+                    ON CONFLICT (key) DO NOTHING
+                """)
+                cur.execute("""
+                    INSERT INTO settings (key, value) VALUES ('file_lifetime', '7')
+                    ON CONFLICT (key) DO NOTHING
+                """)
+            conn.commit()
+    except Exception as e:
+        print(f"[DB] Ошибка миграции _rename_lifetime_settings: {e}")

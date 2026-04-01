@@ -16,7 +16,12 @@ from db import (
 )
 from utils.consts import ADMIN_PASSWORD
 from utils.auth import is_authenticated, password_fingerprint
-from utils.utils import parse_history_days, parse_short_log_days
+from utils.utils import (
+    parse_batch_lifetime,
+    parse_short_log_lifetime,
+    parse_log_lifetime,
+    parse_file_lifetime,
+)
 
 bp = Blueprint("admin", __name__)
 
@@ -54,21 +59,25 @@ def admin_page():
         return redirect(url_for("admin.login"))
     metaprompt      = db_get("metaprompt", "")
     system_prompt   = db_get("system_prompt", "")
-    history_days    = parse_history_days(db_get("history_days", "7"))
-    short_log_days  = parse_short_log_days(db_get("short_log_days", "365"))
-    emulation_mode  = db_get("emulation_mode", "0") == "1"
-    notify_email    = db_get("notify_email", "")
-    notify_phone    = db_get("notify_phone", "")
-    vk_publish_story = db_get("vk_publish_story", "1") == "1"
-    vk_publish_wall  = db_get("vk_publish_wall",  "1") == "1"
-    video_duration  = max(1, min(60, int(db_get("video_duration", "6"))))
+    batch_lifetime     = parse_batch_lifetime(db_get("batch_lifetime", "7"))
+    short_log_lifetime = parse_short_log_lifetime(db_get("short_log_lifetime", "365"))
+    log_lifetime       = parse_log_lifetime(db_get("log_lifetime", "30"))
+    file_lifetime      = parse_file_lifetime(db_get("file_lifetime", "7"))
+    emulation_mode     = db_get("emulation_mode", "0") == "1"
+    notify_email       = db_get("notify_email", "")
+    notify_phone       = db_get("notify_phone", "")
+    vk_publish_story   = db_get("vk_publish_story", "1") == "1"
+    vk_publish_wall    = db_get("vk_publish_wall",  "1") == "1"
+    video_duration     = max(1, min(60, int(db_get("video_duration", "6"))))
 
     return render_template(
         "admin.html",
         metaprompt=metaprompt,
         system_prompt=system_prompt,
-        history_days=history_days,
-        short_log_days=short_log_days,
+        batch_lifetime=batch_lifetime,
+        short_log_lifetime=short_log_lifetime,
+        log_lifetime=log_lifetime,
+        file_lifetime=file_lifetime,
         emulation_mode=emulation_mode,
         notify_email=notify_email,
         notify_phone=notify_phone,
@@ -97,13 +106,21 @@ def save():
     else:
         db_set("metaprompt", metaprompt)
 
-    history_raw = request.form.get("history_days", "").strip()
-    if history_raw:
-        db_set("history_days", str(parse_history_days(history_raw)))
+    batch_lifetime_raw = request.form.get("batch_lifetime", "").strip()
+    if batch_lifetime_raw:
+        db_set("batch_lifetime", str(parse_batch_lifetime(batch_lifetime_raw)))
 
-    short_log_raw = request.form.get("short_log_days", "").strip()
-    if short_log_raw:
-        db_set("short_log_days", str(parse_short_log_days(short_log_raw)))
+    short_log_lifetime_raw = request.form.get("short_log_lifetime", "").strip()
+    if short_log_lifetime_raw:
+        db_set("short_log_lifetime", str(parse_short_log_lifetime(short_log_lifetime_raw)))
+
+    log_lifetime_raw = request.form.get("log_lifetime", "").strip()
+    if log_lifetime_raw:
+        db_set("log_lifetime", str(parse_log_lifetime(log_lifetime_raw)))
+
+    file_lifetime_raw = request.form.get("file_lifetime", "").strip()
+    if file_lifetime_raw:
+        db_set("file_lifetime", str(parse_file_lifetime(file_lifetime_raw)))
 
     emulation_raw = request.form.get("emulation_mode", "0")
     db_set("emulation_mode", "1" if emulation_raw == "1" else "0")

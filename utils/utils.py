@@ -6,18 +6,32 @@ def parse_hhmm(s):
         return 6, 0
 
 
-def parse_history_days(s):
+def parse_batch_lifetime(s):
     try:
         return max(1, min(365, int(s)))
     except Exception:
         return 7
 
 
-def parse_short_log_days(s):
+def parse_short_log_lifetime(s):
     try:
         return max(1, min(3650, int(s)))
     except Exception:
         return 365
+
+
+def parse_log_lifetime(s):
+    try:
+        return max(1, min(3650, int(s)))
+    except Exception:
+        return 30
+
+
+def parse_file_lifetime(s):
+    try:
+        return max(1, min(365, int(s)))
+    except Exception:
+        return 7
 
 
 def to_msk(h, m):

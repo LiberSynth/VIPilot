@@ -752,19 +752,37 @@
       </div>
 
       <div class="card">
-        <div class="card-title">Детальный лог хранить</div>
-        <div class="hint">После указанного срока подробные записи цикла удаляются. Краткая сводка остаётся до срока краткого лога.</div>
+        <div class="card-title">Подробный лог устаревает через</div>
+        <div class="hint">После указанного срока подробные записи шагов пайплайна удаляются. Краткая сводка остаётся до срока краткого лога.</div>
         <div class="lead-row">
-          <input type="number" name="history_days" id="history_days" value="{{ history_days }}" min="1" max="365" step="1">
+          <input type="number" name="log_lifetime" id="log_lifetime" value="{{ log_lifetime }}" min="1" max="3650" step="1">
           <span class="lead-unit">дней</span>
         </div>
       </div>
 
       <div class="card">
-        <div class="card-title">Краткий лог хранить</div>
-        <div class="hint">После указанного срока записи цикла полностью удаляются из базы.</div>
+        <div class="card-title">Краткий лог устаревает через</div>
+        <div class="hint">После указанного срока записи пайплайна полностью удаляются из базы.</div>
         <div class="lead-row">
-          <input type="number" name="short_log_days" id="short_log_days" value="{{ short_log_days }}" min="1" max="3650" step="1">
+          <input type="number" name="short_log_lifetime" id="short_log_lifetime" value="{{ short_log_lifetime }}" min="1" max="3650" step="1">
+          <span class="lead-unit">дней</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">История батчей устаревает через</div>
+        <div class="hint">Опубликованные и устаревшие батчи вместе со связанными сюжетами удаляются через указанный срок.</div>
+        <div class="lead-row">
+          <input type="number" name="batch_lifetime" id="batch_lifetime" value="{{ batch_lifetime }}" min="1" max="365" step="1">
+          <span class="lead-unit">дней</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Файлы устаревают через</div>
+        <div class="hint">Перекодированные видеофайлы удаляются с диска через указанный срок после публикации.</div>
+        <div class="lead-row">
+          <input type="number" name="file_lifetime" id="file_lifetime" value="{{ file_lifetime }}" min="1" max="365" step="1">
           <span class="lead-unit">дней</span>
         </div>
       </div>
@@ -884,8 +902,10 @@ function collectAllSettings(activeTab) {
   data.set('vk_publish_wall',  v('vk_wall_pub_hidden'));
   data.set('notify_email',    v('notify_email'));
   data.set('notify_phone',    v('notify_phone'));
-  data.set('history_days',    v('history_days'));
-  data.set('short_log_days',  v('short_log_days'));
+  data.set('log_lifetime',        v('log_lifetime'));
+  data.set('short_log_lifetime',  v('short_log_lifetime'));
+  data.set('batch_lifetime',      v('batch_lifetime'));
+  data.set('file_lifetime',       v('file_lifetime'));
   data.set('emulation_mode',  v('emulation_hidden'));
   return data;
 }
@@ -976,8 +996,10 @@ function scheduleServiceSave() {
   const fields = [
     document.getElementById('notify_email'),
     document.getElementById('notify_phone'),
-    document.getElementById('history_days'),
-    document.getElementById('short_log_days'),
+    document.getElementById('log_lifetime'),
+    document.getElementById('short_log_lifetime'),
+    document.getElementById('batch_lifetime'),
+    document.getElementById('file_lifetime'),
   ].filter(Boolean);
   fields.forEach(f => {
     f.addEventListener('input', scheduleServiceSave);
