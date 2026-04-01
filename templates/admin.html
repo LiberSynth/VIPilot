@@ -582,7 +582,7 @@
   </div>
   <nav class="sidebar-nav">
     <button class="sidebar-item active" data-panel="pipeline" onclick="switchPanel('pipeline')">
-      <span class="sidebar-item-icon">▶</span>Пайплайн
+      <span class="sidebar-item-icon">▶</span>Управление
     </button>
     <button class="sidebar-item" data-panel="story" onclick="switchPanel('story')">
       <span class="sidebar-item-icon">✍</span>Генерация сюжета
@@ -609,7 +609,7 @@
         <span></span><span></span><span></span>
       </button>
       <div class="header-icon">🎬</div>
-      <h1 id="page-title">Пайплайн</h1>
+      <h1 id="page-title">Управление</h1>
     </div>
     <div class="header-right">
       <a href="/logout" class="logout">Выйти</a>
@@ -656,7 +656,7 @@
 
     <form id="settings-form" style="margin-top:0">
       <div class="card" style="margin-top:12px">
-        <div class="card-title">Время публикации <span class="tz-badge">МСК</span></div>
+        <div class="card-title">Расписание <span class="tz-badge">МСК</span></div>
         <div class="hint">Видео публикуется в указанные моменты по Москве. Можно задать несколько.</div>
         <div id="schedule-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px;"></div>
         <div class="pt-add-row">
@@ -665,14 +665,6 @@
         </div>
       </div>
 
-      <div class="card">
-        <div class="card-title">Упреждения генерации</div>
-        <div class="hint">За сколько минут до публикации запрашивать генерацию видео у модели. Если до публикации осталось меньше — стартует немедленно.</div>
-        <div class="lead-row">
-          <input type="number" id="lead_time_mins" name="lead_time_mins" value="{{ lead_time_mins }}" min="10" max="1440" step="10">
-          <span class="lead-unit">минут</span>
-        </div>
-      </div>
     </form>
 
   </div>
@@ -853,7 +845,7 @@
 
 <script>
 const PANEL_TITLES = {
-  pipeline: 'Пайплайн',
+  pipeline: 'Управление',
   story:    'Генерация сюжета',
   request:  'Генерация видео',
   publish:  'Публикация',
