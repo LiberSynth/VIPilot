@@ -753,7 +753,7 @@
 
       <div class="card">
         <div class="card-title">Подробный лог устаревает через</div>
-        <div class="hint">После указанного срока подробные записи шагов пайплайна удаляются. Краткая сводка остаётся до срока краткого лога.</div>
+        <div class="hint">Подробные записи шагов пайплайна. Не может быть больше срока краткого лога.</div>
         <div class="lead-row">
           <input type="number" name="log_lifetime" id="log_lifetime" value="{{ log_lifetime }}" min="1" max="3650" step="1">
           <span class="lead-unit">дней</span>
@@ -762,7 +762,7 @@
 
       <div class="card">
         <div class="card-title">Краткий лог устаревает через</div>
-        <div class="hint">После указанного срока записи пайплайна полностью удаляются из базы.</div>
+        <div class="hint">Заголовки запусков пайплайна. Не меньше подробного и не больше срока истории батчей.</div>
         <div class="lead-row">
           <input type="number" name="short_log_lifetime" id="short_log_lifetime" value="{{ short_log_lifetime }}" min="1" max="3650" step="1">
           <span class="lead-unit">дней</span>
@@ -771,7 +771,7 @@
 
       <div class="card">
         <div class="card-title">История батчей устаревает через</div>
-        <div class="hint">Опубликованные и устаревшие батчи вместе со связанными сюжетами удаляются через указанный срок.</div>
+        <div class="hint">Опубликованные и устаревшие батчи со связанными сюжетами. Не меньше срока краткого лога.</div>
         <div class="lead-row">
           <input type="number" name="batch_lifetime" id="batch_lifetime" value="{{ batch_lifetime }}" min="1" max="365" step="1">
           <span class="lead-unit">дней</span>
@@ -992,6 +992,26 @@ function scheduleServiceSave() {
   _serviceSaveTimer = setTimeout(saveServiceSettings, 800);
 }
 
+function constrainLifetimes(changed) {
+  const ll  = document.getElementById('log_lifetime');
+  const sll = document.getElementById('short_log_lifetime');
+  const bl  = document.getElementById('batch_lifetime');
+  if (!ll || !sll || !bl) return;
+  let v_ll  = parseInt(ll.value)  || 1;
+  let v_sll = parseInt(sll.value) || 1;
+  let v_bl  = parseInt(bl.value)  || 1;
+  if (changed === 'log_lifetime') {
+    if (v_ll > v_sll) { v_sll = v_ll; sll.value = v_sll; }
+    if (v_bl < v_sll) { v_bl  = v_sll; bl.value  = v_bl;  }
+  } else if (changed === 'short_log_lifetime') {
+    if (v_ll  > v_sll) { v_ll  = v_sll; ll.value  = v_ll;  }
+    if (v_bl  < v_sll) { v_bl  = v_sll; bl.value  = v_bl;  }
+  } else if (changed === 'batch_lifetime') {
+    if (v_bl < v_sll) { v_sll = v_bl; sll.value = v_sll; }
+    if (v_ll > v_sll) { v_ll  = v_sll; ll.value  = v_ll;  }
+  }
+}
+
 (function() {
   const fields = [
     document.getElementById('notify_email'),
@@ -1005,6 +1025,14 @@ function scheduleServiceSave() {
     f.addEventListener('input', scheduleServiceSave);
     f.addEventListener('change', scheduleServiceSave);
   });
+
+  ['log_lifetime', 'short_log_lifetime', 'batch_lifetime'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('change', () => { constrainLifetimes(id); scheduleServiceSave(); });
+    el.addEventListener('input',  () =>   constrainLifetimes(id));
+  });
+
   const emulChk = document.getElementById('emulation_check');
   if (emulChk) emulChk.addEventListener('change', scheduleServiceSave);
 })();

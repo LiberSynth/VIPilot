@@ -106,19 +106,21 @@ def save():
     else:
         db_set("metaprompt", metaprompt)
 
-    batch_lifetime_raw = request.form.get("batch_lifetime", "").strip()
-    if batch_lifetime_raw:
-        db_set("batch_lifetime", str(parse_batch_lifetime(batch_lifetime_raw)))
-
+    log_lifetime_raw       = request.form.get("log_lifetime",       "").strip()
     short_log_lifetime_raw = request.form.get("short_log_lifetime", "").strip()
-    if short_log_lifetime_raw:
-        db_set("short_log_lifetime", str(parse_short_log_lifetime(short_log_lifetime_raw)))
+    batch_lifetime_raw     = request.form.get("batch_lifetime",     "").strip()
+    file_lifetime_raw      = request.form.get("file_lifetime",      "").strip()
 
-    log_lifetime_raw = request.form.get("log_lifetime", "").strip()
-    if log_lifetime_raw:
-        db_set("log_lifetime", str(parse_log_lifetime(log_lifetime_raw)))
+    if log_lifetime_raw or short_log_lifetime_raw or batch_lifetime_raw:
+        ll  = parse_log_lifetime(log_lifetime_raw       or db_get("log_lifetime",       "30"))
+        sll = parse_short_log_lifetime(short_log_lifetime_raw or db_get("short_log_lifetime", "365"))
+        bl  = parse_batch_lifetime(batch_lifetime_raw   or db_get("batch_lifetime",     "7"))
+        ll  = min(ll,  sll)
+        bl  = max(bl,  sll)
+        db_set("log_lifetime",       str(ll))
+        db_set("short_log_lifetime", str(sll))
+        db_set("batch_lifetime",     str(bl))
 
-    file_lifetime_raw = request.form.get("file_lifetime", "").strip()
     if file_lifetime_raw:
         db_set("file_lifetime", str(parse_file_lifetime(file_lifetime_raw)))
 
