@@ -6,6 +6,8 @@ from .db import (
     db_get_schedule,
     db_add_schedule_slot,
     db_delete_schedule_slot,
+    db_get_active_targets,
+    db_ensure_batch,
     db_log_root,
     db_get_log,
     db_save_cycle,

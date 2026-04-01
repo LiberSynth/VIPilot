@@ -16,6 +16,7 @@ def run_upgrades():
     _create_log_entries()
     _add_loop_interval()
     _log_batch_id_nullable()
+    _batches_unique_constraint()
 
 
 def _add_emulation_mode():
@@ -190,3 +191,24 @@ def _log_batch_id_nullable():
             conn.commit()
     except Exception as e:
         print(f"[DB] Ошибка миграции _log_batch_id_nullable: {e}")
+
+
+def _batches_unique_constraint():
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT EXISTS (
+                        SELECT 1 FROM pg_constraint
+                        WHERE conname = 'batches_scheduled_at_target_id_key'
+                    )
+                """)
+                if not cur.fetchone()[0]:
+                    cur.execute("""
+                        ALTER TABLE batches
+                        ADD CONSTRAINT batches_scheduled_at_target_id_key
+                        UNIQUE (scheduled_at, target_id)
+                    """)
+            conn.commit()
+    except Exception as e:
+        print(f"[DB] Ошибка миграции _batches_unique_constraint: {e}")

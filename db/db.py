@@ -101,6 +101,53 @@ def db_delete_schedule_slot(slot_id):
 
 
 # ---------------------------------------------------------------------------
+# Таргеты
+# ---------------------------------------------------------------------------
+
+def db_get_active_targets():
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT id, name, aspect_ratio_x, aspect_ratio_y FROM targets WHERE active = TRUE"
+                )
+                rows = cur.fetchall()
+        return [
+            {"id": str(row[0]), "name": row[1], "aspect_ratio_x": row[2], "aspect_ratio_y": row[3]}
+            for row in rows
+        ]
+    except Exception as e:
+        print(f"[DB] Ошибка db_get_active_targets: {e}")
+        return []
+
+
+# ---------------------------------------------------------------------------
+# Батчи
+# ---------------------------------------------------------------------------
+
+def db_ensure_batch(scheduled_at, target_id):
+    """Создаёт батч если не существует. Возвращает True если создан, False если уже был."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO batches (scheduled_at, target_id)
+                    VALUES (%s, %s)
+                    ON CONFLICT (scheduled_at, target_id) DO NOTHING
+                    RETURNING id
+                    """,
+                    (scheduled_at, target_id),
+                )
+                created = cur.fetchone() is not None
+            conn.commit()
+        return created
+    except Exception as e:
+        print(f"[DB] Ошибка db_ensure_batch: {e}")
+        return False
+
+
+# ---------------------------------------------------------------------------
 # Лог уровня приложения (без батча)
 # ---------------------------------------------------------------------------
 
