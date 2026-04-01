@@ -120,6 +120,55 @@ def db_log_root(message, status='info'):
         print(f"[DB] Ошибка db_log_root: {e}")
 
 
+def db_get_log(limit=200):
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT
+                        l.id,
+                        l.batch_id,
+                        l.pipeline,
+                        l.message,
+                        l.status,
+                        l.time_point,
+                        COALESCE(
+                            json_agg(
+                                json_build_object(
+                                    'message', le.message,
+                                    'level',   le.level,
+                                    'time_point', le.time_point
+                                ) ORDER BY le.time_point
+                            ) FILTER (WHERE le.id IS NOT NULL),
+                            '[]'
+                        ) AS entries
+                    FROM log l
+                    LEFT JOIN log_entries le ON le.log_id = l.id
+                    GROUP BY l.id
+                    ORDER BY l.time_point DESC
+                    LIMIT %s
+                    """,
+                    (limit,),
+                )
+                rows = cur.fetchall()
+        return [
+            {
+                "id":         str(row[0]),
+                "batch_id":   str(row[1]) if row[1] else None,
+                "pipeline":   row[2],
+                "message":    row[3],
+                "status":     row[4],
+                "time_point": row[5].isoformat() if row[5] else None,
+                "entries":    row[6],
+            }
+            for row in rows
+        ]
+    except Exception as e:
+        print(f"[DB] Ошибка db_get_log: {e}")
+        return []
+
+
 # ---------------------------------------------------------------------------
 # Циклы
 # ---------------------------------------------------------------------------

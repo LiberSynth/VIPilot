@@ -256,6 +256,35 @@
   .btn-secondary:disabled { opacity: .4; cursor: default; }
 
   /* ── Cycle cards ── */
+  .app-log-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+  .app-log-item {
+    display: grid;
+    grid-template-columns: 140px 80px 70px 1fr;
+    align-items: baseline;
+    gap: 8px;
+    padding: 7px 12px;
+    background: #1a1a24;
+    border: 1px solid #2a2a38;
+    border-radius: 10px;
+    font-size: 12px;
+  }
+  .app-log-item.status-error  { border-color: rgba(255,80,80,.35); }
+  .app-log-item.status-info   { border-color: rgba(62,207,142,.2); }
+  .app-log-time   { color: #666; font-variant-numeric: tabular-nums; }
+  .app-log-pipeline { color: #888; }
+  .app-log-status { font-weight: 600; }
+  .app-log-status.ok,
+  .app-log-status.info   { color: #3ecf8e; }
+  .app-log-status.error  { color: #ff5050; }
+  .app-log-msg    { color: #ccc; }
+  .app-log-separator {
+    font-size: 11px;
+    color: #444;
+    text-align: center;
+    padding: 10px 0 6px;
+    border-top: 1px solid #222;
+    margin-top: 4px;
+  }
   .cycle-list { display: flex; flex-direction: column; gap: 10px; }
 
   .cycle-card {
@@ -838,6 +867,8 @@
 
   <!-- ══ ИСТОРИЯ ══ -->
   <div id="panel-log" class="tab-panel">
+    <div id="app-log-list" class="app-log-list"></div>
+    <div class="app-log-separator">Предыдущие циклы (старый формат)</div>
     <div id="cycle-list" class="cycle-list"></div>
   </div>
 
@@ -1796,6 +1827,58 @@ async function refreshLog() {
 
 refreshLog();
 setInterval(refreshLog, 4000);
+
+// ── App log (новые таблицы) ──
+(function() {
+  const PIPELINE_LABELS = {
+    root:        'система',
+    planning:    'планирование',
+    story:       'сюжет',
+    video:       'видео',
+    transcoding: 'транскодирование',
+    publishing:  'публикация',
+    cleanup:     'очистка',
+  };
+
+  function fmtTime(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    return d.toLocaleString('ru-RU', {
+      day: '2-digit', month: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+    });
+  }
+
+  function renderAppLog(entries) {
+    const container = document.getElementById('app-log-list');
+    if (!container) return;
+    if (!entries || entries.length === 0) {
+      container.innerHTML = '<div style="font-size:12px;color:#444;padding:6px 0">Нет записей</div>';
+      return;
+    }
+    container.innerHTML = entries.map(function(e) {
+      const statusClass = 'status-' + (e.status || 'info');
+      const statusLabel = e.status || 'info';
+      const pipeline    = PIPELINE_LABELS[e.pipeline] || e.pipeline;
+      return '<div class="app-log-item ' + statusClass + '">' +
+        '<span class="app-log-time">'    + fmtTime(e.time_point)   + '</span>' +
+        '<span class="app-log-pipeline">' + pipeline               + '</span>' +
+        '<span class="app-log-status '  + statusLabel + '">' + statusLabel + '</span>' +
+        '<span class="app-log-msg">'    + (e.message || '')        + '</span>' +
+      '</div>';
+    }).join('');
+  }
+
+  function refreshAppLog() {
+    fetch('/api/log')
+      .then(function(r) { return r.json(); })
+      .then(renderAppLog)
+      .catch(function() {});
+  }
+
+  refreshAppLog();
+  setInterval(refreshAppLog, 5000);
+})();
 
 // ── Schedule management ──
 (function() {

@@ -28,6 +28,7 @@ from db import (
     db_add_schedule_slot,
     db_delete_schedule_slot,
     db_log_root,
+    db_get_log,
     db_save_cycle,
     db_load_cycles,
     db_trim_cycles,
@@ -973,6 +974,13 @@ def log_data():
             "cycles": cycles,
         }
     )
+
+
+@flask_app.route("/api/log")
+def api_log():
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    return jsonify(db_get_log())
 
 
 @flask_app.route("/run-now", methods=["POST"])
