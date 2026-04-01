@@ -2037,7 +2037,7 @@ setInterval(refreshLog, 4000);
     const pip = PIPELINE_LABELS[log.pipeline] || log.pipeline;
     const hasEntries = log.entries && log.entries.length > 0;
     const chevron = hasEntries ? '<span class="monitor-log-chevron">▼</span>' : '';
-    return '<div class="monitor-log-item" onclick="monitorToggleLog(this)">' +
+    return '<div class="monitor-log-item" onclick="monitorToggleLog(event,this)">' +
       '<div class="monitor-log-header">' +
         '<span class="monitor-log-ts">'       + fmtMsk(log.time_point)                        + '</span>' +
         '<span class="monitor-log-pipeline">' + esc(pip)                                      + '</span>' +
@@ -2247,7 +2247,8 @@ setInterval(refreshLog, 4000);
     });
   };
 
-  window.monitorToggleLog = function(el) {
+  window.monitorToggleLog = function(e, el) {
+    e.stopPropagation();
     if (el.querySelector('.monitor-entries')) el.classList.toggle('open');
   };
 
