@@ -23,9 +23,9 @@ from db import (
     run_upgrades,
     db_get,
     db_set,
-    db_get_publish_times,
-    db_add_publish_time,
-    db_delete_publish_time,
+    db_get_schedule,
+    db_add_schedule_slot,
+    db_delete_schedule_slot,
     db_save_cycle,
     db_load_cycles,
     db_trim_cycles,
@@ -776,7 +776,7 @@ def scheduler_loop():
 
     while True:
         lead_mins = parse_lead_mins(db_get("lead_time_mins", "120"))
-        publish_times = db_get_publish_times()
+        publish_times = db_get_schedule()
 
         now_utc = datetime.now(timezone.utc)
         today = now_utc.date()
@@ -1087,11 +1087,11 @@ def test_notify():
     return redirect(url_for("admin"))
 
 
-@flask_app.route("/api/publish-times", methods=["GET"])
-def api_get_publish_times():
+@flask_app.route("/api/schedule", methods=["GET"])
+def api_get_schedule():
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
-    times = db_get_publish_times()
+    times = db_get_schedule()
     result = []
     for t in times:
         h, m = parse_hhmm(t["time_utc"])
@@ -1100,8 +1100,8 @@ def api_get_publish_times():
     return jsonify(result)
 
 
-@flask_app.route("/api/publish-times", methods=["POST"])
-def api_add_publish_time():
+@flask_app.route("/api/schedule", methods=["POST"])
+def api_add_schedule_slot():
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
     data = request.get_json()
@@ -1111,17 +1111,17 @@ def api_add_publish_time():
     h_msk, m_msk = parse_hhmm(time_msk)
     h_utc, m_utc = to_utc_from_msk(h_msk, m_msk)
     time_utc = f"{h_utc:02d}:{m_utc:02d}"
-    new_id = db_add_publish_time(time_utc)
+    new_id = db_add_schedule_slot(time_utc)
     if new_id is None:
         return jsonify({"error": "db error"}), 500
     return jsonify({"id": new_id, "time_msk": f"{h_msk:02d}:{m_msk:02d}"})
 
 
-@flask_app.route("/api/publish-times/<time_id>", methods=["DELETE"])
-def api_delete_publish_time(time_id):
+@flask_app.route("/api/schedule/<slot_id>", methods=["DELETE"])
+def api_delete_schedule_slot(slot_id):
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
-    ok = db_delete_publish_time(time_id)
+    ok = db_delete_schedule_slot(slot_id)
     return jsonify({"ok": ok})
 
 

@@ -658,10 +658,10 @@
       <div class="card" style="margin-top:12px">
         <div class="card-title">Время публикации <span class="tz-badge">МСК</span></div>
         <div class="hint">Видео публикуется в указанные моменты по Москве. Можно задать несколько.</div>
-        <div id="publish-times-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px;"></div>
+        <div id="schedule-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px;"></div>
         <div class="pt-add-row">
-          <input type="time" id="new-publish-time" class="pt-time-input">
-          <button type="button" class="pt-btn-add" id="pt-save-btn" onclick="addPublishTime()" disabled>Сохранить</button>
+          <input type="time" id="new-schedule-time" class="pt-time-input">
+          <button type="button" class="pt-btn-add" id="pt-save-btn" onclick="addScheduleSlot()" disabled>Сохранить</button>
         </div>
       </div>
 
@@ -1805,10 +1805,10 @@ async function refreshLog() {
 refreshLog();
 setInterval(refreshLog, 4000);
 
-// ── Publish times management ──
+// ── Schedule management ──
 (function() {
-  function renderPublishTimes(times) {
-    const list = document.getElementById('publish-times-list');
+  function renderSchedule(times) {
+    const list = document.getElementById('schedule-list');
     if (!list) return;
     list.innerHTML = '';
     if (!times || times.length === 0) {
@@ -1823,54 +1823,54 @@ setInterval(refreshLog, 4000);
       row.dataset.id = t.id;
       row.innerHTML =
         '<div class="pt-val-box">' + t.time_msk + '</div>' +
-        '<button type="button" class="pt-btn-remove" onclick="deletePublishTime(this,\'' + t.id + '\')">Удалить</button>';
+        '<button type="button" class="pt-btn-remove" onclick="deleteScheduleSlot(this,\'' + t.id + '\')">Удалить</button>';
       list.appendChild(row);
     });
   }
 
-  function loadPublishTimes() {
-    return fetch('/api/publish-times')
+  function loadSchedule() {
+    return fetch('/api/schedule')
       .then(function(r) { return r.json(); })
-      .then(renderPublishTimes)
+      .then(renderSchedule)
       .catch(function() {});
   }
 
   function updateSaveBtn() {
-    const input = document.getElementById('new-publish-time');
+    const input = document.getElementById('new-schedule-time');
     const btn = document.getElementById('pt-save-btn');
     if (btn) btn.disabled = !input || !input.value;
   }
 
-  function addPublishTime() {
-    const input = document.getElementById('new-publish-time');
+  function addScheduleSlot() {
+    const input = document.getElementById('new-schedule-time');
     const btn = document.getElementById('pt-save-btn');
     if (!input || !input.value) return;
     const val = input.value;
     input.value = '';
     if (btn) btn.disabled = true;
-    fetch('/api/publish-times', {
+    fetch('/api/schedule', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({time: val})
     })
       .then(function(r) { return r.json(); })
-      .then(function() { return loadPublishTimes(); })
+      .then(function() { return loadSchedule(); })
       .catch(function() {});
   }
 
-  window.addPublishTime = addPublishTime;
+  window.addScheduleSlot = addScheduleSlot;
 
-  window.deletePublishTime = function(btn, id) {
+  window.deleteScheduleSlot = function(btn, id) {
     btn.disabled = true;
-    fetch('/api/publish-times/' + id, {method: 'DELETE'})
+    fetch('/api/schedule/' + id, {method: 'DELETE'})
       .then(function(r) { return r.json(); })
-      .then(function() { return loadPublishTimes(); })
+      .then(function() { return loadSchedule(); })
       .catch(function() {});
   };
 
   // Enable/disable save button based on input completeness
   (function() {
-    const input = document.getElementById('new-publish-time');
+    const input = document.getElementById('new-schedule-time');
     if (input) input.addEventListener('input', updateSaveBtn);
   })();
 

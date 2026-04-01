@@ -60,43 +60,43 @@ def db_set(key, value):
 # Расписание публикаций
 # ---------------------------------------------------------------------------
 
-def db_get_publish_times():
+def db_get_schedule():
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
-                cur.execute("SELECT id, time_utc FROM publish_times ORDER BY time_utc")
+                cur.execute("SELECT id, time_utc FROM schedule ORDER BY time_utc")
                 rows = cur.fetchall()
         return [{"id": str(row[0]), "time_utc": row[1]} for row in rows]
     except Exception as e:
-        print(f"[DB] Ошибка получения времён публикации: {e}")
+        print(f"[DB] Ошибка получения расписания: {e}")
         return []
 
 
-def db_add_publish_time(time_utc):
+def db_add_schedule_slot(time_utc):
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "INSERT INTO publish_times (time_utc) VALUES (%s) RETURNING id",
+                    "INSERT INTO schedule (time_utc) VALUES (%s) RETURNING id",
                     (time_utc,),
                 )
                 row = cur.fetchone()
             conn.commit()
         return str(row[0])
     except Exception as e:
-        print(f"[DB] Ошибка добавления времени публикации: {e}")
+        print(f"[DB] Ошибка добавления слота расписания: {e}")
         return None
 
 
-def db_delete_publish_time(time_id):
+def db_delete_schedule_slot(slot_id):
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
-                cur.execute("DELETE FROM publish_times WHERE id = %s", (time_id,))
+                cur.execute("DELETE FROM schedule WHERE id = %s", (slot_id,))
             conn.commit()
         return True
     except Exception as e:
-        print(f"[DB] Ошибка удаления времени публикации: {e}")
+        print(f"[DB] Ошибка удаления слота расписания: {e}")
         return False
 
 

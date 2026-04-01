@@ -3,9 +3,9 @@ from .upgrade import run_upgrades
 from .db import (
     db_get,
     db_set,
-    db_get_publish_times,
-    db_add_publish_time,
-    db_delete_publish_time,
+    db_get_schedule,
+    db_add_schedule_slot,
+    db_delete_schedule_slot,
     db_save_cycle,
     db_load_cycles,
     db_trim_cycles,
