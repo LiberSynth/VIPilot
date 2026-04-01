@@ -10,6 +10,7 @@ Pipeline 6 — Сборщик мусора.
 """
 
 import os
+import time
 
 from db import (
     db_get,
@@ -19,6 +20,9 @@ from db import (
 )
 from log import db_log_pipeline
 from utils.utils import parse_log_lifetime, parse_short_log_lifetime, parse_batch_lifetime, parse_file_lifetime
+
+_last_idle_log: float = 0
+_IDLE_LOG_INTERVAL = 3600  # логировать «нечего убирать» не чаще раза в час
 
 
 def _delete_files(paths: list) -> tuple[int, int]:
@@ -88,8 +92,13 @@ def run():
             summary.append(f"orphan files: -{orphan_deleted}")
             print(f"[cleanup] Удалено файлов-сирот: {orphan_deleted}")
 
+        global _last_idle_log
         if summary:
             db_log_pipeline("cleanup", "Очистка: " + ", ".join(summary), status="ok")
+            _last_idle_log = time.time()
+        elif time.time() - _last_idle_log >= _IDLE_LOG_INTERVAL:
+            db_log_pipeline("cleanup", "Данные в норме", status="ok")
+            _last_idle_log = time.time()
 
     except Exception as e:
         db_log_pipeline("cleanup", f"Сбой пайплайна: {e}", status="error")
