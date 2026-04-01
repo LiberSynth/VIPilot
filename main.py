@@ -772,15 +772,6 @@ def run_full_cycle():
         raise
 
 
-# def scheduler_loop():
-#     # УСТАРЕЛО: заменено новым main_loop с пайплайнами
-#     slots_state = {}
-#     last_date = None
-#     while True:
-#         ...
-#     time.sleep(30)
-
-
 flask_app = Flask(__name__, static_folder=".")
 flask_app.secret_key = os.environ.get("FLASK_SECRET", os.urandom(24).hex())
 

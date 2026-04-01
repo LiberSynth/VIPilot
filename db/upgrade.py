@@ -7,7 +7,6 @@ def run_upgrades():
     Each migration must be idempotent (safe to run multiple times).
     """
     _add_emulation_mode()
-    _rename_publish_times_to_schedule()
     _add_buffer_hours()
     _create_targets()
     _create_stories()
@@ -17,8 +16,6 @@ def run_upgrades():
     _add_loop_interval()
     _log_batch_id_nullable()
     _batches_unique_constraint()
-    _batches_add_fal_fields()
-    _batches_add_video_job_data()
 
 
 def _add_emulation_mode():
@@ -40,23 +37,6 @@ def _add_emulation_mode():
             conn.commit()
     except Exception as e:
         print(f"[DB] Ошибка миграции _add_emulation_mode: {e}")
-
-
-def _rename_publish_times_to_schedule():
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT EXISTS (
-                        SELECT 1 FROM information_schema.tables
-                        WHERE table_name = 'publish_times'
-                    )
-                """)
-                if cur.fetchone()[0]:
-                    cur.execute("ALTER TABLE publish_times RENAME TO schedule")
-            conn.commit()
-    except Exception as e:
-        print(f"[DB] Ошибка миграции _rename_publish_times_to_schedule: {e}")
 
 
 def _add_buffer_hours():
@@ -120,6 +100,7 @@ def _create_batches():
                         story_id UUID REFERENCES stories(id),
                         video_url TEXT,
                         video_file TEXT,
+                        data JSONB,
                         created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
                         completed_at TIMESTAMPTZ
                     )
@@ -214,36 +195,3 @@ def _batches_unique_constraint():
             conn.commit()
     except Exception as e:
         print(f"[DB] Ошибка миграции _batches_unique_constraint: {e}")
-
-
-def _batches_add_fal_fields():
-    """Добавляет поля для хранения состояния fal.ai-запроса (рестарт-устойчивость)."""
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    ALTER TABLE batches
-                        ADD COLUMN IF NOT EXISTS fal_request_id  VARCHAR(200),
-                        ADD COLUMN IF NOT EXISTS fal_status_url  TEXT,
-                        ADD COLUMN IF NOT EXISTS fal_response_url TEXT
-                """)
-            conn.commit()
-    except Exception as e:
-        print(f"[DB] Ошибка миграции _batches_add_fal_fields: {e}")
-
-
-def _batches_add_video_job_data():
-    """Заменяет платформо-специфичные поля fal_* на универсальный JSONB-столбец data."""
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute("ALTER TABLE batches ADD COLUMN IF NOT EXISTS data JSONB")
-                cur.execute("""
-                    ALTER TABLE batches
-                        DROP COLUMN IF EXISTS fal_request_id,
-                        DROP COLUMN IF EXISTS fal_status_url,
-                        DROP COLUMN IF EXISTS fal_response_url
-                """)
-            conn.commit()
-    except Exception as e:
-        print(f"[DB] Ошибка миграции _batches_add_video_job_data: {e}")
