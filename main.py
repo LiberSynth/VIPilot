@@ -1184,6 +1184,7 @@ def main_loop():
         # 'video':       None,  # Pipeline 3 — генерация видео
         # 'transcoding': None,  # Pipeline 4 — транскодирование
         # 'publishing':  None,  # Pipeline 5 — публикация
+        # 'cleanup':     None,  # Pipeline 6 — сборщик мусора
     }
 
     while True:
@@ -1216,6 +1217,12 @@ def main_loop():
             # if _threads['publishing'] is None or not _threads['publishing'].is_alive():
             #     _threads['publishing'] = threading.Thread(target=publishing.run, daemon=True)
             #     _threads['publishing'].start()
+
+            # Pipeline 6: Сборщик мусора (заготовка)
+            # Очистка устаревших записей log, log_entries и буферных данных batches/stories.
+            # if _threads['cleanup'] is None or not _threads['cleanup'].is_alive():
+            #     _threads['cleanup'] = threading.Thread(target=cleanup.run, daemon=True)
+            #     _threads['cleanup'].start()
 
         except Exception as e:
             db_log_root(f"Ошибка главного цикла: {e}", status='error')
