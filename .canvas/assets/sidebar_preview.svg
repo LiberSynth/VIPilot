@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 320" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
+  <!-- Background -->
+  <rect width="240" height="320" fill="#1a1a24"/>
+  <!-- Top border -->
+  <rect width="240" height="1" fill="#2a2a38"/>
+
+  <!-- Header -->
+  <text x="16" y="30" font-size="11" font-weight="600" fill="#8888a8" letter-spacing="1" text-transform="uppercase">РАЗДЕЛЫ</text>
+  <line x1="0" y1="44" x2="240" y2="44" stroke="#2a2a38" stroke-width="1"/>
+
+  <!-- Item 1: Управление (active) -->
+  <rect x="8" y="52" width="224" height="38" rx="10" fill="rgba(74,124,247,0.14)"/>
+  <!-- Dashboard icon -->
+  <g transform="translate(20, 64)" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <rect x="0" y="0" width="5" height="5" rx="1"/>
+    <rect x="7" y="0" width="5" height="5" rx="1"/>
+    <rect x="0" y="7" width="5" height="5" rx="1"/>
+    <rect x="7" y="7" width="5" height="5" rx="1"/>
+  </g>
+  <text x="44" y="75" font-size="14" font-weight="500" fill="#ffffff">Управление</text>
+
+  <!-- Item 2: Генерация сюжета -->
+  <rect x="8" y="96" width="224" height="38" rx="10" fill="transparent"/>
+  <!-- Pencil icon -->
+  <g transform="translate(20, 108)" stroke="#aaaaaa" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.6">
+    <path d="M8.5 0.5l3 3L3 12H0v-3L8.5 0.5z"/>
+  </g>
+  <text x="44" y="119" font-size="14" font-weight="500" fill="#aaaaaa">Генерация сюжета</text>
+
+  <!-- Item 3: Генерация видео -->
+  <rect x="8" y="140" width="224" height="38" rx="10" fill="transparent"/>
+  <!-- Video icon -->
+  <g transform="translate(20, 152)" stroke="#aaaaaa" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.6">
+    <rect x="0" y="0" width="9" height="7" rx="1.5"/>
+    <polyline points="9,2 13,0.5 13,6.5 9,5"/>
+  </g>
+  <text x="44" y="163" font-size="14" font-weight="500" fill="#aaaaaa">Генерация видео</text>
+
+  <!-- Item 4: Публикация -->
+  <rect x="8" y="184" width="224" height="38" rx="10" fill="transparent"/>
+  <!-- Upload icon -->
+  <g transform="translate(20, 196)" stroke="#aaaaaa" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.6">
+    <polyline points="6.5,9 6.5,0"/>
+    <polyline points="3.5,3 6.5,0 9.5,3"/>
+    <path d="M1 8v2a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V8"/>
+  </g>
+  <text x="44" y="207" font-size="14" font-weight="500" fill="#aaaaaa">Публикация</text>
+
+  <!-- Item 5: Монитор -->
+  <rect x="8" y="228" width="224" height="38" rx="10" fill="transparent"/>
+  <!-- Activity icon -->
+  <g transform="translate(20, 240)" stroke="#aaaaaa" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.6">
+    <polyline points="0,6 3,6 5,1 7,11 9,4 11,6 14,6"/>
+  </g>
+  <text x="44" y="251" font-size="14" font-weight="500" fill="#aaaaaa">Монитор</text>
+
+  <!-- Item 6: Служебные -->
+  <rect x="8" y="272" width="224" height="38" rx="10" fill="transparent"/>
+  <!-- Sliders icon -->
+  <g transform="translate(20, 284)" stroke="#aaaaaa" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.6">
+    <line x1="0" y1="2" x2="12" y2="2"/>
+    <circle cx="4" cy="2" r="2" fill="#aaaaaa" stroke="none"/>
+    <line x1="0" y1="7" x2="12" y2="7"/>
+    <circle cx="8" cy="7" r="2" fill="#aaaaaa" stroke="none"/>
+    <line x1="0" y1="11" x2="12" y2="11"/>
+    <circle cx="3" cy="11" r="2" fill="#aaaaaa" stroke="none"/>
+  </g>
+  <text x="44" y="295" font-size="14" font-weight="500" fill="#aaaaaa">Служебные</text>
+</svg>
