@@ -126,7 +126,9 @@ def db_get_active_targets():
 # ---------------------------------------------------------------------------
 
 def db_ensure_batch(scheduled_at, target_id):
-    """Создаёт батч если не существует. Возвращает UUID нового батча или None если уже был."""
+    """Создаёт батч если не существует.
+    Если батч существует со статусом 'устарел' — сбрасывает его в pending.
+    Возвращает UUID нового/восстановленного батча или None если батч уже активен."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
@@ -134,7 +136,14 @@ def db_ensure_batch(scheduled_at, target_id):
                     """
                     INSERT INTO batches (scheduled_at, target_id)
                     VALUES (%s, %s)
-                    ON CONFLICT (scheduled_at, target_id) DO NOTHING
+                    ON CONFLICT (scheduled_at, target_id) DO UPDATE
+                        SET status       = 'pending',
+                            story_id     = NULL,
+                            video_url    = NULL,
+                            video_file   = NULL,
+                            data         = NULL,
+                            completed_at = NULL
+                        WHERE batches.status = 'устарел'
                     RETURNING id
                     """,
                     (scheduled_at, target_id),
