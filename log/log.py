@@ -96,14 +96,15 @@ def db_get_log(limit=200):
 
 def db_get_monitor(batch_limit=50):
     """
-    Возвращает структурированные данные для монитора:
-    - batches: список батчей с вложенными записями лога (sorted by scheduled_at DESC)
-    - system:  системные события без батча (pipeline='root' и т.п.)
+    Возвращает структурированные данные для монитора.
+    Первичная таблица — log. Батч появляется только если есть хотя бы одна запись в log.
+    - batches: батчи с вложенными log-записями, сортировка по последнему событию DESC
+    - system:  системные события без батча
     """
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
-                # Батчи с вложенными логами
+                # Батчи — ведущая таблица log, JOIN batches/targets
                 cur.execute(
                     """
                     SELECT
@@ -114,37 +115,36 @@ def db_get_monitor(batch_limit=50):
                         t.name,
                         t.aspect_ratio_x,
                         t.aspect_ratio_y,
-                        COALESCE(
-                            json_agg(
-                                json_build_object(
-                                    'id',         l.id::text,
-                                    'pipeline',   l.pipeline,
-                                    'message',    l.message,
-                                    'status',     l.status,
-                                    'time_point', l.time_point,
-                                    'entries', (
-                                        SELECT COALESCE(
-                                            json_agg(
-                                                json_build_object(
-                                                    'message',    le.message,
-                                                    'level',      le.level,
-                                                    'time_point', le.time_point
-                                                ) ORDER BY le.time_point
-                                            ),
-                                            '[]'::json
-                                        )
-                                        FROM log_entries le WHERE le.log_id = l.id
+                        MAX(l.time_point) AS last_event_at,
+                        json_agg(
+                            json_build_object(
+                                'id',         l.id::text,
+                                'pipeline',   l.pipeline,
+                                'message',    l.message,
+                                'status',     l.status,
+                                'time_point', l.time_point,
+                                'entries', (
+                                    SELECT COALESCE(
+                                        json_agg(
+                                            json_build_object(
+                                                'message',    le.message,
+                                                'level',      le.level,
+                                                'time_point', le.time_point
+                                            ) ORDER BY le.time_point
+                                        ),
+                                        '[]'::json
                                     )
-                                ) ORDER BY l.time_point
-                            ) FILTER (WHERE l.id IS NOT NULL),
-                            '[]'::json
+                                    FROM log_entries le WHERE le.log_id = l.id
+                                )
+                            ) ORDER BY l.time_point
                         ) AS logs
-                    FROM batches b
+                    FROM log l
+                    JOIN batches b ON b.id = l.batch_id
                     LEFT JOIN targets t ON t.id = b.target_id
-                    LEFT JOIN log l ON l.batch_id = b.id
+                    WHERE l.batch_id IS NOT NULL
                     GROUP BY b.id, b.scheduled_at, b.status, b.created_at,
                              t.name, t.aspect_ratio_x, t.aspect_ratio_y
-                    ORDER BY b.scheduled_at DESC
+                    ORDER BY MAX(l.time_point) DESC
                     LIMIT %s
                     """,
                     (batch_limit,),
@@ -178,14 +178,15 @@ def db_get_monitor(batch_limit=50):
 
         batches = [
             {
-                "batch_id":      str(r[0]),
-                "scheduled_at":  r[1].isoformat() if r[1] else None,
-                "batch_status":  r[2],
-                "created_at":    r[3].isoformat() if r[3] else None,
-                "target_name":   r[4],
+                "batch_id":       str(r[0]),
+                "scheduled_at":   r[1].isoformat() if r[1] else None,
+                "batch_status":   r[2],
+                "created_at":     r[3].isoformat() if r[3] else None,
+                "target_name":    r[4],
                 "aspect_ratio_x": r[5],
                 "aspect_ratio_y": r[6],
-                "logs":          r[7],
+                "last_event_at":  r[7].isoformat() if r[7] else None,
+                "logs":           r[8],
             }
             for r in batch_rows
         ]

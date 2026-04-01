@@ -301,11 +301,11 @@
     padding: 5px 14px; border-bottom: 1px solid #0f0f18;
   }
   .monitor-sysgroup-item:last-child { border-bottom: none; }
-  .monitor-sysgroup-ts  { color: #444460; flex-shrink: 0; font-variant-numeric: tabular-nums; }
-  .monitor-sysgroup-pip { color: #555570; flex-shrink: 0; }
-  .monitor-sysgroup-msg { color: #888898; flex: 1; word-break: break-word; }
-  .monitor-sysgroup-msg.error { color: #cc4040; }
-  .monitor-sysgroup-msg.ok    { color: #2a9e6a; }
+  .monitor-sysgroup-ts  { color: #6868a0; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+  .monitor-sysgroup-pip { color: #8080a8; flex-shrink: 0; }
+  .monitor-sysgroup-msg { color: #b0b0c8; flex: 1; word-break: break-word; }
+  .monitor-sysgroup-msg.error { color: #ff7070; }
+  .monitor-sysgroup-msg.ok    { color: #3ecf8e; }
   .monitor-batch {
     background: #1a1a24;
     border: 1px solid #2a2a38;
@@ -327,10 +327,10 @@
   .monitor-dot {
     width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
   }
-  .bs-pending  .monitor-dot { background: #444460; }
+  .bs-pending  .monitor-dot { background: #f5a623; box-shadow: 0 0 5px #f5a62380; }
   .bs-ok       .monitor-dot { background: #3ecf8e; }
   .bs-error    .monitor-dot { background: #ff6060; }
-  .bs-running  .monitor-dot { background: #f5a623; box-shadow: 0 0 5px #f5a62380; }
+  .bs-running  .monitor-dot { background: #4a7cf7; box-shadow: 0 0 5px #4a7cf780; }
 
   .monitor-batch-meta { flex: 1; min-width: 0; }
   .monitor-batch-title { font-size: 13px; font-weight: 600; color: #e0e0f0; }
@@ -342,7 +342,7 @@
   }
   .monitor-batch.open .monitor-batch-arrow { transform: rotate(180deg); }
 
-  .monitor-batch-body { display: none; }
+  .monitor-batch-body { display: none; position: relative; }
   .monitor-batch.open .monitor-batch-body { display: block; }
 
   /* Log entries inside batch */
@@ -363,14 +363,14 @@
   }
   .monitor-log-header:hover { background: rgba(255,255,255,.02); }
 
-  .monitor-log-ts       { color: #555575; flex-shrink: 0; font-variant-numeric: tabular-nums; }
-  .monitor-log-pipeline { color: #666680; flex-shrink: 0; }
+  .monitor-log-ts       { color: #8080a8; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+  .monitor-log-pipeline { color: #9898b8; flex-shrink: 0; }
   .monitor-log-status   { font-weight: 600; flex-shrink: 0; }
   .monitor-log-status.ok,
   .monitor-log-status.info { color: #3ecf8e; }
-  .monitor-log-status.error { color: #ff5050; }
-  .monitor-log-msg      { color: #c0c0d8; flex: 1; min-width: 0; word-break: break-word; white-space: pre-wrap; }
-  .monitor-log-chevron  { font-size: 10px; color: #444460; flex-shrink: 0; transition: transform .15s; }
+  .monitor-log-status.error { color: #ff6060; }
+  .monitor-log-msg      { color: #d8d8f0; flex: 1; min-width: 0; word-break: break-word; white-space: pre-wrap; }
+  .monitor-log-chevron  { font-size: 10px; color: #7070a0; flex-shrink: 0; transition: transform .15s; }
   .monitor-log-item.open .monitor-log-chevron { transform: rotate(180deg); }
 
   /* Sub-entries (log_entries) */
@@ -386,9 +386,9 @@
     border-bottom: 1px solid #0e0e18; font-size: 11px;
   }
   .monitor-entry-row:last-child { border-bottom: none; }
-  .monitor-entry-ts  { color: #444460; flex-shrink: 0; font-variant-numeric: tabular-nums; }
-  .monitor-entry-msg { color: #9090b0; word-break: break-word; white-space: pre-wrap; }
-  .monitor-entry-msg.error { color: #ff6060; }
+  .monitor-entry-ts  { color: #6868a0; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+  .monitor-entry-msg { color: #b8b8d8; word-break: break-word; white-space: pre-wrap; }
+  .monitor-entry-msg.error { color: #ff7070; }
   .monitor-entry-msg.ok    { color: #3ecf8e; }
 
   /* System events block */
@@ -2049,24 +2049,41 @@ setInterval(refreshLog, 4000);
     '</div>';
   }
 
+  const MON_SVG_EXPAND   = `<svg viewBox="0 0 16 16"><polyline points="2,6 2,2 6,2"/><polyline points="10,2 14,2 14,6"/><polyline points="14,10 14,14 10,14"/><polyline points="6,14 2,14 2,10"/></svg>`;
+  const MON_SVG_COLLAPSE = `<svg viewBox="0 0 16 16"><polyline points="6,2 6,6 2,6"/><polyline points="10,2 10,6 14,6"/><polyline points="14,10 10,10 10,14"/><polyline points="2,10 6,10 6,14"/></svg>`;
+  const MON_SVG_COPY     = `<svg viewBox="0 0 16 16"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11V3a1 1 0 0 1 1-1h8"/></svg>`;
+
   function renderBatch(batch) {
     const bs   = batch.batch_status || 'pending';
     const logs = batch.logs || [];
 
-    // Дата заголовка — time_point последней лог-записи (или created_at если логов нет)
-    const headTime = logs.length > 0
-      ? logs[logs.length - 1].time_point
-      : batch.created_at;
-
+    const headTime = batch.last_event_at || batch.created_at;
     const ratio = (batch.aspect_ratio_x && batch.aspect_ratio_y)
       ? batch.aspect_ratio_x + ':' + batch.aspect_ratio_y : '';
     const schedStr = fmtMskShort(batch.scheduled_at);
     const sub = ['Публикация: ' + schedStr, batch.target_name, ratio, STATUS_LABELS[bs] || bs]
       .filter(Boolean).join(' · ');
 
-    const logHtml = logs.length > 0
-      ? '<div class="monitor-log-list">' + logs.map(renderLogItem).join('') + '</div>'
-      : '<div style="padding:8px 14px;font-size:11px;color:#444;font-family:monospace">Нет событий</div>';
+    if (logs.length === 0) {
+      return '<div class="monitor-batch bs-' + esc(bs) + '" data-bid="' + esc(batch.batch_id) + '">' +
+        '<div class="monitor-batch-header" style="cursor:default">' +
+          '<span class="monitor-dot"></span>' +
+          '<div class="monitor-batch-meta">' +
+            '<div class="monitor-batch-title">' + fmtMskShort(headTime) + '</div>' +
+            '<div class="monitor-batch-sub">'   + esc(sub) + '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    }
+
+    const logHtml = '<div class="monitor-log-list">' + logs.map(renderLogItem).join('') + '</div>';
+
+    const floatBtns =
+      '<div class="cycle-float-btns" onclick="event.stopPropagation()">' +
+        '<button class="cycle-float-btn" title="Развернуть все" onclick="monitorExpandAll(this)">' + MON_SVG_EXPAND   + '</button>' +
+        '<button class="cycle-float-btn" title="Свернуть все"   onclick="monitorCollapseAll(this)">' + MON_SVG_COLLAPSE + '</button>' +
+        '<button class="cycle-float-btn" title="Скопировать"    onclick="monitorCopy(this,\'' + esc(batch.batch_id) + '\')">' + MON_SVG_COPY + '</button>' +
+      '</div>';
 
     return '<div class="monitor-batch bs-' + esc(bs) + '" data-bid="' + esc(batch.batch_id) + '" onclick="monitorToggleBatch(event,this)">' +
       '<div class="monitor-batch-header">' +
@@ -2077,7 +2094,7 @@ setInterval(refreshLog, 4000);
         '</div>' +
         '<span class="monitor-batch-arrow">▼</span>' +
       '</div>' +
-      '<div class="monitor-batch-body">' + logHtml + '</div>' +
+      '<div class="monitor-batch-body">' + floatBtns + logHtml + '</div>' +
     '</div>';
   }
 
@@ -2096,7 +2113,7 @@ setInterval(refreshLog, 4000);
       '</div>';
     }).join('');
 
-    return '<div class="monitor-sysgroup" data-sg-key="' + esc(key) + '" onclick="monitorToggleSys(this)">' +
+    return '<div class="monitor-sysgroup" data-sg-key="' + esc(key) + '" onclick="monitorToggleSys(event,this)">' +
       '<div class="monitor-sysgroup-header">' +
         '<span class="monitor-sysgroup-dot"></span>' +
         '<div class="monitor-sysgroup-meta">' +
@@ -2112,7 +2129,7 @@ setInterval(refreshLog, 4000);
   function buildTimeline(batches, system) {
     var items = [];
     (batches || []).forEach(function(b) {
-      items.push({ type: 'batch', time: b.created_at, data: b });
+      items.push({ type: 'batch', time: b.last_event_at || b.created_at, data: b });
     });
     (system || []).forEach(function(s) {
       items.push({ type: 'sys', time: s.time_point, data: s });
@@ -2175,12 +2192,59 @@ setInterval(refreshLog, 4000);
   }
 
   window.monitorToggleBatch = function(e, el) {
-    if (e.target.closest('.monitor-log-item')) return;
+    if (e.target.closest('.monitor-batch-body')) return;
     el.classList.toggle('open');
   };
 
-  window.monitorToggleSys = function(el) {
+  window.monitorToggleSys = function(e, el) {
+    if (e.target.closest('.monitor-sysgroup-body')) return;
     el.classList.toggle('open');
+  };
+
+  window.monitorExpandAll = function(btn) {
+    const body = btn.closest('.monitor-batch-body');
+    if (!body) return;
+    body.querySelectorAll('.monitor-log-item').forEach(function(item) {
+      if (item.querySelector('.monitor-entries')) item.classList.add('open');
+    });
+  };
+
+  window.monitorCollapseAll = function(btn) {
+    const body = btn.closest('.monitor-batch-body');
+    if (!body) return;
+    body.querySelectorAll('.monitor-log-item.open').forEach(function(item) {
+      item.classList.remove('open');
+    });
+  };
+
+  window.monitorCopy = function(btn, batchId) {
+    const body = btn.closest('.monitor-batch-body');
+    if (!body) return;
+    var lines = [];
+    body.querySelectorAll('.monitor-log-item').forEach(function(item) {
+      const ts  = item.querySelector('.monitor-log-ts')  ? item.querySelector('.monitor-log-ts').textContent.trim()  : '';
+      const pip = item.querySelector('.monitor-log-pipeline') ? item.querySelector('.monitor-log-pipeline').textContent.trim() : '';
+      const st  = item.querySelector('.monitor-log-status') ? item.querySelector('.monitor-log-status').textContent.trim() : '';
+      const msg = item.querySelector('.monitor-log-msg') ? item.querySelector('.monitor-log-msg').textContent.trim() : '';
+      lines.push('[' + ts + '] ' + pip + ' ' + st + ' ' + msg);
+      item.querySelectorAll('.monitor-entry-row').forEach(function(row) {
+        const ets = row.querySelector('.monitor-entry-ts')  ? row.querySelector('.monitor-entry-ts').textContent.trim()  : '';
+        const emsg= row.querySelector('.monitor-entry-msg') ? row.querySelector('.monitor-entry-msg').textContent.trim() : '';
+        lines.push('  [' + ets + '] ' + emsg);
+      });
+    });
+    const text = lines.join('\n');
+    const doFlash = function() {
+      btn.classList.add('copied');
+      setTimeout(function() { btn.classList.remove('copied'); }, 2000);
+    };
+    navigator.clipboard.writeText(text).then(doFlash).catch(function() {
+      var ta = document.createElement('textarea');
+      ta.value = text; ta.style.cssText = 'position:fixed;opacity:0';
+      document.body.appendChild(ta); ta.select();
+      document.execCommand('copy'); document.body.removeChild(ta);
+      doFlash();
+    });
   };
 
   window.monitorToggleLog = function(el) {
