@@ -7,6 +7,8 @@ from db import (
     db_get_models,
     db_activate_model,
     db_reorder_models,
+    init_db,
+    run_upgrades,
 )
 from log import db_get_log, db_get_monitor
 from utils.auth import is_authenticated
@@ -119,3 +121,15 @@ def api_text_models_reorder():
         return jsonify({"error": "ids required"}), 400
     ok = db_reorder_models(ids)
     return jsonify({"ok": ok})
+
+
+@bp.route("/reseed", methods=["POST"])
+def api_reseed():
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    try:
+        init_db()
+        run_upgrades()
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500

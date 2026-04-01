@@ -89,6 +89,21 @@ def init_db():
                     )
                 """)
                 cur.execute("""
+                    INSERT INTO ai_models (name, url, body, "order", active, ai_platform_id, platform_id, type)
+                    SELECT v.name, v.url, v.body::jsonb, v.ord, v.active, p.id, p.id, v.type
+                    FROM (VALUES
+                        ('sora-2',                    'sora-2/text-to-video',                    '{"prompt":"{}","duration":"{int}","aspect_ratio":"{:d}:{:d}"}',              1, TRUE,  'fal',        'text-to-video'),
+                        ('veo2',                      'veo2',                                    '{"prompt":"{}","duration":"{:d}s","aspect_ratio":"{:d}:{:d}"}',             2, FALSE, 'fal',        'text-to-video'),
+                        ('minimax/video-01',          'minimax/video-01',                       '{"prompt":"{}","duration":"{:d}s","aspect_ratio":"{:d}:{:d}"}',             3, FALSE, 'fal',        'text-to-video'),
+                        ('kling-video/v1.6/standard', 'kling-video/v1.6/standard/text-to-video','{"prompt":"{}","duration":"{:d}","aspect_ratio":"{:d}:{:d}"}',              4, FALSE, 'fal',        'text-to-video'),
+                        ('qwen3.6-plus-preview',      'qwen/qwen3.6-plus-preview:free',         '{"messages":[{"role":"system","content":"{}"},{"role":"user","content":"{}"}],"max_tokens":300,"temperature":0.9}', 1, TRUE,  'OpenRouter', 'text'),
+                        ('llama-3.1-8b-instruct',     'meta-llama/llama-3.1-8b-instruct:free',  '{"messages":[{"role":"system","content":"{}"},{"role":"user","content":"{}"}],"max_tokens":300,"temperature":0.9}', 2, FALSE, 'OpenRouter', 'text'),
+                        ('mistral-7b-instruct',       'mistralai/mistral-7b-instruct:free',     '{"messages":[{"role":"system","content":"{}"},{"role":"user","content":"{}"}],"max_tokens":300,"temperature":0.9}', 3, FALSE, 'OpenRouter', 'text')
+                    ) AS v(name, url, body, ord, active, platform_name, type)
+                    JOIN ai_platforms p ON p.name = v.platform_name
+                    WHERE NOT EXISTS (SELECT 1 FROM ai_models WHERE ai_models.name = v.name)
+                """)
+                cur.execute("""
                     CREATE TABLE IF NOT EXISTS targets (
                         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                         name VARCHAR(200) NOT NULL,
@@ -96,6 +111,14 @@ def init_db():
                         aspect_ratio_y SMALLINT NOT NULL DEFAULT 16,
                         active BOOLEAN NOT NULL DEFAULT TRUE
                     )
+                """)
+                cur.execute("""
+                    INSERT INTO targets (name, aspect_ratio_x, aspect_ratio_y, active)
+                    SELECT * FROM (VALUES
+                        ('VKontakte', 9::SMALLINT, 16::SMALLINT, TRUE),
+                        ('Дзен',     16::SMALLINT, 9::SMALLINT,  FALSE)
+                    ) AS v(name, aspect_ratio_x, aspect_ratio_y, active)
+                    WHERE NOT EXISTS (SELECT 1 FROM targets WHERE name = v.name)
                 """)
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS stories (
