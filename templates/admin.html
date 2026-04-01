@@ -923,16 +923,16 @@ function onVkPublishToggle(changedChk, otherId, selfHidId, otherHidId) {
   savePublishSettings();
 }
 
-// ── Автосохранение панели «Пайплайн» ──
-var _pipelineSaveTimer = null;
+// ── Автосохранение панели «Генерация видео» ──
+var _requestSaveTimer = null;
 
-function savePipelineSettings() {
-  fetch('/save', { method: 'POST', body: collectAllSettings('pipeline') }).catch(() => {});
+function saveRequestSettings() {
+  fetch('/save', { method: 'POST', body: collectAllSettings('request') }).catch(() => {});
 }
 
-function schedulePipelineSave() {
-  clearTimeout(_pipelineSaveTimer);
-  _pipelineSaveTimer = setTimeout(savePipelineSettings, 800);
+function scheduleRequestSave() {
+  clearTimeout(_requestSaveTimer);
+  _requestSaveTimer = setTimeout(saveRequestSettings, 800);
 }
 
 (function() {
@@ -940,8 +940,8 @@ function schedulePipelineSave() {
     document.getElementById('video_duration'),
   ].filter(Boolean);
   fields.forEach(f => {
-    f.addEventListener('input', schedulePipelineSave);
-    f.addEventListener('change', schedulePipelineSave);
+    f.addEventListener('input', scheduleRequestSave);
+    f.addEventListener('change', scheduleRequestSave);
   });
 })();
 
