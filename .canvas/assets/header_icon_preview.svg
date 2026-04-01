@@ -5,10 +5,15 @@
       <stop offset="100%" style="stop-color:#6f4af7"/>
     </linearGradient>
   </defs>
-  <rect width="120" height="120" rx="30" fill="url(#bg)"/>
-  <rect x="10" y="72" width="100" height="40" rx="7" fill="white"/>
-  <rect x="40" y="38" width="25" height="40" rx="5" fill="white"/>
-  <path d="M 45,38 C 45,26 70,26 70,38" stroke="white" stroke-width="8" stroke-linecap="round" fill="none"/>
-  <path d="M 37,38 C 37,16 78,16 78,38" stroke="white" stroke-width="8" stroke-linecap="round" fill="none" opacity="0.7"/>
-  <path d="M 29,38 C 29,6 86,6 86,38" stroke="white" stroke-width="8" stroke-linecap="round" fill="none" opacity="0.4"/>
+  <rect width="120" height="120" rx="28" fill="url(#bg)"/>
+
+  <!-- Smartphone (top) -->
+  <rect x="35" y="6" width="50" height="62" rx="9" stroke="white" stroke-width="5.5" fill="none"/>
+  <!-- Home indicator -->
+  <rect x="50" y="59" width="20" height="3.5" rx="1.75" fill="white"/>
+
+  <!-- Digital mechanism bars (Factory Pattern) -->
+  <rect x="14" y="80" width="92" height="7" rx="3.5" fill="white"/>
+  <rect x="14" y="93" width="66" height="7" rx="3.5" fill="white" opacity="0.65"/>
+  <rect x="14" y="106" width="40" height="7" rx="3.5" fill="white" opacity="0.35"/>
 </svg>
