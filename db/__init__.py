@@ -19,10 +19,3 @@ from .db import (
     get_active_model,
     get_active_text_model,
 )
-from log import (
-    db_log_pipeline,
-    db_log_entry,
-    db_log_root,
-    db_get_log,
-    db_get_monitor,
-)
