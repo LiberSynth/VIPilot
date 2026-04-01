@@ -40,7 +40,7 @@ from db import (
 )
 from log import db_log_root, db_get_log, db_get_monitor
 from db.init import get_db
-from pipelines import planning, story
+from pipelines import planning, story, video
 
 FAL_KEY = os.environ["FAL_API_KEY"]
 VK_TOKEN = os.environ["VK_USER_TOKEN"]
@@ -1195,7 +1195,7 @@ def main_loop():
     _threads = {
         'planning':    None,
         'story':       None,   # Pipeline 2 — генерация сюжетов
-        # 'video':       None,  # Pipeline 3 — генерация видео
+        'video':       None,   # Pipeline 3 — генерация видео
         # 'transcoding': None,  # Pipeline 4 — транскодирование
         # 'publishing':  None,  # Pipeline 5 — публикация
         # 'cleanup':     None,  # Pipeline 6 — сборщик мусора
@@ -1219,10 +1219,10 @@ def main_loop():
                 )
                 _threads['story'].start()
 
-            # Pipeline 3: Генерация видео (заготовка)
-            # if _threads['video'] is None or not _threads['video'].is_alive():
-            #     _threads['video'] = threading.Thread(target=video.run, daemon=True)
-            #     _threads['video'].start()
+            # Pipeline 3: Генерация видео
+            if _threads['video'] is None or not _threads['video'].is_alive():
+                _threads['video'] = threading.Thread(target=video.run, daemon=True)
+                _threads['video'].start()
 
             # Pipeline 4: Транскодирование (заготовка)
             # if _threads['transcoding'] is None or not _threads['transcoding'].is_alive():

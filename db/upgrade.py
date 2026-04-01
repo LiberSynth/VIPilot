@@ -17,6 +17,7 @@ def run_upgrades():
     _add_loop_interval()
     _log_batch_id_nullable()
     _batches_unique_constraint()
+    _batches_add_fal_fields()
 
 
 def _add_emulation_mode():
@@ -212,3 +213,19 @@ def _batches_unique_constraint():
             conn.commit()
     except Exception as e:
         print(f"[DB] Ошибка миграции _batches_unique_constraint: {e}")
+
+
+def _batches_add_fal_fields():
+    """Добавляет поля для хранения состояния fal.ai-запроса (рестарт-устойчивость)."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    ALTER TABLE batches
+                        ADD COLUMN IF NOT EXISTS fal_request_id  VARCHAR(200),
+                        ADD COLUMN IF NOT EXISTS fal_status_url  TEXT,
+                        ADD COLUMN IF NOT EXISTS fal_response_url TEXT
+                """)
+            conn.commit()
+    except Exception as e:
+        print(f"[DB] Ошибка миграции _batches_add_fal_fields: {e}")

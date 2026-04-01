@@ -238,6 +238,150 @@ def db_get_active_text_model():
 
 
 # ---------------------------------------------------------------------------
+# Pipeline 3 — видео
+# ---------------------------------------------------------------------------
+
+def db_get_story_ready_batch():
+    """Возвращает первый батч со status='story_ready', или None."""
+    try:
+        with get_db() as conn:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute("""
+                    SELECT b.id, b.scheduled_at, b.target_id, b.story_id,
+                           t.name AS target_name,
+                           t.aspect_ratio_x, t.aspect_ratio_y
+                    FROM batches b
+                    JOIN targets t ON t.id = b.target_id
+                    WHERE b.status = 'story_ready'
+                    ORDER BY b.scheduled_at
+                    LIMIT 1
+                """)
+                row = cur.fetchone()
+        return dict(row) if row else None
+    except Exception as e:
+        print(f"[DB] Ошибка db_get_story_ready_batch: {e}")
+        return None
+
+
+def db_get_video_pending_batch():
+    """Возвращает первый батч со status='video_pending' и fal_request_id, или None."""
+    try:
+        with get_db() as conn:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute("""
+                    SELECT b.id, b.scheduled_at, b.target_id, b.story_id,
+                           b.fal_request_id, b.fal_status_url, b.fal_response_url,
+                           t.name AS target_name,
+                           t.aspect_ratio_x, t.aspect_ratio_y
+                    FROM batches b
+                    JOIN targets t ON t.id = b.target_id
+                    WHERE b.status = 'video_pending' AND b.fal_request_id IS NOT NULL
+                    ORDER BY b.scheduled_at
+                    LIMIT 1
+                """)
+                row = cur.fetchone()
+        return dict(row) if row else None
+    except Exception as e:
+        print(f"[DB] Ошибка db_get_video_pending_batch: {e}")
+        return None
+
+
+def db_get_story_text(story_id):
+    """Возвращает text из stories.result по UUID, или None."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT result FROM stories WHERE id = %s", (story_id,))
+                row = cur.fetchone()
+        return row[0] if row else None
+    except Exception as e:
+        print(f"[DB] Ошибка db_get_story_text: {e}")
+        return None
+
+
+def db_get_active_video_model():
+    """Возвращает (submit_url, platform_url, body_tpl, model_name, model_id)
+    для активной video-модели из таблицы ai_models (type='text-to-video'), или все None."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT p.url, m.url, m.body, m.name, m.id
+                    FROM ai_models m
+                    JOIN ai_platforms p ON p.id = m.platform_id
+                    WHERE m.active = TRUE AND m.type = 'text-to-video'
+                    ORDER BY m."order"
+                    LIMIT 1
+                """)
+                row = cur.fetchone()
+        if not row:
+            return None, None, None, None, None
+        platform_url = row[0]
+        model_url    = row[1]
+        body_tpl     = row[2] if isinstance(row[2], dict) else {}
+        model_name   = row[3]
+        model_id     = str(row[4])
+        submit_url   = f"{platform_url}/{model_url}"
+        return submit_url, platform_url, body_tpl, model_name, model_id
+    except Exception as e:
+        print(f"[DB] Ошибка db_get_active_video_model: {e}")
+        return None, None, None, None, None
+
+
+def db_set_batch_video_pending(batch_id, request_id, status_url, response_url):
+    """Сохраняет fal_request_id и переводит батч в status='video_pending'."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """UPDATE batches
+                       SET status = 'video_pending',
+                           fal_request_id   = %s,
+                           fal_status_url   = %s,
+                           fal_response_url = %s
+                       WHERE id = %s""",
+                    (request_id, status_url, response_url, batch_id),
+                )
+            conn.commit()
+        return True
+    except Exception as e:
+        print(f"[DB] Ошибка db_set_batch_video_pending: {e}")
+        return False
+
+
+def db_set_batch_video_ready(batch_id, video_url):
+    """Сохраняет video_url и переводит батч в status='video_ready'."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE batches SET status = 'video_ready', video_url = %s WHERE id = %s",
+                    (video_url, batch_id),
+                )
+            conn.commit()
+        return True
+    except Exception as e:
+        print(f"[DB] Ошибка db_set_batch_video_ready: {e}")
+        return False
+
+
+def db_set_batch_video_error(batch_id):
+    """Переводит батч в status='video_error'."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE batches SET status = 'video_error' WHERE id = %s",
+                    (batch_id,),
+                )
+            conn.commit()
+        return True
+    except Exception as e:
+        print(f"[DB] Ошибка db_set_batch_video_error: {e}")
+        return False
+
+
+# ---------------------------------------------------------------------------
 # Циклы
 # ---------------------------------------------------------------------------
 

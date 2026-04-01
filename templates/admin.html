@@ -2003,11 +2003,15 @@ setInterval(refreshLog, 4000);
   };
 
   const STATUS_LABELS = {
-    pending: 'ожидание',
-    running: 'выполняется',
-    ok:      'готово',
-    error:   'ошибка',
-    info:    'инфо',
+    pending:       'ожидание',
+    running:       'выполняется',
+    ok:            'готово',
+    error:         'ошибка',
+    info:          'инфо',
+    story_ready:   'сюжет готов',
+    video_pending: 'видео: ожидание fal.ai',
+    video_ready:   'видео готово',
+    video_error:   'видео: ошибка',
   };
 
   function esc(s) {
@@ -2110,10 +2114,11 @@ setInterval(refreshLog, 4000);
     }
 
     const isActive = logs.some(function(l) { return l.status === 'running'; });
-    const doneStatuses = ['ok', 'done', 'completed'];
+    const doneStatuses = ['ok', 'done', 'completed', 'video_ready'];
+    const errorStatuses = ['error', 'video_error'];
     const md = isActive ? 'md-active'
              : doneStatuses.indexOf(bs) >= 0 ? 'md-ok'
-             : bs === 'error' ? 'md-error'
+             : errorStatuses.indexOf(bs) >= 0 ? 'md-error'
              : 'md-warn';
 
     const logHtml = '<div class="monitor-log-list">' + logs.map(renderLogItem).join('') + '</div>';
