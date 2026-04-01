@@ -24,3 +24,9 @@ id = "BS3dFtoJ2HLiVKKBkL-Nl"
 uri = "file://.canvas/assets/icon_bricks_screen.png"
 type = "image"
 title = "generated_image"
+
+[[generated]]
+id = "T0PsbbLzpylRkQLNLfpt9"
+uri = "file://.canvas/assets/icon_v2_phone_factory.png"
+type = "image"
+title = "generated_image"
