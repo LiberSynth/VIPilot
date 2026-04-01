@@ -18,6 +18,7 @@ def run_upgrades():
     _log_batch_id_nullable()
     _batches_unique_constraint()
     _batches_add_fal_fields()
+    _batches_add_video_job_meta()
 
 
 def _add_emulation_mode():
