@@ -364,7 +364,27 @@
   }
   .monitor-batch.open .monitor-hdr-actions,
   .monitor-sysgroup.open .monitor-hdr-actions { display: flex; }
-  .monitor-hdr-actions .cycle-float-btn { width: 26px; height: 26px; }
+
+  .cycle-float-btn {
+    width: 26px; height: 26px;
+    background: transparent;
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0; flex-shrink: 0;
+    transition: background .15s, border-color .15s;
+  }
+  .cycle-float-btn:hover { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.2); }
+  .cycle-float-btn:active { background: rgba(255,255,255,.14); }
+  .cycle-float-btn svg { width: 13px; height: 13px; }
+  .cycle-float-btn svg * {
+    stroke: #8888b0; fill: none;
+    stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .cycle-float-btn:hover svg * { stroke: #c8c8e8; }
+  .cycle-float-btn.copied { border-color: rgba(62,207,142,.5); }
+  .cycle-float-btn.copied svg * { stroke: #3ecf8e; }
 
   /* Log entries inside batch */
   .monitor-log-list {
