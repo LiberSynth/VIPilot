@@ -324,33 +324,29 @@
   }
   .monitor-batch-header:active { background: rgba(255,255,255,.03); }
 
-  .monitor-dot {
-    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  @keyframes mon-ping {
+    0%   { transform: scale(1);   opacity: .8; }
+    70%  { transform: scale(2.6); opacity: 0;  }
+    100% { transform: scale(2.6); opacity: 0;  }
   }
-  .bs-pending  .monitor-dot { background: #f5a623; box-shadow: 0 0 5px #f5a62380; }
-  .bs-ok       .monitor-dot { background: #3ecf8e; }
-  .bs-error    .monitor-dot { background: #ff6060; }
-  .bs-running  .monitor-dot { background: #4a7cf7; box-shadow: 0 0 5px #4a7cf780; }
+
+  .monitor-dot {
+    width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
+    position: relative; align-self: center;
+  }
+  .monitor-dot.md-warn   { background: #f5a623; }
+  .monitor-dot.md-ok     { background: #3ecf8e; }
+  .monitor-dot.md-error  { background: #ff6060; }
+  .monitor-dot.md-active { background: #4a7cf7; }
+  .monitor-dot.md-active::before {
+    content: ''; position: absolute; inset: -2px; border-radius: 50%;
+    background: #4a7cf7; opacity: .7;
+    animation: mon-ping 1.4s ease-out infinite;
+  }
 
   .monitor-batch-meta { flex: 1; min-width: 0; }
   .monitor-batch-title { font-size: 13px; font-weight: 600; color: #e0e0f0; }
   .monitor-batch-sub   { font-size: 11px; color: #888; margin-top: 2px; }
-
-  @keyframes mon-ping {
-    0%   { transform: scale(1);   opacity: .7; }
-    70%  { transform: scale(2.2); opacity: 0;  }
-    100% { transform: scale(2.2); opacity: 0;  }
-  }
-  .monitor-active-pulse {
-    position: relative; width: 8px; height: 8px; flex-shrink: 0; align-self: center;
-  }
-  .monitor-active-pulse::after {
-    content: ''; position: absolute; inset: 0; border-radius: 50%; background: #4a7cf7;
-  }
-  .monitor-active-pulse::before {
-    content: ''; position: absolute; inset: 0; border-radius: 50%; background: #4a7cf7;
-    animation: mon-ping 1.5s ease-out infinite;
-  }
 
   .monitor-batch-arrow {
     font-size: 12px; color: #666; flex-shrink: 0;
@@ -387,12 +383,17 @@
   }
   .monitor-log-header:hover { background: rgba(255,255,255,.02); }
 
-  .monitor-log-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; align-self: center; background: #444; }
+  .monitor-log-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; align-self: center; background: #444; position: relative; }
   .monitor-log-dot.ls-ok,
   .monitor-log-dot.ls-info     { background: #3ecf8e; }
   .monitor-log-dot.ls-error    { background: #ff6060; }
-  .monitor-log-dot.ls-running  { background: #4a7cf7; box-shadow: 0 0 5px #4a7cf780; }
-  .monitor-log-dot.ls-прервана { background: #666; }
+  .monitor-log-dot.ls-прервана { background: #555; }
+  .monitor-log-dot.ls-running  { background: #4a7cf7; }
+  .monitor-log-dot.ls-running::before {
+    content: ''; position: absolute; inset: -2px; border-radius: 50%;
+    background: #4a7cf7; opacity: .75;
+    animation: mon-ping 1.4s ease-out infinite;
+  }
 
   .monitor-log-ts       { color: #8080a8; flex-shrink: 0; font-variant-numeric: tabular-nums; }
   .monitor-log-pipeline { color: #9898b8; flex-shrink: 0; }
@@ -2099,7 +2100,7 @@ setInterval(refreshLog, 4000);
     if (logs.length === 0) {
       return '<div class="monitor-batch bs-' + esc(bs) + '" data-bid="' + esc(batch.batch_id) + '">' +
         '<div class="monitor-batch-header" style="cursor:default">' +
-          '<span class="monitor-dot"></span>' +
+          '<span class="monitor-dot md-warn"></span>' +
           '<div class="monitor-batch-meta">' +
             '<div class="monitor-batch-title">' + fmtMskShort(headTime) + '</div>' +
             '<div class="monitor-batch-sub">'   + esc(sub) + '</div>' +
@@ -2109,7 +2110,11 @@ setInterval(refreshLog, 4000);
     }
 
     const isActive = logs.some(function(l) { return l.status === 'running'; });
-    const activePulse = isActive ? '<span class="monitor-active-pulse"></span>' : '';
+    const doneStatuses = ['ok', 'done', 'completed'];
+    const md = isActive ? 'md-active'
+             : doneStatuses.indexOf(bs) >= 0 ? 'md-ok'
+             : bs === 'error' ? 'md-error'
+             : 'md-warn';
 
     const logHtml = '<div class="monitor-log-list">' + logs.map(renderLogItem).join('') + '</div>';
 
@@ -2122,8 +2127,7 @@ setInterval(refreshLog, 4000);
 
     return '<div class="monitor-batch bs-' + esc(bs) + '" data-bid="' + esc(batch.batch_id) + '" onclick="monitorToggleBatch(event,this)">' +
       '<div class="monitor-batch-header">' +
-        '<span class="monitor-dot"></span>' +
-        activePulse +
+        '<span class="monitor-dot ' + md + '"></span>' +
         '<div class="monitor-batch-meta">' +
           '<div class="monitor-batch-title">' + fmtMsk(headTime) + '</div>' +
           '<div class="monitor-batch-sub">'   + esc(sub)         + '</div>' +
@@ -2218,9 +2222,11 @@ setInterval(refreshLog, 4000);
     });
   }
 
-  function autoOpenRunning() {
-    document.querySelectorAll('.monitor-batch').forEach(function(el) {
-      if (el.querySelector('[data-status="running"]')) el.classList.add('open');
+  function autoExpandRunningLogs() {
+    document.querySelectorAll('.monitor-batch.open').forEach(function(batch) {
+      batch.querySelectorAll('.monitor-log-item[data-status="running"]').forEach(function(li) {
+        if (li.querySelector('.monitor-entries')) li.classList.add('open');
+      });
     });
   }
 
@@ -2237,7 +2243,7 @@ setInterval(refreshLog, 4000);
       return g.type === 'batch' ? renderBatch(g.data) : renderSysGroup(g.items);
     }).join('');
     restoreOpenState(prev);
-    autoOpenRunning();
+    autoExpandRunningLogs();
   }
 
   function refreshMonitor() {
