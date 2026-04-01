@@ -1878,7 +1878,7 @@ setInterval(refreshLog, 4000);
   (function() {
     const panel = document.getElementById('panel-pipeline');
     if (panel && panel.classList.contains('active')) {
-      loadPublishTimes();
+      loadSchedule();
     }
   })();
 
@@ -1886,7 +1886,7 @@ setInterval(refreshLog, 4000);
   var _origSwitchPanel = window.switchPanel;
   window.switchPanel = function(name) {
     if (_origSwitchPanel) _origSwitchPanel(name);
-    if (name === 'pipeline') loadPublishTimes();
+    if (name === 'pipeline') loadSchedule();
   };
 })();
 </script>

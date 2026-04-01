@@ -1,5 +1,6 @@
 import os
 import time
+import atexit
 import threading
 import requests
 import subprocess
@@ -1226,6 +1227,11 @@ def main_loop():
 _main_loop_started = False
 
 
+def _on_exit():
+    db_log_root("Приложение остановлено", status='info')
+    print("[main] Приложение остановлено")
+
+
 def start_main_loop():
     global _main_loop_started
     if not _main_loop_started:
@@ -1241,6 +1247,8 @@ def start_main_loop():
                 app_state["last_published"] = last["summary"]["published_at"]
                 app_state["last_ok"] = last["status"] == "ok"
         print(f"[DB] Загружено циклов из БД: {len(saved)}")
+        db_log_root("Приложение запущено", status='info')
+        atexit.register(_on_exit)
         t = threading.Thread(target=main_loop, daemon=True)
         t.start()
 
