@@ -371,6 +371,13 @@
   }
   .monitor-log-header:hover { background: rgba(255,255,255,.02); }
 
+  .monitor-log-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; align-self: center; background: #444; }
+  .monitor-log-dot.ls-ok,
+  .monitor-log-dot.ls-info     { background: #3ecf8e; }
+  .monitor-log-dot.ls-error    { background: #ff6060; }
+  .monitor-log-dot.ls-running  { background: #4a7cf7; box-shadow: 0 0 5px #4a7cf780; }
+  .monitor-log-dot.ls-прервана { background: #666; }
+
   .monitor-log-ts       { color: #8080a8; flex-shrink: 0; font-variant-numeric: tabular-nums; }
   .monitor-log-pipeline { color: #9898b8; flex-shrink: 0; }
   .monitor-log-status   { font-weight: 600; flex-shrink: 0; }
@@ -2045,8 +2052,9 @@ setInterval(refreshLog, 4000);
     const pip = PIPELINE_LABELS[log.pipeline] || log.pipeline;
     const hasEntries = log.entries && log.entries.length > 0;
     const chevron = hasEntries ? '<span class="monitor-log-chevron">▼</span>' : '';
-    return '<div class="monitor-log-item" data-lid="' + esc(log.id) + '" onclick="monitorToggleLog(event,this)">' +
+    return '<div class="monitor-log-item" data-lid="' + esc(log.id) + '" data-status="' + esc(st) + '" onclick="monitorToggleLog(event,this)">' +
       '<div class="monitor-log-header">' +
+        '<span class="monitor-log-dot ls-' + esc(st) + '"></span>' +
         '<span class="monitor-log-ts">'       + fmtMsk(log.time_point)                        + '</span>' +
         '<span class="monitor-log-pipeline">' + esc(pip)                                      + '</span>' +
         '<span class="monitor-log-status '    + esc(st) + '">' + esc(STATUS_LABELS[st] || st) + '</span>' +
@@ -2190,6 +2198,12 @@ setInterval(refreshLog, 4000);
     });
   }
 
+  function autoOpenRunning() {
+    document.querySelectorAll('.monitor-batch').forEach(function(el) {
+      if (el.querySelector('[data-status="running"]')) el.classList.add('open');
+    });
+  }
+
   function renderTimeline(data) {
     var el = document.getElementById('monitor-timeline');
     if (!el) return;
@@ -2203,6 +2217,7 @@ setInterval(refreshLog, 4000);
       return g.type === 'batch' ? renderBatch(g.data) : renderSysGroup(g.items);
     }).join('');
     restoreOpenState(prev);
+    autoOpenRunning();
   }
 
   function refreshMonitor() {
