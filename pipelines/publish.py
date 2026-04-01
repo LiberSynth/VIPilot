@@ -7,6 +7,7 @@ Pipeline 5 — Публикация.
 
 import os
 import time
+from datetime import datetime, timezone
 
 import requests
 
@@ -174,6 +175,12 @@ def run():
             db_log_pipeline('publish', 'Батч устарел — слот удалён из расписания или таргет отключён',
                             status='прервана', batch_id=batch_id)
             print(f"[publish] Батч {batch_id[:8]}… устарел, пропускаю")
+            return
+
+        now = datetime.now(timezone.utc)
+        if now < batch['scheduled_at']:
+            remaining = int((batch['scheduled_at'] - now).total_seconds() / 60)
+            print(f"[publish] Батч {batch_id[:8]}… ещё не время ({remaining} мин до публикации)")
             return
 
         print(f"[publish] Батч {batch_id[:8]}… ({target}) — начало публикации")
