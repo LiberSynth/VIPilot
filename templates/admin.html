@@ -234,7 +234,12 @@
   .toggle-wrap input:checked + .toggle-track { background: #f5a623; }
   .toggle-wrap input:checked + .toggle-track::after { transform: translateX(20px); }
 
-  .card.emulation-card { border-color: rgba(245,166,35,.35); }
+  .card.emulation-active { border-color: rgba(245,166,35,.35); }
+  .service-section-label {
+    font-size: 11px; color: #555; font-weight: 600;
+    text-transform: uppercase; letter-spacing: .07em;
+    padding: 18px 2px 6px;
+  }
   .emulation-badge {
     display: inline-block; font-size: 10px; font-weight: 700;
     background: rgba(245,166,35,.18); color: #f5a623;
@@ -762,7 +767,7 @@
         </div>
       </div>
 
-      <div class="card emulation-card">
+      <div class="card emulation-card{% if emulation_mode %} emulation-active{% endif %}">
         <div class="toggle-row">
           <div>
             <div class="toggle-label">
@@ -779,6 +784,29 @@
           </label>
         </div>
       </div>
+
+      <div class="card">
+        <div class="card-title">Производительность</div>
+        <div class="hint">Управляет горизонтом планирования батчей и частотой опроса пайплайнов.</div>
+        <div style="margin-top:14px">
+          <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block">Горизонт планирования</label>
+          <div class="lead-row">
+            <input type="number" name="buffer_hours" id="buffer_hours" value="{{ buffer_hours }}" min="1" max="720" step="1">
+            <span class="lead-unit">ч</span>
+          </div>
+          <div class="hint" style="margin-top:5px">Насколько вперёд создаются батчи. По умолчанию: 24 ч.</div>
+        </div>
+        <div style="margin-top:14px">
+          <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block">Таймаут рабочего цикла</label>
+          <div class="lead-row">
+            <input type="number" name="loop_interval" id="loop_interval" value="{{ loop_interval }}" min="1" max="3600" step="1">
+            <span class="lead-unit">с</span>
+          </div>
+          <div class="hint" style="margin-top:5px">Пауза между итерациями главного цикла. По умолчанию: 5 с.</div>
+        </div>
+      </div>
+
+      <div class="service-section-label">Сроки хранения</div>
 
       <div class="card">
         <div class="card-title">Подробный лог устаревает через</div>

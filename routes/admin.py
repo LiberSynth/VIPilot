@@ -69,6 +69,8 @@ def admin_page():
     vk_publish_story   = db_get("vk_publish_story", "1") == "1"
     vk_publish_wall    = db_get("vk_publish_wall",  "1") == "1"
     video_duration     = max(1, min(60, int(db_get("video_duration", "6"))))
+    buffer_hours       = max(1, min(720, int(db_get("buffer_hours", "24"))))
+    loop_interval      = max(1, min(3600, int(db_get("loop_interval", "5"))))
 
     return render_template(
         "admin.html",
@@ -84,6 +86,8 @@ def admin_page():
         vk_publish_story=vk_publish_story,
         vk_publish_wall=vk_publish_wall,
         video_duration=video_duration,
+        buffer_hours=buffer_hours,
+        loop_interval=loop_interval,
     )
 
 
@@ -145,6 +149,20 @@ def save():
         except (ValueError, TypeError):
             vid_dur = 6
         db_set("video_duration", str(vid_dur))
+
+    buf_str = request.form.get("buffer_hours", "").strip()
+    if buf_str:
+        try:
+            db_set("buffer_hours", str(max(1, min(720, int(buf_str)))))
+        except (ValueError, TypeError):
+            pass
+
+    loop_str = request.form.get("loop_interval", "").strip()
+    if loop_str:
+        try:
+            db_set("loop_interval", str(max(1, min(3600, int(loop_str)))))
+        except (ValueError, TypeError):
+            pass
 
     return redirect(url_for("admin.admin_page") + f"?tab={active_tab}")
 
