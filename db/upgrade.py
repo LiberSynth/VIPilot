@@ -94,10 +94,10 @@ def _create_stories():
             with conn.cursor() as cur:
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS stories (
-                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                        script TEXT NOT NULL,
-                        model_id UUID REFERENCES models(id),
-                        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                        id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                        time_point TIMESTAMPTZ NOT NULL DEFAULT now(),
+                        result     TEXT NOT NULL,
+                        model_id   UUID REFERENCES models(id)
                     )
                 """)
             conn.commit()
