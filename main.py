@@ -40,12 +40,6 @@ def parse_hhmm(s):
         return 6, 0
 
 
-def parse_lead_mins(s):
-    try:
-        return max(10, min(1440, int(s)))
-    except Exception:
-        return 120
-
 
 def parse_history_days(s):
     try:
@@ -138,8 +132,6 @@ def admin():
         return redirect(url_for("login"))
     metaprompt = db_get("metaprompt", "")
     system_prompt = db_get("system_prompt", "")
-    lead_mins = parse_lead_mins(db_get("lead_time_mins", "120"))
-
     history_days = parse_history_days(db_get("history_days", "7"))
     short_log_days = parse_short_log_days(db_get("short_log_days", "365"))
     emulation_mode = db_get("emulation_mode", "0") == "1"
@@ -147,15 +139,12 @@ def admin():
     notify_phone = db_get("notify_phone", "")
     vk_publish_story = db_get("vk_publish_story", "1") == "1"
     vk_publish_wall = db_get("vk_publish_wall", "1") == "1"
-    aspect_ratio_x = int(db_get("aspect_ratio_x", "9"))
-    aspect_ratio_y = int(db_get("aspect_ratio_y", "16"))
     video_duration = max(1, min(60, int(db_get("video_duration", "6"))))
 
     return render_template(
         "admin.html",
         metaprompt=metaprompt,
         system_prompt=system_prompt,
-        lead_time_mins=lead_mins,
         history_days=history_days,
         short_log_days=short_log_days,
         emulation_mode=emulation_mode,
@@ -163,8 +152,6 @@ def admin():
         notify_phone=notify_phone,
         vk_publish_story=vk_publish_story,
         vk_publish_wall=vk_publish_wall,
-        aspect_ratio_x=aspect_ratio_x,
-        aspect_ratio_y=aspect_ratio_y,
         video_duration=video_duration,
     )
 
@@ -188,10 +175,6 @@ def save():
     else:
         db_set("metaprompt", metaprompt)
 
-    lead_raw = request.form.get("lead_time_mins", "").strip()
-    if lead_raw:
-        db_set("lead_time_mins", str(parse_lead_mins(lead_raw)))
-
     history_raw = request.form.get("history_days", "").strip()
     if history_raw:
         db_set("history_days", str(parse_history_days(history_raw)))
@@ -213,17 +196,6 @@ def save():
         vk_story_raw = "1"
     db_set("vk_publish_story", "1" if vk_story_raw == "1" else "0")
     db_set("vk_publish_wall", "1" if vk_wall_raw == "1" else "0")
-
-    try:
-        ar_x = max(1, min(99, int(request.form.get("aspect_ratio_x", "9"))))
-    except (ValueError, TypeError):
-        ar_x = 9
-    try:
-        ar_y = max(1, min(99, int(request.form.get("aspect_ratio_y", "16"))))
-    except (ValueError, TypeError):
-        ar_y = 16
-    db_set("aspect_ratio_x", str(ar_x))
-    db_set("aspect_ratio_y", str(ar_y))
 
     vid_dur_str = request.form.get("video_duration")
     if vid_dur_str is not None:

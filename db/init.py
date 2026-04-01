@@ -33,14 +33,10 @@ def init_db():
                     INSERT INTO settings (key, value) VALUES
                         ('metaprompt', ''),
                         ('system_prompt', ''),
-                        ('publish_time', '03:00'),
-                        ('lead_time_mins', '60'),
                         ('notify_email', ''),
                         ('notify_phone', ''),
                         ('vk_publish_story', '1'),
                         ('vk_publish_wall', '1'),
-                        ('aspect_ratio_x', '9'),
-                        ('aspect_ratio_y', '16'),
                         ('video_duration', '6'),
                         ('buffer_hours', '24'),
                         ('loop_interval', '5')
@@ -54,10 +50,7 @@ def init_db():
                 """)
                 cur.execute("SELECT COUNT(*) FROM schedule")
                 if cur.fetchone()[0] == 0:
-                    cur.execute("SELECT value FROM settings WHERE key = 'publish_time'")
-                    _pt_row = cur.fetchone()
-                    _default_pt = _pt_row[0] if _pt_row else "03:00"
-                    cur.execute("INSERT INTO schedule (time_utc) VALUES (%s)", (_default_pt,))
+                    cur.execute("INSERT INTO schedule (time_utc) VALUES ('03:00')")
 
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS video_urls (
