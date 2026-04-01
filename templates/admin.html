@@ -336,6 +336,22 @@
   .monitor-batch-title { font-size: 13px; font-weight: 600; color: #e0e0f0; }
   .monitor-batch-sub   { font-size: 11px; color: #888; margin-top: 2px; }
 
+  @keyframes mon-ping {
+    0%   { transform: scale(1);   opacity: .7; }
+    70%  { transform: scale(2.2); opacity: 0;  }
+    100% { transform: scale(2.2); opacity: 0;  }
+  }
+  .monitor-active-pulse {
+    position: relative; width: 8px; height: 8px; flex-shrink: 0; align-self: center;
+  }
+  .monitor-active-pulse::after {
+    content: ''; position: absolute; inset: 0; border-radius: 50%; background: #4a7cf7;
+  }
+  .monitor-active-pulse::before {
+    content: ''; position: absolute; inset: 0; border-radius: 50%; background: #4a7cf7;
+    animation: mon-ping 1.5s ease-out infinite;
+  }
+
   .monitor-batch-arrow {
     font-size: 12px; color: #666; flex-shrink: 0;
     transition: transform .2s;
@@ -2092,6 +2108,9 @@ setInterval(refreshLog, 4000);
       '</div>';
     }
 
+    const isActive = logs.some(function(l) { return l.status === 'running'; });
+    const activePulse = isActive ? '<span class="monitor-active-pulse"></span>' : '';
+
     const logHtml = '<div class="monitor-log-list">' + logs.map(renderLogItem).join('') + '</div>';
 
     const hdrActions =
@@ -2104,6 +2123,7 @@ setInterval(refreshLog, 4000);
     return '<div class="monitor-batch bs-' + esc(bs) + '" data-bid="' + esc(batch.batch_id) + '" onclick="monitorToggleBatch(event,this)">' +
       '<div class="monitor-batch-header">' +
         '<span class="monitor-dot"></span>' +
+        activePulse +
         '<div class="monitor-batch-meta">' +
           '<div class="monitor-batch-title">' + fmtMsk(headTime) + '</div>' +
           '<div class="monitor-batch-sub">'   + esc(sub)         + '</div>' +
