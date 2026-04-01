@@ -2012,8 +2012,10 @@ setInterval(refreshLog, 4000);
     story_ready:   'сюжет готов',
     video_pending: 'видео: ожидание fal.ai',
     video_ready:   'видео готово',
-    video_error:   'видео: ошибка',
-    'устарел':     'устарел',
+    video_error:       'видео: ошибка',
+    transcode_ready:   'транскод готов',
+    transcode_error:   'транскод: ошибка',
+    'устарел':         'устарел',
   };
 
   function esc(s) {
@@ -2116,8 +2118,8 @@ setInterval(refreshLog, 4000);
     }
 
     const isActive = logs.some(function(l) { return l.status === 'running'; });
-    const doneStatuses = ['ok', 'done', 'completed', 'video_ready'];
-    const errorStatuses = ['error', 'video_error'];
+    const doneStatuses  = ['ok', 'done', 'completed', 'video_ready', 'transcode_ready'];
+    const errorStatuses = ['error', 'video_error', 'transcode_error'];
     const md = isActive ? 'md-active'
              : bs === 'устарел'                   ? 'md-skip'
              : doneStatuses.indexOf(bs) >= 0      ? 'md-ok'

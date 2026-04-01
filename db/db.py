@@ -407,6 +407,60 @@ def db_set_batch_video_ready(batch_id, video_url):
         return False
 
 
+def db_get_video_ready_batch():
+    """Возвращает первый батч со status='video_ready', или None."""
+    try:
+        with get_db() as conn:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute("""
+                    SELECT b.id, b.scheduled_at, b.target_id, b.story_id, b.video_url,
+                           t.name AS target_name,
+                           t.aspect_ratio_x, t.aspect_ratio_y
+                    FROM batches b
+                    JOIN targets t ON t.id = b.target_id
+                    WHERE b.status = 'video_ready'
+                    ORDER BY b.scheduled_at
+                    LIMIT 1
+                """)
+                row = cur.fetchone()
+        return dict(row) if row else None
+    except Exception as e:
+        print(f"[DB] Ошибка db_get_video_ready_batch: {e}")
+        return None
+
+
+def db_set_batch_transcode_ready(batch_id, video_file):
+    """Сохраняет путь к файлу и переводит батч в status='transcode_ready'."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE batches SET status = 'transcode_ready', video_file = %s WHERE id = %s",
+                    (video_file, batch_id),
+                )
+            conn.commit()
+        return True
+    except Exception as e:
+        print(f"[DB] Ошибка db_set_batch_transcode_ready: {e}")
+        return False
+
+
+def db_set_batch_transcode_error(batch_id):
+    """Переводит батч в status='transcode_error'."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE batches SET status = 'transcode_error' WHERE id = %s",
+                    (batch_id,),
+                )
+            conn.commit()
+        return True
+    except Exception as e:
+        print(f"[DB] Ошибка db_set_batch_transcode_error: {e}")
+        return False
+
+
 def db_set_batch_video_error(batch_id):
     """Переводит батч в status='video_error'."""
     try:

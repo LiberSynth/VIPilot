@@ -40,7 +40,7 @@ from db import (
 )
 from log import db_log_root, db_get_log, db_get_monitor
 from db.init import get_db
-from pipelines import planning, story, video
+from pipelines import planning, story, video, transcode
 
 FAL_KEY = os.environ["FAL_API_KEY"]
 VK_TOKEN = os.environ["VK_USER_TOKEN"]
@@ -1193,12 +1193,12 @@ def logout():
 
 def main_loop():
     _threads = {
-        'planning':    None,
-        'story':       None,   # Pipeline 2 — генерация сюжетов
-        'video':       None,   # Pipeline 3 — генерация видео
-        # 'transcoding': None,  # Pipeline 4 — транскодирование
-        # 'publishing':  None,  # Pipeline 5 — публикация
-        # 'cleanup':     None,  # Pipeline 6 — сборщик мусора
+        'planning':   None,
+        'story':      None,   # Pipeline 2 — генерация сюжетов
+        'video':      None,   # Pipeline 3 — генерация видео
+        'transcode':  None,   # Pipeline 4 — транскодирование
+        # 'publishing': None,  # Pipeline 5 — публикация
+        # 'cleanup':    None,  # Pipeline 6 — сборщик мусора
     }
 
     while True:
@@ -1224,10 +1224,10 @@ def main_loop():
                 _threads['video'] = threading.Thread(target=video.run, daemon=True)
                 _threads['video'].start()
 
-            # Pipeline 4: Транскодирование (заготовка)
-            # if _threads['transcoding'] is None or not _threads['transcoding'].is_alive():
-            #     _threads['transcoding'] = threading.Thread(target=transcoding.run, daemon=True)
-            #     _threads['transcoding'].start()
+            # Pipeline 4: Транскодирование
+            if _threads['transcode'] is None or not _threads['transcode'].is_alive():
+                _threads['transcode'] = threading.Thread(target=transcode.run, daemon=True)
+                _threads['transcode'].start()
 
             # Pipeline 5: Публикация (заготовка)
             # if _threads['publishing'] is None or not _threads['publishing'].is_alive():
