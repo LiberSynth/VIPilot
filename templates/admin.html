@@ -342,8 +342,13 @@
   }
   .monitor-batch.open .monitor-batch-arrow { transform: rotate(180deg); }
 
-  .monitor-batch-body { display: none; position: relative; }
+  .monitor-batch-body { display: none; }
   .monitor-batch.open .monitor-batch-body { display: block; }
+  .monitor-batch-body .cycle-float-btns {
+    position: static;
+    padding: 8px 10px 4px;
+    justify-content: flex-end;
+  }
 
   /* Log entries inside batch */
   .monitor-log-list {
@@ -2037,7 +2042,7 @@ setInterval(refreshLog, 4000);
     const pip = PIPELINE_LABELS[log.pipeline] || log.pipeline;
     const hasEntries = log.entries && log.entries.length > 0;
     const chevron = hasEntries ? '<span class="monitor-log-chevron">▼</span>' : '';
-    return '<div class="monitor-log-item" onclick="monitorToggleLog(event,this)">' +
+    return '<div class="monitor-log-item" data-lid="' + esc(log.id) + '" onclick="monitorToggleLog(event,this)">' +
       '<div class="monitor-log-header">' +
         '<span class="monitor-log-ts">'       + fmtMsk(log.time_point)                        + '</span>' +
         '<span class="monitor-log-pipeline">' + esc(pip)                                      + '</span>' +
@@ -2150,14 +2155,17 @@ setInterval(refreshLog, 4000);
   }
 
   function getOpenState() {
-    var bids = {}, sgkeys = {};
+    var bids = {}, sgkeys = {}, lids = {};
     document.querySelectorAll('.monitor-batch.open').forEach(function(el) {
       if (el.dataset.bid) bids[el.dataset.bid] = true;
     });
     document.querySelectorAll('.monitor-sysgroup.open').forEach(function(el) {
       if (el.dataset.sgKey) sgkeys[el.dataset.sgKey] = true;
     });
-    return { bids: bids, sgkeys: sgkeys };
+    document.querySelectorAll('.monitor-log-item.open').forEach(function(el) {
+      if (el.dataset.lid) lids[el.dataset.lid] = true;
+    });
+    return { bids: bids, sgkeys: sgkeys, lids: lids };
   }
 
   function restoreOpenState(state) {
@@ -2166,6 +2174,9 @@ setInterval(refreshLog, 4000);
     });
     document.querySelectorAll('.monitor-sysgroup').forEach(function(el) {
       if (state.sgkeys[el.dataset.sgKey]) el.classList.add('open');
+    });
+    document.querySelectorAll('.monitor-log-item').forEach(function(el) {
+      if (state.lids && state.lids[el.dataset.lid]) el.classList.add('open');
     });
   }
 
