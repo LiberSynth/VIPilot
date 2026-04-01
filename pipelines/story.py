@@ -121,7 +121,8 @@ def run():
         try:
             data = resp.json()
         except ValueError:
-            msg = f'OpenRouter вернул не-JSON (HTTP {resp.status_code}): {resp.text[:300]}'
+            body_preview = ' '.join(resp.text.split())[:200]
+            msg = f'OpenRouter вернул не-JSON (HTTP {resp.status_code}): {body_preview or "(пустое тело)"}'
             db_log_update(log_id, msg, 'error')
             if log_id:
                 db_log_entry(log_id, msg, level='error')
