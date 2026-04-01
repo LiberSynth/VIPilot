@@ -40,7 +40,7 @@ from db import (
 )
 from log import db_log_root, db_get_log, db_get_monitor
 from db.init import get_db
-from pipelines import planning, story, video, transcode
+from pipelines import planning, story, video, transcode, publish
 
 FAL_KEY = os.environ["FAL_API_KEY"]
 VK_TOKEN = os.environ["VK_USER_TOKEN"]
@@ -1197,7 +1197,7 @@ def main_loop():
         'story':      None,   # Pipeline 2 — генерация сюжетов
         'video':      None,   # Pipeline 3 — генерация видео
         'transcode':  None,   # Pipeline 4 — транскодирование
-        # 'publishing': None,  # Pipeline 5 — публикация
+        'publish':    None,   # Pipeline 5 — публикация
         # 'cleanup':    None,  # Pipeline 6 — сборщик мусора
     }
 
@@ -1229,10 +1229,10 @@ def main_loop():
                 _threads['transcode'] = threading.Thread(target=transcode.run, daemon=True)
                 _threads['transcode'].start()
 
-            # Pipeline 5: Публикация (заготовка)
-            # if _threads['publishing'] is None or not _threads['publishing'].is_alive():
-            #     _threads['publishing'] = threading.Thread(target=publishing.run, daemon=True)
-            #     _threads['publishing'].start()
+            # Pipeline 5: Публикация
+            if _threads['publish'] is None or not _threads['publish'].is_alive():
+                _threads['publish'] = threading.Thread(target=publish.run, daemon=True)
+                _threads['publish'].start()
 
             # Pipeline 6: Сборщик мусора (заготовка)
             # Очистка устаревших записей log, log_entries и буферных данных batches/stories.

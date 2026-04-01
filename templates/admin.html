@@ -2015,6 +2015,8 @@ setInterval(refreshLog, 4000);
     video_error:       'видео: ошибка',
     transcode_ready:   'транскод готов',
     transcode_error:   'транскод: ошибка',
+    published:         'опубликовано',
+    publish_error:     'публикация: ошибка',
     'устарел':         'устарел',
   };
 
@@ -2118,8 +2120,8 @@ setInterval(refreshLog, 4000);
     }
 
     const isActive = logs.some(function(l) { return l.status === 'running'; });
-    const doneStatuses  = ['ok', 'done', 'completed', 'video_ready', 'transcode_ready'];
-    const errorStatuses = ['error', 'video_error', 'transcode_error'];
+    const doneStatuses  = ['ok', 'done', 'completed', 'video_ready', 'transcode_ready', 'published'];
+    const errorStatuses = ['error', 'video_error', 'transcode_error', 'publish_error'];
     const md = isActive ? 'md-active'
              : bs === 'устарел'                   ? 'md-skip'
              : doneStatuses.indexOf(bs) >= 0      ? 'md-ok'

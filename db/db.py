@@ -461,6 +461,61 @@ def db_set_batch_transcode_error(batch_id):
         return False
 
 
+def db_get_transcode_ready_batch():
+    """Возвращает первый батч со status='transcode_ready', или None."""
+    try:
+        with get_db() as conn:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute("""
+                    SELECT b.id, b.scheduled_at, b.target_id, b.story_id,
+                           b.video_url, b.video_file,
+                           t.name AS target_name,
+                           t.aspect_ratio_x, t.aspect_ratio_y
+                    FROM batches b
+                    JOIN targets t ON t.id = b.target_id
+                    WHERE b.status = 'transcode_ready'
+                    ORDER BY b.scheduled_at
+                    LIMIT 1
+                """)
+                row = cur.fetchone()
+        return dict(row) if row else None
+    except Exception as e:
+        print(f"[DB] Ошибка db_get_transcode_ready_batch: {e}")
+        return None
+
+
+def db_set_batch_published(batch_id):
+    """Переводит батч в status='published' и ставит completed_at."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE batches SET status = 'published', completed_at = now() WHERE id = %s",
+                    (batch_id,),
+                )
+            conn.commit()
+        return True
+    except Exception as e:
+        print(f"[DB] Ошибка db_set_batch_published: {e}")
+        return False
+
+
+def db_set_batch_publish_error(batch_id):
+    """Переводит батч в status='publish_error'."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE batches SET status = 'publish_error' WHERE id = %s",
+                    (batch_id,),
+                )
+            conn.commit()
+        return True
+    except Exception as e:
+        print(f"[DB] Ошибка db_set_batch_publish_error: {e}")
+        return False
+
+
 def db_set_batch_video_error(batch_id):
     """Переводит батч в status='video_error'."""
     try:
