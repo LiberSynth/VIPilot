@@ -992,33 +992,27 @@ function scheduleServiceSave() {
   _serviceSaveTimer = setTimeout(saveServiceSettings, 800);
 }
 
-function constrainLifetimes(changed) {
+function validateLifetimes() {
   const ll  = document.getElementById('log_lifetime');
   const sll = document.getElementById('short_log_lifetime');
   const bl  = document.getElementById('batch_lifetime');
-  if (!ll || !sll || !bl) return;
-  let v_ll  = parseInt(ll.value)  || 1;
-  let v_sll = parseInt(sll.value) || 1;
-  let v_bl  = parseInt(bl.value)  || 1;
-  if (changed === 'log_lifetime') {
-    if (v_ll > v_sll) { v_sll = v_ll; sll.value = v_sll; }
-    if (v_bl < v_sll) { v_bl  = v_sll; bl.value  = v_bl;  }
-  } else if (changed === 'short_log_lifetime') {
-    if (v_ll  > v_sll) { v_ll  = v_sll; ll.value  = v_ll;  }
-    if (v_bl  < v_sll) { v_bl  = v_sll; bl.value  = v_bl;  }
-  } else if (changed === 'batch_lifetime') {
-    if (v_bl < v_sll) { v_sll = v_bl; sll.value = v_sll; }
-    if (v_ll > v_sll) { v_ll  = v_sll; ll.value  = v_ll;  }
-  }
+  if (!ll || !sll || !bl) return true;
+  const v_ll  = parseInt(ll.value)  || 0;
+  const v_sll = parseInt(sll.value) || 0;
+  const v_bl  = parseInt(bl.value)  || 0;
+  const llInvalid  = v_ll  > v_sll;
+  const sllInvalid = v_sll < v_ll || v_sll > v_bl;
+  const blInvalid  = v_bl  < v_sll;
+  ll.style.outline  = llInvalid  ? '2px solid #ff6060' : '';
+  sll.style.outline = sllInvalid ? '2px solid #ff6060' : '';
+  bl.style.outline  = blInvalid  ? '2px solid #ff6060' : '';
+  return !llInvalid && !sllInvalid && !blInvalid;
 }
 
 (function() {
   const fields = [
     document.getElementById('notify_email'),
     document.getElementById('notify_phone'),
-    document.getElementById('log_lifetime'),
-    document.getElementById('short_log_lifetime'),
-    document.getElementById('batch_lifetime'),
     document.getElementById('file_lifetime'),
   ].filter(Boolean);
   fields.forEach(f => {
@@ -1029,8 +1023,8 @@ function constrainLifetimes(changed) {
   ['log_lifetime', 'short_log_lifetime', 'batch_lifetime'].forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
-    el.addEventListener('change', () => { constrainLifetimes(id); scheduleServiceSave(); });
-    el.addEventListener('input',  () =>   constrainLifetimes(id));
+    el.addEventListener('input',  validateLifetimes);
+    el.addEventListener('change', () => { if (validateLifetimes()) scheduleServiceSave(); });
   });
 
   const emulChk = document.getElementById('emulation_check');

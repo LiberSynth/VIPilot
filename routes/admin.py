@@ -112,14 +112,15 @@ def save():
     file_lifetime_raw      = request.form.get("file_lifetime",      "").strip()
 
     if log_lifetime_raw or short_log_lifetime_raw or batch_lifetime_raw:
-        ll  = parse_log_lifetime(log_lifetime_raw       or db_get("log_lifetime",       "30"))
+        ll  = parse_log_lifetime(log_lifetime_raw             or db_get("log_lifetime",       "30"))
         sll = parse_short_log_lifetime(short_log_lifetime_raw or db_get("short_log_lifetime", "365"))
-        bl  = parse_batch_lifetime(batch_lifetime_raw   or db_get("batch_lifetime",     "7"))
-        ll  = min(ll,  sll)
-        bl  = max(bl,  sll)
-        db_set("log_lifetime",       str(ll))
-        db_set("short_log_lifetime", str(sll))
-        db_set("batch_lifetime",     str(bl))
+        bl  = parse_batch_lifetime(batch_lifetime_raw         or db_get("batch_lifetime",     "7"))
+        if ll <= sll <= bl:
+            db_set("log_lifetime",       str(ll))
+            db_set("short_log_lifetime", str(sll))
+            db_set("batch_lifetime",     str(bl))
+        else:
+            flash("Сроки хранения нарушают иерархию: подробный ≤ краткий ≤ история батчей", "error")
 
     if file_lifetime_raw:
         db_set("file_lifetime", str(parse_file_lifetime(file_lifetime_raw)))
