@@ -1,12 +1,13 @@
-import psycopg2.extras
 from flask import Blueprint, jsonify, request
 
 from db import (
     db_get_schedule,
     db_add_schedule_slot,
     db_delete_schedule_slot,
+    db_get_models,
+    db_activate_model,
+    db_reorder_models,
 )
-from db.init import get_db
 from log import db_get_log, db_get_monitor
 from utils.auth import is_authenticated
 from utils.utils import parse_hhmm, to_msk, to_utc_from_msk
@@ -70,36 +71,15 @@ def api_delete_schedule_slot(slot_id):
 def api_models():
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
-    try:
-        with get_db() as conn:
-            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-                cur.execute("""
-                    SELECT vm.id, vm.name, vm.url, vm.body, vm."order", vm.active,
-                           p.name AS platform_name
-                    FROM models vm
-                    LEFT JOIN ai_platforms p ON p.id = vm.ai_platform_id
-                    WHERE vm.type = 0
-                    ORDER BY vm."order" ASC
-                """)
-                rows = cur.fetchall()
-        return jsonify([dict(r) for r in rows])
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    return jsonify(db_get_models("text-to-video"))
 
 
 @bp.route("/models/<string:model_id>/activate", methods=["POST"])
 def api_model_activate(model_id):
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute("UPDATE models SET active = FALSE WHERE type = 0")
-                cur.execute("UPDATE models SET active = TRUE WHERE id = %s", (model_id,))
-            conn.commit()
-        return jsonify({"ok": True})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    ok = db_activate_model(model_id, "text-to-video")
+    return jsonify({"ok": ok})
 
 
 @bp.route("/models/reorder", methods=["POST"])
@@ -110,51 +90,23 @@ def api_models_reorder():
     ids = data.get("ids", [])
     if not ids or not isinstance(ids, list):
         return jsonify({"error": "ids required"}), 400
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                for idx, model_id in enumerate(ids, start=1):
-                    cur.execute('UPDATE models SET "order" = %s WHERE id = %s', (idx, model_id))
-            conn.commit()
-        return jsonify({"ok": True})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    ok = db_reorder_models(ids)
+    return jsonify({"ok": ok})
 
 
 @bp.route("/text-models", methods=["GET"])
 def api_text_models():
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
-    try:
-        with get_db() as conn:
-            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-                cur.execute("""
-                    SELECT m.id, m.name, m.url, m.body, m."order", m.active,
-                           p.name AS platform_name
-                    FROM models m
-                    LEFT JOIN ai_platforms p ON p.id = m.ai_platform_id
-                    WHERE m.type = 1
-                    ORDER BY m."order" ASC
-                """)
-                rows = cur.fetchall()
-        return jsonify([dict(r) for r in rows])
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    return jsonify(db_get_models("text"))
 
 
 @bp.route("/text-models/<model_id>/activate", methods=["POST"])
 def api_text_model_activate(model_id):
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute("UPDATE models SET active = FALSE WHERE type = 1")
-                cur.execute("UPDATE models SET active = TRUE WHERE id = %s", (model_id,))
-            conn.commit()
-        return jsonify({"ok": True})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    ok = db_activate_model(model_id, "text")
+    return jsonify({"ok": ok})
 
 
 @bp.route("/text-models/reorder", methods=["POST"])
@@ -165,12 +117,5 @@ def api_text_models_reorder():
     ids = data.get("ids", [])
     if not ids or not isinstance(ids, list):
         return jsonify({"error": "ids required"}), 400
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                for idx, model_id in enumerate(ids, start=1):
-                    cur.execute('UPDATE models SET "order" = %s WHERE id = %s', (idx, model_id))
-            conn.commit()
-        return jsonify({"ok": True})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    ok = db_reorder_models(ids)
+    return jsonify({"ok": ok})

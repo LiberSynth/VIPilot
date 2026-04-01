@@ -20,7 +20,6 @@ from db import (
 from log import db_log_pipeline, db_log_entry, db_log_update, db_log_interrupt_running
 
 _OUT_DIR = 'videos'
-os.makedirs(_OUT_DIR, exist_ok=True)
 
 
 def _ffmpeg(src, dst, log_id):
@@ -57,6 +56,7 @@ def _ffmpeg(src, dst, log_id):
 
 def run():
     try:
+        os.makedirs(_OUT_DIR, exist_ok=True)
         db_log_interrupt_running('transcode')
 
         batch = db_get_video_ready_batch()

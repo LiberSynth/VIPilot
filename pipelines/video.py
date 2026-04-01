@@ -39,20 +39,16 @@ def _headers():
     }
 
 
-def _build_body(body_tpl, prompt, ar_x, ar_y):
+def _build_body(body_tpl, prompt, ar_x, ar_y, video_duration):
     """Заполняет шаблон тела запроса значениями из батча/настроек."""
     body = dict(body_tpl)
     if 'prompt' in body:
         body['prompt'] = str(body['prompt']).format(prompt)
     if 'duration' in body:
-        try:
-            dur = max(1, min(60, int(db_get('video_duration', '6'))))
-        except (ValueError, TypeError):
-            dur = 6
         if body['duration'] == '{int}':
-            body['duration'] = dur
+            body['duration'] = video_duration
         else:
-            body['duration'] = str(body['duration']).format(dur)
+            body['duration'] = str(body['duration']).format(video_duration)
     if 'aspect_ratio' in body:
         body['aspect_ratio'] = str(body['aspect_ratio']).format(ar_x, ar_y)
     return body
@@ -136,6 +132,11 @@ def run():
         ar_y     = batch['aspect_ratio_y']
         story_id = str(batch['story_id'])
 
+        try:
+            video_duration = max(1, min(60, int(db_get('video_duration', '6'))))
+        except (ValueError, TypeError):
+            video_duration = 6
+
         if not db_is_batch_scheduled(batch['scheduled_at'], batch['target_id']):
             db_set_batch_obsolete(batch_id)
             db_log_pipeline('video', 'Батч устарел — слот удалён из расписания или таргет отключён',
@@ -190,7 +191,7 @@ def run():
                 preview = story_text[:120] + ('…' if len(story_text) > 120 else '')
                 db_log_entry(log_id, f"Промпт: {preview}")
 
-            body = _build_body(body_tpl, story_text, ar_x, ar_y)
+            body = _build_body(body_tpl, story_text, ar_x, ar_y, video_duration)
             print(f"[video] Запрос к fal.ai: модель={model_name}, ar={ar_x}:{ar_y}")
 
             try:

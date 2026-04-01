@@ -9,8 +9,7 @@ from datetime import datetime, timezone, timedelta
 from db import db_get, db_get_schedule, db_get_active_targets, db_ensure_batch
 from log import db_log_pipeline, db_log_entry
 from utils.utils import parse_hhmm
-
-MSK = timezone(timedelta(hours=3))
+from utils.consts import MSK
 
 
 def run():

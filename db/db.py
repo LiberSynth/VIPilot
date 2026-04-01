@@ -7,24 +7,6 @@ from .init import get_db
 
 
 # ---------------------------------------------------------------------------
-# Helpers (будут вынесены в utils.py на следующем шаге)
-# ---------------------------------------------------------------------------
-
-def _parse_history_days(s):
-    try:
-        return max(1, min(365, int(s)))
-    except Exception:
-        return 7
-
-
-def _parse_short_log_days(s):
-    try:
-        return max(1, min(3650, int(s)))
-    except Exception:
-        return 365
-
-
-# ---------------------------------------------------------------------------
 # Настройки
 # ---------------------------------------------------------------------------
 
@@ -540,3 +522,55 @@ def db_set_batch_video_error(batch_id):
         print(f"[DB] Ошибка db_set_batch_video_error: {e}")
         return False
 
+
+
+# ---------------------------------------------------------------------------
+# AI-модели — управление (используется в routes/api.py)
+# ---------------------------------------------------------------------------
+
+def db_get_models(model_type: str):
+    """Возвращает список моделей заданного типа ('text' или 'text-to-video')."""
+    try:
+        with get_db() as conn:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute("""
+                    SELECT m.id, m.name, m.url, m.body, m."order", m.active,
+                           p.name AS platform_name
+                    FROM ai_models m
+                    LEFT JOIN ai_platforms p ON p.id = m.platform_id
+                    WHERE m.type = %s
+                    ORDER BY m."order" ASC
+                """, (model_type,))
+                rows = cur.fetchall()
+        return [dict(r) for r in rows]
+    except Exception as e:
+        print(f"[DB] Ошибка db_get_models({model_type}): {e}")
+        return []
+
+
+def db_activate_model(model_id: str, model_type: str):
+    """Деактивирует все модели типа, активирует указанную."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("UPDATE ai_models SET active = FALSE WHERE type = %s", (model_type,))
+                cur.execute("UPDATE ai_models SET active = TRUE  WHERE id = %s", (model_id,))
+            conn.commit()
+        return True
+    except Exception as e:
+        print(f"[DB] Ошибка db_activate_model: {e}")
+        return False
+
+
+def db_reorder_models(ids: list):
+    """Выставляет поле order по порядку переданных UUID."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                for idx, model_id in enumerate(ids, start=1):
+                    cur.execute('UPDATE ai_models SET "order" = %s WHERE id = %s', (idx, model_id))
+            conn.commit()
+        return True
+    except Exception as e:
+        print(f"[DB] Ошибка db_reorder_models: {e}")
+        return False

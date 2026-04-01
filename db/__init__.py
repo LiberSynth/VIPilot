@@ -27,4 +27,7 @@ from .db import (
     db_get_transcode_ready_batch,
     db_set_batch_published,
     db_set_batch_publish_error,
+    db_get_models,
+    db_activate_model,
+    db_reorder_models,
 )
