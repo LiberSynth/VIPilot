@@ -8,6 +8,7 @@ def run_upgrades():
     """
     _add_emulation_mode()
     _add_buffer_hours()
+    _create_ai_models()
     _create_targets()
     _create_stories()
     _create_batches()
@@ -51,6 +52,29 @@ def _add_buffer_hours():
             conn.commit()
     except Exception as e:
         print(f"[DB] Ошибка миграции _add_buffer_hours: {e}")
+
+
+def _create_ai_models():
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS ai_models (
+                        id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                        name           VARCHAR(200) NOT NULL,
+                        url            VARCHAR(200) NOT NULL,
+                        body           JSONB NOT NULL DEFAULT '{}',
+                        "order"        INTEGER NOT NULL DEFAULT 0,
+                        active         BOOLEAN NOT NULL DEFAULT FALSE,
+                        ai_platform_id UUID REFERENCES ai_platforms(id),
+                        platform_id    UUID REFERENCES ai_platforms(id),
+                        type           VARCHAR(50) NOT NULL,
+                        time_point     TIMESTAMPTZ NOT NULL DEFAULT now()
+                    )
+                """)
+            conn.commit()
+    except Exception as e:
+        print(f"[DB] Ошибка миграции _create_ai_models: {e}")
 
 
 def _create_targets():

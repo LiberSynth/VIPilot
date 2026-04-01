@@ -54,9 +54,9 @@ def init_db():
 
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS video_urls (
-                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                        url TEXT NOT NULL UNIQUE,
-                        created_at FLOAT NOT NULL
+                        id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                        url        TEXT NOT NULL UNIQUE,
+                        time_point FLOAT NOT NULL
                     )
                 """)
                 cur.execute("""
@@ -75,6 +75,20 @@ def init_db():
                     WHERE NOT EXISTS (SELECT 1 FROM ai_platforms WHERE name = v.name)
                 """)
                 cur.execute("""
+                    CREATE TABLE IF NOT EXISTS ai_models (
+                        id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                        name           VARCHAR(200) NOT NULL,
+                        url            VARCHAR(200) NOT NULL,
+                        body           JSONB NOT NULL DEFAULT '{}',
+                        "order"        INTEGER NOT NULL DEFAULT 0,
+                        active         BOOLEAN NOT NULL DEFAULT FALSE,
+                        ai_platform_id UUID REFERENCES ai_platforms(id),
+                        platform_id    UUID REFERENCES ai_platforms(id),
+                        type           VARCHAR(50) NOT NULL,
+                        time_point     TIMESTAMPTZ NOT NULL DEFAULT now()
+                    )
+                """)
+                cur.execute("""
                     CREATE TABLE IF NOT EXISTS targets (
                         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                         name VARCHAR(200) NOT NULL,
@@ -85,10 +99,10 @@ def init_db():
                 """)
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS stories (
-                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                        script TEXT NOT NULL,
-                        model_id UUID REFERENCES ai_models(id),
-                        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                        id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                        time_point TIMESTAMPTZ NOT NULL DEFAULT now(),
+                        result     TEXT NOT NULL,
+                        model_id   UUID REFERENCES ai_models(id)
                     )
                 """)
                 cur.execute("""
