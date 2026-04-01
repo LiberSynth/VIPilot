@@ -7,7 +7,7 @@ Pipeline 1 — Планирование.
 from datetime import datetime, timezone, timedelta
 
 from db import db_get, db_get_schedule, db_get_active_targets, db_ensure_batch
-from log import db_log_pipeline
+from log import db_log_pipeline, db_log_entry
 
 
 def _parse_hhmm(s):
@@ -39,12 +39,16 @@ def run():
                         batch_id = db_ensure_batch(dt, target['id'])
                         if batch_id:
                             created += 1
-                            db_log_pipeline(
+                            log_id = db_log_pipeline(
                                 'planning',
-                                f"Батч запланирован: {dt.strftime('%d.%m %H:%M')} UTC / {target['name']}",
+                                'Батч запланирован',
                                 status='ok',
                                 batch_id=batch_id,
                             )
+                            if log_id:
+                                db_log_entry(log_id, f"Публикация: {dt.strftime('%d.%m.%Y %H:%M')} UTC")
+                                db_log_entry(log_id, f"Таргет: {target['name']}  ({target['aspect_ratio_x']}:{target['aspect_ratio_y']})")
+                                db_log_entry(log_id, f"Горизонт планирования: {buffer_hours} ч")
                             print(
                                 f"[planning] Создан батч: {dt.strftime('%d.%m %H:%M')} UTC"
                                 f" / {target['name']}"
