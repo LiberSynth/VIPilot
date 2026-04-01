@@ -574,3 +574,98 @@ def db_reorder_models(ids: list):
     except Exception as e:
         print(f"[DB] Ошибка db_reorder_models: {e}")
         return False
+
+
+# ---------------------------------------------------------------------------
+# Cleanup — очистка устаревших данных
+# ---------------------------------------------------------------------------
+
+def db_cleanup_log_entries(log_lifetime_days: int) -> int:
+    """Удаляет log_entries записи, чей родительский лог старше log_lifetime_days.
+    Возвращает количество удалённых строк."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    DELETE FROM log_entries
+                    WHERE log_id IN (
+                        SELECT id FROM log
+                        WHERE time_point < now() - make_interval(days => %s)
+                    )
+                """, (log_lifetime_days,))
+                count = cur.rowcount
+            conn.commit()
+        return count
+    except Exception as e:
+        print(f"[DB] Ошибка db_cleanup_log_entries: {e}")
+        return 0
+
+
+def db_cleanup_logs(short_log_lifetime_days: int) -> int:
+    """Удаляет записи log (вместе с оставшимися log_entries) старше short_log_lifetime_days.
+    Возвращает количество удалённых строк."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    DELETE FROM log_entries
+                    WHERE log_id IN (
+                        SELECT id FROM log
+                        WHERE time_point < now() - make_interval(days => %s)
+                    )
+                """, (short_log_lifetime_days,))
+                cur.execute("""
+                    DELETE FROM log
+                    WHERE time_point < now() - make_interval(days => %s)
+                """, (short_log_lifetime_days,))
+                count = cur.rowcount
+            conn.commit()
+        return count
+    except Exception as e:
+        print(f"[DB] Ошибка db_cleanup_logs: {e}")
+        return 0
+
+
+def db_cleanup_batches(batch_lifetime_days: int) -> list:
+    """Удаляет батчи со статусом 'published'/'устарел' старше batch_lifetime_days.
+    Удаляет связанные логи и осиротевшие stories.
+    Возвращает список video_file путей для физического удаления."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT id, video_file FROM batches
+                    WHERE status IN ('published', 'устарел')
+                      AND completed_at < now() - make_interval(days => %s)
+                """, (batch_lifetime_days,))
+                rows = cur.fetchall()
+                if not rows:
+                    return []
+                batch_ids  = [str(r[0]) for r in rows]
+                video_files = [r[1] for r in rows if r[1]]
+
+                fmt = ','.join(['%s'] * len(batch_ids))
+
+                cur.execute(f"""
+                    DELETE FROM log_entries
+                    WHERE log_id IN (
+                        SELECT id FROM log WHERE batch_id IN ({fmt})
+                    )
+                """, batch_ids)
+
+                cur.execute(f"DELETE FROM log WHERE batch_id IN ({fmt})", batch_ids)
+
+                cur.execute(f"DELETE FROM batches WHERE id IN ({fmt})", batch_ids)
+
+                cur.execute("""
+                    DELETE FROM stories
+                    WHERE id NOT IN (
+                        SELECT DISTINCT story_id FROM batches WHERE story_id IS NOT NULL
+                    )
+                """)
+
+            conn.commit()
+        return video_files
+    except Exception as e:
+        print(f"[DB] Ошибка db_cleanup_batches: {e}")
+        return []

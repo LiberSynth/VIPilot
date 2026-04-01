@@ -6,7 +6,7 @@ from flask import Flask, request
 
 from db import init_db, run_upgrades, db_get
 from log import db_log_root
-from pipelines import planning, story, video, transcode, publish
+from pipelines import planning, story, video, transcode, publish, cleanup
 from routes.admin import bp as admin_bp
 from routes.api import bp as api_bp
 from utils.consts import FLASK_SECRET
@@ -43,7 +43,7 @@ def main_loop():
         'video':     None,
         'transcode': None,
         'publish':   None,
-        # 'cleanup': None,
+        'cleanup':   None,
     }
 
     while True:
@@ -56,15 +56,11 @@ def main_loop():
                 ('video',     video),
                 ('transcode', transcode),
                 ('publish',   publish),
+                ('cleanup',   cleanup),
             ]:
                 if _threads[name] is None or not _threads[name].is_alive():
                     _threads[name] = threading.Thread(target=module.run, daemon=True)
                     _threads[name].start()
-
-            # Pipeline 6 (cleanup) — заготовка
-            # if _threads['cleanup'] is None or not _threads['cleanup'].is_alive():
-            #     _threads['cleanup'] = threading.Thread(target=cleanup.run, daemon=True)
-            #     _threads['cleanup'].start()
 
         except Exception as e:
             db_log_root(f"Ошибка главного цикла: {e}", status='error')

@@ -30,4 +30,7 @@ from .db import (
     db_get_models,
     db_activate_model,
     db_reorder_models,
+    db_cleanup_log_entries,
+    db_cleanup_logs,
+    db_cleanup_batches,
 )
