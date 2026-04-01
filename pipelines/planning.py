@@ -8,13 +8,9 @@ from datetime import datetime, timezone, timedelta
 
 from db import db_get, db_get_schedule, db_get_active_targets, db_ensure_batch
 from log import db_log_pipeline, db_log_entry
+from utils.utils import parse_hhmm
 
 MSK = timezone(timedelta(hours=3))
-
-
-def _parse_hhmm(s):
-    h, m = map(int, s.split(':'))
-    return h, m
 
 
 def run():
@@ -34,7 +30,7 @@ def run():
         for day_offset in range(days_to_check):
             day = (now + timedelta(days=day_offset)).date()
             for slot in schedule:
-                h, m = _parse_hhmm(slot['time_utc'])
+                h, m = parse_hhmm(slot['time_utc'])
                 dt = datetime(day.year, day.month, day.day, h, m, tzinfo=timezone.utc)
                 if now <= dt < window_end:
                     for target in targets:

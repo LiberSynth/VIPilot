@@ -1,0 +1,135 @@
+import time
+from flask import (
+    Blueprint,
+    render_template,
+    request,
+    redirect,
+    url_for,
+    session,
+    flash,
+    send_file,
+)
+
+from db import (
+    db_get,
+    db_set,
+)
+from utils.consts import ADMIN_PASSWORD
+from utils.auth import is_authenticated, password_fingerprint
+from utils.utils import parse_history_days, parse_short_log_days
+
+bp = Blueprint("admin", __name__)
+
+
+@bp.route("/favicon.ico")
+def favicon():
+    return send_file("generated-icon.png", mimetype="image/png")
+
+
+@bp.route("/healthz")
+def healthz():
+    return "ok", 200
+
+
+@bp.route("/", methods=["GET", "POST"])
+def login():
+    if is_authenticated():
+        return redirect(url_for("admin.admin_page"))
+
+    error = False
+    if request.method == "POST":
+        if request.form.get("password") == ADMIN_PASSWORD:
+            session["auth"] = True
+            session["pw_fp"] = password_fingerprint()
+            session["auth_ts"] = time.time()
+            session.permanent = False
+            return redirect(url_for("admin.admin_page"))
+        error = True
+    return render_template("login.html", error=error)
+
+
+@bp.route("/admin")
+def admin_page():
+    if not is_authenticated():
+        return redirect(url_for("admin.login"))
+    metaprompt      = db_get("metaprompt", "")
+    system_prompt   = db_get("system_prompt", "")
+    history_days    = parse_history_days(db_get("history_days", "7"))
+    short_log_days  = parse_short_log_days(db_get("short_log_days", "365"))
+    emulation_mode  = db_get("emulation_mode", "0") == "1"
+    notify_email    = db_get("notify_email", "")
+    notify_phone    = db_get("notify_phone", "")
+    vk_publish_story = db_get("vk_publish_story", "1") == "1"
+    vk_publish_wall  = db_get("vk_publish_wall",  "1") == "1"
+    video_duration  = max(1, min(60, int(db_get("video_duration", "6"))))
+
+    return render_template(
+        "admin.html",
+        metaprompt=metaprompt,
+        system_prompt=system_prompt,
+        history_days=history_days,
+        short_log_days=short_log_days,
+        emulation_mode=emulation_mode,
+        notify_email=notify_email,
+        notify_phone=notify_phone,
+        vk_publish_story=vk_publish_story,
+        vk_publish_wall=vk_publish_wall,
+        video_duration=video_duration,
+    )
+
+
+@bp.route("/save", methods=["POST"])
+def save():
+    if not is_authenticated():
+        return redirect(url_for("admin.login"))
+
+    system_prompt_val = request.form.get("system_prompt")
+    if system_prompt_val is not None:
+        db_set("system_prompt", system_prompt_val)
+
+    metaprompt = request.form.get("metaprompt", "").strip()
+    active_tab = request.form.get("active_tab", "pipeline")
+    if not metaprompt:
+        if active_tab == "story":
+            print("[SAVE] Попытка сохранить пустой мета-промпт — отклонено")
+            flash("Мета-промпт не может быть пустым", "error")
+            return redirect(url_for("admin.admin_page"))
+    else:
+        db_set("metaprompt", metaprompt)
+
+    history_raw = request.form.get("history_days", "").strip()
+    if history_raw:
+        db_set("history_days", str(parse_history_days(history_raw)))
+
+    short_log_raw = request.form.get("short_log_days", "").strip()
+    if short_log_raw:
+        db_set("short_log_days", str(parse_short_log_days(short_log_raw)))
+
+    emulation_raw = request.form.get("emulation_mode", "0")
+    db_set("emulation_mode", "1" if emulation_raw == "1" else "0")
+
+    db_set("notify_email", request.form.get("notify_email", "").strip())
+    db_set("notify_phone", request.form.get("notify_phone", "").strip())
+
+    vk_story_raw = request.form.get("vk_publish_story", "0")
+    vk_wall_raw  = request.form.get("vk_publish_wall",  "0")
+    if vk_story_raw != "1" and vk_wall_raw != "1":
+        vk_story_raw = "1"
+    db_set("vk_publish_story", "1" if vk_story_raw == "1" else "0")
+    db_set("vk_publish_wall",  "1" if vk_wall_raw  == "1" else "0")
+
+    vid_dur_str = request.form.get("video_duration")
+    if vid_dur_str is not None:
+        try:
+            vid_dur = max(1, min(60, int(vid_dur_str)))
+        except (ValueError, TypeError):
+            vid_dur = 6
+        db_set("video_duration", str(vid_dur))
+
+    return redirect(url_for("admin.admin_page") + f"?tab={active_tab}")
+
+
+@bp.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("admin.login"))
