@@ -9,6 +9,8 @@ from datetime import datetime, timezone, timedelta
 from db import db_get, db_get_schedule, db_get_active_targets, db_ensure_batch
 from log import db_log_pipeline, db_log_entry
 
+MSK = timezone(timedelta(hours=3))
+
 
 def _parse_hhmm(s):
     h, m = map(int, s.split(':'))
@@ -46,7 +48,8 @@ def run():
                                 batch_id=batch_id,
                             )
                             if log_id:
-                                db_log_entry(log_id, f"Публикация: {dt.strftime('%d.%m.%Y %H:%M')} UTC")
+                                dt_msk = dt.astimezone(MSK)
+                                db_log_entry(log_id, f"Публикация: {dt_msk.strftime('%d.%m.%Y %H:%M')} МСК")
                                 db_log_entry(log_id, f"Таргет: {target['name']}  ({target['aspect_ratio_x']}:{target['aspect_ratio_y']})")
                                 db_log_entry(log_id, f"Горизонт планирования: {buffer_hours} ч")
                             print(
