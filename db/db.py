@@ -264,19 +264,18 @@ def db_get_story_ready_batch():
 
 
 def db_get_video_pending_batch():
-    """Возвращает первый батч со status='video_pending' и fal_request_id, или None."""
+    """Возвращает первый батч со status='video_pending' и заполненным data, или None."""
     try:
         with get_db() as conn:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
                 cur.execute("""
-                    SELECT b.id, b.scheduled_at, b.target_id, b.story_id,
-                           b.fal_request_id, b.fal_status_url, b.fal_response_url,
+                    SELECT b.id, b.scheduled_at, b.target_id, b.story_id, b.data,
                            t.name AS target_name,
                            t.aspect_ratio_x, t.aspect_ratio_y
                     FROM batches b
                     JOIN targets t ON t.id = b.target_id
                     WHERE b.status = 'video_pending'
-                      AND b.fal_request_id IS NOT NULL
+                      AND b.data IS NOT NULL
                     ORDER BY b.scheduled_at
                     LIMIT 1
                 """)
@@ -373,19 +372,17 @@ def db_get_active_video_model():
         return None, None, None, None, None
 
 
-def db_set_batch_video_pending(batch_id, request_id, status_url, response_url):
-    """Сохраняет fal_request_id и переводит батч в status='video_pending'."""
+def db_set_batch_video_pending(batch_id, job_data):
+    """Сохраняет данные задания и переводит батч в status='video_pending'."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """UPDATE batches
                        SET status = 'video_pending',
-                           fal_request_id   = %s,
-                           fal_status_url   = %s,
-                           fal_response_url = %s
+                           data   = %s::jsonb
                        WHERE id = %s""",
-                    (request_id, status_url, response_url, batch_id),
+                    (json.dumps(job_data), batch_id),
                 )
             conn.commit()
         return True

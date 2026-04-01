@@ -148,9 +148,9 @@ def run():
 
         # --- Возобновление ---
         if resumed:
-            request_id   = batch['fal_request_id']
-            status_url   = batch['fal_status_url']
-            response_url = batch['fal_response_url']
+            request_id   = batch['data']['request_id']
+            status_url   = batch['data']['status_url']
+            response_url = batch['data']['response_url']
             log_id = db_log_pipeline(
                 'video', 'Генерация видео… (возобновление)',
                 status='running', batch_id=batch_id,
@@ -243,7 +243,11 @@ def run():
             response_url = data.get('response_url',
                                     f"{platform_url}/requests/{request_id}")
 
-            db_set_batch_video_pending(batch_id, request_id, status_url, response_url)
+            db_set_batch_video_pending(batch_id, {
+                'request_id':   request_id,
+                'status_url':   status_url,
+                'response_url': response_url,
+            })
             if log_id:
                 db_log_entry(log_id, f"Запрос принят: {request_id}")
             print(f"[video] Генерация запущена: request_id={request_id}")

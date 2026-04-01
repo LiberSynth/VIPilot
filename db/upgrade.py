@@ -18,7 +18,7 @@ def run_upgrades():
     _log_batch_id_nullable()
     _batches_unique_constraint()
     _batches_add_fal_fields()
-    _batches_add_video_job_meta()
+    _batches_add_video_job_data()
 
 
 def _add_emulation_mode():
@@ -230,3 +230,20 @@ def _batches_add_fal_fields():
             conn.commit()
     except Exception as e:
         print(f"[DB] Ошибка миграции _batches_add_fal_fields: {e}")
+
+
+def _batches_add_video_job_data():
+    """Заменяет платформо-специфичные поля fal_* на универсальный JSONB-столбец data."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("ALTER TABLE batches ADD COLUMN IF NOT EXISTS data JSONB")
+                cur.execute("""
+                    ALTER TABLE batches
+                        DROP COLUMN IF EXISTS fal_request_id,
+                        DROP COLUMN IF EXISTS fal_status_url,
+                        DROP COLUMN IF EXISTS fal_response_url
+                """)
+            conn.commit()
+    except Exception as e:
+        print(f"[DB] Ошибка миграции _batches_add_video_job_data: {e}")
