@@ -2294,6 +2294,7 @@ setInterval(refreshLog, 4000);
 
   window.monitorToggleLog = function(e, el) {
     e.stopPropagation();
+    if (e.target.closest('.monitor-entries')) return;
     if (el.querySelector('.monitor-entries')) el.classList.toggle('open');
   };
 
