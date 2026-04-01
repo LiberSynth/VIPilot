@@ -1512,9 +1512,9 @@ function validateLifetimes() {
   }
 
   function renderSysGroup(items) {
-    const key     = items[0] ? items[0].time_point : '';
-    const headTime = items[0] ? items[0].time_point : null;
-    const n       = items.length;
+    const key      = items[0] ? items[0].time_point : '';
+    const headTime = items.length ? items[items.length - 1].time_point : null;
+    const n        = items.length;
     const sub     = n + ' ' + (n === 1 ? 'событие' : n < 5 ? 'события' : 'событий');
 
     const rows = items.map(function(e) {
