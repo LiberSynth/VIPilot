@@ -13,6 +13,8 @@ from db import (
     db_get_active_text_model,
     db_create_story,
     db_set_batch_story,
+    db_is_batch_scheduled,
+    db_set_batch_obsolete,
 )
 from log import db_log_pipeline, db_log_entry, db_log_update, db_log_interrupt_running
 
@@ -52,6 +54,14 @@ def run():
 
         batch_id = str(batch['id'])
         target   = batch['target_name']
+
+        if not db_is_batch_scheduled(batch['scheduled_at']):
+            db_set_batch_obsolete(batch_id)
+            log_id = db_log_pipeline('story', 'Батч устарел — слот удалён из расписания',
+                                     status='прервана', batch_id=batch_id)
+            print(f"[story] Батч {batch_id[:8]}… устарел, пропускаю")
+            return
+
         print(f"[story] Батч {batch_id[:8]}… ({target}) — начало генерации сюжета")
 
         log_id = db_log_pipeline(

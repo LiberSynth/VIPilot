@@ -17,6 +17,8 @@ from db import (
     db_get,
     db_get_story_ready_batch,
     db_get_video_pending_batch,
+    db_is_batch_scheduled,
+    db_set_batch_obsolete,
     db_get_story_text,
     db_get_active_video_model,
     db_set_batch_video_pending,
@@ -133,6 +135,13 @@ def run():
         ar_x     = batch['aspect_ratio_x']
         ar_y     = batch['aspect_ratio_y']
         story_id = str(batch['story_id'])
+
+        if not db_is_batch_scheduled(batch['scheduled_at']):
+            db_set_batch_obsolete(batch_id)
+            db_log_pipeline('video', 'Батч устарел — слот удалён из расписания',
+                            status='прервана', batch_id=batch_id)
+            print(f"[video] Батч {batch_id[:8]}… устарел, пропускаю")
+            return
 
         print(f"[video] Батч {batch_id[:8]}… ({target}) — "
               f"{'возобновление' if resumed else 'начало'} генерации видео")

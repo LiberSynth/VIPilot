@@ -162,12 +162,7 @@ def db_get_pending_batch():
                            t.aspect_ratio_x, t.aspect_ratio_y
                     FROM batches b
                     JOIN targets t ON t.id = b.target_id
-                    WHERE b.status = 'pending'
-                      AND b.story_id IS NULL
-                      AND EXISTS (
-                          SELECT 1 FROM schedule
-                          WHERE time_utc = to_char(b.scheduled_at AT TIME ZONE 'UTC', 'HH24:MI')
-                      )
+                    WHERE b.status = 'pending' AND b.story_id IS NULL
                     ORDER BY b.scheduled_at
                     LIMIT 1
                 """)
@@ -258,10 +253,6 @@ def db_get_story_ready_batch():
                     FROM batches b
                     JOIN targets t ON t.id = b.target_id
                     WHERE b.status = 'story_ready'
-                      AND EXISTS (
-                          SELECT 1 FROM schedule
-                          WHERE time_utc = to_char(b.scheduled_at AT TIME ZONE 'UTC', 'HH24:MI')
-                      )
                     ORDER BY b.scheduled_at
                     LIMIT 1
                 """)
@@ -286,10 +277,6 @@ def db_get_video_pending_batch():
                     JOIN targets t ON t.id = b.target_id
                     WHERE b.status = 'video_pending'
                       AND b.fal_request_id IS NOT NULL
-                      AND EXISTS (
-                          SELECT 1 FROM schedule
-                          WHERE time_utc = to_char(b.scheduled_at AT TIME ZONE 'UTC', 'HH24:MI')
-                      )
                     ORDER BY b.scheduled_at
                     LIMIT 1
                 """)
@@ -298,6 +285,43 @@ def db_get_video_pending_batch():
     except Exception as e:
         print(f"[DB] Ошибка db_get_video_pending_batch: {e}")
         return None
+
+
+def db_is_batch_scheduled(scheduled_at):
+    """Проверяет, есть ли в расписании слот, совпадающий по времени с батчем.
+    scheduled_at — datetime или строка ISO (UTC). Возвращает True/False."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT EXISTS (
+                        SELECT 1 FROM schedule
+                        WHERE time_utc = to_char(%s::timestamptz AT TIME ZONE 'UTC', 'HH24:MI')
+                    )
+                    """,
+                    (scheduled_at,),
+                )
+                return cur.fetchone()[0]
+    except Exception as e:
+        print(f"[DB] Ошибка db_is_batch_scheduled: {e}")
+        return True  # безопасный fallback: не блокируем работу
+
+
+def db_set_batch_obsolete(batch_id):
+    """Переводит батч в status='устарел'."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE batches SET status = 'устарел' WHERE id = %s",
+                    (batch_id,),
+                )
+            conn.commit()
+        return True
+    except Exception as e:
+        print(f"[DB] Ошибка db_set_batch_obsolete: {e}")
+        return False
 
 
 def db_get_story_text(story_id):
