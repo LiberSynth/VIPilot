@@ -401,11 +401,12 @@
   .monitor-log-item:last-child { border-bottom: none; }
 
   .monitor-log-header {
-    display: flex; align-items: baseline; gap: 8px;
+    display: flex; flex-direction: column; gap: 2px;
     padding: 7px 14px; cursor: pointer;
     user-select: none; -webkit-user-select: none;
   }
   .monitor-log-header:hover { background: rgba(255,255,255,.02); }
+  .monitor-log-header-top { display: flex; align-items: center; gap: 8px; }
 
   .monitor-log-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; align-self: center; background: #444; position: relative; }
   .monitor-log-dot.ls-ok,
@@ -420,12 +421,8 @@
   }
 
   .monitor-log-ts       { color: #8080a8; flex-shrink: 0; font-variant-numeric: tabular-nums; }
-  .monitor-log-pipeline { color: #9898b8; flex-shrink: 0; }
-  .monitor-log-status   { font-weight: 600; flex-shrink: 0; }
-  .monitor-log-status.ok,
-  .monitor-log-status.info { color: #3ecf8e; }
-  .monitor-log-status.error { color: #ff6060; }
-  .monitor-log-msg      { color: #d8d8f0; flex: 1; min-width: 0; word-break: break-word; white-space: pre-wrap; }
+  .monitor-log-pipeline { color: #d0d0ec; flex-shrink: 0; font-weight: 500; }
+  .monitor-log-comment  { color: #9090b8; font-size: 12px; padding-left: 23px; word-break: break-word; white-space: pre-wrap; line-height: 1.4; }
   .monitor-log-chevron  { font-size: 10px; color: #7070a0; flex-shrink: 0; transition: transform .15s; }
   .monitor-log-item.open .monitor-log-chevron { transform: rotate(180deg); }
 
@@ -1321,13 +1318,13 @@ function validateLifetimes() {
 // ── Monitor ──
 (function() {
   const PIPELINE_LABELS = {
-    root:        'система',
-    planning:    'планирование',
-    story:       'сюжет',
-    video:       'видео',
-    transcoding: 'транскодирование',
-    publishing:  'публикация',
-    cleanup:     'очистка',
+    root:        'Система',
+    planning:    'Планирование',
+    story:       'Сюжет',
+    video:       'Видео',
+    transcoding: 'Транскодирование',
+    publishing:  'Публикация',
+    cleanup:     'Очистка',
   };
 
   const STATUS_LABELS = {
@@ -1406,14 +1403,16 @@ function validateLifetimes() {
     const pip = PIPELINE_LABELS[log.pipeline] || log.pipeline;
     const hasEntries = log.entries && log.entries.length > 0;
     const chevron = hasEntries ? '<span class="monitor-log-chevron">▼</span>' : '';
+    const comment = log.message ? '<div class="monitor-log-comment">' + esc(log.message) + '</div>' : '';
     return '<div class="monitor-log-item" data-lid="' + esc(log.id) + '" data-status="' + esc(st) + '" onclick="monitorToggleLog(event,this)">' +
       '<div class="monitor-log-header">' +
-        '<span class="monitor-log-dot ls-' + esc(st) + '"></span>' +
-        '<span class="monitor-log-ts">'       + fmtMsk(log.time_point)                        + '</span>' +
-        '<span class="monitor-log-pipeline">' + esc(pip)                                      + '</span>' +
-        '<span class="monitor-log-status '    + esc(st) + '">' + esc(STATUS_LABELS[st] || st) + '</span>' +
-        '<span class="monitor-log-msg">'      + esc(log.message || '')                        + '</span>' +
-        chevron +
+        '<div class="monitor-log-header-top">' +
+          '<span class="monitor-log-dot ls-' + esc(st) + '"></span>' +
+          '<span class="monitor-log-ts">'       + fmtMsk(log.time_point) + '</span>' +
+          '<span class="monitor-log-pipeline">' + esc(pip)               + '</span>' +
+          chevron +
+        '</div>' +
+        comment +
       '</div>' +
       renderEntries(log.entries) +
     '</div>';
