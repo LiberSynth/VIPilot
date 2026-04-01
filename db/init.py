@@ -67,24 +67,6 @@ def init_db():
                     )
                 """)
                 cur.execute("""
-                    CREATE TABLE IF NOT EXISTS generated_stories (
-                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                        created_at FLOAT NOT NULL,
-                        model_id UUID NOT NULL REFERENCES models(id),
-                        result TEXT NOT NULL
-                    )
-                """)
-                cur.execute("""
-                    CREATE TABLE IF NOT EXISTS cycles (
-                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                        started TEXT NOT NULL,
-                        started_ts FLOAT NOT NULL,
-                        status TEXT NOT NULL,
-                        entries JSONB NOT NULL DEFAULT '[]',
-                        summary JSONB NOT NULL DEFAULT '{}'
-                    )
-                """)
-                cur.execute("""
                     CREATE TABLE IF NOT EXISTS ai_platforms (
                         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                         name VARCHAR(200) NOT NULL,
@@ -100,46 +82,6 @@ def init_db():
                     WHERE NOT EXISTS (SELECT 1 FROM ai_platforms WHERE name = v.name)
                 """)
                 cur.execute("""
-                    CREATE TABLE IF NOT EXISTS models (
-                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                        name VARCHAR(200) NOT NULL,
-                        url VARCHAR(500) NOT NULL,
-                        body JSONB NOT NULL DEFAULT '{}',
-                        "order" INTEGER NOT NULL DEFAULT 0,
-                        active BOOLEAN NOT NULL DEFAULT FALSE,
-                        type SMALLINT NOT NULL DEFAULT 0,
-                        ai_platform_id UUID REFERENCES ai_platforms(id)
-                    )
-                """)
-                cur.execute("SELECT COUNT(*) FROM models WHERE type = 0")
-                if cur.fetchone()[0] == 0:
-                    cur.executemany(
-                        'INSERT INTO models (name, url, body, "order", active, type, ai_platform_id) '
-                        "VALUES (%s, %s, %s::jsonb, %s, %s, 0, "
-                        "(SELECT id FROM ai_platforms WHERE name = 'fal'))",
-                        [
-                            ("veo2", "veo2", _fal_body, 1, True),
-                            ("minimax/video-01", "minimax/video-01", _fal_body, 2, False),
-                            ("kling-video/v1.6/standard", "kling-video/v1.6/standard/text-to-video", _kling_body, 3, False),
-                            ("sora-2", "sora-2/text-to-video", _sora_body, 4, False),
-                        ],
-                    )
-
-                for _name, _url, _order, _active in [
-                    ("qwen3.6-plus-preview", "qwen/qwen3.6-plus-preview:free", 1, True),
-                    ("llama-3.1-8b-instruct", "meta-llama/llama-3.1-8b-instruct:free", 2, False),
-                    ("mistral-7b-instruct", "mistralai/mistral-7b-instruct:free", 3, False),
-                ]:
-                    cur.execute("SELECT COUNT(*) FROM models WHERE name = %s", (_name,))
-                    if cur.fetchone()[0] == 0:
-                        cur.execute(
-                            'INSERT INTO models (name, url, body, "order", active, type, ai_platform_id) '
-                            "VALUES (%s, %s, %s::jsonb, %s, %s, 1, "
-                            "(SELECT id FROM ai_platforms WHERE name = 'OpenRouter'))",
-                            (_name, _url, _text_body, _order, _active),
-                        )
-
-                cur.execute("""
                     CREATE TABLE IF NOT EXISTS targets (
                         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                         name VARCHAR(200) NOT NULL,
@@ -152,7 +94,7 @@ def init_db():
                     CREATE TABLE IF NOT EXISTS stories (
                         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                         script TEXT NOT NULL,
-                        model_id UUID REFERENCES models(id),
+                        model_id UUID REFERENCES ai_models(id),
                         created_at TIMESTAMPTZ NOT NULL DEFAULT now()
                     )
                 """)

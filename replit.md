@@ -1,60 +1,69 @@
-# VK Daily Story Publisher
+# Red Brick Core — автопубликатор
 
-Автоматическая система ежедневной публикации видеоисторий в VK сообщество (-236929597).
+Flask-приложение для автоматической публикации видеоисторий в VK/Дзен через 6-пайплайновую систему.
 
-## Как работает
+## Архитектура пайплайнов
 
-1. Система проверяет расписание каждые 30 секунд
-2. За `lead_time_mins` минут до публикации запрашивает генерацию видео через fal.ai
-3. Случайный промпт выбирается из 15 сценариев на тему строительства/ремонта
-4. Опрос статуса каждые 30 секунд (генерация занимает ~3-15 минут в зависимости от модели)
-5. Видео скачивается с автоматическим retry при сбоях
-6. Транскодируется через ffmpeg (H.264/AAC/faststart) для VK
-7. Публикуется в историю и/или на стену сообщества
+Каждый пайплайн запускается отдельным потоком с интервалом `loop_interval` секунд:
 
-## Технические детали
+1. **planning.py** — создаёт батчи по расписанию (`schedule`), формирует `batches` со статусом `pending`
+2. **story.py** — генерирует текстовый сюжет через OpenRouter → статус `story_ready`
+3. **video.py** — запрашивает генерацию видео через fal.ai → статус `video_pending` → `video_ready`
+4. **transcode.py** — перекодирует видео через ffmpeg (H.264/AAC/faststart) → статус `transcode_ready`
+5. **publish.py** — публикует в VK (история/стена) и/или Дзен → статус `published` (с проверкой времени публикации)
+6. **cleanup.py** — архивирует старые записи (пока не активирован)
 
-- **Модель**: выбирается динамически из таблицы `models` (поле `active = TRUE`)
-- **URL запроса**: `https://queue.fal.run/{models.url}`
-- **Тело запроса**: формируется из шаблона `models.body`; поля `prompt`, `duration`, `aspect_ratio` заполняются из настроек
-- **fal.ai API**: ручной polling через `status_url` из ответа на POST
-- **Результат**: берётся из `response_url` из ответа на POST
-- **VK API**: `stories.getVideoUploadServer` → upload → `stories.save`; `wall.post` для стены
-- **Retry**: при сбое генерации — следующая попытка через 30 минут; при сбое скачивания — 3 попытки
-
-## Настройки (хранятся в таблице settings)
-
-- `lead_time_mins` — упреждение генерации (минуты)
-- `video_duration` — длительность видео (секунды, 1–60)
-- `aspect_ratio_x` / `aspect_ratio_y` — соотношение сторон (например 9:16)
-- `vk_publish_story` / `vk_publish_wall` — куда публиковать
-- `metaprompt` — дополнительный контекст для промпта
-- `emulation_mode` — режим эмуляции (без реальных запросов к fal.ai)
+Статусы батча: `pending → story_ready → video_pending → video_ready → transcode_ready → published`; `устарел` может быть выставлен на любом этапе.
 
 ## Таблицы БД
 
-- `settings` — ключ/значение настроек (PK: key VARCHAR)
-- `publish_times` — времена публикации (UUID PK, поле: time_utc VARCHAR)
-- `models` — модели fal.ai (UUID PK, поля: name, url, body JSONB, order, active)
-- `cycles` — история запусков пайплайна (UUID PK)
-- `video_urls` — URL ранее сгенерированных видео для эмуляции (UUID PK)
+- `settings` — ключ/значение настроек
+- `schedule` — расписание публикаций (время UTC)
+- `targets` — целевые площадки (VK, Дзен) с токенами и параметрами
+- `batches` — очередь задач пайплайна (UUID PK, все статусы и данные)
+- `stories` — сгенерированные тексты сюжетов
+- `ai_models` — модели fal.ai (name, url, body JSONB, order, active)
+- `ai_platforms` — платформы ИИ
+- `log` — корневые записи лога
+- `log_entries` — записи внутри корневых логов
+- `video_urls` — URL сгенерированных видео для эмуляции
+
+## Настройки (settings)
+
+Активные:
+- `buffer_hours` — временно́е окно до публикации для попадания в буфер
+- `loop_interval` — интервал опроса пайплайнов (секунды)
+- `metaprompt` — дополнительный контекст для генерации сюжетов
+- `system_prompt` — системный промпт для LLM
+- `video_duration` — длительность видео (секунды, 1–60)
+- `vk_publish_story` / `vk_publish_wall` — типы публикации в VK
+- `emulation_mode` — режим эмуляции (без реальных запросов)
+- `history_days` — глубина истории в мониторе
+- `short_log_days` — срок хранения коротких логов
+
+Неиспользуемые (ещё в БД и интерфейсе, не удалены):
+- `publish_time` — устарело, расписание теперь в таблице `schedule`
+- `lead_time_mins` — упреждение (убрано с новой системой буфера)
+- `aspect_ratio_x` / `aspect_ratio_y` — глобальные дефолты; реальные значения берутся из `targets`
+- `notify_email` / `notify_phone` — уведомления при сбоях (функционал удалён)
 
 ## Секреты
 
 - `FAL_API_KEY` — ключ fal.ai для генерации видео
-- `OPENROUTER_API_KEY` — ключ OpenRouter для генерации сюжетов (текстовые модели)
-- `VK_USER_TOKEN` — личный токен VK с правами на истории сообщества
-- `ADMIN_PASSWORD` — пароль для входа в панель администратора
-- `DATABASE_URL` — строка подключения к PostgreSQL
-
-## Запуск
-
-Workflow "Start application" запускает `python main.py` — бесконечный цикл с проверкой каждые 30 сек.
+- `OPENROUTER_API_KEY` — ключ OpenRouter для генерации сюжетов
+- `VK_USER_TOKEN` — личный токен VK
+- `ADMIN_PASSWORD` — пароль панели администратора
+- `DATABASE_URL` — строка подключения PostgreSQL
 
 ## Файлы
 
-- `main.py` — основной пайплайн + Flask-панель администратора
-- `templates/admin.html` — интерфейс панели (5 вкладок: Пайплайн, Запрос, Публикация, Сервис, История)
+- `main.py` — Flask + запуск потоков пайплайнов + роуты панели
+- `pipelines/` — story.py, video.py, transcode.py, publish.py, planning.py, cleanup.py
+- `db/` — init.py, db.py, upgrade.py, __init__.py
+- `log.py` — логирование в БД
+- `templates/admin.html` — панель администратора (5 вкладок)
 - `templates/login.html` — страница входа
-- `vk_video_post.py` — вспомогательные функции публикации VK
-- `attached_assets/generated_videos/` — тестовые видео
+
+## Запуск
+
+Workflow "Start application": `python main.py`

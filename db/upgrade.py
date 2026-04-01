@@ -79,7 +79,7 @@ def _create_stories():
                         id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                         time_point TIMESTAMPTZ NOT NULL DEFAULT now(),
                         result     TEXT NOT NULL,
-                        model_id   UUID REFERENCES models(id)
+                        model_id   UUID REFERENCES ai_models(id)
                     )
                 """)
             conn.commit()
