@@ -2176,7 +2176,7 @@ setInterval(refreshLog, 4000);
   function buildTimeline(batches, system) {
     var items = [];
     (batches || []).forEach(function(b) {
-      items.push({ type: 'batch', time: b.last_event_at || b.created_at, data: b });
+      items.push({ type: 'batch', time: b.created_at, data: b });
     });
     (system || []).forEach(function(s) {
       items.push({ type: 'sys', time: s.time_point, data: s });
