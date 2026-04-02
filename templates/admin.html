@@ -993,7 +993,7 @@ function monitorClockStart() {
   const el = document.getElementById('monitor-clock');
   if (!el) return;
   monitorClockTick();
-  el.style.display = '';
+  el.style.display = 'inline';
   if (!_monitorClockTimer) _monitorClockTimer = setInterval(monitorClockTick, 1000);
 }
 function monitorClockStop() {
