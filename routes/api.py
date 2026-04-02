@@ -1,6 +1,7 @@
 import os
 import threading
 from flask import Blueprint, jsonify, request
+from log import db_log_root
 
 from db import (
     db_get_schedule,
@@ -166,6 +167,7 @@ def api_workflow_start():
         return jsonify({"error": "unauthorized"}), 401
     env_set("workflow_state", "running")
     wf_state.set_running()
+    db_log_root("Движок запущен вручную", status='info')
     return jsonify({"ok": True, "state": "running"})
 
 
@@ -175,6 +177,7 @@ def api_workflow_pause():
         return jsonify({"error": "unauthorized"}), 401
     env_set("workflow_state", "pause")
     wf_state.set_paused()
+    db_log_root("Движок приостановлен вручную", status='info')
     return jsonify({"ok": True, "state": "pause"})
 
 
@@ -182,6 +185,7 @@ def api_workflow_pause():
 def api_workflow_restart():
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
+    db_log_root("Перезапуск движка вручную", status='info')
     def _do_restart():
         import time as _time
         import sys as _sys
