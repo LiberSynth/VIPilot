@@ -7,6 +7,8 @@ Pipeline 5 — Публикация.
 
 from datetime import datetime, timezone
 
+import os
+
 from db import (
     db_get,
     db_get_transcode_ready_batch,
@@ -14,6 +16,7 @@ from db import (
     db_set_batch_obsolete,
     db_set_batch_published,
     db_set_batch_publish_error,
+    db_set_batch_video_ready,
 )
 from log import db_log_pipeline, db_log_entry, db_log_update, db_log_interrupt_running
 from clients import vk
