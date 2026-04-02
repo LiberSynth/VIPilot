@@ -135,7 +135,7 @@ def db_get_monitor(batch_limit=50):
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
-                # Батчи — ведущая таблица log, JOIN batches/targets
+                # Батчи — ведущая таблица batches, LEFT JOIN log/targets
                 cur.execute(
                     """
                     SELECT
@@ -147,35 +147,37 @@ def db_get_monitor(batch_limit=50):
                         t.aspect_ratio_x,
                         t.aspect_ratio_y,
                         MAX(l.time_point) AS last_event_at,
-                        json_agg(
-                            json_build_object(
-                                'id',         l.id::text,
-                                'pipeline',   l.pipeline,
-                                'message',    l.message,
-                                'status',     l.status,
-                                'time_point', l.time_point,
-                                'entries', (
-                                    SELECT COALESCE(
-                                        json_agg(
-                                            json_build_object(
-                                                'message',    le.message,
-                                                'level',      le.level,
-                                                'time_point', le.time_point
-                                            ) ORDER BY le.time_point
-                                        ),
-                                        '[]'::json
+                        COALESCE(
+                            json_agg(
+                                json_build_object(
+                                    'id',         l.id::text,
+                                    'pipeline',   l.pipeline,
+                                    'message',    l.message,
+                                    'status',     l.status,
+                                    'time_point', l.time_point,
+                                    'entries', (
+                                        SELECT COALESCE(
+                                            json_agg(
+                                                json_build_object(
+                                                    'message',    le.message,
+                                                    'level',      le.level,
+                                                    'time_point', le.time_point
+                                                ) ORDER BY le.time_point
+                                            ),
+                                            '[]'::json
+                                        )
+                                        FROM log_entries le WHERE le.log_id = l.id
                                     )
-                                    FROM log_entries le WHERE le.log_id = l.id
-                                )
-                            ) ORDER BY l.time_point
+                                ) ORDER BY l.time_point
+                            ) FILTER (WHERE l.id IS NOT NULL),
+                            '[]'::json
                         ) AS logs
-                    FROM log l
-                    JOIN batches b ON b.id = l.batch_id
+                    FROM batches b
+                    LEFT JOIN log l ON l.batch_id = b.id
                     LEFT JOIN targets t ON t.id = b.target_id
-                    WHERE l.batch_id IS NOT NULL
                     GROUP BY b.id, b.scheduled_at, b.status, b.created_at,
                              t.name, t.aspect_ratio_x, t.aspect_ratio_y
-                    ORDER BY b.created_at DESC
+                    ORDER BY COALESCE(MAX(l.time_point), b.created_at) DESC
                     LIMIT %s
                     """,
                     (batch_limit,),
