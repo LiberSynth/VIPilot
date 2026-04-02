@@ -1,5 +1,4 @@
 import os
-import signal
 import threading
 from flask import Blueprint, jsonify, request
 
@@ -185,7 +184,8 @@ def api_workflow_restart():
         return jsonify({"error": "unauthorized"}), 401
     def _do_restart():
         import time as _time
-        _time.sleep(0.5)
-        os.kill(os.getpid(), signal.SIGTERM)
+        import sys as _sys
+        _time.sleep(0.8)
+        os.execv(_sys.executable, [_sys.executable] + _sys.argv)
     threading.Thread(target=_do_restart, daemon=True).start()
     return jsonify({"ok": True})

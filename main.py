@@ -1,6 +1,5 @@
 import os
 import time
-import signal
 import atexit
 import threading
 from flask import Flask, request
