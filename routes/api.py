@@ -15,7 +15,6 @@ from db import (
     init_db,
     run_upgrades,
     db_clear_all_history,
-    db_delete_batch,
     env_get,
     env_set,
     db_create_adhoc_batch,
@@ -107,14 +106,6 @@ def api_delete_schedule_slot(slot_id):
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
     ok = db_delete_schedule_slot(slot_id)
-    return jsonify({"ok": ok})
-
-
-@bp.route("/batch/<batch_id>", methods=["DELETE"])
-def api_delete_batch(batch_id):
-    if not is_authenticated():
-        return jsonify({"error": "unauthorized"}), 401
-    ok = db_delete_batch(batch_id)
     return jsonify({"ok": ok})
 
 

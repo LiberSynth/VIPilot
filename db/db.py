@@ -967,7 +967,7 @@ def db_clear_all_history():
                     DELETE FROM batches
                     WHERE status IN (
                         'published', 'отменён',
-                        'publish_error', 'video_error', 'transcode_error', 'story_error'
+                        'publish_error', 'video_error', 'transcode_error'
                     )
                 """)
                 bl = cur.rowcount
@@ -984,31 +984,6 @@ def db_clear_all_history():
     except Exception as e:
         print(f"[DB] Ошибка db_clear_all_history: {e}")
         raise
-
-
-def db_delete_batch(batch_id: str) -> bool:
-    """Удаляет батч и все его логи по ID. Возвращает True если батч был найден и удалён."""
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    DELETE FROM log_entries
-                    WHERE log_id IN (SELECT id FROM log WHERE batch_id = %s)
-                """, (batch_id,))
-                cur.execute("DELETE FROM log WHERE batch_id = %s", (batch_id,))
-                cur.execute("DELETE FROM batches WHERE id = %s", (batch_id,))
-                deleted = cur.rowcount
-                cur.execute("""
-                    DELETE FROM stories
-                    WHERE id NOT IN (
-                        SELECT DISTINCT story_id FROM batches WHERE story_id IS NOT NULL
-                    )
-                """)
-            conn.commit()
-        return deleted > 0
-    except Exception as e:
-        print(f"[DB] Ошибка db_delete_batch: {e}")
-        return False
 
 
 def db_cleanup_video_data(file_lifetime_days: int) -> int:
