@@ -1625,7 +1625,7 @@ function validateLifetimes() {
     const headTime = batch.created_at;
     const ratio = (batch.aspect_ratio_x && batch.aspect_ratio_y)
       ? batch.aspect_ratio_x + ':' + batch.aspect_ratio_y : '';
-    const schedStr = batch.adhoc ? 'Оперативная' : 'Публикация: ' + fmtMskShort(batch.scheduled_at);
+    const schedStr = batch.adhoc ? 'Публикация: сейчас' : 'Публикация: ' + fmtMskShort(batch.scheduled_at);
     const sub = [schedStr, batch.target_name, ratio, STATUS_LABELS[bs] || bs]
       .filter(Boolean).join(' · ');
 
