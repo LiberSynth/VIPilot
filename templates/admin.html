@@ -45,9 +45,11 @@
   h1 { font-size: 16px; font-weight: 700; color: #fff; }
   #monitor-clock {
     display: none;
-    font-size: 13px; font-weight: 500; color: #888;
+    text-align: right;
+    font-size: 12px; font-weight: 500; color: #555;
     font-variant-numeric: tabular-nums;
-    letter-spacing: 0.02em;
+    letter-spacing: 0.04em;
+    margin-bottom: 10px;
   }
   .header-right { display: flex; align-items: center; gap: 10px; }
   .logout {
@@ -694,7 +696,6 @@
         </svg>
       </div>
       <h1 id="page-title">Управление</h1>
-      <span id="monitor-clock"></span>
     </div>
     <div class="header-right">
       <a href="/logout" class="logout">Выйти</a>
@@ -924,6 +925,7 @@
 
   <!-- ══ ИСТОРИЯ ══ -->
   <div id="panel-log" class="tab-panel">
+    <div id="monitor-clock"></div>
     <div id="monitor-timeline" class="monitor-timeline"></div>
   </div>
 
@@ -999,12 +1001,12 @@ function monitorClockStart() {
     const serverMs = d.utc_ms;
     _monitorClockOffset = serverMs - Math.round((t0 + t1) / 2);
     monitorClockTick();
-    el.style.display = 'inline';
+    el.style.display = 'block';
     if (!_monitorClockTimer) _monitorClockTimer = setInterval(monitorClockTick, 1000);
   }).catch(() => {
     // fallback — локальное время
     monitorClockTick();
-    el.style.display = 'inline';
+    el.style.display = 'block';
     if (!_monitorClockTimer) _monitorClockTimer = setInterval(monitorClockTick, 1000);
   });
 }
