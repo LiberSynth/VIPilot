@@ -78,9 +78,9 @@ def db_get_schedule():
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
-                cur.execute("SELECT id, time_utc FROM schedule ORDER BY time_utc")
+                cur.execute("SELECT id, time_utc, created_at FROM schedule ORDER BY time_utc")
                 rows = cur.fetchall()
-        return [{"id": str(row[0]), "time_utc": row[1]} for row in rows]
+        return [{"id": str(row[0]), "time_utc": row[1], "created_at": row[2]} for row in rows]
     except Exception as e:
         print(f"[DB] Ошибка получения расписания: {e}")
         return []

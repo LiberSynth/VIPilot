@@ -20,10 +20,11 @@ def run():
         if not schedule or not targets:
             return
 
-        buffer_hours  = int(db_get('buffer_hours', '24'))
-        now           = datetime.now(timezone.utc)
-        window_end    = now + timedelta(hours=buffer_hours)
-        days_to_check = int(buffer_hours / 24) + 2
+        buffer_hours      = int(db_get('buffer_hours', '24'))
+        now               = datetime.now(timezone.utc)
+        window_end        = now + timedelta(hours=buffer_hours)
+        catchup_threshold = now - timedelta(hours=buffer_hours)
+        days_to_check     = int(buffer_hours / 24) + 2
 
         created = 0
         for day_offset in range(days_to_check):
@@ -31,7 +32,13 @@ def run():
             for slot in schedule:
                 h, m = parse_hhmm(slot['time_utc'])
                 dt = datetime(day.year, day.month, day.day, h, m, tzinfo=timezone.utc)
-                if now <= dt < window_end:
+                in_future_window = now <= dt < window_end
+                is_catchup = (
+                    dt < now
+                    and slot.get('created_at') is not None
+                    and slot['created_at'] < catchup_threshold
+                )
+                if in_future_window or is_catchup:
                     for target in targets:
                         batch_id = db_ensure_batch(dt, target['id'])
                         if batch_id:

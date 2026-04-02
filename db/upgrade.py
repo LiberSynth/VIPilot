@@ -25,6 +25,7 @@ def run_upgrades():
     _fix_log_lifetime_keys()
     _add_adhoc_column()
     _scheduled_at_nullable()
+    _add_schedule_created_at()
 
 
 def _add_emulation_mode():
@@ -379,6 +380,32 @@ def _create_environment_table():
             conn.commit()
     except Exception as e:
         print(f"[DB] Ошибка миграции _create_environment_table: {e}")
+
+
+def _add_schedule_created_at():
+    """Добавляет created_at в таблицу schedule.
+    Существующие слоты получают '2000-01-01' — заведомо старше любого горизонта,
+    поэтому все они сразу eligible для catch-up. Новые слоты получают now()."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT column_name FROM information_schema.columns
+                    WHERE table_name = 'schedule' AND column_name = 'created_at'
+                """)
+                if not cur.fetchone():
+                    cur.execute("""
+                        ALTER TABLE schedule
+                        ADD COLUMN created_at TIMESTAMPTZ NOT NULL
+                        DEFAULT '2000-01-01'::timestamptz
+                    """)
+                    cur.execute("""
+                        ALTER TABLE schedule
+                        ALTER COLUMN created_at SET DEFAULT now()
+                    """)
+            conn.commit()
+    except Exception as e:
+        print(f"[DB] Ошибка миграции _add_schedule_created_at: {e}")
 
 
 def _scheduled_at_nullable():
