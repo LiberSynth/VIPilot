@@ -38,6 +38,7 @@ from .db import (
     db_get_transcode_ready_batch,
     db_get_batch_video_data,
     db_get_random_video_data,
+    db_steal_video_from_cancelled,
     db_set_batch_published,
     db_set_batch_publish_error,
     db_get_models,
