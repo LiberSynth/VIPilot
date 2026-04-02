@@ -6,6 +6,7 @@ def run_upgrades():
     Add new migration functions here as the schema evolves.
     Each migration must be idempotent (safe to run multiple times).
     """
+    _create_environment_table()
     _add_emulation_mode()
     _add_buffer_hours()
     _create_ai_models()
@@ -318,3 +319,23 @@ def _recover_story_generating():
             print(f"[DB] Восстановлено story_generating → pending: {n}")
     except Exception as e:
         print(f"[DB] Ошибка миграции _recover_story_generating: {e}")
+
+
+def _create_environment_table():
+    """Создаёт таблицу environment и добавляет начальные записи."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS environment (
+                        key VARCHAR(100) PRIMARY KEY,
+                        value TEXT NOT NULL
+                    )
+                """)
+                cur.execute("""
+                    INSERT INTO environment (key, value) VALUES ('workflow_state', 'running')
+                    ON CONFLICT (key) DO NOTHING
+                """)
+            conn.commit()
+    except Exception as e:
+        print(f"[DB] Ошибка миграции _create_environment_table: {e}")

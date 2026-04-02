@@ -7,6 +7,38 @@ from .init import get_db
 
 
 # ---------------------------------------------------------------------------
+# Окружение (environment)
+# ---------------------------------------------------------------------------
+
+def env_get(key, default=""):
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT value FROM environment WHERE key = %s", (key,))
+                row = cur.fetchone()
+                return row[0] if row else default
+    except Exception as e:
+        print(f"[DB] Ошибка чтения env {key}: {e}")
+        return default
+
+
+def env_set(key, value):
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO environment (key, value) VALUES (%s, %s)
+                    ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+                    """,
+                    (key, value),
+                )
+            conn.commit()
+    except Exception as e:
+        print(f"[DB] Ошибка записи env {key}: {e}")
+
+
+# ---------------------------------------------------------------------------
 # Настройки
 # ---------------------------------------------------------------------------
 

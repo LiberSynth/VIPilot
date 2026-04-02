@@ -1,15 +1,17 @@
 import os
 import time
+import signal
 import atexit
 import threading
 from flask import Flask, request
 
-from db import init_db, run_upgrades, db_get, db_recover_video_generating
+from db import init_db, run_upgrades, db_get, db_recover_video_generating, env_get, env_set
 from log import db_log_root
 from pipelines import planning, story, video, transcode, publish, cleanup
 from routes.admin import bp as admin_bp
 from routes.api import bp as api_bp
 from utils.consts import FLASK_SECRET
+import utils.workflow_state as wf_state
 
 flask_app = Flask(__name__, static_folder=".")
 flask_app.secret_key = FLASK_SECRET
@@ -48,6 +50,8 @@ def main_loop():
 
     while True:
         try:
+            wf_state.wait_if_paused()
+
             interval = int(db_get('loop_interval', '5'))
 
             for name, module in [
@@ -84,6 +88,8 @@ def start_main_loop():
         init_db()
         run_upgrades()
         db_recover_video_generating()
+        env_set('workflow_state', 'running')
+        wf_state.set_running()
         db_log_root("Приложение запущено", status='info')
         atexit.register(_on_exit)
         t = threading.Thread(target=main_loop, daemon=True)

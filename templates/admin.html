@@ -291,6 +291,39 @@
   .confirm-confirm:hover { background: #d03838; }
   .confirm-confirm:disabled { opacity: .5; cursor: default; }
 
+  /* ── Workflow control ── */
+  .header-workflow {
+    display: flex; align-items: center; gap: 10px;
+    margin-top: 10px; padding-top: 10px;
+    border-top: 1px solid #1e1e2e;
+  }
+  .wf-label {
+    font-size: 11px; font-weight: 600; color: #6666a0;
+    text-transform: uppercase; letter-spacing: .07em;
+    white-space: nowrap; flex-shrink: 0;
+  }
+  .wf-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    transition: background .3s, box-shadow .3s;
+  }
+  .wf-dot.running { background: #3ecf8e; box-shadow: 0 0 6px #3ecf8e88; }
+  .wf-dot.pause   { background: #f5a623; }
+  .wf-state-text  { font-size: 12px; color: #888; white-space: nowrap; }
+  .wf-btns { display: flex; gap: 6px; margin-left: auto; }
+  .wf-btn {
+    font-size: 12px; font-weight: 600; color: #c0c0d8;
+    padding: 5px 11px; border: 1px solid #2a2a38; border-radius: 7px;
+    background: none; cursor: pointer; font-family: inherit;
+    transition: background .12s, border-color .12s, opacity .12s;
+    white-space: nowrap;
+  }
+  .wf-btn:active:not(:disabled) { background: rgba(255,255,255,.05); }
+  .wf-btn:disabled { opacity: .32; cursor: default; }
+  .wf-btn.wf-start { color: #4a7cf7; border-color: rgba(74,124,247,.35); }
+  .wf-btn.wf-start:hover:not(:disabled) { background: rgba(74,124,247,.1); border-color: rgba(74,124,247,.6); }
+  .wf-btn.wf-restart { color: #f07050; border-color: rgba(240,112,80,.35); }
+  .wf-btn.wf-restart:hover:not(:disabled) { background: rgba(240,112,80,.1); border-color: rgba(240,112,80,.6); }
+
   /* ── Monitor ── */
   .monitor-section-label {
     font-size: 11px; color: #444; text-align: center;
@@ -666,6 +699,16 @@
     </div>
     <div class="header-right">
       <a href="/logout" class="logout">Выйти</a>
+    </div>
+  </div>
+  <div class="header-workflow">
+    <span class="wf-label">Движок</span>
+    <span class="wf-dot {{ 'running' if workflow_state == 'running' else 'pause' }}" id="wf-dot"></span>
+    <span class="wf-state-text" id="wf-state-text">{{ 'Работает' if workflow_state == 'running' else 'Приостановлен' }}</span>
+    <div class="wf-btns">
+      <button class="wf-btn wf-start" id="wf-btn-start" onclick="wfStart()" {{ 'disabled' if workflow_state == 'running' else '' }}>Запустить</button>
+      <button class="wf-btn" id="wf-btn-pause" onclick="wfPause()" {{ '' if workflow_state == 'running' else 'disabled' }}>Приостановить</button>
+      <button class="wf-btn wf-restart" id="wf-btn-restart" onclick="openRestartDialog()">Перезапустить</button>
     </div>
   </div>
 </header>
@@ -1913,6 +1956,71 @@ function showToast(msg, type) {
     setTimeout(function() { el.remove(); }, 300);
   }, 3500);
 }
+
+function wfUpdateUI(state) {
+  var dot = document.getElementById('wf-dot');
+  var text = document.getElementById('wf-state-text');
+  var btnStart = document.getElementById('wf-btn-start');
+  var btnPause = document.getElementById('wf-btn-pause');
+  if (state === 'running') {
+    dot.className = 'wf-dot running';
+    text.textContent = 'Работает';
+    btnStart.disabled = true;
+    btnPause.disabled = false;
+  } else {
+    dot.className = 'wf-dot pause';
+    text.textContent = 'Приостановлен';
+    btnStart.disabled = false;
+    btnPause.disabled = true;
+  }
+}
+
+function wfStart() {
+  var btn = document.getElementById('wf-btn-start');
+  btn.disabled = true;
+  fetch('/api/workflow/start', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.ok) { wfUpdateUI('running'); showToast('Движок запущен', 'success'); }
+    })
+    .catch(function() { btn.disabled = false; showToast('Ошибка соединения', 'error'); });
+}
+
+function wfPause() {
+  var btn = document.getElementById('wf-btn-pause');
+  btn.disabled = true;
+  fetch('/api/workflow/pause', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.ok) { wfUpdateUI('pause'); showToast('Движок приостановлен', 'success'); }
+    })
+    .catch(function() { btn.disabled = false; showToast('Ошибка соединения', 'error'); });
+}
+
+function openRestartDialog() {
+  document.getElementById('restartOverlay').classList.add('open');
+}
+
+function closeRestartDialog() {
+  document.getElementById('restartOverlay').classList.remove('open');
+  var btn = document.getElementById('restartConfirmBtn');
+  btn.disabled = false;
+  btn.textContent = 'Перезапустить';
+}
+
+function confirmRestart() {
+  var btn = document.getElementById('restartConfirmBtn');
+  btn.disabled = true;
+  btn.textContent = 'Перезапуск…';
+  fetch('/api/workflow/restart', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function() {
+      document.getElementById('restartOverlay').classList.remove('open');
+      showToast('Перезапуск… страница обновится автоматически', 'success');
+      setTimeout(function() { location.reload(); }, 4000);
+    })
+    .catch(function() { closeRestartDialog(); showToast('Ошибка соединения', 'error'); });
+}
 </script>
 
 <div class="confirm-overlay" id="clearHistoryOverlay" onclick="if(event.target===this)closeClearHistoryDialog()">
@@ -1926,6 +2034,20 @@ function showToast(msg, type) {
     <div class="confirm-box-btns">
       <button class="confirm-cancel" onclick="closeClearHistoryDialog()">Отмена</button>
       <button class="confirm-confirm" id="clearHistoryConfirmBtn" onclick="confirmClearHistory()">Очистить</button>
+    </div>
+  </div>
+</div>
+
+<div class="confirm-overlay" id="restartOverlay" onclick="if(event.target===this)closeRestartDialog()">
+  <div class="confirm-box">
+    <div class="confirm-box-title">Перезапустить движок?</div>
+    <div class="confirm-box-text">
+      Приложение будет остановлено и автоматически перезапущено.<br><br>
+      Текущие задачи будут прерваны. После перезапуска движок вернётся в режим <strong>Работает</strong>.
+    </div>
+    <div class="confirm-box-btns">
+      <button class="confirm-cancel" onclick="closeRestartDialog()">Отмена</button>
+      <button class="confirm-confirm" id="restartConfirmBtn" onclick="confirmRestart()" style="background:#b05820">Перезапустить</button>
     </div>
   </div>
 </div>

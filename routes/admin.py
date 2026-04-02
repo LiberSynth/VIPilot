@@ -13,6 +13,7 @@ from flask import (
 from db import (
     db_get,
     db_set,
+    env_get,
 )
 from utils.consts import ADMIN_PASSWORD
 from utils.auth import is_authenticated, password_fingerprint
@@ -72,6 +73,8 @@ def admin_page():
     buffer_hours       = max(1, min(720, int(db_get("buffer_hours", "24"))))
     loop_interval      = max(1, min(3600, int(db_get("loop_interval", "5"))))
 
+    workflow_state = env_get("workflow_state", "running")
+
     return render_template(
         "admin.html",
         metaprompt=metaprompt,
@@ -88,6 +91,7 @@ def admin_page():
         video_duration=video_duration,
         buffer_hours=buffer_hours,
         loop_interval=loop_interval,
+        workflow_state=workflow_state,
     )
 
 

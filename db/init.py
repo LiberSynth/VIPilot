@@ -24,6 +24,16 @@ def init_db():
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
+                    CREATE TABLE IF NOT EXISTS environment (
+                        key VARCHAR(100) PRIMARY KEY,
+                        value TEXT NOT NULL
+                    )
+                """)
+                cur.execute("""
+                    INSERT INTO environment (key, value) VALUES ('workflow_state', 'running')
+                    ON CONFLICT (key) DO NOTHING
+                """)
+                cur.execute("""
                     CREATE TABLE IF NOT EXISTS settings (
                         key VARCHAR(100) PRIMARY KEY,
                         value TEXT NOT NULL

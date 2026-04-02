@@ -1,3 +1,6 @@
+import os
+import signal
+import threading
 from flask import Blueprint, jsonify, request
 
 from db import (
@@ -10,10 +13,13 @@ from db import (
     init_db,
     run_upgrades,
     db_clear_all_history,
+    env_get,
+    env_set,
 )
 from log import db_get_log, db_get_monitor
 from utils.auth import is_authenticated
 from utils.utils import parse_hhmm, to_msk, to_utc_from_msk
+import utils.workflow_state as wf_state
 
 bp = Blueprint("api", __name__, url_prefix="/api")
 
@@ -145,3 +151,41 @@ def api_clear_history():
         return jsonify({"ok": True, "deleted": result})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@bp.route("/workflow/state", methods=["GET"])
+def api_workflow_state():
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    state = env_get("workflow_state", "running")
+    return jsonify({"state": state})
+
+
+@bp.route("/workflow/start", methods=["POST"])
+def api_workflow_start():
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    env_set("workflow_state", "running")
+    wf_state.set_running()
+    return jsonify({"ok": True, "state": "running"})
+
+
+@bp.route("/workflow/pause", methods=["POST"])
+def api_workflow_pause():
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    env_set("workflow_state", "pause")
+    wf_state.set_paused()
+    return jsonify({"ok": True, "state": "pause"})
+
+
+@bp.route("/workflow/restart", methods=["POST"])
+def api_workflow_restart():
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    def _do_restart():
+        import time as _time
+        _time.sleep(0.5)
+        os.kill(os.getpid(), signal.SIGTERM)
+    threading.Thread(target=_do_restart, daemon=True).start()
+    return jsonify({"ok": True})
