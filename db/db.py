@@ -157,8 +157,8 @@ def db_update_target_aspect_ratio(target_id, x, y):
 
 def db_ensure_batch(scheduled_at, target_id):
     """Создаёт батч если не существует.
-    Если батч существует со статусом 'отменён' — сбрасывает его в pending.
-    Возвращает UUID нового/восстановленного батча или None если батч уже активен."""
+    Отменённые батчи не восстанавливаются — остаются отменёнными.
+    Возвращает UUID нового батча или None если батч уже существует."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
@@ -166,14 +166,7 @@ def db_ensure_batch(scheduled_at, target_id):
                     """
                     INSERT INTO batches (scheduled_at, target_id)
                     VALUES (%s, %s)
-                    ON CONFLICT (scheduled_at, target_id) DO UPDATE
-                        SET status       = 'pending',
-                            story_id     = NULL,
-                            video_url    = NULL,
-                            video_file   = NULL,
-                            data         = NULL,
-                            completed_at = NULL
-                        WHERE batches.status = 'отменён'
+                    ON CONFLICT (scheduled_at, target_id) DO NOTHING
                     RETURNING id
                     """,
                     (scheduled_at, target_id),
