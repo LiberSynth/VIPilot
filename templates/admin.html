@@ -1886,17 +1886,29 @@ function confirmClearHistory() {
         if (d.log_entries) parts.push('записей: ' + d.log_entries);
         if (d.batches)     parts.push('батчей: ' + d.batches);
         if (d.stories)     parts.push('сюжетов: ' + d.stories);
-        alert('История очищена.' + (parts.length ? '\n' + parts.join(', ') : ''));
+        showToast('История очищена' + (parts.length ? ': ' + parts.join(', ') : ''), 'success');
       } else {
-        alert('Ошибка: ' + (data.error || 'неизвестная ошибка'));
+        showToast('Ошибка: ' + (data.error || 'неизвестная ошибка'), 'error');
       }
     })
     .catch(function(e) {
       closeClearHistoryDialog();
       btn.disabled = false;
       btn.textContent = 'Очистить';
-      alert('Ошибка соединения: ' + e);
+      showToast('Ошибка соединения', 'error');
     });
+}
+
+function showToast(msg, type) {
+  var el = document.createElement('div');
+  el.className = 'flash ' + (type || 'success');
+  el.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:2000;max-width:420px;width:90%;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.4);transition:opacity .3s';
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(function() {
+    el.style.opacity = '0';
+    setTimeout(function() { el.remove(); }, 300);
+  }, 3500);
 }
 </script>
 
