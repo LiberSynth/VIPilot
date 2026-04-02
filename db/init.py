@@ -107,8 +107,9 @@ def init_db():
                         ('minimax/video-01',          'minimax/video-01',                       '{"prompt":"{}","duration":"{:d}s","aspect_ratio":"{:d}:{:d}"}',             3, FALSE, 'fal',        'text-to-video'),
                         ('kling-video/v1.6/standard', 'kling-video/v1.6/standard/text-to-video','{"prompt":"{}","duration":"{:d}","aspect_ratio":"{:d}:{:d}"}',              4, FALSE, 'fal',        'text-to-video'),
                         ('qwen3.6-plus-preview',      'qwen/qwen3.6-plus-preview:free',         '{"messages":[{"role":"system","content":"{}"},{"role":"user","content":"{}"}],"max_tokens":300,"temperature":0.9}', 1, TRUE,  'OpenRouter', 'text'),
-                        ('llama-3.1-8b-instruct',     'meta-llama/llama-3.1-8b-instruct:free',  '{"messages":[{"role":"system","content":"{}"},{"role":"user","content":"{}"}],"max_tokens":300,"temperature":0.9}', 2, FALSE, 'OpenRouter', 'text'),
-                        ('mistral-7b-instruct',       'mistralai/mistral-7b-instruct:free',     '{"messages":[{"role":"system","content":"{}"},{"role":"user","content":"{}"}],"max_tokens":300,"temperature":0.9}', 3, FALSE, 'OpenRouter', 'text')
+                        ('openrouter/free',           'openrouter/free',                        '{"messages":[{"role":"system","content":"{}"},{"role":"user","content":"{}"}],"max_tokens":300,"temperature":0.9}', 2, TRUE,  'OpenRouter', 'text'),
+                        ('mistral-7b-instruct',       'mistralai/mistral-7b-instruct:free',     '{"messages":[{"role":"system","content":"{}"},{"role":"user","content":"{}"}],"max_tokens":300,"temperature":0.9}', 3, TRUE,  'OpenRouter', 'text'),
+                        ('llama-3.1-8b-instruct',     'meta-llama/llama-3.1-8b-instruct:free',  '{"messages":[{"role":"system","content":"{}"},{"role":"user","content":"{}"}],"max_tokens":300,"temperature":0.9}', 4, TRUE,  'OpenRouter', 'text')
                     ) AS v(name, url, body, ord, active, platform_name, type)
                     JOIN ai_platforms p ON p.name = v.platform_name
                     WHERE NOT EXISTS (SELECT 1 FROM ai_models WHERE ai_models.name = v.name)
