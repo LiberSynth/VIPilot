@@ -24,6 +24,7 @@ def run_upgrades():
     _recover_story_generating()
     _fix_log_lifetime_keys()
     _add_adhoc_column()
+    _scheduled_at_nullable()
 
 
 def _add_emulation_mode():
@@ -378,3 +379,21 @@ def _create_environment_table():
             conn.commit()
     except Exception as e:
         print(f"[DB] Ошибка миграции _create_environment_table: {e}")
+
+
+def _scheduled_at_nullable():
+    """Снимает ограничение NOT NULL с колонки scheduled_at в таблице batches
+    чтобы adhoc-батчи могли иметь scheduled_at = NULL."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT is_nullable FROM information_schema.columns
+                    WHERE table_name = 'batches' AND column_name = 'scheduled_at'
+                """)
+                row = cur.fetchone()
+                if row and row[0] == 'NO':
+                    cur.execute("ALTER TABLE batches ALTER COLUMN scheduled_at DROP NOT NULL")
+            conn.commit()
+    except Exception as e:
+        print(f"[DB] Ошибка миграции _scheduled_at_nullable: {e}")
