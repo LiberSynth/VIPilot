@@ -374,6 +374,7 @@
   .monitor-dot.md-ok     { background: #3ecf8e; }
   .monitor-dot.md-error  { background: #ff6060; }
   .monitor-dot.md-active { background: #4a7cf7; }
+  .monitor-dot.md-wait   { background: #7eb8f7; }
   .monitor-dot.md-skip   { background: #9b9b9b; }
   .monitor-dot.md-active::before {
     content: ''; position: absolute; inset: -2px; border-radius: 50%;
@@ -1541,12 +1542,14 @@ function validateLifetimes() {
     }
 
     const isActive = logs.some(function(l) { return l.status === 'running'; });
-    const doneStatuses  = ['ok', 'done', 'completed', 'video_ready', 'transcode_ready', 'published'];
+    const doneStatuses  = ['published'];
+    const waitStatuses  = ['story_ready', 'video_pending', 'video_ready', 'transcode_ready'];
     const errorStatuses = ['error', 'video_error', 'transcode_error', 'publish_error'];
     const md = isActive ? 'md-active'
              : bs === 'устарел'                   ? 'md-skip'
              : doneStatuses.indexOf(bs) >= 0      ? 'md-ok'
              : errorStatuses.indexOf(bs) >= 0     ? 'md-error'
+             : waitStatuses.indexOf(bs) >= 0      ? 'md-wait'
              : 'md-warn';
 
     const logHtml = '<div class="monitor-log-list">' + logs.map(renderLogItem).join('') + '</div>';
