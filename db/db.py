@@ -538,6 +538,25 @@ def db_set_batch_video_error(batch_id):
         return False
 
 
+def db_set_batch_pending(batch_id):
+    """Сбрасывает батч в статус 'pending', очищая story_id, video_url и data.
+    Используется для перезапуска цикла генерации после фатального сбоя видео."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """UPDATE batches
+                       SET status = 'pending', story_id = NULL,
+                           video_url = NULL, video_file = NULL, data = NULL
+                       WHERE id = %s""",
+                    (batch_id,),
+                )
+            conn.commit()
+        return True
+    except Exception as e:
+        print(f"[DB] Ошибка db_set_batch_pending: {e}")
+        return False
+
 
 # ---------------------------------------------------------------------------
 # AI-модели — управление (используется в routes/api.py)

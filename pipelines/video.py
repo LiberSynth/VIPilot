@@ -24,6 +24,7 @@ from db import (
     db_set_batch_video_pending,
     db_set_batch_video_ready,
     db_set_batch_video_error,
+    db_set_batch_pending,
 )
 from log import db_log_pipeline, db_log_entry, db_log_update, db_log_interrupt_running
 
@@ -54,6 +55,15 @@ def _build_body(body_tpl, prompt, ar_x, ar_y, video_duration):
     return body
 
 
+def _reset_to_pending(log_id, batch_id, msg):
+    """Логирует фатальный сбой и сбрасывает батч в pending для повторного цикла."""
+    db_log_update(log_id, msg, 'error')
+    if log_id:
+        db_log_entry(log_id, msg, level='error')
+        db_log_entry(log_id, 'Батч сброшен в «запланирован» — цикл генерации перезапустится', level='warn')
+    db_set_batch_pending(batch_id)
+
+
 def _poll(log_id, batch_id, status_url, response_url):
     """Поллит fal.ai до завершения. Возвращает video_url или None."""
     for attempt in range(_POLL_MAX):
@@ -78,43 +88,31 @@ def _poll(log_id, batch_id, status_url, response_url):
                 if detail:
                     types = [d.get('type', '') for d in detail] if isinstance(detail, list) else []
                     if any('content_policy' in t for t in types):
-                        msg = 'fal.ai отклонил промпт: нарушение политики контента'
-                        db_log_update(log_id, msg, 'error')
-                        if log_id:
-                            db_log_entry(log_id, msg, level='error')
-                        db_set_batch_video_error(batch_id)
+                        _reset_to_pending(log_id, batch_id,
+                                          'fal.ai отклонил промпт: нарушение политики контента')
                         return None
                 video_url = result.get('video', {}).get('url')
                 if not video_url:
-                    msg = f'Нет URL видео в ответе fal.ai: {str(result)[:200]}'
-                    db_log_update(log_id, msg, 'error')
-                    if log_id:
-                        db_log_entry(log_id, msg, level='error')
-                    db_set_batch_video_error(batch_id)
+                    _reset_to_pending(log_id, batch_id,
+                                      f'Нет URL видео в ответе fal.ai: {str(result)[:200]}')
                     return None
                 return video_url
 
             elif status == 'FAILED':
-                msg = f'fal.ai: генерация провалилась: {str(s)[:200]}'
-                db_log_update(log_id, msg, 'error')
-                if log_id:
-                    db_log_entry(log_id, msg, level='error')
-                db_set_batch_video_error(batch_id)
+                _reset_to_pending(log_id, batch_id,
+                                  f'fal.ai: генерация провалилась: {str(s)[:200]}')
                 return None
 
         except Exception as e:
             if log_id:
                 db_log_entry(log_id, f"Ошибка опроса статуса: {e}", level='warn')
 
-    msg = 'Таймаут генерации видео (2 часа)'
-    db_log_update(log_id, msg, 'error')
-    if log_id:
-        db_log_entry(log_id, msg, level='error')
-    db_set_batch_video_error(batch_id)
+    _reset_to_pending(log_id, batch_id, 'Таймаут генерации видео (2 часа)')
     return None
 
 
 def run():
+    batch_id = None
     try:
         db_log_interrupt_running('video')
 
@@ -267,5 +265,6 @@ def run():
         print(f"[video] Готово: batch → video_ready, url={video_url[:60]}…")
 
     except Exception as e:
-        db_log_pipeline('video', f"Сбой пайплайна: {e}", status='error')
+        db_log_pipeline('video', f"Сбой пайплайна: {e}", status='error',
+                        batch_id=batch_id)
         print(f"[video] Ошибка: {e}")
