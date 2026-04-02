@@ -292,16 +292,7 @@
   .confirm-confirm:disabled { opacity: .5; cursor: default; }
 
   /* ── Workflow control ── */
-  .header-workflow {
-    display: flex; align-items: center; gap: 10px;
-    margin-top: 10px; padding-top: 10px;
-    border-top: 1px solid #1e1e2e;
-  }
-  .wf-label {
-    font-size: 11px; font-weight: 600; color: #6666a0;
-    text-transform: uppercase; letter-spacing: .07em;
-    white-space: nowrap; flex-shrink: 0;
-  }
+  .wf-row { display: flex; align-items: center; gap: 10px; }
   .wf-dot {
     width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
     transition: background .3s, box-shadow .3s;
@@ -701,16 +692,6 @@
       <a href="/logout" class="logout">Выйти</a>
     </div>
   </div>
-  <div class="header-workflow">
-    <span class="wf-label">Движок</span>
-    <span class="wf-dot {{ 'running' if workflow_state == 'running' else 'pause' }}" id="wf-dot"></span>
-    <span class="wf-state-text" id="wf-state-text">{{ 'Работает' if workflow_state == 'running' else 'Приостановлен' }}</span>
-    <div class="wf-btns">
-      <button class="wf-btn wf-start" id="wf-btn-start" onclick="wfStart()" {{ 'disabled' if workflow_state == 'running' else '' }}>Запустить</button>
-      <button class="wf-btn" id="wf-btn-pause" onclick="wfPause()" {{ '' if workflow_state == 'running' else 'disabled' }}>Приостановить</button>
-      <button class="wf-btn wf-restart" id="wf-btn-restart" onclick="openRestartDialog()">Перезапустить</button>
-    </div>
-  </div>
 </header>
 
 <div class="container">
@@ -724,8 +705,21 @@
   <!-- ══ ПАЙПЛАЙН ══ -->
   <div id="panel-pipeline" class="tab-panel active">
 
+    <div class="card" style="margin-top:12px">
+      <div class="card-title">Движок</div>
+      <div class="wf-row">
+        <span class="wf-dot {{ 'running' if workflow_state == 'running' else 'pause' }}" id="wf-dot"></span>
+        <span class="wf-state-text" id="wf-state-text">{{ 'Работает' if workflow_state == 'running' else 'Приостановлен' }}</span>
+        <div class="wf-btns">
+          <button class="wf-btn wf-start" id="wf-btn-start" onclick="wfStart()" {{ 'disabled' if workflow_state == 'running' else '' }}>Запустить</button>
+          <button class="wf-btn" id="wf-btn-pause" onclick="wfPause()" {{ '' if workflow_state == 'running' else 'disabled' }}>Приостановить</button>
+          <button class="wf-btn wf-restart" id="wf-btn-restart" onclick="openRestartDialog()">Перезапустить</button>
+        </div>
+      </div>
+    </div>
+
     <form id="settings-form" style="margin-top:0">
-      <div class="card" style="margin-top:12px">
+      <div class="card">
         <div class="card-title">Расписание</div>
         <div class="hint">Видео публикуется в указанные моменты по Москве. Можно задать несколько.</div>
         <div id="schedule-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px;"></div>
