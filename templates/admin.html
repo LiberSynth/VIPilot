@@ -211,6 +211,7 @@
   }
   .flash.success { background: rgba(62,207,142,.1); border: 1px solid rgba(62,207,142,.25); color: #3ecf8e; }
   .flash.error { background: rgba(255,80,80,.1); border: 1px solid rgba(255,80,80,.25); color: #ff6060; }
+  .flash.warn { background: rgba(245,166,35,.1); border: 1px solid rgba(245,166,35,.25); color: #f5a623; }
 
   .toggle-row {
     display: flex; align-items: center; justify-content: space-between; gap: 12px;
@@ -705,7 +706,7 @@
   <!-- ══ ПАЙПЛАЙН ══ -->
   <div id="panel-pipeline" class="tab-panel active">
 
-    <div class="card" style="margin-top:12px">
+    <div class="card{% if emulation_mode %} emulation-active{% endif %}" style="margin-top:12px" id="wf-card">
       <div class="card-title">Движок</div>
       <div class="wf-row">
         <span class="wf-dot {{ 'running' if workflow_state == 'running' else 'pause' }}" id="wf-dot"></span>
@@ -715,6 +716,16 @@
           <button class="wf-btn" id="wf-btn-pause" onclick="wfPause()" {{ '' if workflow_state == 'running' else 'disabled' }}>Приостановить</button>
           <button class="wf-btn wf-restart" id="wf-btn-restart" onclick="openRestartDialog()">Перезапустить</button>
         </div>
+      </div>
+      <div class="wf-row" style="margin-top:12px;padding-top:10px;border-top:1px solid #1e1e2e">
+        <span class="wf-state-text">Эмуляция</span>
+        <span class="wf-state-text" style="color:#555570;font-size:11px;margin-left:4px">— видео и транскод фиктивные, публикация реальная</span>
+        <span id="emulation-badge" class="emulation-badge" {% if not emulation_mode %}style="display:none"{% endif %}>ВКЛ</span>
+        <label class="toggle-wrap" style="margin-left:auto">
+          <input type="checkbox" id="emulation_check" {% if emulation_mode %}checked{% endif %}
+                 onchange="wfEmulation(this.checked)">
+          <span class="toggle-track"></span>
+        </label>
       </div>
     </div>
 
@@ -830,24 +841,6 @@
         <div style="margin-top:12px">
           <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block">SMS (номер в формате 79161234567)</label>
           <input type="tel" name="notify_phone" id="notify_phone" value="{{ notify_phone }}" placeholder="79161234567">
-        </div>
-      </div>
-
-      <div class="card emulation-card{% if emulation_mode %} emulation-active{% endif %}">
-        <div class="toggle-row">
-          <div>
-            <div class="toggle-label">
-              Режим эмуляции
-              {% if emulation_mode %}<span class="emulation-badge">ВКЛ</span>{% endif %}
-            </div>
-            <div class="toggle-hint">Генерация не запрашивается. Берётся случайное ранее сгенерированное видео.</div>
-          </div>
-          <label class="toggle-wrap">
-            <input type="hidden" name="emulation_mode" id="emulation_hidden" value="{{ '1' if emulation_mode else '0' }}">
-            <input type="checkbox" id="emulation_check" {% if emulation_mode %}checked{% endif %}
-                   onchange="document.getElementById('emulation_hidden').value = this.checked ? '1' : '0'">
-            <span class="toggle-track"></span>
-          </label>
         </div>
       </div>
 
@@ -1037,7 +1030,6 @@ function collectAllSettings(activeTab) {
   data.set('log_lifetime',        v('log_lifetime'));
   data.set('batch_lifetime',      v('batch_lifetime'));
   data.set('file_lifetime',       v('file_lifetime'));
-  data.set('emulation_mode',  v('emulation_hidden'));
   return data;
 }
 
@@ -1158,8 +1150,6 @@ function validateLifetimes() {
     el.addEventListener('change', () => { if (validateLifetimes()) scheduleServiceSave(); });
   });
 
-  const emulChk = document.getElementById('emulation_check');
-  if (emulChk) emulChk.addEventListener('change', scheduleServiceSave);
 })();
 
 // ── Models list with drag-and-drop ──
@@ -1989,6 +1979,24 @@ function wfPause() {
       if (d.ok) { wfUpdateUI('pause'); showToast('Движок приостановлен', 'success'); }
     })
     .catch(function() { btn.disabled = false; showToast('Ошибка соединения', 'error'); });
+}
+
+function wfEmulation(checked) {
+  fetch('/api/workflow/emulation', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled: checked ? '1' : '0' }),
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var badge = document.getElementById('emulation-badge');
+      var card  = document.getElementById('wf-card');
+      var on = d.emulation_mode === '1';
+      if (badge) badge.style.display = on ? '' : 'none';
+      if (card)  card.classList.toggle('emulation-active', on);
+      showToast(on ? 'Эмуляция включена' : 'Эмуляция выключена', on ? 'warn' : 'success');
+    })
+    .catch(function() { showToast('Ошибка соединения', 'error'); });
 }
 
 function openRestartDialog() {

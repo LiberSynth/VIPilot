@@ -9,6 +9,7 @@ def run_upgrades():
     _create_environment_table()
     _add_emulation_mode()
     _add_buffer_hours()
+    _migrate_emulation_to_env()
     _create_ai_models()
     _create_targets()
     _create_stories()
@@ -43,6 +44,27 @@ def _add_emulation_mode():
             conn.commit()
     except Exception as e:
         print(f"[DB] Ошибка миграции _add_emulation_mode: {e}")
+
+
+def _migrate_emulation_to_env():
+    """Переносит emulation_mode из settings в environment (однократно)."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT value FROM settings WHERE key = 'emulation_mode'")
+                row = cur.fetchone()
+                val = row[0] if row else '0'
+                cur.execute(
+                    """
+                    INSERT INTO environment (key, value) VALUES ('emulation_mode', %s)
+                    ON CONFLICT (key) DO NOTHING
+                    """,
+                    (val,),
+                )
+                cur.execute("DELETE FROM settings WHERE key = 'emulation_mode'")
+            conn.commit()
+    except Exception as e:
+        print(f"[DB] Ошибка миграции _migrate_emulation_to_env: {e}")
 
 
 def _add_buffer_hours():

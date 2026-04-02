@@ -15,6 +15,7 @@ import requests
 
 from db import (
     db_get,
+    env_get,
     db_get_story_ready_batch_atomic,
     db_get_video_pending_batch,
     db_is_batch_scheduled,
@@ -143,6 +144,20 @@ def run():
             db_log_pipeline('video', 'Батч устарел — слот удалён из расписания или таргет отключён',
                             status='прервана', batch_id=batch_id)
             print(f"[video] Батч {batch_id[:8]}… устарел, пропускаю")
+            return
+
+        # ── Режим эмуляции ──────────────────────────────────────────────────
+        if env_get("emulation_mode", "0") == "1":
+            print(f"[video] Батч {batch_id[:8]}… — эмуляция генерации видео")
+            log_id = db_log_pipeline(
+                'video', 'Видео [эмуляция]',
+                status='running', batch_id=batch_id,
+            )
+            if log_id:
+                db_log_entry(log_id, '[эмуляция] Запрос к модели пропущен')
+                db_log_entry(log_id, '[эмуляция] Батч переведён в video_ready')
+            db_set_batch_video_ready(batch_id, 'emulation://skipped')
+            db_log_update(log_id, 'Видео [эмуляция]', 'ok')
             return
 
         print(f"[video] Батч {batch_id[:8]}… ({target}) — "

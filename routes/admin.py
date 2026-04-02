@@ -14,6 +14,7 @@ from db import (
     db_get,
     db_set,
     env_get,
+    env_set,
 )
 from utils.consts import ADMIN_PASSWORD
 from utils.auth import is_authenticated, password_fingerprint
@@ -64,7 +65,7 @@ def admin_page():
     log_lifetime       = parse_log_lifetime(db_get("log_lifetime", "365"))
     entries_lifetime   = parse_entries_lifetime(db_get("entries_lifetime", "30"))
     file_lifetime      = parse_file_lifetime(db_get("file_lifetime", "7"))
-    emulation_mode     = db_get("emulation_mode", "0") == "1"
+    emulation_mode     = env_get("emulation_mode", "0") == "1"
     notify_email       = db_get("notify_email", "")
     notify_phone       = db_get("notify_phone", "")
     vk_publish_story   = db_get("vk_publish_story", "1") == "1"
@@ -132,9 +133,6 @@ def save():
 
     if file_lifetime_raw:
         db_set("file_lifetime", str(parse_file_lifetime(file_lifetime_raw)))
-
-    emulation_raw = request.form.get("emulation_mode", "0")
-    db_set("emulation_mode", "1" if emulation_raw == "1" else "0")
 
     db_set("notify_email", request.form.get("notify_email", "").strip())
     db_set("notify_phone", request.form.get("notify_phone", "").strip())
