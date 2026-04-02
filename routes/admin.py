@@ -40,6 +40,11 @@ def healthz():
     return "ok", 200
 
 
+@bp.route("/icon-preview")
+def icon_preview():
+    return render_template("icon_preview.html")
+
+
 @bp.route("/", methods=["GET", "POST"])
 def login():
     if is_authenticated():

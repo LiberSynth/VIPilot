@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0f0f13;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    gap: 48px;
+    flex-wrap: wrap;
+    padding: 40px;
+  }
+  .variant {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+  .label {
+    color: #666;
+    font-family: -apple-system, sans-serif;
+    font-size: 12px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .logo-icon {
+    width: 64px;
+    height: 64px;
+    background: linear-gradient(135deg, #4a7cf7, #6f4af7);
+    border-radius: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+</style>
+</head>
+<body>
+
+<!-- Вариант: текущий (сдвиг по умолчанию) -->
+<div class="variant">
+  <div class="logo-icon">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36" fill="none" width="42" height="42">
+      <!-- Phone: right-up -->
+      <rect x="20" y="2" width="13" height="22" rx="2.8" stroke="#ffc542" stroke-width="1.6" fill="none"/>
+      <rect x="23.5" y="4.5" width="6" height="1.2" rx="0.6" fill="#ffc542" opacity="0.5"/>
+      <rect x="25" y="22" width="3" height="1.2" rx="0.6" fill="#ffc542" opacity="0.5"/>
+      <path d="M24.5 12 L24.5 17.5 L29.5 14.75 Z" fill="#ffc542" opacity="0.95"/>
+
+      <!-- Network (AI brain): left-down -->
+      <circle cx="9.5" cy="19" r="1.5" fill="#38efff"/>
+      <circle cx="9.5" cy="12" r="1.2" fill="#38efff" opacity="0.85"/>
+      <circle cx="15.2" cy="15" r="1.2" fill="#38efff" opacity="0.85"/>
+      <circle cx="15.2" cy="23" r="1.2" fill="#38efff" opacity="0.85"/>
+      <circle cx="9.5" cy="26" r="1.2" fill="#38efff" opacity="0.85"/>
+      <circle cx="3.8" cy="23" r="1.2" fill="#38efff" opacity="0.85"/>
+      <circle cx="3.8" cy="15" r="1.2" fill="#38efff" opacity="0.85"/>
+      <!-- Lines center to outer -->
+      <line x1="9.5" y1="19" x2="9.5" y2="12" stroke="#38efff" stroke-width="0.9" opacity="0.45"/>
+      <line x1="9.5" y1="19" x2="15.2" y2="15" stroke="#38efff" stroke-width="0.9" opacity="0.45"/>
+      <line x1="9.5" y1="19" x2="15.2" y2="23" stroke="#38efff" stroke-width="0.9" opacity="0.45"/>
+      <line x1="9.5" y1="19" x2="9.5" y2="26" stroke="#38efff" stroke-width="0.9" opacity="0.45"/>
+      <line x1="9.5" y1="19" x2="3.8" y2="23" stroke="#38efff" stroke-width="0.9" opacity="0.45"/>
+      <line x1="9.5" y1="19" x2="3.8" y2="15" stroke="#38efff" stroke-width="0.9" opacity="0.45"/>
+      <!-- Outer ring -->
+      <line x1="9.5" y1="12" x2="15.2" y2="15" stroke="#38efff" stroke-width="0.9" opacity="0.28"/>
+      <line x1="15.2" y1="15" x2="15.2" y2="23" stroke="#38efff" stroke-width="0.9" opacity="0.28"/>
+      <line x1="15.2" y1="23" x2="9.5" y2="26" stroke="#38efff" stroke-width="0.9" opacity="0.28"/>
+      <line x1="9.5" y1="26" x2="3.8" y2="23" stroke="#38efff" stroke-width="0.9" opacity="0.28"/>
+      <line x1="3.8" y1="23" x2="3.8" y2="15" stroke="#38efff" stroke-width="0.9" opacity="0.28"/>
+      <line x1="3.8" y1="15" x2="9.5" y2="12" stroke="#38efff" stroke-width="0.9" opacity="0.28"/>
+      <!-- Connector -->
+      <path d="M16 18 Q17.5 18 17.5 15.5 Q17.5 13.5 20 13" stroke="white" stroke-width="1.3" fill="none" opacity="0.5" stroke-linecap="round"/>
+    </svg>
+  </div>
+  <div class="label">Вариант А</div>
+</div>
+
+<!-- Вариант B: более крупный коннектор, другой угол -->
+<div class="variant">
+  <div class="logo-icon">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36" fill="none" width="42" height="42">
+      <!-- Phone: right-up, shifted more -->
+      <rect x="21" y="1.5" width="13" height="22" rx="2.8" stroke="#ffd166" stroke-width="1.6" fill="none"/>
+      <rect x="24.5" y="4" width="6" height="1.2" rx="0.6" fill="#ffd166" opacity="0.5"/>
+      <rect x="26" y="21.5" width="3" height="1.2" rx="0.6" fill="#ffd166" opacity="0.5"/>
+      <path d="M25.5 11 L25.5 17 L30.5 14 Z" fill="#ffd166" opacity="0.95"/>
+
+      <!-- Network: left-down, shifted more -->
+      <circle cx="8.5" cy="21" r="1.5" fill="#4af5ff"/>
+      <circle cx="8.5" cy="14" r="1.2" fill="#4af5ff" opacity="0.85"/>
+      <circle cx="14.2" cy="17" r="1.2" fill="#4af5ff" opacity="0.85"/>
+      <circle cx="14.2" cy="25" r="1.2" fill="#4af5ff" opacity="0.85"/>
+      <circle cx="8.5" cy="28" r="1.2" fill="#4af5ff" opacity="0.85"/>
+      <circle cx="2.8" cy="25" r="1.2" fill="#4af5ff" opacity="0.85"/>
+      <circle cx="2.8" cy="17" r="1.2" fill="#4af5ff" opacity="0.85"/>
+      <line x1="8.5" y1="21" x2="8.5" y2="14" stroke="#4af5ff" stroke-width="0.9" opacity="0.45"/>
+      <line x1="8.5" y1="21" x2="14.2" y2="17" stroke="#4af5ff" stroke-width="0.9" opacity="0.45"/>
+      <line x1="8.5" y1="21" x2="14.2" y2="25" stroke="#4af5ff" stroke-width="0.9" opacity="0.45"/>
+      <line x1="8.5" y1="21" x2="8.5" y2="28" stroke="#4af5ff" stroke-width="0.9" opacity="0.45"/>
+      <line x1="8.5" y1="21" x2="2.8" y2="25" stroke="#4af5ff" stroke-width="0.9" opacity="0.45"/>
+      <line x1="8.5" y1="21" x2="2.8" y2="17" stroke="#4af5ff" stroke-width="0.9" opacity="0.45"/>
+      <line x1="8.5" y1="14" x2="14.2" y2="17" stroke="#4af5ff" stroke-width="0.9" opacity="0.28"/>
+      <line x1="14.2" y1="17" x2="14.2" y2="25" stroke="#4af5ff" stroke-width="0.9" opacity="0.28"/>
+      <line x1="14.2" y1="25" x2="8.5" y2="28" stroke="#4af5ff" stroke-width="0.9" opacity="0.28"/>
+      <line x1="8.5" y1="28" x2="2.8" y2="25" stroke="#4af5ff" stroke-width="0.9" opacity="0.28"/>
+      <line x1="2.8" y1="25" x2="2.8" y2="17" stroke="#4af5ff" stroke-width="0.9" opacity="0.28"/>
+      <line x1="2.8" y1="17" x2="8.5" y2="14" stroke="#4af5ff" stroke-width="0.9" opacity="0.28"/>
+      <!-- Connector wavy -->
+      <path d="M14.8 19.5 C16.5 19.5 16 15.5 18 14 C19 13.3 20 13 21 12.8" stroke="white" stroke-width="1.3" fill="none" opacity="0.5" stroke-linecap="round"/>
+    </svg>
+  </div>
+  <div class="label">Вариант Б</div>
+</div>
+
+</body>
+</html>
