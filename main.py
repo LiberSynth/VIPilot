@@ -88,8 +88,10 @@ def start_main_loop():
         init_db()
         run_upgrades()
         db_recover_video_generating()
-        env_set('workflow_state', 'running')
-        wf_state.set_running()
+        if env_get('workflow_state', 'running') == 'pause':
+            wf_state.set_paused()
+        else:
+            wf_state.set_running()
         db_log_root("Приложение запущено", status='info')
         atexit.register(_on_exit)
         t = threading.Thread(target=main_loop, daemon=True)
