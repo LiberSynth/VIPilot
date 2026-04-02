@@ -963,13 +963,7 @@ def db_clear_all_history():
                 le = cur.rowcount
                 cur.execute("DELETE FROM log")
                 ll = cur.rowcount
-                cur.execute("""
-                    DELETE FROM batches
-                    WHERE status IN (
-                        'published', 'отменён',
-                        'publish_error', 'video_error', 'transcode_error'
-                    )
-                """)
+                cur.execute("DELETE FROM batches")
                 bl = cur.rowcount
                 cur.execute("""
                     DELETE FROM stories
