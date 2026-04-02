@@ -157,7 +157,7 @@ def db_update_target_aspect_ratio(target_id, x, y):
 
 def db_ensure_batch(scheduled_at, target_id):
     """Создаёт батч если не существует.
-    Если батч существует со статусом 'устарел' — сбрасывает его в pending.
+    Если батч существует со статусом 'отменён' — сбрасывает его в pending.
     Возвращает UUID нового/восстановленного батча или None если батч уже активен."""
     try:
         with get_db() as conn:
@@ -173,7 +173,7 @@ def db_ensure_batch(scheduled_at, target_id):
                             video_file   = NULL,
                             data         = NULL,
                             completed_at = NULL
-                        WHERE batches.status = 'устарел'
+                        WHERE batches.status = 'отменён'
                     RETURNING id
                     """,
                     (scheduled_at, target_id),
@@ -475,12 +475,12 @@ def db_is_batch_scheduled(scheduled_at, target_id):
 
 
 def db_set_batch_obsolete(batch_id):
-    """Переводит батч в status='устарел'."""
+    """Переводит батч в status='отменён'."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "UPDATE batches SET status = 'устарел' WHERE id = %s",
+                    "UPDATE batches SET status = 'отменён' WHERE id = %s",
                     (batch_id,),
                 )
             conn.commit()
@@ -871,7 +871,7 @@ def db_reorder_models(ids: list):
 
 
 # ---------------------------------------------------------------------------
-# Cleanup — очистка устаревших данных
+# Cleanup — очистка отменённых данных
 # ---------------------------------------------------------------------------
 
 def db_cleanup_log_entries(log_lifetime_days: int) -> int:
@@ -932,7 +932,7 @@ def db_clear_all_history():
                 cur.execute("""
                     DELETE FROM batches
                     WHERE status IN (
-                        'published', 'устарел',
+                        'published', 'отменён',
                         'publish_error', 'video_error', 'transcode_error'
                     )
                 """)
@@ -953,7 +953,7 @@ def db_clear_all_history():
 
 
 def db_cleanup_video_data(file_lifetime_days: int) -> int:
-    """Обнуляет video_data у опубликованных/устаревших батчей старше file_lifetime_days.
+    """Обнуляет video_data у опубликованных/отменённых батчей старше file_lifetime_days.
     Сама запись батча сохраняется, удаляется только бинарник.
     Возвращает количество обновлённых батчей."""
     try:
@@ -961,7 +961,7 @@ def db_cleanup_video_data(file_lifetime_days: int) -> int:
             with conn.cursor() as cur:
                 cur.execute("""
                     UPDATE batches SET video_data = NULL
-                    WHERE status IN ('published', 'устарел')
+                    WHERE status IN ('published', 'отменён')
                       AND completed_at < now() - make_interval(days => %s)
                       AND video_data IS NOT NULL
                 """, (file_lifetime_days,))
@@ -974,7 +974,7 @@ def db_cleanup_video_data(file_lifetime_days: int) -> int:
 
 
 def db_cleanup_batches(batch_lifetime_days: int) -> int:
-    """Удаляет батчи со статусом 'published'/'устарел' старше batch_lifetime_days.
+    """Удаляет батчи со статусом 'published'/'отменён' старше batch_lifetime_days.
     Удаляет связанные логи и осиротевшие stories.
     Возвращает количество удалённых батчей."""
     try:
@@ -982,7 +982,7 @@ def db_cleanup_batches(batch_lifetime_days: int) -> int:
             with conn.cursor() as cur:
                 cur.execute("""
                     SELECT id FROM batches
-                    WHERE status IN ('published', 'устарел')
+                    WHERE status IN ('published', 'отменён')
                       AND completed_at < now() - make_interval(days => %s)
                 """, (batch_lifetime_days,))
                 rows = cur.fetchall()

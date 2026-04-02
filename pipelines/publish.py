@@ -66,9 +66,9 @@ def run():
 
         if not db_is_batch_scheduled(batch['scheduled_at'], batch['target_id']):
             db_set_batch_obsolete(batch_id)
-            db_log_pipeline('publish', 'Батч устарел — слот удалён из расписания или таргет отключён',
+            db_log_pipeline('publish', 'Батч отменён — слот удалён из расписания или таргет отключён',
                             status='прервана', batch_id=batch_id)
-            print(f"[publish] Батч {batch_id[:8]}… устарел, пропускаю")
+            print(f"[publish] Батч {batch_id[:8]}… отменён, пропускаю")
             return
 
         now = datetime.now(timezone.utc)

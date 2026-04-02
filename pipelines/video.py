@@ -142,9 +142,9 @@ def run():
 
         if not db_is_batch_scheduled(batch['scheduled_at'], batch['target_id']):
             db_set_batch_obsolete(batch_id)
-            db_log_pipeline('video', 'Батч устарел — слот удалён из расписания или таргет отключён',
+            db_log_pipeline('video', 'Батч отменён — слот удалён из расписания или таргет отключён',
                             status='прервана', batch_id=batch_id)
-            print(f"[video] Батч {batch_id[:8]}… устарел, пропускаю")
+            print(f"[video] Батч {batch_id[:8]}… отменён, пропускаю")
             return
 
         # ── Режим эмуляции ──────────────────────────────────────────────────
@@ -306,7 +306,7 @@ def run():
         print(f"[video] Ошибка: {e}")
     finally:
         # Если батч был захвачен (video_generating) но не переведён в
-        # video_pending/video_ready/устарел/pending — возвращаем в story_ready.
+        # video_pending/video_ready/отменён/pending — возвращаем в story_ready.
         # Безопасно: UPDATE сработает только если статус всё ещё video_generating.
         if batch_id:
             db_reset_video_generating(batch_id)
