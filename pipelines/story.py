@@ -175,9 +175,8 @@ def run():
                     if log_id:
                         db_log_entry(log_id, f"[{model_name}] не удалось сохранить сюжет", level='warn')
                 else:
-                    if attempt + 1 < fails_to_next:
-                        if log_id:
-                            db_log_entry(log_id, f"[{model_name}] попытка {attempt + 1}/{fails_to_next} не удалась", level='warn')
+                    if log_id:
+                        db_log_entry(log_id, f"[{model_name}] попытка {attempt + 1}/{fails_to_next} не удалась", level='warn')
 
             if story_id:
                 break
