@@ -758,6 +758,38 @@ def db_cleanup_logs(short_log_lifetime_days: int) -> int:
         return 0
 
 
+def db_clear_all_history():
+    """Удаляет всю историю: log_entries, log, завершённые батчи и осиротевшие сюжеты."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM log_entries")
+                le = cur.rowcount
+                cur.execute("DELETE FROM log")
+                ll = cur.rowcount
+                cur.execute("""
+                    DELETE FROM batches
+                    WHERE status IN (
+                        'published', 'устарел',
+                        'publish_error', 'video_error', 'transcode_error'
+                    )
+                """)
+                bl = cur.rowcount
+                cur.execute("""
+                    DELETE FROM stories
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM batches WHERE story_id = stories.id
+                    )
+                """)
+                sl = cur.rowcount
+            conn.commit()
+        print(f"[DB] Очистка истории: log_entries={le}, log={ll}, batches={bl}, stories={sl}")
+        return {"log_entries": le, "logs": ll, "batches": bl, "stories": sl}
+    except Exception as e:
+        print(f"[DB] Ошибка db_clear_all_history: {e}")
+        raise
+
+
 def db_cleanup_video_data(file_lifetime_days: int) -> int:
     """Обнуляет video_data у опубликованных/устаревших батчей старше file_lifetime_days.
     Сама запись батча сохраняется, удаляется только бинарник.

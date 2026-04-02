@@ -262,6 +262,34 @@
   }
   .btn-secondary:active { background: rgba(74,124,247,.1); }
   .btn-secondary:disabled { opacity: .4; cursor: default; }
+  .btn-danger {
+    width: 100%; background: transparent; color: #ff6060;
+    border: 1px solid rgba(255,80,80,.35); border-radius: 12px;
+    padding: 15px; font-size: 15px; font-weight: 600;
+    cursor: pointer; margin-top: 8px;
+  }
+  .btn-danger:hover { background: rgba(255,80,80,.08); border-color: rgba(255,80,80,.55); }
+  .btn-danger:active { background: rgba(255,80,80,.15); }
+  .btn-danger:disabled { opacity: .4; cursor: default; }
+  .confirm-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,.6); z-index: 1000;
+    align-items: center; justify-content: center;
+  }
+  .confirm-overlay.open { display: flex; }
+  .confirm-box {
+    background: #1a1a28; border: 1px solid #2e2e42; border-radius: 16px;
+    padding: 28px 24px 20px; max-width: 340px; width: 90%;
+  }
+  .confirm-box-title { font-size: 16px; font-weight: 700; color: #e0e0f0; margin-bottom: 10px; }
+  .confirm-box-text  { font-size: 13px; color: #888898; line-height: 1.55; margin-bottom: 22px; }
+  .confirm-box-btns  { display: flex; gap: 10px; }
+  .confirm-box-btns button { flex: 1; padding: 12px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; }
+  .confirm-cancel  { background: #2a2a3a; color: #aaa; }
+  .confirm-cancel:hover  { background: #32324a; }
+  .confirm-confirm { background: #c03030; color: #fff; }
+  .confirm-confirm:hover { background: #d03838; }
+  .confirm-confirm:disabled { opacity: .5; cursor: default; }
 
   /* ── Monitor ── */
   .monitor-section-label {
@@ -807,7 +835,7 @@
       </div>
 
       <div class="card">
-        <div class="card-title">Сроки хранения</div>
+        <div class="card-title">Хранение и очистка</div>
         <div class="hint">Насколько долго хранятся данные до автоматической очистки. Соблюдайте иерархию: подробный лог ≤ краткий лог ≤ история батчей.</div>
 
         <div style="margin-top:14px">
@@ -844,6 +872,11 @@
             <span class="lead-unit">дней</span>
           </div>
           <div class="hint" style="margin-top:5px">Перекодированные видеофайлы удаляются после публикации.</div>
+        </div>
+
+        <div style="margin-top:20px;padding-top:16px;border-top:1px solid #1e1e28">
+          <button type="button" class="btn-danger" onclick="openClearHistoryDialog()">Очистить всю историю</button>
+          <div class="hint" style="margin-top:6px">Удаляет все логи и завершённые батчи. Активные батчи не затрагиваются.</div>
         </div>
       </div>
 
@@ -1827,6 +1860,59 @@ function validateLifetimes() {
     if (name === 'pipeline') loadSchedule();
   };
 })();
+
+function openClearHistoryDialog() {
+  document.getElementById('clearHistoryOverlay').classList.add('open');
+}
+
+function closeClearHistoryDialog() {
+  document.getElementById('clearHistoryOverlay').classList.remove('open');
+}
+
+function confirmClearHistory() {
+  var btn = document.getElementById('clearHistoryConfirmBtn');
+  btn.disabled = true;
+  btn.textContent = 'Удаляем…';
+  fetch('/api/clear_history', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      closeClearHistoryDialog();
+      btn.disabled = false;
+      btn.textContent = 'Очистить';
+      if (data.ok) {
+        var d = data.deleted || {};
+        var parts = [];
+        if (d.logs)        parts.push('логов: ' + d.logs);
+        if (d.log_entries) parts.push('записей: ' + d.log_entries);
+        if (d.batches)     parts.push('батчей: ' + d.batches);
+        if (d.stories)     parts.push('сюжетов: ' + d.stories);
+        alert('История очищена.' + (parts.length ? '\n' + parts.join(', ') : ''));
+      } else {
+        alert('Ошибка: ' + (data.error || 'неизвестная ошибка'));
+      }
+    })
+    .catch(function(e) {
+      closeClearHistoryDialog();
+      btn.disabled = false;
+      btn.textContent = 'Очистить';
+      alert('Ошибка соединения: ' + e);
+    });
+}
 </script>
+
+<div class="confirm-overlay" id="clearHistoryOverlay" onclick="if(event.target===this)closeClearHistoryDialog()">
+  <div class="confirm-box">
+    <div class="confirm-box-title">Очистить всю историю?</div>
+    <div class="confirm-box-text">
+      Будут удалены все логи (краткие и подробные) и все завершённые батчи со связанными сюжетами.<br><br>
+      Активные батчи (в очереди, в процессе генерации) не затрагиваются.<br><br>
+      Действие нельзя отменить.
+    </div>
+    <div class="confirm-box-btns">
+      <button class="confirm-cancel" onclick="closeClearHistoryDialog()">Отмена</button>
+      <button class="confirm-confirm" id="clearHistoryConfirmBtn" onclick="confirmClearHistory()">Очистить</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>

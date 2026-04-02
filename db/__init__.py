@@ -40,4 +40,5 @@ from .db import (
     db_cleanup_logs,
     db_cleanup_batches,
     db_cleanup_video_data,
+    db_clear_all_history,
 )

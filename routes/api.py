@@ -9,6 +9,7 @@ from db import (
     db_reorder_models,
     init_db,
     run_upgrades,
+    db_clear_all_history,
 )
 from log import db_get_log, db_get_monitor
 from utils.auth import is_authenticated
@@ -131,5 +132,16 @@ def api_reseed():
         init_db()
         run_upgrades()
         return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@bp.route("/clear_history", methods=["POST"])
+def api_clear_history():
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    try:
+        result = db_clear_all_history()
+        return jsonify({"ok": True, "deleted": result})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
