@@ -13,6 +13,8 @@ import os
 import time
 import requests
 
+from utils.notify import notify_failure
+
 from db import (
     db_get,
     env_get,
@@ -304,6 +306,7 @@ def run():
         db_log_pipeline('video', f"Сбой пайплайна: {e}", status='error',
                         batch_id=batch_id)
         print(f"[video] Ошибка: {e}")
+        notify_failure(f"сбой video-пайплайна: {e}")
     finally:
         # Если батч был захвачен (video_generating) но не переведён в
         # video_pending/video_ready/отменён/pending — возвращаем в story_ready.

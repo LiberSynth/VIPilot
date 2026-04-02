@@ -7,6 +7,7 @@ Pipeline 5 — Публикация.
 
 from datetime import datetime, timezone
 
+from utils.notify import notify_failure
 from db import (
     db_get,
     db_get_transcode_ready_batch,
@@ -108,3 +109,4 @@ def run():
         db_log_pipeline('publish', f'Сбой пайплайна: {e}', status='error',
                         batch_id=batch_id)
         print(f"[publish] Ошибка: {e}")
+        notify_failure(f"сбой publish-пайплайна: {e}")

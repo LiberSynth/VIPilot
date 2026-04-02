@@ -10,6 +10,7 @@ import tempfile
 
 import requests
 
+from utils.notify import notify_failure
 from db import (
     env_get,
     db_get_video_ready_batch,
@@ -163,3 +164,4 @@ def run():
         db_log_pipeline('transcode', f'Сбой пайплайна: {e}', status='error',
                         batch_id=batch_id)
         print(f"[transcode] Ошибка: {e}")
+        notify_failure(f"сбой transcode-пайплайна: {e}")

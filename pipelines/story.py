@@ -9,6 +9,7 @@ Pipeline 2 — Генерация сюжета.
 import os
 import requests
 
+from utils.notify import notify_failure
 from db import (
     db_get,
     db_get_pending_batch,
@@ -231,6 +232,7 @@ def run():
             if new_log_id:
                 db_log_entry(new_log_id, msg, level='error')
         print(f"[story] Ошибка: {e}")
+        notify_failure(f"сбой story-пайплайна: {e}")
 
     finally:
         if batch_id and not batch_done:
