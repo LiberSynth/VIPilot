@@ -256,6 +256,20 @@
     vertical-align: middle; letter-spacing: .04em;
   }
 
+  .btn-run-now {
+    display: inline-block;
+    padding: 9px 20px;
+    background: linear-gradient(135deg, #4a7cf7, #6f4af7);
+    color: #fff;
+    border: none;
+    border-radius: 9px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    letter-spacing: 0.01em;
+  }
+  .btn-run-now:active { opacity: .8; }
+  .btn-run-now:disabled { opacity: .4; cursor: default; }
   .btn-primary {
     width: 100%; background: linear-gradient(135deg, #4a7cf7, #6f4af7);
     color: #fff; border: none; border-radius: 12px;
@@ -716,6 +730,11 @@
 
     <form id="settings-form" style="margin-top:0">
       <div class="card">
+        <div class="card-title">Оперативный запуск</div>
+        <div class="hint">Создаёт батч вне расписания и запускает его немедленно.</div>
+        <button type="button" class="btn-run-now" id="btn-run-now" onclick="runNow()">Запустить сейчас</button>
+      </div>
+      <div class="card" style="margin-top:12px">
         <div class="card-title">Расписание</div>
         <div class="hint">Видео публикуется в указанные моменты по Москве. Можно задать несколько.</div>
         <div id="schedule-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px;"></div>
@@ -1606,8 +1625,8 @@ function validateLifetimes() {
     const headTime = batch.created_at;
     const ratio = (batch.aspect_ratio_x && batch.aspect_ratio_y)
       ? batch.aspect_ratio_x + ':' + batch.aspect_ratio_y : '';
-    const schedStr = fmtMskShort(batch.scheduled_at);
-    const sub = ['Публикация: ' + schedStr, batch.target_name, ratio, STATUS_LABELS[bs] || bs]
+    const schedStr = batch.adhoc ? 'Оперативная' : 'Публикация: ' + fmtMskShort(batch.scheduled_at);
+    const sub = [schedStr, batch.target_name, ratio, STATUS_LABELS[bs] || bs]
       .filter(Boolean).join(' · ');
 
     if (logs.length === 0) {
@@ -1894,6 +1913,28 @@ function validateLifetimes() {
     const input = document.getElementById('new-schedule-time');
     const btn = document.getElementById('pt-save-btn');
     if (btn) btn.disabled = !input || !input.value;
+  }
+
+  function runNow() {
+    const btn = document.getElementById('btn-run-now');
+    if (btn) { btn.disabled = true; btn.textContent = 'Запускается…'; }
+    fetch('/api/run-now', { method: 'POST' })
+      .then(r => r.json())
+      .then(d => {
+        if (d.ok) {
+          if (btn) { btn.textContent = 'Запущено'; }
+          setTimeout(() => {
+            if (btn) { btn.disabled = false; btn.textContent = 'Запустить сейчас'; }
+          }, 3000);
+        } else {
+          alert('Ошибка: ' + (d.error || 'неизвестная ошибка'));
+          if (btn) { btn.disabled = false; btn.textContent = 'Запустить сейчас'; }
+        }
+      })
+      .catch(() => {
+        alert('Ошибка соединения');
+        if (btn) { btn.disabled = false; btn.textContent = 'Запустить сейчас'; }
+      });
   }
 
   function addScheduleSlot() {

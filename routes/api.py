@@ -16,6 +16,8 @@ from db import (
     db_clear_all_history,
     env_get,
     env_set,
+    db_create_adhoc_batch,
+    db_get_active_targets,
 )
 from log import db_get_log, db_get_monitor
 from utils.auth import is_authenticated
@@ -28,6 +30,20 @@ bp = Blueprint("api", __name__, url_prefix="/api")
 @bp.route("/time")
 def api_time():
     return jsonify({"utc_ms": int(time.time() * 1000)})
+
+
+@bp.route("/run-now", methods=["POST"])
+def api_run_now():
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    targets = db_get_active_targets()
+    if not targets:
+        return jsonify({"error": "Нет активных таргетов"}), 400
+    target_id = str(targets[0]['id'])
+    batch_id = db_create_adhoc_batch(target_id)
+    if not batch_id:
+        return jsonify({"error": "Не удалось создать батч"}), 500
+    return jsonify({"ok": True, "batch_id": batch_id})
 
 
 @bp.route("/log")

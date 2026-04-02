@@ -174,9 +174,29 @@ def db_ensure_batch(scheduled_at, target_id):
 # Батчи — пайплайновые функции
 # ---------------------------------------------------------------------------
 
+def db_create_adhoc_batch(target_id):
+    """Создаёт внеплановый батч с adhoc=True и scheduled_at=NULL.
+    Возвращает UUID нового батча или None при ошибке."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO batches (scheduled_at, target_id, adhoc)
+                    VALUES (NULL, %s, TRUE)
+                    RETURNING id
+                """, (target_id,))
+                row = cur.fetchone()
+            conn.commit()
+        return str(row[0]) if row else None
+    except Exception as e:
+        print(f"[DB] Ошибка db_create_adhoc_batch: {e}")
+        return None
+
+
 def db_get_pending_batch():
     """Атомарно захватывает первый pending-батч: переводит его в 'story_generating'
-    и возвращает данные. Гарантирует, что два потока не возьмут один и тот же батч."""
+    и возвращает данные. Гарантирует, что два потока не возьмут один и тот же батч.
+    Adhoc-батчи (scheduled_at IS NULL) имеют приоритет."""
     try:
         with get_db() as conn:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
@@ -186,13 +206,13 @@ def db_get_pending_batch():
                         WHERE id = (
                             SELECT id FROM batches
                             WHERE status = 'pending' AND story_id IS NULL
-                            ORDER BY scheduled_at
+                            ORDER BY scheduled_at NULLS FIRST
                             LIMIT 1
                             FOR UPDATE SKIP LOCKED
                         )
                         RETURNING *
                     )
-                    SELECT c.id, c.scheduled_at, c.target_id,
+                    SELECT c.id, c.scheduled_at, c.target_id, c.adhoc,
                            t.name AS target_name,
                            t.aspect_ratio_x, t.aspect_ratio_y
                     FROM claimed c
@@ -409,7 +429,10 @@ def db_get_video_pending_batch():
 
 def db_is_batch_scheduled(scheduled_at, target_id):
     """Проверяет актуальность батча: слот расписания существует И таргет активен.
-    Возвращает True если оба условия выполнены, False если хотя бы одно нарушено."""
+    Возвращает True если оба условия выполнены, False если хотя бы одно нарушено.
+    Adhoc-батчи (scheduled_at=None) всегда считаются актуальными."""
+    if scheduled_at is None:
+        return True
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
@@ -613,19 +636,20 @@ def db_set_batch_transcode_error(batch_id):
 
 
 def db_get_transcode_ready_batch():
-    """Возвращает первый батч со status='transcode_ready', или None."""
+    """Возвращает первый батч со status='transcode_ready', или None.
+    Adhoc-батчи (scheduled_at IS NULL) имеют приоритет."""
     try:
         with get_db() as conn:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
                 cur.execute("""
                     SELECT b.id, b.scheduled_at, b.target_id, b.story_id,
-                           b.video_url, b.video_file,
+                           b.video_url, b.video_file, b.adhoc,
                            t.name AS target_name,
                            t.aspect_ratio_x, t.aspect_ratio_y
                     FROM batches b
                     JOIN targets t ON t.id = b.target_id
                     WHERE b.status = 'transcode_ready'
-                    ORDER BY b.scheduled_at
+                    ORDER BY b.scheduled_at NULLS FIRST
                     LIMIT 1
                 """)
                 row = cur.fetchone()

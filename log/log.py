@@ -141,6 +141,7 @@ def db_get_monitor(batch_limit=50):
                     SELECT
                         b.id,
                         b.scheduled_at,
+                        b.adhoc,
                         b.status,
                         b.created_at,
                         t.name,
@@ -175,7 +176,7 @@ def db_get_monitor(batch_limit=50):
                     FROM batches b
                     LEFT JOIN log l ON l.batch_id = b.id
                     LEFT JOIN targets t ON t.id = b.target_id
-                    GROUP BY b.id, b.scheduled_at, b.status, b.created_at,
+                    GROUP BY b.id, b.scheduled_at, b.adhoc, b.status, b.created_at,
                              t.name, t.aspect_ratio_x, t.aspect_ratio_y
                     ORDER BY COALESCE(MAX(l.time_point), b.created_at) DESC
                     LIMIT %s
@@ -213,13 +214,14 @@ def db_get_monitor(batch_limit=50):
             {
                 "batch_id":       str(r[0]),
                 "scheduled_at":   r[1].isoformat() if r[1] else None,
-                "batch_status":   r[2],
-                "created_at":     r[3].isoformat() if r[3] else None,
-                "target_name":    r[4],
-                "aspect_ratio_x": r[5],
-                "aspect_ratio_y": r[6],
-                "last_event_at":  r[7].isoformat() if r[7] else None,
-                "logs":           r[8],
+                "adhoc":          r[2],
+                "batch_status":   r[3],
+                "created_at":     r[4].isoformat() if r[4] else None,
+                "target_name":    r[5],
+                "aspect_ratio_x": r[6],
+                "aspect_ratio_y": r[7],
+                "last_event_at":  r[8].isoformat() if r[8] else None,
+                "logs":           r[9],
             }
             for r in batch_rows
         ]

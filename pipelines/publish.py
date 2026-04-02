@@ -72,7 +72,7 @@ def run():
             return
 
         now = datetime.now(timezone.utc)
-        if now < batch['scheduled_at']:
+        if batch['scheduled_at'] is not None and now < batch['scheduled_at']:
             remaining = int((batch['scheduled_at'] - now).total_seconds() / 60)
             print(f"[publish] Батч {batch_id[:8]}… ещё не время ({remaining} мин до публикации)")
             return

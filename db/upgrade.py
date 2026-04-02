@@ -23,6 +23,7 @@ def run_upgrades():
     _add_video_data_column()
     _recover_story_generating()
     _fix_log_lifetime_keys()
+    _add_adhoc_column()
 
 
 def _add_emulation_mode():
@@ -341,6 +342,22 @@ def _recover_story_generating():
             print(f"[DB] Восстановлено story_generating → pending: {n}")
     except Exception as e:
         print(f"[DB] Ошибка миграции _recover_story_generating: {e}")
+
+
+def _add_adhoc_column():
+    """Добавляет колонку adhoc BOOLEAN в таблицу batches."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT column_name FROM information_schema.columns
+                    WHERE table_name = 'batches' AND column_name = 'adhoc'
+                """)
+                if not cur.fetchone():
+                    cur.execute("ALTER TABLE batches ADD COLUMN adhoc BOOLEAN NOT NULL DEFAULT FALSE")
+            conn.commit()
+    except Exception as e:
+        print(f"[DB] Ошибка миграции _add_adhoc_column: {e}")
 
 
 def _create_environment_table():
