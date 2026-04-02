@@ -4,7 +4,7 @@ import atexit
 import threading
 from flask import Flask, request
 
-from db import init_db, run_upgrades, db_get
+from db import init_db, run_upgrades, db_get, db_recover_video_generating
 from log import db_log_root
 from pipelines import planning, story, video, transcode, publish, cleanup
 from routes.admin import bp as admin_bp
@@ -83,6 +83,7 @@ def start_main_loop():
         _main_loop_started = True
         init_db()
         run_upgrades()
+        db_recover_video_generating()
         db_log_root("Приложение запущено", status='info')
         atexit.register(_on_exit)
         t = threading.Thread(target=main_loop, daemon=True)

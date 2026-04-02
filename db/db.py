@@ -193,6 +193,75 @@ def db_recover_story_generating():
         return 0
 
 
+def db_get_story_ready_batch_atomic():
+    """Атомарно захватывает первый story_ready-батч: переводит его в 'video_generating'
+    и возвращает данные. Гарантирует, что два потока не возьмут один и тот же батч."""
+    try:
+        with get_db() as conn:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute("""
+                    WITH claimed AS (
+                        UPDATE batches SET status = 'video_generating'
+                        WHERE id = (
+                            SELECT id FROM batches
+                            WHERE status = 'story_ready'
+                            ORDER BY scheduled_at
+                            LIMIT 1
+                            FOR UPDATE SKIP LOCKED
+                        )
+                        RETURNING *
+                    )
+                    SELECT c.id, c.scheduled_at, c.target_id, c.story_id,
+                           t.name AS target_name,
+                           t.aspect_ratio_x, t.aspect_ratio_y
+                    FROM claimed c
+                    JOIN targets t ON t.id = c.target_id
+                """)
+                row = cur.fetchone()
+            conn.commit()
+        return dict(row) if row else None
+    except Exception as e:
+        print(f"[DB] Ошибка db_get_story_ready_batch_atomic: {e}")
+        return None
+
+
+def db_recover_video_generating():
+    """Сбрасывает застрявшие video_generating-батчи в story_ready при старте."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE batches SET status = 'story_ready'
+                    WHERE status = 'video_generating'
+                """)
+                n = cur.rowcount
+            conn.commit()
+        if n:
+            print(f"[DB] Восстановлено video_generating → story_ready: {n}")
+        return n
+    except Exception as e:
+        print(f"[DB] Ошибка db_recover_video_generating: {e}")
+        return 0
+
+
+def db_reset_video_generating(batch_id):
+    """Сбрасывает video_generating → story_ready для конкретного батча
+    (только если батч ещё в этом статусе — безопасно вызывать в finally)."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE batches SET status = 'story_ready'
+                    WHERE id = %s AND status = 'video_generating'
+                """, (batch_id,))
+                n = cur.rowcount
+            conn.commit()
+        if n:
+            print(f"[DB] Восстановлено video_generating → story_ready: {batch_id[:8]}…")
+    except Exception as e:
+        print(f"[DB] Ошибка db_reset_video_generating: {e}")
+
+
 def db_set_batch_story(batch_id, story_id):
     """Привязывает story к батчу и переводит статус в 'story_ready'."""
     try:

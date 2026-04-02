@@ -15,7 +15,7 @@ import requests
 
 from db import (
     db_get,
-    db_get_story_ready_batch,
+    db_get_story_ready_batch_atomic,
     db_get_video_pending_batch,
     db_is_batch_scheduled,
     db_set_batch_obsolete,
@@ -25,6 +25,7 @@ from db import (
     db_set_batch_video_ready,
     db_set_batch_video_error,
     db_set_batch_pending,
+    db_reset_video_generating,
 )
 from log import db_log_pipeline, db_log_entry, db_log_update, db_log_interrupt_running
 
@@ -120,7 +121,9 @@ def run():
         batch   = db_get_video_pending_batch()
         resumed = batch is not None
         if not batch:
-            batch = db_get_story_ready_batch()
+            # Атомарный захват: batch сразу переводится в video_generating,
+            # поэтому следующий поток его не возьмёт.
+            batch = db_get_story_ready_batch_atomic()
         if not batch:
             return
 
@@ -268,3 +271,9 @@ def run():
         db_log_pipeline('video', f"Сбой пайплайна: {e}", status='error',
                         batch_id=batch_id)
         print(f"[video] Ошибка: {e}")
+    finally:
+        # Если батч был захвачен (video_generating) но не переведён в
+        # video_pending/video_ready/устарел/pending — возвращаем в story_ready.
+        # Безопасно: UPDATE сработает только если статус всё ещё video_generating.
+        if batch_id:
+            db_reset_video_generating(batch_id)
