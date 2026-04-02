@@ -25,7 +25,6 @@ def run_upgrades():
     _fix_log_lifetime_keys()
     _add_adhoc_column()
     _scheduled_at_nullable()
-    _sync_dev_models()
 
 
 def _add_emulation_mode():
@@ -380,46 +379,6 @@ def _create_environment_table():
             conn.commit()
     except Exception as e:
         print(f"[DB] Ошибка миграции _create_environment_table: {e}")
-
-
-def _sync_dev_models():
-    """Синхронизирует ai_models с эталонным набором дев-окружения:
-    добавляет openrouter/free, выставляет правильные order и active для всех моделей.
-    Идемпотентна — безопасно запускать повторно."""
-    text_defaults = [
-        ('qwen3.6-plus-preview',      1, True),
-        ('openrouter/free',           2, True),
-        ('mistral-7b-instruct',       3, True),
-        ('llama-3.1-8b-instruct',     4, True),
-    ]
-    video_defaults = [
-        ('sora-2',                    1, True),
-        ('kling-video/v1.6/standard', 2, True),
-        ('veo2',                      3, True),
-        ('minimax/video-01',          4, False),
-    ]
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    INSERT INTO ai_models (name, url, body, "order", active, platform_id, type)
-                    SELECT 'openrouter/free',
-                           'openrouter/free',
-                           '{"messages":[{"role":"system","content":"{}"},{"role":"user","content":"{}"}],"max_tokens":300,"temperature":0.9}'::jsonb,
-                           2, TRUE, p.id, 'text'
-                    FROM ai_platforms p WHERE p.name = 'OpenRouter'
-                    AND NOT EXISTS (SELECT 1 FROM ai_models WHERE name = 'openrouter/free')
-                """)
-
-                for name, order, active in text_defaults + video_defaults:
-                    cur.execute(
-                        'UPDATE ai_models SET "order" = %s, active = %s WHERE name = %s',
-                        (order, active, name),
-                    )
-            conn.commit()
-        print("[DB] _sync_dev_models: модели синхронизированы")
-    except Exception as e:
-        print(f"[DB] Ошибка миграции _sync_dev_models: {e}")
 
 
 def _scheduled_at_nullable():
