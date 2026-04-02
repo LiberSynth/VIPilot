@@ -1,4 +1,5 @@
 import time
+from utils.version import VERSION as APP_VERSION
 from flask import (
     Blueprint,
     render_template,
@@ -113,6 +114,7 @@ def admin_page():
         target_id=target_id,
         aspect_ratio_x=aspect_ratio_x,
         aspect_ratio_y=aspect_ratio_y,
+        app_version=APP_VERSION,
     )
 
 
