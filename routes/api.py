@@ -186,6 +186,12 @@ def api_workflow_restart():
         import time as _time
         import sys as _sys
         _time.sleep(0.8)
+        # Close all inherited file descriptors (including the Flask socket)
+        # so the new process can bind port 5000 cleanly.
+        try:
+            os.closerange(3, 4096)
+        except Exception:
+            pass
         os.execv(_sys.executable, [_sys.executable] + _sys.argv)
     threading.Thread(target=_do_restart, daemon=True).start()
     return jsonify({"ok": True})
