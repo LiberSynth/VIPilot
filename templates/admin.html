@@ -975,11 +975,12 @@ function switchPanel(name) {
 }
 
 let _monitorClockTimer = null;
+let _monitorClockOffset = 0; // разница: серверное UTC ms - клиентское Date.now() ms
 function monitorClockTick() {
   const el = document.getElementById('monitor-clock');
   if (!el) return;
-  const now = new Date();
-  const msk = new Date(now.getTime() + 3 * 60 * 60 * 1000);
+  const serverNow = Date.now() + _monitorClockOffset;
+  const msk = new Date(serverNow + 3 * 60 * 60 * 1000);
   const pad = n => String(n).padStart(2, '0');
   el.textContent =
     pad(msk.getUTCDate()) + '.' +
@@ -992,9 +993,20 @@ function monitorClockTick() {
 function monitorClockStart() {
   const el = document.getElementById('monitor-clock');
   if (!el) return;
-  monitorClockTick();
-  el.style.display = 'inline';
-  if (!_monitorClockTimer) _monitorClockTimer = setInterval(monitorClockTick, 1000);
+  const t0 = Date.now();
+  fetch('/api/time').then(r => r.json()).then(d => {
+    const t1 = Date.now();
+    const serverMs = d.utc_ms;
+    _monitorClockOffset = serverMs - Math.round((t0 + t1) / 2);
+    monitorClockTick();
+    el.style.display = 'inline';
+    if (!_monitorClockTimer) _monitorClockTimer = setInterval(monitorClockTick, 1000);
+  }).catch(() => {
+    // fallback — локальное время
+    monitorClockTick();
+    el.style.display = 'inline';
+    if (!_monitorClockTimer) _monitorClockTimer = setInterval(monitorClockTick, 1000);
+  });
 }
 function monitorClockStop() {
   if (_monitorClockTimer) { clearInterval(_monitorClockTimer); _monitorClockTimer = null; }

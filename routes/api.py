@@ -1,5 +1,6 @@
 import os
 import threading
+import time
 from flask import Blueprint, jsonify, request
 from log import db_log_root
 
@@ -22,6 +23,11 @@ from utils.utils import parse_hhmm, to_msk, to_utc_from_msk
 import utils.workflow_state as wf_state
 
 bp = Blueprint("api", __name__, url_prefix="/api")
+
+
+@bp.route("/time")
+def api_time():
+    return jsonify({"utc_ms": int(time.time() * 1000)})
 
 
 @bp.route("/log")
