@@ -706,29 +706,6 @@
   <!-- ══ ПАЙПЛАЙН ══ -->
   <div id="panel-pipeline" class="tab-panel active">
 
-    <div class="card{% if emulation_mode %} emulation-active{% endif %}" style="margin-top:12px" id="wf-card">
-      <div class="card-title">Движок</div>
-      <div class="wf-row">
-        <span class="wf-dot {{ 'running' if workflow_state == 'running' else 'pause' }}" id="wf-dot"></span>
-        <span class="wf-state-text" id="wf-state-text">{{ 'Работает' if workflow_state == 'running' else 'Приостановлен' }}</span>
-        <div class="wf-btns">
-          <button class="wf-btn wf-start" id="wf-btn-start" onclick="wfStart()" {{ 'disabled' if workflow_state == 'running' else '' }}>Запустить</button>
-          <button class="wf-btn" id="wf-btn-pause" onclick="wfPause()" {{ '' if workflow_state == 'running' else 'disabled' }}>Приостановить</button>
-          <button class="wf-btn wf-restart" id="wf-btn-restart" onclick="openRestartDialog()">Перезапустить</button>
-        </div>
-      </div>
-      <div class="wf-row" style="margin-top:12px;padding-top:10px;border-top:1px solid #1e1e2e">
-        <span class="wf-state-text">Эмуляция</span>
-        <span class="wf-state-text" style="color:#555570;font-size:11px;margin-left:4px">— видео и транскод фиктивные, публикация реальная</span>
-        <span id="emulation-badge" class="emulation-badge" {% if not emulation_mode %}style="display:none"{% endif %}>ВКЛ</span>
-        <label class="toggle-wrap" style="margin-left:auto">
-          <input type="checkbox" id="emulation_check" {% if emulation_mode %}checked{% endif %}
-                 onchange="wfEmulation(this.checked)">
-          <span class="toggle-track"></span>
-        </label>
-      </div>
-    </div>
-
     <form id="settings-form" style="margin-top:0">
       <div class="card">
         <div class="card-title">Расписание</div>
@@ -828,6 +805,29 @@
 
   <!-- ══ СЛУЖЕБНЫЕ ══ -->
   <div id="panel-service" class="tab-panel">
+
+    <div class="card{% if emulation_mode %} emulation-active{% endif %}" style="margin-top:12px" id="wf-card">
+      <div class="card-title">Движок</div>
+      <div class="wf-row">
+        <span class="wf-dot {{ 'running' if workflow_state == 'running' else 'pause' }}" id="wf-dot"></span>
+        <span class="wf-state-text" id="wf-state-text">{{ 'Работает' if workflow_state == 'running' else 'Приостановлен' }}</span>
+        <div class="wf-btns">
+          <button class="wf-btn wf-start" id="wf-btn-start" onclick="wfStart()" {{ 'disabled' if workflow_state == 'running' else '' }}>Запустить</button>
+          <button class="wf-btn" id="wf-btn-pause" onclick="wfPause()" {{ '' if workflow_state == 'running' else 'disabled' }}>Приостановить</button>
+          <button class="wf-btn wf-restart" id="wf-btn-restart" onclick="openRestartDialog()">Перезапустить</button>
+        </div>
+      </div>
+      <div class="wf-row" style="margin-top:12px;padding-top:10px;border-top:1px solid #1e1e2e">
+        <span class="wf-state-text">Эмуляция</span>
+        <span class="wf-state-text" style="color:#555570;font-size:11px;margin-left:4px">— видео и транскод фиктивные, публикация реальная</span>
+        <span id="emulation-badge" class="emulation-badge" {% if not emulation_mode %}style="display:none"{% endif %}>ВКЛ</span>
+        <label class="toggle-wrap" style="margin-left:auto">
+          <input type="checkbox" id="emulation_check" {% if emulation_mode %}checked{% endif %}
+                 onchange="wfEmulation(this.checked)">
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+    </div>
 
     <form id="service-form" style="margin-top:0">
 
