@@ -58,9 +58,6 @@ def init_db():
                         time_utc VARCHAR(5) NOT NULL
                     )
                 """)
-                cur.execute("SELECT COUNT(*) FROM schedule")
-                if cur.fetchone()[0] == 0:
-                    cur.execute("INSERT INTO schedule (time_utc) VALUES ('03:00')")
 
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS video_urls (
