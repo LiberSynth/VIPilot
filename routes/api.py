@@ -19,7 +19,7 @@ from db import (
     db_create_adhoc_batch,
     db_get_active_targets,
 )
-from log import db_get_log, db_get_monitor
+from log import db_get_log, db_get_monitor, db_log_pipeline, db_log_entry
 from utils.auth import is_authenticated
 from utils.utils import parse_hhmm, to_msk, to_utc_from_msk
 import utils.workflow_state as wf_state
@@ -39,10 +39,20 @@ def api_run_now():
     targets = db_get_active_targets()
     if not targets:
         return jsonify({"error": "Нет активных таргетов"}), 400
-    target_id = str(targets[0]['id'])
+    target = targets[0]
+    target_id = str(target['id'])
     batch_id = db_create_adhoc_batch(target_id)
     if not batch_id:
         return jsonify({"error": "Не удалось создать батч"}), 500
+    log_id = db_log_pipeline(
+        'planning',
+        'Оперативный запуск',
+        status='ok',
+        batch_id=batch_id,
+    )
+    if log_id:
+        db_log_entry(log_id, "Запуск по запросу пользователя (внеплановый)")
+        db_log_entry(log_id, f"Таргет: {target['name']}  ({target['aspect_ratio_x']}:{target['aspect_ratio_y']})")
     return jsonify({"ok": True, "batch_id": batch_id})
 
 
