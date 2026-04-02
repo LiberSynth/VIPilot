@@ -687,6 +687,47 @@ def db_get_batch_video_data(batch_id) -> bytes | None:
         return None
 
 
+def db_steal_video_from_cancelled(batch_id) -> str | None:
+    """Ищет самый старый отменённый батч с готовым видео (video_data IS NOT NULL),
+    переносит video_data и video_url в указанный батч, переводит его в transcode_ready,
+    зануляет video_data у донора. Возвращает id донора (str) или None."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT id, video_data, video_url
+                    FROM batches
+                    WHERE status = 'отменён' AND video_data IS NOT NULL
+                    ORDER BY created_at ASC
+                    LIMIT 1
+                    FOR UPDATE SKIP LOCKED
+                """)
+                donor = cur.fetchone()
+                if not donor:
+                    return None
+
+                donor_id, video_data, video_url = donor
+
+                cur.execute("""
+                    UPDATE batches
+                    SET status     = 'transcode_ready',
+                        video_data = %s,
+                        video_url  = %s
+                    WHERE id = %s
+                """, (psycopg2.Binary(bytes(video_data)), video_url, batch_id))
+
+                cur.execute(
+                    "UPDATE batches SET video_data = NULL WHERE id = %s",
+                    (donor_id,),
+                )
+
+            conn.commit()
+        return str(donor_id)
+    except Exception as e:
+        print(f"[DB] Ошибка db_steal_video_from_cancelled: {e}")
+        return None
+
+
 def db_set_batch_transcode_error(batch_id):
     """Переводит батч в status='transcode_error'."""
     try:

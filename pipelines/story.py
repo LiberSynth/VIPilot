@@ -18,6 +18,8 @@ from db import (
     db_set_batch_pending,
     db_is_batch_scheduled,
     db_set_batch_obsolete,
+    db_steal_video_from_cancelled,
+    env_get,
 )
 from log import db_log_pipeline, db_log_entry, db_log_update, db_log_interrupt_running
 
@@ -116,6 +118,21 @@ def run():
             print(f"[story] Батч {batch_id[:8]}… отменён, пропускаю")
             batch_done = True
             return
+
+        if env_get('emulation_mode', '0') != '1':
+            donor_id = db_steal_video_from_cancelled(batch_id)
+            if donor_id:
+                msg = f"Видео взято из отменённого батча {donor_id[:8]}… — генерация пропущена"
+                log_id = db_log_pipeline(
+                    'story', msg,
+                    status='ok', batch_id=batch_id,
+                )
+                if log_id:
+                    db_log_entry(log_id, f"Батч-донор: {donor_id}")
+                    db_log_entry(log_id, "video_data перенесён, статус: transcode_ready")
+                print(f"[story] Батч {batch_id[:8]}… — {msg}")
+                batch_done = True
+                return
 
         print(f"[story] Батч {batch_id[:8]}… ({target}) — начало генерации сюжета")
 
