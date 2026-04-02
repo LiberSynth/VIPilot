@@ -1,7 +1,7 @@
 """
 Pipeline 4 — Транскодирование.
 Берёт первый video_ready-батч, скачивает исходник, транскодирует в H.264 / AAC / MP4
-и сохраняет результат локально. Статус: video_ready → transcode_ready / transcode_error.
+и сохраняет результат в базу данных (bytea). Статус: video_ready → transcode_ready / transcode_error.
 """
 
 import os
@@ -18,8 +18,6 @@ from db import (
     db_set_batch_transcode_error,
 )
 from log import db_log_pipeline, db_log_entry, db_log_update, db_log_interrupt_running
-
-_OUT_DIR = 'videos'
 
 
 def _ffmpeg(src, dst, log_id):
@@ -56,7 +54,6 @@ def _ffmpeg(src, dst, log_id):
 
 def run():
     try:
-        os.makedirs(_OUT_DIR, exist_ok=True)
         db_log_interrupt_running('transcode')
 
         batch = db_get_video_ready_batch()
@@ -96,34 +93,45 @@ def run():
             print(f"[transcode] {msg}")
             return
 
-        with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as tmp:
-            tmp_path = tmp.name
+        with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as tmp_src:
+            tmp_src_path = tmp_src.name
             for chunk in r.iter_content(chunk_size=256 * 1024):
-                tmp.write(chunk)
+                tmp_src.write(chunk)
 
-        src_mb = round(os.path.getsize(tmp_path) / 1024 / 1024, 1)
+        src_mb = round(os.path.getsize(tmp_src_path) / 1024 / 1024, 1)
         if log_id:
             db_log_entry(log_id, f'Скачано: {src_mb} МБ, запускаю ffmpeg…')
         print(f"[transcode] Скачано {src_mb} МБ, запускаю ffmpeg…")
 
-        out_path = os.path.join(_OUT_DIR, f'{batch_id}.mp4')
-        ok = _ffmpeg(tmp_path, out_path, log_id)
-        os.unlink(tmp_path)
+        with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as tmp_out:
+            tmp_out_path = tmp_out.name
+
+        ok = _ffmpeg(tmp_src_path, tmp_out_path, log_id)
+        os.unlink(tmp_src_path)
 
         if not ok:
+            try:
+                os.unlink(tmp_out_path)
+            except Exception:
+                pass
             msg = 'Ошибка ffmpeg'
             db_log_update(log_id, msg, 'error')
             db_set_batch_transcode_error(batch_id)
             print(f"[transcode] {msg}")
             return
 
-        out_mb = round(os.path.getsize(out_path) / 1024 / 1024, 1)
-        db_set_batch_transcode_ready(batch_id, out_path)
-        msg = f'Транскодирование завершено ({out_mb} МБ)'
+        out_mb = round(os.path.getsize(tmp_out_path) / 1024 / 1024, 1)
+
+        with open(tmp_out_path, 'rb') as f:
+            video_data = f.read()
+        os.unlink(tmp_out_path)
+
+        db_set_batch_transcode_ready(batch_id, video_data)
+        msg = f'Транскодирование завершено ({out_mb} МБ), сохранено в БД'
         db_log_update(log_id, msg, 'ok')
         if log_id:
-            db_log_entry(log_id, f'Файл: {out_path}')
-        print(f"[transcode] Готово: {out_path} ({out_mb} МБ)")
+            db_log_entry(log_id, msg)
+        print(f"[transcode] Готово: {out_mb} МБ → БД")
 
     except Exception as e:
         db_log_pipeline('transcode', f'Сбой пайплайна: {e}', status='error')

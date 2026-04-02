@@ -420,20 +420,35 @@ def db_get_video_ready_batch():
         return None
 
 
-def db_set_batch_transcode_ready(batch_id, video_file):
-    """Сохраняет путь к файлу и переводит батч в status='transcode_ready'."""
+def db_set_batch_transcode_ready(batch_id, video_data: bytes):
+    """Сохраняет транскодированный файл в БД и переводит батч в status='transcode_ready'."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "UPDATE batches SET status = 'transcode_ready', video_file = %s WHERE id = %s",
-                    (video_file, batch_id),
+                    "UPDATE batches SET status = 'transcode_ready', video_data = %s WHERE id = %s",
+                    (psycopg2.Binary(video_data), batch_id),
                 )
             conn.commit()
         return True
     except Exception as e:
         print(f"[DB] Ошибка db_set_batch_transcode_ready: {e}")
         return False
+
+
+def db_get_batch_video_data(batch_id) -> bytes | None:
+    """Возвращает транскодированные байты видео для батча, или None."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT video_data FROM batches WHERE id = %s", (batch_id,))
+                row = cur.fetchone()
+        if row and row[0] is not None:
+            return bytes(row[0])
+        return None
+    except Exception as e:
+        print(f"[DB] Ошибка db_get_batch_video_data: {e}")
+        return None
 
 
 def db_set_batch_transcode_error(batch_id):
@@ -626,23 +641,43 @@ def db_cleanup_logs(short_log_lifetime_days: int) -> int:
         return 0
 
 
-def db_cleanup_batches(batch_lifetime_days: int) -> list:
-    """Удаляет батчи со статусом 'published'/'устарел' старше batch_lifetime_days.
-    Удаляет связанные логи и осиротевшие stories.
-    Возвращает список video_file путей для физического удаления."""
+def db_cleanup_video_data(file_lifetime_days: int) -> int:
+    """Обнуляет video_data у опубликованных/устаревших батчей старше file_lifetime_days.
+    Сама запись батча сохраняется, удаляется только бинарник.
+    Возвращает количество обновлённых батчей."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                    SELECT id, video_file FROM batches
+                    UPDATE batches SET video_data = NULL
+                    WHERE status IN ('published', 'устарел')
+                      AND completed_at < now() - make_interval(days => %s)
+                      AND video_data IS NOT NULL
+                """, (file_lifetime_days,))
+                count = cur.rowcount
+            conn.commit()
+        return count
+    except Exception as e:
+        print(f"[DB] Ошибка db_cleanup_video_data: {e}")
+        return 0
+
+
+def db_cleanup_batches(batch_lifetime_days: int) -> int:
+    """Удаляет батчи со статусом 'published'/'устарел' старше batch_lifetime_days.
+    Удаляет связанные логи и осиротевшие stories.
+    Возвращает количество удалённых батчей."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT id FROM batches
                     WHERE status IN ('published', 'устарел')
                       AND completed_at < now() - make_interval(days => %s)
                 """, (batch_lifetime_days,))
                 rows = cur.fetchall()
                 if not rows:
-                    return []
-                batch_ids  = [str(r[0]) for r in rows]
-                video_files = [r[1] for r in rows if r[1]]
+                    return 0
+                batch_ids = [str(r[0]) for r in rows]
 
                 fmt = ','.join(['%s'] * len(batch_ids))
 
@@ -665,7 +700,7 @@ def db_cleanup_batches(batch_lifetime_days: int) -> list:
                 """)
 
             conn.commit()
-        return video_files
+        return len(batch_ids)
     except Exception as e:
         print(f"[DB] Ошибка db_cleanup_batches: {e}")
-        return []
+        return 0

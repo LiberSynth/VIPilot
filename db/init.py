@@ -137,6 +137,7 @@ def init_db():
                         story_id UUID REFERENCES stories(id),
                         video_url TEXT,
                         video_file TEXT,
+                        video_data BYTEA,
                         data JSONB,
                         created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
                         completed_at TIMESTAMPTZ

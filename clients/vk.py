@@ -1,8 +1,10 @@
 """
 VK API-клиент.
 Отвечает за публикацию видео в историю и на стену сообщества ВКонтакте.
+Принимает видео в виде байт (bytes) — никаких файлов на диске.
 """
 
+import io
 import os
 import time
 
@@ -15,7 +17,7 @@ _VK_API   = 'https://api.vk.com/method'
 _VK_VER   = '5.131'
 
 
-def publish_story(video_file: str, group_id: int, log_id) -> int | None:
+def publish_story(video_data: bytes, group_id: int, log_id) -> int | None:
     """Публикует видео как историю ВКонтакте. Возвращает story_id или None."""
     r = requests.post(f'{_VK_API}/stories.getVideoUploadServer', data={
         'group_id':    group_id,
@@ -33,12 +35,11 @@ def publish_story(video_file: str, group_id: int, log_id) -> int | None:
 
     for attempt in range(3):
         try:
-            with open(video_file, 'rb') as f:
-                up = requests.post(
-                    upload_url,
-                    files={'video_file': ('video.mp4', f, 'video/mp4')},
-                    timeout=300,
-                )
+            up = requests.post(
+                upload_url,
+                files={'video_file': ('video.mp4', io.BytesIO(video_data), 'video/mp4')},
+                timeout=300,
+            )
             up.raise_for_status()
             if not up.text.strip():
                 if log_id:
@@ -78,7 +79,7 @@ def publish_story(video_file: str, group_id: int, log_id) -> int | None:
     return None
 
 
-def publish_wall(video_file: str, group_id: int, log_id) -> int | None:
+def publish_wall(video_data: bytes, group_id: int, log_id) -> int | None:
     """Публикует видео на стену сообщества ВКонтакте. Возвращает post_id или None."""
     save_resp = requests.post(f'{_VK_API}/video.save', data={
         'group_id':     group_id,
@@ -98,8 +99,11 @@ def publish_wall(video_file: str, group_id: int, log_id) -> int | None:
     video_id   = save_resp['response']['video_id']
     owner_id   = save_resp['response']['owner_id']
 
-    with open(video_file, 'rb') as f:
-        up = requests.post(upload_url, files={'video_file': f}, timeout=300)
+    up = requests.post(
+        upload_url,
+        files={'video_file': ('video.mp4', io.BytesIO(video_data), 'video/mp4')},
+        timeout=300,
+    )
     up.raise_for_status()
 
     post_resp = requests.post(f'{_VK_API}/wall.post', data={

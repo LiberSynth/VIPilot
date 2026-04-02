@@ -2,49 +2,52 @@
 Pipeline 5 — Публикация.
 Берёт первый transcode_ready-батч и публикует видео на платформу таргета.
 Поддерживается: VKontakte (история + стена, настраивается через settings).
-Статус: transcode_ready → published / publish_error.
+Видео берётся из БД (video_data). Статус: transcode_ready → published / publish_error.
 """
 
 from datetime import datetime, timezone
 
-import os
-
 from db import (
     db_get,
     db_get_transcode_ready_batch,
+    db_get_batch_video_data,
     db_is_batch_scheduled,
     db_set_batch_obsolete,
     db_set_batch_published,
     db_set_batch_publish_error,
-    db_set_batch_video_ready,
 )
 from log import db_log_pipeline, db_log_entry, db_log_update, db_log_interrupt_running
 from clients import vk
 
 
-def _publish_vk(batch, log_id):
+def _publish_vk(batch_id, log_id):
     """Публикует батч на ВКонтакте. Возвращает True если хоть один канал успешен."""
     if not vk.is_configured():
         if log_id:
             db_log_entry(log_id, 'VK_USER_TOKEN не задан', level='error')
         return False
 
-    group_id   = int(db_get('vk_group_id', '236929597'))
-    do_story   = db_get('vk_publish_story', '1') == '1'
-    do_wall    = db_get('vk_publish_wall',  '1') == '1'
-    video_file = batch['video_file']
+    video_data = db_get_batch_video_data(batch_id)
+    if video_data is None:
+        if log_id:
+            db_log_entry(log_id, 'video_data отсутствует в БД', level='error')
+        return False
+
+    group_id = int(db_get('vk_group_id', '236929597'))
+    do_story  = db_get('vk_publish_story', '1') == '1'
+    do_wall   = db_get('vk_publish_wall',  '1') == '1'
 
     story_ok = wall_ok = False
 
     if do_story:
         if log_id:
             db_log_entry(log_id, 'Публикую историю…')
-        story_ok = vk.publish_story(video_file, group_id, log_id) is not None
+        story_ok = vk.publish_story(video_data, group_id, log_id) is not None
 
     if do_wall:
         if log_id:
             db_log_entry(log_id, 'Публикую на стену…')
-        wall_ok = vk.publish_wall(video_file, group_id, log_id) is not None
+        wall_ok = vk.publish_wall(video_data, group_id, log_id) is not None
 
     return story_ok or wall_ok
 
@@ -81,7 +84,7 @@ def run():
         )
 
         if target == 'VKontakte':
-            ok = _publish_vk(batch, log_id)
+            ok = _publish_vk(batch_id, log_id)
         else:
             msg = f'Платформа «{target}» не поддерживается'
             db_log_update(log_id, msg, 'error')

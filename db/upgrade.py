@@ -18,6 +18,7 @@ def run_upgrades():
     _log_batch_id_nullable()
     _batches_unique_constraint()
     _rename_lifetime_settings()
+    _add_video_data_column()
 
 
 def _add_emulation_mode():
@@ -247,3 +248,18 @@ def _rename_lifetime_settings():
             conn.commit()
     except Exception as e:
         print(f"[DB] Ошибка миграции _rename_lifetime_settings: {e}")
+
+
+def _add_video_data_column():
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT column_name FROM information_schema.columns
+                    WHERE table_name = 'batches' AND column_name = 'video_data'
+                """)
+                if not cur.fetchone():
+                    cur.execute("ALTER TABLE batches ADD COLUMN video_data BYTEA")
+            conn.commit()
+    except Exception as e:
+        print(f"[DB] Ошибка миграции _add_video_data_column: {e}")
