@@ -135,6 +135,22 @@ def db_get_active_targets():
         return []
 
 
+def db_update_target_aspect_ratio(target_id, x, y):
+    """Обновляет соотношение сторон для указанного target."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE targets SET aspect_ratio_x = %s, aspect_ratio_y = %s WHERE id = %s",
+                    (x, y, target_id)
+                )
+            conn.commit()
+        return True
+    except Exception as e:
+        print(f"[DB] Ошибка db_update_target_aspect_ratio: {e}")
+        return False
+
+
 # ---------------------------------------------------------------------------
 # Батчи
 # ---------------------------------------------------------------------------

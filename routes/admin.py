@@ -15,6 +15,8 @@ from db import (
     db_set,
     env_get,
     env_set,
+    db_get_active_targets,
+    db_update_target_aspect_ratio,
 )
 from utils.consts import ADMIN_PASSWORD
 from utils.auth import is_authenticated, password_fingerprint
@@ -76,6 +78,12 @@ def admin_page():
 
     workflow_state = env_get("workflow_state", "running")
 
+    active_targets  = db_get_active_targets()
+    target          = active_targets[0] if active_targets else None
+    target_id       = target["id"] if target else None
+    aspect_ratio_x  = target["aspect_ratio_x"] if target else 9
+    aspect_ratio_y  = target["aspect_ratio_y"] if target else 16
+
     return render_template(
         "admin.html",
         metaprompt=metaprompt,
@@ -93,6 +101,9 @@ def admin_page():
         buffer_hours=buffer_hours,
         loop_interval=loop_interval,
         workflow_state=workflow_state,
+        target_id=target_id,
+        aspect_ratio_x=aspect_ratio_x,
+        aspect_ratio_y=aspect_ratio_y,
     )
 
 
@@ -143,6 +154,16 @@ def save():
         vk_story_raw = "1"
     db_set("vk_publish_story", "1" if vk_story_raw == "1" else "0")
     db_set("vk_publish_wall",  "1" if vk_wall_raw  == "1" else "0")
+
+    ar_target_id = request.form.get("target_id", "").strip()
+    ar_raw = request.form.get("aspect_ratio", "").strip()
+    if ar_target_id and ar_raw and ":" in ar_raw:
+        try:
+            ax, ay = [int(v) for v in ar_raw.split(":", 1)]
+            if ax > 0 and ay > 0:
+                db_update_target_aspect_ratio(ar_target_id, ax, ay)
+        except (ValueError, TypeError):
+            pass
 
     vid_dur_str = request.form.get("video_duration")
     if vid_dur_str is not None:
