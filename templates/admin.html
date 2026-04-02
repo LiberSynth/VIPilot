@@ -1804,6 +1804,7 @@ function validateLifetimes() {
         '<button class="cycle-float-btn" title="Развернуть все" onclick="monitorExpandAll(this)">' + MON_SVG_EXPAND   + '</button>' +
         '<button class="cycle-float-btn" title="Свернуть все"   onclick="monitorCollapseAll(this)">' + MON_SVG_COLLAPSE + '</button>' +
         '<button class="cycle-float-btn" title="Скопировать"    onclick="monitorCopy(this)">'         + MON_SVG_COPY + '</button>' +
+        '<button class="cycle-float-btn" title="Удалить батч"   onclick="deleteBatch(this,\'' + esc(batch.batch_id) + '\')" style="color:#ff6b6b">✕</button>' +
       '</div>';
 
     return '<div class="monitor-batch bs-' + esc(bs) + '" data-bid="' + esc(batch.batch_id) + '" onclick="monitorToggleBatch(event,this)">' +
@@ -2101,6 +2102,15 @@ function validateLifetimes() {
 
   window.runNow = runNow;
   window.addScheduleSlot = addScheduleSlot;
+
+  window.deleteBatch = function(btn, id) {
+    btn.disabled = true;
+    btn.textContent = '…';
+    fetch('/api/batch/' + id, {method: 'DELETE'})
+      .then(function(r) { return r.json(); })
+      .then(function() { loadMonitor && loadMonitor(); })
+      .catch(function() { btn.disabled = false; btn.textContent = '✕'; });
+  };
 
   window.deleteScheduleSlot = function(btn, id) {
     btn.disabled = true;
