@@ -10,6 +10,7 @@ from db import (
     db_delete_schedule_slot,
     db_get_models,
     db_activate_model,
+    db_toggle_model,
     db_reorder_models,
     init_db,
     run_upgrades,
@@ -119,7 +120,7 @@ def api_models():
 def api_model_activate(model_id):
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
-    ok = db_activate_model(model_id, "text-to-video")
+    ok = db_toggle_model(model_id)
     return jsonify({"ok": ok})
 
 
@@ -146,7 +147,7 @@ def api_text_models():
 def api_text_model_activate(model_id):
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
-    ok = db_activate_model(model_id, "text")
+    ok = db_toggle_model(model_id)
     return jsonify({"ok": ok})
 
 

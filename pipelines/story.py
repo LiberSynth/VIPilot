@@ -1,8 +1,9 @@
 """
 Pipeline 2 — Генерация сюжета.
 Берёт первый pending-батч, атомарно захватывает его (story_generating),
-генерирует текст через активную text-модель (OpenRouter) и сохраняет результат.
-При любом сбое finally-блок возвращает батч в pending для повторной попытки.
+перебирает активные text-модели по порядку (с retry на каждую),
+генерирует текст через OpenRouter и сохраняет результат.
+Если все модели не ответили — батч возвращается в pending для следующего цикла.
 """
 
 import os
@@ -11,7 +12,7 @@ import requests
 from db import (
     db_get,
     db_get_pending_batch,
-    db_get_active_text_model,
+    db_get_active_text_models,
     db_create_story,
     db_set_batch_story,
     db_set_batch_pending,
@@ -46,19 +47,63 @@ def _build_body(body_tpl, model_url, system_prompt, user_prompt):
     return body
 
 
+def _try_model(log_id, m, system_prompt, user_prompt):
+    """Один запрос к одной модели. Возвращает текст сюжета или None."""
+    model_name = m['name']
+    try:
+        body = _build_body(m['body_tpl'], m['model_url'], system_prompt, user_prompt)
+        resp = requests.post(m['platform_url'], headers=_headers(), json=body, timeout=60)
+    except requests.exceptions.Timeout:
+        if log_id:
+            db_log_entry(log_id, f"[{model_name}] таймаут (60 с)", level='warn')
+        return None
+    except requests.exceptions.RequestException as e:
+        if log_id:
+            db_log_entry(log_id, f"[{model_name}] ошибка соединения: {e}", level='warn')
+        return None
+
+    try:
+        data = resp.json()
+    except ValueError:
+        preview = ' '.join(resp.text.split())[:200]
+        if log_id:
+            db_log_entry(log_id, f"[{model_name}] не-JSON (HTTP {resp.status_code}): {preview}", level='warn')
+        return None
+
+    if resp.status_code >= 400:
+        err = data.get('error', {})
+        if isinstance(err, dict):
+            err = err.get('message', data)
+        if log_id:
+            db_log_entry(log_id, f"[{model_name}] HTTP {resp.status_code}: {err}", level='warn')
+        return None
+
+    choices = data.get('choices')
+    if not choices:
+        if log_id:
+            db_log_entry(log_id, f"[{model_name}] нет поля choices в ответе", level='warn')
+        return None
+
+    result = (choices[0].get('message') or {}).get('content', '').strip()
+    if not result:
+        if log_id:
+            db_log_entry(log_id, f"[{model_name}] пустой текст", level='warn')
+        return None
+
+    return result
+
+
 def run():
     batch_id   = None
-    batch_done = False   # True когда батч переведён в финальный статус (любой, кроме story_generating)
+    batch_done = False
     log_id     = None
 
     try:
         db_log_interrupt_running('story')
 
-        # Атомарный захват: batch сразу переводится в story_generating,
-        # поэтому следующий поток его не возьмёт.
         batch = db_get_pending_batch()
         if not batch:
-            batch_done = True   # нечего делать — сброс не нужен
+            batch_done = True
             return
 
         batch_id = str(batch['id'])
@@ -85,19 +130,21 @@ def run():
             if log_id:
                 db_log_entry(log_id, msg, level='error')
             print(f"[story] {msg}")
-            return   # finally сбросит в pending
+            return
 
-        platform_url, model_url, body_tpl, model_name, model_id = db_get_active_text_model()
-        if not platform_url:
-            msg = 'Нет активной text-модели в ai_models'
+        models = db_get_active_text_models()
+        if not models:
+            msg = 'Нет активных text-моделей в ai_models'
             db_log_update(log_id, msg, 'error')
             if log_id:
                 db_log_entry(log_id, msg, level='error')
             print(f"[story] {msg}")
-            return   # finally сбросит в pending
+            return
 
-        if log_id:
-            db_log_entry(log_id, f"Модель: {model_name}")
+        try:
+            fails_to_next = max(1, int(db_get('story_fails_to_next', '3')))
+        except (ValueError, TypeError):
+            fails_to_next = 3
 
         system_prompt = db_get('system_prompt', '')
         user_prompt   = db_get('metaprompt', '')
@@ -105,85 +152,53 @@ def run():
         if log_id:
             preview = user_prompt[:120] + ('…' if len(user_prompt) > 120 else '')
             db_log_entry(log_id, f"Промпт: {preview}")
+            db_log_entry(log_id, f"Моделей: {len(models)}, попыток на модель: {fails_to_next}")
 
-        body = _build_body(body_tpl, model_url, system_prompt, user_prompt)
-        print(f"[story] Запрос к OpenRouter: модель={model_name}")
+        story_id        = None
+        used_model_name = None
+        used_model_id   = None
 
-        try:
-            resp = requests.post(platform_url, headers=_headers(), json=body, timeout=60)
-        except requests.exceptions.Timeout:
-            msg = 'Таймаут запроса к OpenRouter (60 сек)'
-            db_log_update(log_id, msg, 'error')
+        for m in models:
+            model_name = m['name']
             if log_id:
-                db_log_entry(log_id, msg, level='error')
-            print(f"[story] {msg}")
-            return   # finally сбросит в pending
-        except requests.exceptions.RequestException as e:
-            msg = f'Ошибка соединения с OpenRouter: {e}'
-            db_log_update(log_id, msg, 'error')
-            if log_id:
-                db_log_entry(log_id, msg, level='error')
-            print(f"[story] {msg}")
-            return   # finally сбросит в pending
+                db_log_entry(log_id, f"Модель: {model_name}")
+            print(f"[story] Запрос к OpenRouter: модель={model_name}")
 
-        try:
-            data = resp.json()
-        except ValueError:
-            body_preview = ' '.join(resp.text.split())[:200]
-            msg = f'OpenRouter вернул не-JSON (HTTP {resp.status_code}): {body_preview or "(пустое тело)"}'
-            db_log_update(log_id, msg, 'error')
-            if log_id:
-                db_log_entry(log_id, msg, level='error')
-            print(f"[story] {msg}")
-            return   # finally сбросит в pending
+            for attempt in range(fails_to_next):
+                result = _try_model(log_id, m, system_prompt, user_prompt)
+                if result:
+                    story_id = db_create_story(m['id'], result)
+                    if story_id:
+                        used_model_name = model_name
+                        used_model_id   = m['id']
+                        break
+                    if log_id:
+                        db_log_entry(log_id, f"[{model_name}] не удалось сохранить сюжет", level='warn')
+                else:
+                    if attempt + 1 < fails_to_next:
+                        if log_id:
+                            db_log_entry(log_id, f"[{model_name}] попытка {attempt + 1}/{fails_to_next} не удалась", level='warn')
 
-        if resp.status_code >= 400:
-            err = data.get('error', {})
-            if isinstance(err, dict):
-                err = err.get('message', data)
-            msg = f'OpenRouter HTTP {resp.status_code}: {err}'
-            db_log_update(log_id, msg, 'error')
-            if log_id:
-                db_log_entry(log_id, msg, level='error')
-            print(f"[story] {msg}")
-            return   # finally сбросит в pending
+            if story_id:
+                break
 
-        choices = data.get('choices')
-        if not choices:
-            msg = f'OpenRouter: нет поля choices в ответе: {str(data)[:300]}'
-            db_log_update(log_id, msg, 'error')
+        if not story_id:
+            msg = 'Все активные модели не дали результата — батч возвращён в очередь'
+            db_log_update(log_id, msg, 'warn')
             if log_id:
-                db_log_entry(log_id, msg, level='error')
+                db_log_entry(log_id, msg, level='warn')
             print(f"[story] {msg}")
-            return   # finally сбросит в pending
-
-        result = (choices[0].get('message') or {}).get('content', '').strip()
-        if not result:
-            msg = 'OpenRouter вернул пустой текст'
-            db_log_update(log_id, msg, 'error')
-            if log_id:
-                db_log_entry(log_id, msg, level='error')
-            print(f"[story] {msg}")
-            return   # finally сбросит в pending
+            return
 
         preview = result[:200] + ('…' if len(result) > 200 else '')
         print(f"[story] Сюжет получен: {result[:100]}{'…' if len(result) > 100 else ''}")
         if log_id:
             db_log_entry(log_id, f"Сюжет: {preview}")
 
-        story_id = db_create_story(model_id, result)
-        if not story_id:
-            msg = 'Не удалось сохранить сюжет в БД'
-            db_log_update(log_id, msg, 'error')
-            if log_id:
-                db_log_entry(log_id, msg, level='error')
-            print(f"[story] {msg}")
-            return   # finally сбросит в pending
-
         db_set_batch_story(batch_id, story_id)
-        batch_done = True   # статус теперь story_ready — сброс не нужен
+        batch_done = True
 
-        msg = f'Сюжет сгенерирован ({model_name})'
+        msg = f'Сюжет сгенерирован ({used_model_name})'
         db_log_update(log_id, msg, 'ok')
         if log_id:
             db_log_entry(log_id, f"Сохранён как story {story_id[:8]}…, батч → story_ready")
@@ -202,8 +217,6 @@ def run():
         print(f"[story] Ошибка: {e}")
 
     finally:
-        # Если батч был захвачен (story_generating) но не завершён нормально —
-        # возвращаем в pending, чтобы следующий цикл повторил попытку.
         if batch_id and not batch_done:
             db_set_batch_pending(batch_id)
             print(f"[story] Батч {batch_id[:8]}… сброшен в pending (повторная попытка)")

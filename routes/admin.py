@@ -75,6 +75,8 @@ def admin_page():
     video_duration     = max(1, min(60, int(db_get("video_duration", "6"))))
     buffer_hours       = max(1, min(720, int(db_get("buffer_hours", "24"))))
     loop_interval      = max(1, min(3600, int(db_get("loop_interval", "5"))))
+    story_fails_to_next = max(1, int(db_get("story_fails_to_next", "3")))
+    video_fails_to_next = max(1, int(db_get("video_fails_to_next", "3")))
 
     workflow_state = env_get("workflow_state", "running")
 
@@ -100,6 +102,8 @@ def admin_page():
         video_duration=video_duration,
         buffer_hours=buffer_hours,
         loop_interval=loop_interval,
+        story_fails_to_next=story_fails_to_next,
+        video_fails_to_next=video_fails_to_next,
         workflow_state=workflow_state,
         target_id=target_id,
         aspect_ratio_x=aspect_ratio_x,
@@ -185,6 +189,20 @@ def save():
     if loop_str:
         try:
             db_set("loop_interval", str(max(1, min(3600, int(loop_str)))))
+        except (ValueError, TypeError):
+            pass
+
+    story_fails_str = request.form.get("story_fails_to_next", "").strip()
+    if story_fails_str:
+        try:
+            db_set("story_fails_to_next", str(max(1, int(story_fails_str))))
+        except (ValueError, TypeError):
+            pass
+
+    video_fails_str = request.form.get("video_fails_to_next", "").strip()
+    if video_fails_str:
+        try:
+            db_set("video_fails_to_next", str(max(1, int(video_fails_str))))
         except (ValueError, TypeError):
             pass
 

@@ -532,6 +532,65 @@ def db_get_active_video_model():
         return None, None, None, None, None
 
 
+def db_get_active_text_models():
+    """Возвращает список всех активных text-моделей в порядке order."""
+    try:
+        with get_db() as conn:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute("""
+                    SELECT p.url AS platform_url, m.url AS model_url,
+                           m.body, m.name, m.id
+                    FROM ai_models m
+                    JOIN ai_platforms p ON p.id = m.platform_id
+                    WHERE m.active = TRUE AND m.type = 'text'
+                    ORDER BY m."order"
+                """)
+                rows = cur.fetchall()
+        result = []
+        for row in rows:
+            result.append({
+                'platform_url': row['platform_url'],
+                'model_url':    row['model_url'],
+                'body_tpl':     row['body'] if isinstance(row['body'], dict) else {},
+                'name':         row['name'],
+                'id':           str(row['id']),
+            })
+        return result
+    except Exception as e:
+        print(f"[DB] Ошибка db_get_active_text_models: {e}")
+        return []
+
+
+def db_get_active_video_models():
+    """Возвращает список всех активных text-to-video моделей в порядке order."""
+    try:
+        with get_db() as conn:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute("""
+                    SELECT p.url AS platform_url, m.url AS model_url,
+                           m.body, m.name, m.id
+                    FROM ai_models m
+                    JOIN ai_platforms p ON p.id = m.platform_id
+                    WHERE m.active = TRUE AND m.type = 'text-to-video'
+                    ORDER BY m."order"
+                """)
+                rows = cur.fetchall()
+        result = []
+        for row in rows:
+            result.append({
+                'platform_url': row['platform_url'],
+                'model_url':    row['model_url'],
+                'body_tpl':     row['body'] if isinstance(row['body'], dict) else {},
+                'name':         row['name'],
+                'id':           str(row['id']),
+                'submit_url':   f"{row['platform_url']}/{row['model_url']}",
+            })
+        return result
+    except Exception as e:
+        print(f"[DB] Ошибка db_get_active_video_models: {e}")
+        return []
+
+
 def db_set_batch_video_pending(batch_id, job_data):
     """Сохраняет данные задания и переводит батч в status='video_pending'."""
     try:
@@ -778,6 +837,22 @@ def db_activate_model(model_id: str, model_type: str):
         return True
     except Exception as e:
         print(f"[DB] Ошибка db_activate_model: {e}")
+        return False
+
+
+def db_toggle_model(model_id: str):
+    """Переключает active для одной модели (не затрагивает остальные)."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE ai_models SET active = NOT active WHERE id = %s",
+                    (model_id,),
+                )
+            conn.commit()
+        return True
+    except Exception as e:
+        print(f"[DB] Ошибка db_toggle_model: {e}")
         return False
 
 

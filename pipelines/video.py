@@ -22,6 +22,7 @@ from db import (
     db_set_batch_obsolete,
     db_get_story_text,
     db_get_active_video_model,
+    db_get_active_video_models,
     db_set_batch_video_pending,
     db_set_batch_video_ready,
     db_set_batch_video_error,
@@ -183,9 +184,9 @@ def run():
                 print(f"[video] {msg}")
                 return
 
-            submit_url, platform_url, body_tpl, model_name, _ = db_get_active_video_model()
-            if not submit_url:
-                msg = 'Нет активной video-модели в ai_models (type=text-to-video)'
+            models = db_get_active_video_models()
+            if not models:
+                msg = 'Нет активных video-моделей в ai_models (type=text-to-video)'
                 db_log_pipeline('video', msg, status='error', batch_id=batch_id)
                 print(f"[video] {msg}")
                 return
@@ -197,69 +198,86 @@ def run():
                 print(f"[video] {msg}")
                 return
 
+            try:
+                fails_to_next = max(1, int(db_get('video_fails_to_next', '3')))
+            except (ValueError, TypeError):
+                fails_to_next = 3
+
             log_id = db_log_pipeline(
                 'video', 'Генерация видео…',
                 status='running', batch_id=batch_id,
             )
             if log_id:
-                db_log_entry(log_id, f"Модель: {model_name}")
                 db_log_entry(log_id, f"Соотношение сторон: {ar_x}:{ar_y}")
                 preview = story_text[:120] + ('…' if len(story_text) > 120 else '')
                 db_log_entry(log_id, f"Промпт: {preview}")
+                db_log_entry(log_id, f"Моделей: {len(models)}, попыток на модель: {fails_to_next}")
 
-            body = _build_body(body_tpl, story_text, ar_x, ar_y, video_duration)
-            print(f"[video] Запрос к fal.ai: модель={model_name}, ar={ar_x}:{ar_y}")
+            request_id   = None
+            status_url   = None
+            response_url = None
+            used_model   = None
 
-            try:
-                resp = requests.post(submit_url, headers=_headers(), json=body, timeout=30)
-            except requests.exceptions.Timeout:
-                msg = 'Таймаут отправки запроса к fal.ai (30 сек)'
-                db_log_update(log_id, msg, 'error')
+            for m in models:
+                model_name   = m['name']
+                submit_url   = m['submit_url']
+                platform_url = m['platform_url']
+                body_tpl     = m['body_tpl']
+
                 if log_id:
-                    db_log_entry(log_id, msg, level='error')
+                    db_log_entry(log_id, f"Модель: {model_name}")
+                print(f"[video] Запрос к fal.ai: модель={model_name}, ar={ar_x}:{ar_y}")
+
+                for attempt in range(fails_to_next):
+                    try:
+                        body = _build_body(body_tpl, story_text, ar_x, ar_y, video_duration)
+                        resp = requests.post(submit_url, headers=_headers(), json=body, timeout=30)
+                    except requests.exceptions.Timeout:
+                        if log_id:
+                            db_log_entry(log_id, f"[{model_name}] таймаут (30 с), попытка {attempt + 1}/{fails_to_next}", level='warn')
+                        continue
+                    except requests.exceptions.RequestException as e:
+                        if log_id:
+                            db_log_entry(log_id, f"[{model_name}] ошибка соединения: {e}", level='warn')
+                        continue
+
+                    try:
+                        data = resp.json()
+                    except ValueError:
+                        body_preview = ' '.join(resp.text.split())[:200]
+                        if log_id:
+                            db_log_entry(log_id, f"[{model_name}] не-JSON (HTTP {resp.status_code}): {body_preview}", level='warn')
+                        continue
+
+                    if resp.status_code >= 400:
+                        err = data.get('error', data)
+                        if log_id:
+                            db_log_entry(log_id, f"[{model_name}] HTTP {resp.status_code}: {err}", level='warn')
+                        continue
+
+                    if 'request_id' not in data:
+                        if log_id:
+                            db_log_entry(log_id, f"[{model_name}] нет request_id: {str(data)[:200]}", level='warn')
+                        continue
+
+                    request_id   = data['request_id']
+                    status_url   = data.get('status_url',
+                                            f"{platform_url}/requests/{request_id}/status")
+                    response_url = data.get('response_url',
+                                            f"{platform_url}/requests/{request_id}")
+                    used_model   = model_name
+                    break
+
+                if request_id:
+                    break
+
+            if not request_id:
+                msg = 'Все активные видео-модели не приняли запрос — батч возвращён в очередь'
+                if log_id:
+                    db_log_update(log_id, msg, 'warn')
+                    db_log_entry(log_id, msg, level='warn')
                 print(f"[video] {msg}")
                 return
-            except requests.exceptions.RequestException as e:
-                msg = f'Ошибка соединения с fal.ai: {e}'
-                db_log_update(log_id, msg, 'error')
-                if log_id:
-                    db_log_entry(log_id, msg, level='error')
-                print(f"[video] {msg}")
-                return
-
-            try:
-                data = resp.json()
-            except ValueError:
-                body_preview = ' '.join(resp.text.split())[:200]
-                msg = f'fal.ai вернул не-JSON (HTTP {resp.status_code}): {body_preview or "(пустое тело)"}'
-                db_log_update(log_id, msg, 'error')
-                if log_id:
-                    db_log_entry(log_id, msg, level='error')
-                print(f"[video] {msg}")
-                return
-
-            if resp.status_code >= 400:
-                err = data.get('error', data)
-                msg = f'fal.ai HTTP {resp.status_code}: {err}'
-                db_log_update(log_id, msg, 'error')
-                if log_id:
-                    db_log_entry(log_id, msg, level='error')
-                print(f"[video] {msg}")
-                return
-
-            if 'request_id' not in data:
-                msg = f'fal.ai не вернул request_id: {str(data)[:300]}'
-                db_log_update(log_id, msg, 'error')
-                if log_id:
-                    db_log_entry(log_id, msg, level='error')
-                print(f"[video] {msg}")
-                return
-
-            request_id   = data['request_id']
-            status_url   = data.get('status_url',
-                                    f"{platform_url}/requests/{request_id}/status")
-            response_url = data.get('response_url',
-                                    f"{platform_url}/requests/{request_id}")
 
             db_set_batch_video_pending(batch_id, {
                 'request_id':   request_id,
@@ -267,7 +285,7 @@ def run():
                 'response_url': response_url,
             })
             if log_id:
-                db_log_entry(log_id, f"Запрос принят: {request_id}")
+                db_log_entry(log_id, f"Запрос принят ({used_model}): {request_id}")
             print(f"[video] Генерация запущена: request_id={request_id}")
 
         # --- Поллинг ---

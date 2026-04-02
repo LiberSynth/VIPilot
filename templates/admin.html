@@ -620,14 +620,14 @@
   }
   .model-item.model-active { border-color: rgba(62,207,142,.35); }
   .model-radio {
-    width: 18px; height: 18px; border-radius: 50%;
+    width: 18px; height: 18px; border-radius: 4px;
     border: 2px solid #2a2a38; flex-shrink: 0; cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     transition: border-color .15s;
   }
   .model-item.model-active .model-radio { border-color: #3ecf8e; }
   .model-radio-dot {
-    width: 8px; height: 8px; border-radius: 50%;
+    width: 10px; height: 10px; border-radius: 2px;
     background: #3ecf8e; display: none;
   }
   .model-item.model-active .model-radio-dot { display: block; }
@@ -800,6 +800,11 @@
 
     <div class="card" style="margin-top:12px">
       <div class="card-title">Модели</div>
+      <div class="hint">Активируйте одну или несколько. Порядок задаёт очерёдность перебора при сбое.</div>
+      <div class="lead-row" style="margin-bottom:10px">
+        <input type="number" name="story_fails_to_next" id="story_fails_to_next" value="{{ story_fails_to_next }}" min="1" max="99" step="1">
+        <span class="lead-unit">попыток на модель</span>
+      </div>
       <div class="model-list" id="text-model-list">
         <div class="model-loading">Загрузка...</div>
       </div>
@@ -820,6 +825,11 @@
 
     <div class="card" style="margin-top:12px">
       <div class="card-title">Модели</div>
+      <div class="hint">Активируйте одну или несколько. Порядок задаёт очерёдность перебора при сбое.</div>
+      <div class="lead-row" style="margin-bottom:10px">
+        <input type="number" name="video_fails_to_next" id="video_fails_to_next" value="{{ video_fails_to_next }}" min="1" max="99" step="1">
+        <span class="lead-unit">попыток на модель</span>
+      </div>
       <div class="model-list" id="model-list">
         <div class="model-loading">Загрузка...</div>
       </div>
@@ -1226,6 +1236,7 @@ function scheduleRequestSave() {
 (function() {
   const fields = [
     document.getElementById('video_duration'),
+    document.getElementById('video_fails_to_next'),
   ].filter(Boolean);
   fields.forEach(f => {
     f.addEventListener('input', scheduleRequestSave);
@@ -1246,14 +1257,15 @@ function scheduleStorySave() {
 }
 
 (function() {
-  if (ta) {
-    ta.addEventListener('input', scheduleStorySave);
-    ta.addEventListener('change', scheduleStorySave);
-  }
-  if (taSys) {
-    taSys.addEventListener('input', scheduleStorySave);
-    taSys.addEventListener('change', scheduleStorySave);
-  }
+  const storyFields = [
+    ta,
+    taSys,
+    document.getElementById('story_fails_to_next'),
+  ].filter(Boolean);
+  storyFields.forEach(f => {
+    f.addEventListener('input', scheduleStorySave);
+    f.addEventListener('change', scheduleStorySave);
+  });
 })();
 
 // ── Автосохранение панели «Публикация» ──
@@ -1415,9 +1427,8 @@ function validateLifetimes() {
   window.activateModel = function(id) {
     var container = document.getElementById('model-list');
     if (container) {
-      container.querySelectorAll('.model-item').forEach(function(el) {
-        el.classList.toggle('model-active', el.dataset.id === id);
-      });
+      var item = container.querySelector('[data-id="' + id + '"]');
+      if (item) item.classList.toggle('model-active');
     }
     fetch('/api/models/' + id + '/activate', {method: 'POST'})
       .catch(function(e) { console.error('activate error', e); loadModels(); });
@@ -1542,9 +1553,8 @@ function validateLifetimes() {
   window.activateTextModel = function(id) {
     var container = document.getElementById('text-model-list');
     if (container) {
-      container.querySelectorAll('.model-item').forEach(function(el) {
-        el.classList.toggle('model-active', el.dataset.id === id);
-      });
+      var item = container.querySelector('[data-id="' + id + '"]');
+      if (item) item.classList.toggle('model-active');
     }
     fetch('/api/text-models/' + id + '/activate', {method: 'POST'})
       .catch(function(e) { console.error('text activate error', e); loadTextModels(); });
