@@ -1954,6 +1954,7 @@ function validateLifetimes() {
       .catch(function() {});
   }
 
+  window.runNow = runNow;
   window.addScheduleSlot = addScheduleSlot;
 
   window.deleteScheduleSlot = function(btn, id) {
