@@ -185,7 +185,7 @@ def api_workflow_pause():
 def api_workflow_restart():
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
-    db_log_root("Перезапуск движка вручную", status='info')
+    db_log_root("Перезапуск приложения вручную", status='info')
     def _do_restart():
         import time as _time
         import sys as _sys
