@@ -9,6 +9,7 @@ from .db import (
     db_get_active_targets,
     db_ensure_batch,
     db_get_pending_batch,
+    db_recover_story_generating,
     db_set_batch_story,
     db_create_story,
     db_get_active_text_model,

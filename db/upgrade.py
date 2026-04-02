@@ -19,6 +19,7 @@ def run_upgrades():
     _batches_unique_constraint()
     _rename_lifetime_settings()
     _add_video_data_column()
+    _recover_story_generating()
 
 
 def _add_emulation_mode():
@@ -263,3 +264,20 @@ def _add_video_data_column():
             conn.commit()
     except Exception as e:
         print(f"[DB] Ошибка миграции _add_video_data_column: {e}")
+
+
+def _recover_story_generating():
+    """Сбрасывает застрявшие story_generating-батчи в pending при старте приложения."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE batches SET status = 'pending'
+                    WHERE status = 'story_generating'
+                """)
+                n = cur.rowcount
+            conn.commit()
+        if n:
+            print(f"[DB] Восстановлено story_generating → pending: {n}")
+    except Exception as e:
+        print(f"[DB] Ошибка миграции _recover_story_generating: {e}")

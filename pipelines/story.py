@@ -1,7 +1,8 @@
 """
 Pipeline 2 — Генерация сюжета.
-Берёт первый pending-батч без сюжета, генерирует текст через активную
-text-модель (OpenRouter) и сохраняет результат в таблицу stories.
+Берёт первый pending-батч, атомарно захватывает его (story_generating),
+генерирует текст через активную text-модель (OpenRouter) и сохраняет результат.
+При любом сбое finally-блок возвращает батч в pending для повторной попытки.
 """
 
 import os
@@ -13,6 +14,7 @@ from db import (
     db_get_active_text_model,
     db_create_story,
     db_set_batch_story,
+    db_set_batch_pending,
     db_is_batch_scheduled,
     db_set_batch_obsolete,
 )
@@ -45,11 +47,18 @@ def _build_body(body_tpl, model_url, system_prompt, user_prompt):
 
 
 def run():
+    batch_id   = None
+    batch_done = False   # True когда батч переведён в финальный статус (любой, кроме story_generating)
+    log_id     = None
+
     try:
         db_log_interrupt_running('story')
 
+        # Атомарный захват: batch сразу переводится в story_generating,
+        # поэтому следующий поток его не возьмёт.
         batch = db_get_pending_batch()
         if not batch:
+            batch_done = True   # нечего делать — сброс не нужен
             return
 
         batch_id = str(batch['id'])
@@ -60,15 +69,14 @@ def run():
             db_log_pipeline('story', 'Батч устарел — слот удалён из расписания или таргет отключён',
                             status='прервана', batch_id=batch_id)
             print(f"[story] Батч {batch_id[:8]}… устарел, пропускаю")
+            batch_done = True
             return
 
         print(f"[story] Батч {batch_id[:8]}… ({target}) — начало генерации сюжета")
 
         log_id = db_log_pipeline(
-            'story',
-            'Генерация сюжета…',
-            status='running',
-            batch_id=batch_id,
+            'story', 'Генерация сюжета…',
+            status='running', batch_id=batch_id,
         )
 
         if not _API_KEY:
@@ -77,7 +85,7 @@ def run():
             if log_id:
                 db_log_entry(log_id, msg, level='error')
             print(f"[story] {msg}")
-            return
+            return   # finally сбросит в pending
 
         platform_url, model_url, body_tpl, model_name, model_id = db_get_active_text_model()
         if not platform_url:
@@ -86,7 +94,7 @@ def run():
             if log_id:
                 db_log_entry(log_id, msg, level='error')
             print(f"[story] {msg}")
-            return
+            return   # finally сбросит в pending
 
         if log_id:
             db_log_entry(log_id, f"Модель: {model_name}")
@@ -109,14 +117,14 @@ def run():
             if log_id:
                 db_log_entry(log_id, msg, level='error')
             print(f"[story] {msg}")
-            return
+            return   # finally сбросит в pending
         except requests.exceptions.RequestException as e:
             msg = f'Ошибка соединения с OpenRouter: {e}'
             db_log_update(log_id, msg, 'error')
             if log_id:
                 db_log_entry(log_id, msg, level='error')
             print(f"[story] {msg}")
-            return
+            return   # finally сбросит в pending
 
         try:
             data = resp.json()
@@ -127,7 +135,7 @@ def run():
             if log_id:
                 db_log_entry(log_id, msg, level='error')
             print(f"[story] {msg}")
-            return
+            return   # finally сбросит в pending
 
         if resp.status_code >= 400:
             err = data.get('error', {})
@@ -138,7 +146,7 @@ def run():
             if log_id:
                 db_log_entry(log_id, msg, level='error')
             print(f"[story] {msg}")
-            return
+            return   # finally сбросит в pending
 
         choices = data.get('choices')
         if not choices:
@@ -147,7 +155,7 @@ def run():
             if log_id:
                 db_log_entry(log_id, msg, level='error')
             print(f"[story] {msg}")
-            return
+            return   # finally сбросит в pending
 
         result = (choices[0].get('message') or {}).get('content', '').strip()
         if not result:
@@ -156,7 +164,7 @@ def run():
             if log_id:
                 db_log_entry(log_id, msg, level='error')
             print(f"[story] {msg}")
-            return
+            return   # finally сбросит в pending
 
         preview = result[:200] + ('…' if len(result) > 200 else '')
         print(f"[story] Сюжет получен: {result[:100]}{'…' if len(result) > 100 else ''}")
@@ -170,9 +178,10 @@ def run():
             if log_id:
                 db_log_entry(log_id, msg, level='error')
             print(f"[story] {msg}")
-            return
+            return   # finally сбросит в pending
 
         db_set_batch_story(batch_id, story_id)
+        batch_done = True   # статус теперь story_ready — сброс не нужен
 
         msg = f'Сюжет сгенерирован ({model_name})'
         db_log_update(log_id, msg, 'ok')
@@ -182,5 +191,13 @@ def run():
         print(f"[story] Готово: story_id={story_id[:8]}…, batch → story_ready")
 
     except Exception as e:
-        db_log_pipeline('story', f"Сбой пайплайна: {e}", status='error')
+        db_log_pipeline('story', f"Сбой пайплайна: {e}", status='error',
+                        batch_id=batch_id)
         print(f"[story] Ошибка: {e}")
+
+    finally:
+        # Если батч был захвачен (story_generating) но не завершён нормально —
+        # возвращаем в pending, чтобы следующий цикл повторил попытку.
+        if batch_id and not batch_done:
+            db_set_batch_pending(batch_id)
+            print(f"[story] Батч {batch_id[:8]}… сброшен в pending (повторная попытка)")

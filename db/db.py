@@ -143,25 +143,54 @@ def db_ensure_batch(scheduled_at, target_id):
 # ---------------------------------------------------------------------------
 
 def db_get_pending_batch():
-    """Возвращает первый батч со status='pending' и story_id IS NULL, или None."""
+    """Атомарно захватывает первый pending-батч: переводит его в 'story_generating'
+    и возвращает данные. Гарантирует, что два потока не возьмут один и тот же батч."""
     try:
         with get_db() as conn:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
                 cur.execute("""
-                    SELECT b.id, b.scheduled_at, b.target_id,
+                    WITH claimed AS (
+                        UPDATE batches SET status = 'story_generating'
+                        WHERE id = (
+                            SELECT id FROM batches
+                            WHERE status = 'pending' AND story_id IS NULL
+                            ORDER BY scheduled_at
+                            LIMIT 1
+                            FOR UPDATE SKIP LOCKED
+                        )
+                        RETURNING *
+                    )
+                    SELECT c.id, c.scheduled_at, c.target_id,
                            t.name AS target_name,
                            t.aspect_ratio_x, t.aspect_ratio_y
-                    FROM batches b
-                    JOIN targets t ON t.id = b.target_id
-                    WHERE b.status = 'pending' AND b.story_id IS NULL
-                    ORDER BY b.scheduled_at
-                    LIMIT 1
+                    FROM claimed c
+                    JOIN targets t ON t.id = c.target_id
                 """)
                 row = cur.fetchone()
+            conn.commit()
         return dict(row) if row else None
     except Exception as e:
         print(f"[DB] Ошибка db_get_pending_batch: {e}")
         return None
+
+
+def db_recover_story_generating():
+    """Сбрасывает застрявшие story_generating-батчи в pending при старте."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE batches SET status = 'pending'
+                    WHERE status = 'story_generating'
+                """)
+                n = cur.rowcount
+            conn.commit()
+        if n:
+            print(f"[DB] Восстановлено story_generating → pending: {n}")
+        return n
+    except Exception as e:
+        print(f"[DB] Ошибка db_recover_story_generating: {e}")
+        return 0
 
 
 def db_set_batch_story(batch_id, story_id):
