@@ -21,6 +21,7 @@ from db import (
 )
 from utils.consts import ADMIN_PASSWORD
 from utils.auth import is_authenticated, password_fingerprint
+from utils.limiter import limiter
 from utils.utils import (
     parse_batch_lifetime,
     parse_entries_lifetime,
@@ -47,6 +48,7 @@ def icon_preview():
 
 
 @bp.route("/", methods=["GET", "POST"])
+@limiter.limit("10 per minute")
 def login():
     if is_authenticated():
         return redirect(url_for("admin.admin_page"))

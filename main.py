@@ -10,10 +10,12 @@ from pipelines import planning, story, video, transcode, publish, cleanup
 from routes.admin import bp as admin_bp
 from routes.api import bp as api_bp
 from utils.consts import FLASK_SECRET
+from utils.limiter import limiter
 import utils.workflow_state as wf_state
 
 flask_app = Flask(__name__, static_folder=".")
 flask_app.secret_key = FLASK_SECRET
+limiter.init_app(flask_app)
 
 flask_app.register_blueprint(admin_bp)
 flask_app.register_blueprint(api_bp)
