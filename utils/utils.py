@@ -13,14 +13,14 @@ def parse_batch_lifetime(s):
         return 7
 
 
-def parse_short_log_lifetime(s):
+def parse_log_lifetime(s):
     try:
         return max(1, min(3650, int(s)))
     except Exception:
         return 365
 
 
-def parse_log_lifetime(s):
+def parse_entries_lifetime(s):
     try:
         return max(1, min(3650, int(s)))
     except Exception:

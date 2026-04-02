@@ -20,6 +20,7 @@ def run_upgrades():
     _rename_lifetime_settings()
     _add_video_data_column()
     _recover_story_generating()
+    _fix_log_lifetime_keys()
 
 
 def _add_emulation_mode():
@@ -264,6 +265,42 @@ def _add_video_data_column():
             conn.commit()
     except Exception as e:
         print(f"[DB] Ошибка миграции _add_video_data_column: {e}")
+
+
+def _fix_log_lifetime_keys():
+    """Переименовывает log_lifetime→entries_lifetime, short_log_lifetime→log_lifetime,
+    удаляет устаревший short_log_days."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                # Шаг 1: log_lifetime (подробные записи) → entries_lifetime
+                cur.execute("""
+                    UPDATE settings SET key = 'entries_lifetime'
+                    WHERE key = 'log_lifetime'
+                      AND NOT EXISTS (SELECT 1 FROM settings WHERE key = 'entries_lifetime')
+                """)
+                # Шаг 2: short_log_lifetime (краткие заголовки) → log_lifetime
+                # (log_lifetime уже освободили на шаге 1)
+                cur.execute("""
+                    UPDATE settings SET key = 'log_lifetime'
+                    WHERE key = 'short_log_lifetime'
+                      AND NOT EXISTS (SELECT 1 FROM settings WHERE key = 'log_lifetime')
+                """)
+                # Шаг 3: вставить defaults если ключи не появились
+                cur.execute("""
+                    INSERT INTO settings (key, value) VALUES ('entries_lifetime', '30')
+                    ON CONFLICT (key) DO NOTHING
+                """)
+                cur.execute("""
+                    INSERT INTO settings (key, value) VALUES ('log_lifetime', '365')
+                    ON CONFLICT (key) DO NOTHING
+                """)
+                # Шаг 4: удалить устаревший ключ-призрак
+                cur.execute("DELETE FROM settings WHERE key = 'short_log_days'")
+                cur.execute("DELETE FROM settings WHERE key = 'short_log_lifetime'")
+            conn.commit()
+    except Exception as e:
+        print(f"[DB] Ошибка миграции _fix_log_lifetime_keys: {e}")
 
 
 def _recover_story_generating():

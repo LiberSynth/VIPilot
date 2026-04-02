@@ -813,7 +813,7 @@
         <div style="margin-top:14px">
           <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block">Подробный лог</label>
           <div class="lead-row">
-            <input type="number" name="log_lifetime" id="log_lifetime" value="{{ log_lifetime }}" min="1" max="3650" step="1">
+            <input type="number" name="entries_lifetime" id="entries_lifetime" value="{{ entries_lifetime }}" min="1" max="3650" step="1">
             <span class="lead-unit">дней</span>
           </div>
           <div class="hint" style="margin-top:5px">Подробные записи шагов пайплайна.</div>
@@ -822,7 +822,7 @@
         <div style="margin-top:14px">
           <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block">Краткий лог</label>
           <div class="lead-row">
-            <input type="number" name="short_log_lifetime" id="short_log_lifetime" value="{{ short_log_lifetime }}" min="1" max="3650" step="1">
+            <input type="number" name="log_lifetime" id="log_lifetime" value="{{ log_lifetime }}" min="1" max="3650" step="1">
             <span class="lead-unit">дней</span>
           </div>
           <div class="hint" style="margin-top:5px">Заголовки запусков пайплайна.</div>
@@ -962,8 +962,8 @@ function collectAllSettings(activeTab) {
   data.set('vk_publish_wall',  v('vk_wall_pub_hidden'));
   data.set('notify_email',    v('notify_email'));
   data.set('notify_phone',    v('notify_phone'));
+  data.set('entries_lifetime',    v('entries_lifetime'));
   data.set('log_lifetime',        v('log_lifetime'));
-  data.set('short_log_lifetime',  v('short_log_lifetime'));
   data.set('batch_lifetime',      v('batch_lifetime'));
   data.set('file_lifetime',       v('file_lifetime'));
   data.set('emulation_mode',  v('emulation_hidden'));
@@ -1053,8 +1053,8 @@ function scheduleServiceSave() {
 }
 
 function validateLifetimes() {
-  const ll  = document.getElementById('log_lifetime');
-  const sll = document.getElementById('short_log_lifetime');
+  const ll  = document.getElementById('entries_lifetime');
+  const sll = document.getElementById('log_lifetime');
   const bl  = document.getElementById('batch_lifetime');
   if (!ll || !sll || !bl) return true;
   const v_ll  = parseInt(ll.value)  || 0;
@@ -1080,7 +1080,7 @@ function validateLifetimes() {
     f.addEventListener('change', scheduleServiceSave);
   });
 
-  ['log_lifetime', 'short_log_lifetime', 'batch_lifetime'].forEach(id => {
+  ['entries_lifetime', 'log_lifetime', 'batch_lifetime'].forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
     el.addEventListener('input',  validateLifetimes);

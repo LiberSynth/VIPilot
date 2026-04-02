@@ -1,10 +1,10 @@
 """
 Pipeline 6 — Сборщик мусора.
 Удаляет устаревшие данные согласно 4 настройкам времени жизни:
-  log_lifetime        — подробные записи log_entries
-  short_log_lifetime  — краткие записи log (заголовки)
-  batch_lifetime      — батчи + осиротевшие stories
-  file_lifetime       — обнуляет video_data у опубликованных батчей в БД
+  entries_lifetime  — подробные записи log_entries
+  log_lifetime      — краткие записи log (заголовки)
+  batch_lifetime    — батчи + осиротевшие stories
+  file_lifetime     — обнуляет video_data у опубликованных батчей в БД
 
 Запускается каждые loop_interval секунд; делает всё за один проход.
 """
@@ -19,7 +19,7 @@ from db import (
     db_cleanup_video_data,
 )
 from log import db_log_pipeline
-from utils.utils import parse_log_lifetime, parse_short_log_lifetime, parse_batch_lifetime, parse_file_lifetime
+from utils.utils import parse_entries_lifetime, parse_log_lifetime, parse_batch_lifetime, parse_file_lifetime
 
 _last_idle_log: float = 0
 _IDLE_LOG_INTERVAL = 3600
@@ -27,19 +27,19 @@ _IDLE_LOG_INTERVAL = 3600
 
 def run():
     try:
-        log_lifetime        = parse_log_lifetime(db_get("log_lifetime", "30"))
-        short_log_lifetime  = parse_short_log_lifetime(db_get("short_log_lifetime", "365"))
+        entries_lifetime    = parse_entries_lifetime(db_get("entries_lifetime", "30"))
+        log_lifetime        = parse_log_lifetime(db_get("log_lifetime", "365"))
         batch_lifetime      = parse_batch_lifetime(db_get("batch_lifetime", "7"))
         file_lifetime       = parse_file_lifetime(db_get("file_lifetime", "7"))
 
         summary = []
 
-        n = db_cleanup_log_entries(log_lifetime)
+        n = db_cleanup_log_entries(entries_lifetime)
         if n:
             summary.append(f"log_entries: -{n}")
             print(f"[cleanup] Удалено log_entries: {n}")
 
-        n = db_cleanup_logs(short_log_lifetime)
+        n = db_cleanup_logs(log_lifetime)
         if n:
             summary.append(f"log: -{n}")
             print(f"[cleanup] Удалено log-записей: {n}")

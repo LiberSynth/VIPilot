@@ -18,7 +18,7 @@ from utils.consts import ADMIN_PASSWORD
 from utils.auth import is_authenticated, password_fingerprint
 from utils.utils import (
     parse_batch_lifetime,
-    parse_short_log_lifetime,
+    parse_entries_lifetime,
     parse_log_lifetime,
     parse_file_lifetime,
 )
@@ -60,8 +60,8 @@ def admin_page():
     metaprompt      = db_get("metaprompt", "")
     system_prompt   = db_get("system_prompt", "")
     batch_lifetime     = parse_batch_lifetime(db_get("batch_lifetime", "7"))
-    short_log_lifetime = parse_short_log_lifetime(db_get("short_log_lifetime", "365"))
-    log_lifetime       = parse_log_lifetime(db_get("log_lifetime", "30"))
+    log_lifetime       = parse_log_lifetime(db_get("log_lifetime", "365"))
+    entries_lifetime   = parse_entries_lifetime(db_get("entries_lifetime", "30"))
     file_lifetime      = parse_file_lifetime(db_get("file_lifetime", "7"))
     emulation_mode     = db_get("emulation_mode", "0") == "1"
     notify_email       = db_get("notify_email", "")
@@ -77,8 +77,8 @@ def admin_page():
         metaprompt=metaprompt,
         system_prompt=system_prompt,
         batch_lifetime=batch_lifetime,
-        short_log_lifetime=short_log_lifetime,
         log_lifetime=log_lifetime,
+        entries_lifetime=entries_lifetime,
         file_lifetime=file_lifetime,
         emulation_mode=emulation_mode,
         notify_email=notify_email,
@@ -110,19 +110,19 @@ def save():
     else:
         db_set("metaprompt", metaprompt)
 
-    log_lifetime_raw       = request.form.get("log_lifetime",       "").strip()
-    short_log_lifetime_raw = request.form.get("short_log_lifetime", "").strip()
-    batch_lifetime_raw     = request.form.get("batch_lifetime",     "").strip()
-    file_lifetime_raw      = request.form.get("file_lifetime",      "").strip()
+    entries_lifetime_raw = request.form.get("entries_lifetime", "").strip()
+    log_lifetime_raw     = request.form.get("log_lifetime",     "").strip()
+    batch_lifetime_raw   = request.form.get("batch_lifetime",   "").strip()
+    file_lifetime_raw    = request.form.get("file_lifetime",    "").strip()
 
-    if log_lifetime_raw or short_log_lifetime_raw or batch_lifetime_raw:
-        ll  = parse_log_lifetime(log_lifetime_raw             or db_get("log_lifetime",       "30"))
-        sll = parse_short_log_lifetime(short_log_lifetime_raw or db_get("short_log_lifetime", "365"))
-        bl  = parse_batch_lifetime(batch_lifetime_raw         or db_get("batch_lifetime",     "7"))
-        if ll <= sll <= bl:
-            db_set("log_lifetime",       str(ll))
-            db_set("short_log_lifetime", str(sll))
-            db_set("batch_lifetime",     str(bl))
+    if entries_lifetime_raw or log_lifetime_raw or batch_lifetime_raw:
+        el  = parse_entries_lifetime(entries_lifetime_raw or db_get("entries_lifetime", "30"))
+        ll  = parse_log_lifetime(log_lifetime_raw         or db_get("log_lifetime",     "365"))
+        bl  = parse_batch_lifetime(batch_lifetime_raw     or db_get("batch_lifetime",   "7"))
+        if el <= ll <= bl:
+            db_set("entries_lifetime", str(el))
+            db_set("log_lifetime",     str(ll))
+            db_set("batch_lifetime",   str(bl))
         else:
             flash("Сроки хранения нарушают иерархию: подробный ≤ краткий ≤ история батчей", "error")
 
