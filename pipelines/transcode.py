@@ -53,6 +53,7 @@ def _ffmpeg(src, dst, log_id):
 
 
 def run():
+    batch_id = None
     try:
         db_log_interrupt_running('transcode')
 
@@ -134,5 +135,6 @@ def run():
         print(f"[transcode] Готово: {out_mb} МБ → БД")
 
     except Exception as e:
-        db_log_pipeline('transcode', f'Сбой пайплайна: {e}', status='error')
+        db_log_pipeline('transcode', f'Сбой пайплайна: {e}', status='error',
+                        batch_id=batch_id)
         print(f"[transcode] Ошибка: {e}")

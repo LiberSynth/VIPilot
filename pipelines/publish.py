@@ -53,6 +53,7 @@ def _publish_vk(batch_id, log_id):
 
 
 def run():
+    batch_id = None
     try:
         db_log_interrupt_running('publish')
 
@@ -104,5 +105,6 @@ def run():
             print(f"[publish] Батч {batch_id[:8]}… ошибка публикации")
 
     except Exception as e:
-        db_log_pipeline('publish', f'Сбой пайплайна: {e}', status='error')
+        db_log_pipeline('publish', f'Сбой пайплайна: {e}', status='error',
+                        batch_id=batch_id)
         print(f"[publish] Ошибка: {e}")
