@@ -37,6 +37,16 @@ def log_request():
     print(msg)
 
 
+_wakeup = threading.Event()
+
+
+def _wrap(module):
+    def _runner():
+        module.run()
+        _wakeup.set()
+    return _runner
+
+
 def main_loop():
     _threads = {
         'planning':  None,
@@ -48,6 +58,8 @@ def main_loop():
     }
 
     while True:
+        _wakeup.clear()
+        interval = 5
         try:
             wf_state.wait_if_paused()
 
@@ -62,14 +74,14 @@ def main_loop():
                 ('cleanup',   cleanup),
             ]:
                 if _threads[name] is None or not _threads[name].is_alive():
-                    _threads[name] = threading.Thread(target=module.run, daemon=True)
+                    _threads[name] = threading.Thread(target=_wrap(module), daemon=True)
                     _threads[name].start()
 
         except Exception as e:
             db_log_root(f"Ошибка главного цикла: {e}", status='error')
             print(f"[main_loop] Ошибка: {e}")
 
-        time.sleep(interval)
+        _wakeup.wait(timeout=interval)
 
 
 _main_loop_started = False
