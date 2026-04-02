@@ -191,8 +191,14 @@ def run():
         print(f"[story] Готово: story_id={story_id[:8]}…, batch → story_ready")
 
     except Exception as e:
-        db_log_pipeline('story', f"Сбой пайплайна: {e}", status='error',
-                        batch_id=batch_id)
+        msg = f"Сбой пайплайна: {e}"
+        if log_id:
+            db_log_update(log_id, msg, 'error')
+            db_log_entry(log_id, msg, level='error')
+        else:
+            new_log_id = db_log_pipeline('story', msg, status='error', batch_id=batch_id)
+            if new_log_id:
+                db_log_entry(new_log_id, msg, level='error')
         print(f"[story] Ошибка: {e}")
 
     finally:
