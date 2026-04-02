@@ -84,7 +84,7 @@ def _try_model(log_id, m, system_prompt, user_prompt):
             db_log_entry(log_id, f"[{model_name}] нет поля choices в ответе", level='warn')
         return None
 
-    result = (choices[0].get('message') or {}).get('content', '').strip()
+    result = ((choices[0].get('message') or {}).get('content') or '').strip()
     if not result:
         if log_id:
             db_log_entry(log_id, f"[{model_name}] пустой текст", level='warn')
