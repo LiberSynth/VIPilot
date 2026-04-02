@@ -156,10 +156,11 @@ def save():
     db_set("vk_publish_wall",  "1" if vk_wall_raw  == "1" else "0")
 
     ar_target_id = request.form.get("target_id", "").strip()
-    ar_raw = request.form.get("aspect_ratio", "").strip()
-    if ar_target_id and ar_raw and ":" in ar_raw:
+    ar_x_raw = request.form.get("aspect_ratio_x", "").strip()
+    ar_y_raw = request.form.get("aspect_ratio_y", "").strip()
+    if ar_target_id and ar_x_raw and ar_y_raw:
         try:
-            ax, ay = [int(v) for v in ar_raw.split(":", 1)]
+            ax, ay = int(ar_x_raw), int(ar_y_raw)
             if ax > 0 and ay > 0:
                 db_update_target_aspect_ratio(ar_target_id, ax, ay)
         except (ValueError, TypeError):
