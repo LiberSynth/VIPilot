@@ -1144,36 +1144,34 @@ const ccSys = document.getElementById('charcount_sysprompt');
 function updateSysCount() { if (taSys && ccSys) ccSys.textContent = taSys.value.length + ' символов'; }
 if (taSys) { taSys.addEventListener('input', updateSysCount); updateSysCount(); }
 
-// ── Высоты textarea: сохранение и восстановление через cookies ──
+// ── Высоты textarea: сохранение и восстановление через localStorage ──
 (function() {
-  function getCookie(name) {
-    const m = document.cookie.match('(?:^|; )' + name + '=([^;]*)');
-    return m ? decodeURIComponent(m[1]) : null;
-  }
-  function setCookie(name, value) {
-    document.cookie = name + '=' + encodeURIComponent(value) + '; max-age=31536000; path=/; SameSite=Lax';
-  }
-  function applyHeight(el, cookieName, defaultPx) {
-    const saved = parseInt(getCookie(cookieName), 10);
+  var KEY_SYS = 'rbc_sysprompt_h';
+  var KEY_META = 'rbc_metaprompt_h';
+
+  function applyHeight(el, key, defaultPx) {
+    var saved = parseInt(localStorage.getItem(key), 10);
     el.style.height = (saved > 0 ? saved : defaultPx) + 'px';
   }
-  function watchHeight(el, cookieName) {
+
+  function watchHeight(el, key) {
     var saveTimer = null;
     new ResizeObserver(function() {
       clearTimeout(saveTimer);
       saveTimer = setTimeout(function() {
         var h = Math.round(el.offsetHeight);
-        if (h > 0) setCookie(cookieName, h);
-      }, 300);
+        if (h > 30) localStorage.setItem(key, h);
+      }, 250);
     }).observe(el);
   }
+
   if (taSys) {
-    applyHeight(taSys, 'sysprompt_h', 100);
-    watchHeight(taSys, 'sysprompt_h');
+    applyHeight(taSys, KEY_SYS, 100);
+    watchHeight(taSys, KEY_SYS);
   }
   if (ta) {
-    applyHeight(ta, 'metaprompt_h', 300);
-    watchHeight(ta, 'metaprompt_h');
+    applyHeight(ta, KEY_META, 300);
+    watchHeight(ta, KEY_META);
   }
 })();
 
