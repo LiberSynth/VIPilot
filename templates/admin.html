@@ -43,6 +43,12 @@
     font-size: 16px;
   }
   h1 { font-size: 16px; font-weight: 700; color: #fff; }
+  #monitor-clock {
+    display: none;
+    font-size: 13px; font-weight: 500; color: #888;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+  }
   .header-right { display: flex; align-items: center; gap: 10px; }
   .logout {
     font-size: 12px; color: #888; text-decoration: none;
@@ -688,6 +694,7 @@
         </svg>
       </div>
       <h1 id="page-title">Управление</h1>
+      <span id="monitor-clock"></span>
     </div>
     <div class="header-right">
       <a href="/logout" class="logout">Выйти</a>
@@ -952,6 +959,11 @@ function switchPanel(name) {
   const titleEl = document.getElementById('page-title');
   if (titleEl) titleEl.textContent = PANEL_TITLES[name] || name;
   closeSidebar();
+  if (name === 'log') {
+    monitorClockStart();
+  } else {
+    monitorClockStop();
+  }
   // Load models when switching to request panel
   if (name === 'request') {
     if (typeof loadModels === 'function') loadModels();
@@ -960,6 +972,34 @@ function switchPanel(name) {
   if (name === 'story') {
     if (typeof loadTextModels === 'function') loadTextModels();
   }
+}
+
+let _monitorClockTimer = null;
+function monitorClockTick() {
+  const el = document.getElementById('monitor-clock');
+  if (!el) return;
+  const now = new Date();
+  const msk = new Date(now.getTime() + 3 * 60 * 60 * 1000);
+  const pad = n => String(n).padStart(2, '0');
+  el.textContent =
+    pad(msk.getUTCDate()) + '.' +
+    pad(msk.getUTCMonth() + 1) + '.' +
+    msk.getUTCFullYear() + ' ' +
+    pad(msk.getUTCHours()) + ':' +
+    pad(msk.getUTCMinutes()) + ':' +
+    pad(msk.getUTCSeconds());
+}
+function monitorClockStart() {
+  const el = document.getElementById('monitor-clock');
+  if (!el) return;
+  monitorClockTick();
+  el.style.display = '';
+  if (!_monitorClockTimer) _monitorClockTimer = setInterval(monitorClockTick, 1000);
+}
+function monitorClockStop() {
+  if (_monitorClockTimer) { clearInterval(_monitorClockTimer); _monitorClockTimer = null; }
+  const el = document.getElementById('monitor-clock');
+  if (el) el.style.display = 'none';
 }
 
 // Восстановить раздел из ?tab=... после сохранения
