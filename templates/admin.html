@@ -1456,9 +1456,37 @@ function validateLifetimes() {
   const MON_SVG_COLLAPSE = `<svg viewBox="0 0 16 16"><polyline points="6,2 6,6 2,6"/><polyline points="10,2 10,6 14,6"/><polyline points="14,10 10,10 10,14"/><polyline points="2,10 6,10 6,14"/></svg>`;
   const MON_SVG_COPY     = `<svg viewBox="0 0 16 16"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11V3a1 1 0 0 1 1-1h8"/></svg>`;
 
+  function groupLogsByPipeline(logs) {
+    const order = [];
+    const map   = {};
+    logs.forEach(function(log) {
+      if (!map[log.pipeline]) {
+        map[log.pipeline] = {
+          id:         log.id,
+          pipeline:   log.pipeline,
+          time_point: log.time_point,
+          status:     log.status,
+          message:    log.message,
+          entries:    []
+        };
+        order.push(log.pipeline);
+      }
+      const g = map[log.pipeline];
+      g.status = log.status;
+      if (log.message) g.message = log.message;
+      if (log.entries) log.entries.forEach(function(e) { g.entries.push(e); });
+    });
+    order.forEach(function(pip) {
+      map[pip].entries.sort(function(a, b) {
+        return (a.time_point || '').localeCompare(b.time_point || '');
+      });
+    });
+    return order.map(function(pip) { return map[pip]; });
+  }
+
   function renderBatch(batch) {
     const bs   = batch.batch_status || 'pending';
-    const logs = batch.logs || [];
+    const logs = groupLogsByPipeline(batch.logs || []);
 
     const headTime = batch.created_at;
     const ratio = (batch.aspect_ratio_x && batch.aspect_ratio_y)
