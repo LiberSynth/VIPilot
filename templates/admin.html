@@ -2128,10 +2128,14 @@ function validateLifetimes() {
   }
 
   function loadSchedule() {
+    const list = document.getElementById('schedule-list');
+    if (list) list.innerHTML = '<div style="font-size:13px;color:#555;padding:4px 0;">Загрузка…</div>';
     return fetch('/api/schedule')
       .then(function(r) { return r.json(); })
       .then(renderSchedule)
-      .catch(function() {});
+      .catch(function() {
+        if (list) list.innerHTML = '<div style="font-size:13px;color:#555;padding:4px 0;">Ошибка загрузки</div>';
+      });
   }
 
   function updateSaveBtn() {
