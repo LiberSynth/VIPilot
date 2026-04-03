@@ -234,45 +234,55 @@ def api_text_model_probe(model_id):
         _probe_jobs[job_id] = {"events": [], "done": False, "result": None, "ts": time.time()}
 
     def _run():
-        _probe_append(job_id, f"Промпт: {user_prompt[:120]}{'…' if len(user_prompt) > 120 else ''}", "info")
+        import json as _json
+        _probe_append(job_id, f"Модель: {model_name}", "info")
+        _probe_append(job_id, f"URL: {platform_url}", "info")
         _probe_append(job_id, f"Попыток: {fails_to_next}", "info")
+
+        # Показываем сам запрос
+        req_preview = _json.dumps(body, ensure_ascii=False, indent=2)
+        _probe_append(job_id, f"→ Запрос:\n{req_preview}", "info")
+
         result = None
         for attempt in range(fails_to_next):
-            _probe_append(job_id, f"[{model_name}] попытка {attempt + 1}/{fails_to_next}…", "info")
+            _probe_append(job_id, f"[попытка {attempt + 1}/{fails_to_next}] отправляю…", "info")
             try:
                 resp = _requests.post(platform_url, headers=req_headers, json=body, timeout=60)
             except _requests.exceptions.Timeout:
-                _probe_append(job_id, f"[{model_name}] таймаут (60 с)", "warn")
+                _probe_append(job_id, f"[попытка {attempt + 1}/{fails_to_next}] таймаут (60 с)", "warn")
                 continue
             except _requests.exceptions.RequestException as e:
-                _probe_append(job_id, f"[{model_name}] ошибка соединения: {e}", "warn")
+                _probe_append(job_id, f"[попытка {attempt + 1}/{fails_to_next}] ошибка соединения: {e}", "warn")
                 continue
+
+            # Показываем сырой ответ
+            raw_preview = " ".join(resp.text.split())[:500]
+            _probe_append(job_id, f"← HTTP {resp.status_code}: {raw_preview}", "info")
+
             try:
                 data = resp.json()
             except ValueError:
-                preview = " ".join(resp.text.split())[:200]
-                _probe_append(job_id, f"[{model_name}] не-JSON (HTTP {resp.status_code}): {preview}", "warn")
+                _probe_append(job_id, f"[попытка {attempt + 1}/{fails_to_next}] не-JSON ответ", "warn")
                 continue
             if resp.status_code >= 400:
                 err = data.get("error", {})
                 if isinstance(err, dict):
                     err = err.get("message", str(data))
-                _probe_append(job_id, f"[{model_name}] HTTP {resp.status_code}: {err}", "warn")
+                _probe_append(job_id, f"[попытка {attempt + 1}/{fails_to_next}] ошибка: {err}", "warn")
                 continue
             choices = data.get("choices")
             if not choices:
-                _probe_append(job_id, f"[{model_name}] нет поля choices в ответе", "warn")
+                _probe_append(job_id, f"[попытка {attempt + 1}/{fails_to_next}] нет поля choices в ответе", "warn")
                 continue
             text = ((choices[0].get("message") or {}).get("content") or "").strip()
             if not text:
-                _probe_append(job_id, f"[{model_name}] пустой текст", "warn")
+                _probe_append(job_id, f"[попытка {attempt + 1}/{fails_to_next}] пустой текст", "warn")
                 continue
             result = text
-            preview = text[:200] + ("…" if len(text) > 200 else "")
-            _probe_append(job_id, f"[{model_name}] успех — сюжет: {preview}", "ok")
+            _probe_append(job_id, f"[попытка {attempt + 1}/{fails_to_next}] успех", "ok")
             break
         if result is None:
-            _probe_append(job_id, f"[{model_name}] все попытки исчерпаны", "error")
+            _probe_append(job_id, f"все попытки исчерпаны", "error")
         _probe_finish(job_id, result)
 
     threading.Thread(target=_run, daemon=True).start()
