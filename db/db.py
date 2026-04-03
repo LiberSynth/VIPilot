@@ -407,6 +407,7 @@ def db_get_active_text_model():
                     FROM ai_models m
                     JOIN ai_platforms p ON p.id = m.platform_id
                     WHERE m.active = TRUE AND m.type = 'text'
+                      AND (m.unsuitable IS NULL OR m.unsuitable = FALSE)
                     ORDER BY m."order"
                     LIMIT 1
                 """)
@@ -568,6 +569,7 @@ def db_get_active_text_models():
                     FROM ai_models m
                     JOIN ai_platforms p ON p.id = m.platform_id
                     WHERE m.active = TRUE AND m.type = 'text'
+                      AND (m.unsuitable IS NULL OR m.unsuitable = FALSE)
                     ORDER BY m."order"
                 """)
                 rows = cur.fetchall()
@@ -939,10 +941,11 @@ def db_get_models(model_type: str):
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
                 cur.execute("""
                     SELECT m.id, m.name, m.url, m.body, m."order", m.active,
-                           p.name AS platform_name
+                           m.unsuitable, p.name AS platform_name
                     FROM ai_models m
                     LEFT JOIN ai_platforms p ON p.id = m.platform_id
                     WHERE m.type = %s
+                      AND (m.unsuitable IS NULL OR m.unsuitable = FALSE)
                     ORDER BY m."order" ASC
                 """, (model_type,))
                 rows = cur.fetchall()
