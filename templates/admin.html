@@ -2619,8 +2619,8 @@ function confirmRestart() {
               } else if (ev.type === 'error') {
                 appendLine('<div style="color:#c05050;margin-bottom:4px">✗ Попытка ' + ev.attempt + '/' + ev.total + ': ' + escHtml(ev.msg) + '</div>');
               } else if (ev.type === 'success') {
-                body.innerHTML = '<div style="color:#6a6;font-size:11px;margin-bottom:8px">✓ Успех с попытки ' + ev.attempt + '/' + ev.total + '</div>'
-                  + '<div style="white-space:pre-wrap;line-height:1.55">' + escHtml(ev.result) + '</div>';
+                appendLine('<div style="color:#6a6;font-size:11px;margin-bottom:6px">✓ Успех с попытки ' + ev.attempt + '/' + ev.total + '</div>'
+                  + '<div style="white-space:pre-wrap;line-height:1.55;border-top:1px solid rgba(255,255,255,.07);padding-top:8px">' + escHtml(ev.result) + '</div>');
                 btn.classList.remove('probing');
               } else if (ev.type === 'fail') {
                 appendLine('<div style="color:#c05050;margin-top:6px;font-weight:600">Все попытки исчерпаны. Последняя ошибка:<br>' + escHtml(ev.msg) + '</div>');

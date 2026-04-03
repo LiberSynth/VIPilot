@@ -220,6 +220,7 @@ def api_text_model_probe(model_id):
     platform_url = m["platform_url"]
 
     def _generate():
+        yield ": padding " + " " * 2048 + "\n\n"
         last_error = "Неизвестная ошибка"
         for attempt in range(fails_to_next):
             yield "data: " + _json.dumps({
