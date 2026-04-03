@@ -1798,7 +1798,7 @@ function validateLifetimes() {
     const storyBtn = (log.pipeline === 'story' && st === 'ok' && storyId)
       ? '<button class="cycle-float-btn story-view-btn" title="Посмотреть сюжет" onclick="openStoryModal(\'' + esc(storyId) + '\')">' + MON_SVG_EYE + '</button>'
       : '';
-    const videoBtn = (log.pipeline === 'transcode' && st === 'ok' && hasVideoData)
+    const videoBtn = (log.pipeline === 'video' && st === 'ok' && hasVideoData)
       ? '<button class="cycle-float-btn" title="Просмотр видео" onclick="openVideoModal(\'' + esc(batchId) + '\')">' + MON_SVG_PLAY + '</button>'
       : '';
     const pipActions = '<div class="monitor-pip-actions" onclick="event.stopPropagation()">' +
