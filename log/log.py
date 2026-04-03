@@ -193,12 +193,17 @@ def db_get_monitor(batch_limit=50):
                                 ) ORDER BY l.created_at
                             ) FILTER (WHERE l.id IS NOT NULL),
                             '[]'::json
-                        ) AS logs
+                        ) AS logs,
+                        tm.name AS text_model_name,
+                        vm.name AS video_model_name
                     FROM batches b
                     LEFT JOIN log l ON l.batch_id = b.id
                     LEFT JOIN targets t ON t.id = b.target_id
+                    LEFT JOIN ai_models tm ON tm.id = b.text_model_id
+                    LEFT JOIN ai_models vm ON vm.id = b.video_model_id
                     GROUP BY b.id, b.scheduled_at, b.adhoc, b.status, b.created_at,
-                             t.name, t.aspect_ratio_x, t.aspect_ratio_y, b.story_id, b.video_data
+                             t.name, t.aspect_ratio_x, t.aspect_ratio_y, b.story_id, b.video_data,
+                             tm.name, vm.name
                     ORDER BY COALESCE(MAX(l.created_at), b.created_at) DESC
                     LIMIT %s
                     """,
@@ -233,18 +238,20 @@ def db_get_monitor(batch_limit=50):
 
         batches = [
             {
-                "batch_id":       str(r[0]),
-                "scheduled_at":   r[1].isoformat() if r[1] else None,
-                "adhoc":          r[2],
-                "batch_status":   r[3],
-                "created_at":     r[4].isoformat() if r[4] else None,
-                "target_name":    r[5],
-                "aspect_ratio_x": r[6],
-                "aspect_ratio_y": r[7],
-                "last_event_at":  r[8].isoformat() if r[8] else None,
-                "story_id":       str(r[9]) if r[9] else None,
-                "has_video_data": bool(r[10]),
-                "logs":           r[11],
+                "batch_id":         str(r[0]),
+                "scheduled_at":     r[1].isoformat() if r[1] else None,
+                "adhoc":            r[2],
+                "batch_status":     r[3],
+                "created_at":       r[4].isoformat() if r[4] else None,
+                "target_name":      r[5],
+                "aspect_ratio_x":   r[6],
+                "aspect_ratio_y":   r[7],
+                "last_event_at":    r[8].isoformat() if r[8] else None,
+                "story_id":         str(r[9]) if r[9] else None,
+                "has_video_data":   bool(r[10]),
+                "logs":             r[11],
+                "text_model_name":  r[12],
+                "video_model_name": r[13],
             }
             for r in batch_rows
         ]

@@ -11,6 +11,7 @@ import requests
 
 from utils.notify import notify_failure
 from db import (
+    db_set_batch_text_model,
     db_get,
     db_get_pending_batch,
     db_get_active_text_models,
@@ -213,6 +214,7 @@ def run():
             db_log_entry(log_id, f"Сюжет: {preview}")
 
         db_set_batch_story(batch_id, story_id)
+        db_set_batch_text_model(batch_id, used_model_id)
         batch_done = True
 
         msg = f'Сюжет сгенерирован ({used_model_name})'

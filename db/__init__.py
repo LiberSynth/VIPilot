@@ -18,6 +18,8 @@ from .db import (
     db_recover_video_generating,
     db_reset_video_generating,
     db_set_batch_story,
+    db_set_batch_text_model,
+    db_set_batch_video_model,
     db_create_story,
     db_get_active_text_model,
     db_get_active_text_models,

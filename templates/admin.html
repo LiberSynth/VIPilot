@@ -1786,7 +1786,7 @@ function validateLifetimes() {
   const PIPELINE_RESTARTABLE = ['story', 'video', 'transcode', 'publish'];
   const PIPELINE_ERROR_STATUSES = ['error', 'video_error', 'transcode_error', 'publish_error'];
 
-  function renderLogItem(log, batchId, storyId, hasVideoData) {
+  function renderLogItem(log, batchId, storyId, hasVideoData, textModelName, videoModelName) {
     const st  = log.status || 'info';
     const pip = PIPELINE_LABELS[log.pipeline] || log.pipeline;
     const hasEntries = log.entries && log.entries.length > 0;
@@ -1799,13 +1799,11 @@ function validateLifetimes() {
     const restartBtn = canRestart
       ? '<button class="cycle-float-btn" title="Перезапустить" data-bid="' + esc(batchId) + '" data-pip="' + esc(log.pipeline) + '" onclick="monitorPipelineRestart(this)">' + MON_SVG_RESTART + '</button>'
       : '';
-    const _modelMatch = (log.message || '').match(/\(([^)]+)\)\s*$/);
-    const _modelName  = _modelMatch ? _modelMatch[1] : '';
     const storyBtn = (log.pipeline === 'story' && st === 'ok' && storyId)
-      ? '<button class="cycle-float-btn story-view-btn" title="Посмотреть сюжет" onclick="openStoryModal(\'' + esc(storyId) + '\',\'' + esc(_modelName) + '\')">' + MON_SVG_EYE + '</button>'
+      ? '<button class="cycle-float-btn story-view-btn" title="Посмотреть сюжет" onclick="openStoryModal(\'' + esc(storyId) + '\',\'' + esc(textModelName || '') + '\')">' + MON_SVG_EYE + '</button>'
       : '';
     const videoBtn = (log.pipeline === 'video' && st === 'ok' && hasVideoData)
-      ? '<button class="cycle-float-btn" title="Просмотр видео" onclick="openVideoModal(\'' + esc(batchId) + '\',\'' + esc(_modelName) + '\')">' + MON_SVG_PLAY + '</button>'
+      ? '<button class="cycle-float-btn" title="Просмотр видео" onclick="openVideoModal(\'' + esc(batchId) + '\',\'' + esc(videoModelName || '') + '\')">' + MON_SVG_PLAY + '</button>'
       : '';
     const pipActions = '<div class="monitor-pip-actions" onclick="event.stopPropagation()">' +
       storyBtn +
@@ -1896,7 +1894,7 @@ function validateLifetimes() {
              : waitStatuses.indexOf(bs) >= 0      ? 'md-wait'
              : 'md-warn';
 
-    const logHtml = '<div class="monitor-log-list">' + logs.map(function(log) { return renderLogItem(log, batch.batch_id, batch.story_id, batch.has_video_data); }).join('') + '</div>';
+    const logHtml = '<div class="monitor-log-list">' + logs.map(function(log) { return renderLogItem(log, batch.batch_id, batch.story_id, batch.has_video_data, batch.text_model_name, batch.video_model_name); }).join('') + '</div>';
 
     const hdrActions =
       '<div class="monitor-hdr-actions" onclick="event.stopPropagation()">' +

@@ -16,6 +16,7 @@ import requests
 from utils.notify import notify_failure
 
 from db import (
+    db_set_batch_video_model,
     db_get,
     env_get,
     db_get_story_ready_batch_atomic,
@@ -222,7 +223,8 @@ def run():
             request_id   = None
             status_url   = None
             response_url = None
-            used_model   = None
+            used_model    = None
+            used_model_id = None
 
             for m in models:
                 model_name   = m['name']
@@ -271,7 +273,8 @@ def run():
                                             f"{platform_url}/requests/{request_id}/status")
                     response_url = data.get('response_url',
                                             f"{platform_url}/requests/{request_id}")
-                    used_model   = model_name
+                    used_model    = model_name
+                    used_model_id = m['id']
                     break
 
                 if request_id:
@@ -301,8 +304,9 @@ def run():
             return
 
         db_set_batch_video_ready(batch_id, video_url)
-        video_model = (batch.get('data') or {}).get('model_name') or used_model or ''
-        msg = f'Видео сгенерировано ({video_model})' if video_model else 'Видео сгенерировано'
+        if used_model_id:
+            db_set_batch_video_model(batch_id, used_model_id)
+        msg = f'Видео сгенерировано ({used_model})' if used_model else 'Видео сгенерировано'
         db_log_update(log_id, msg, 'ok')
         if log_id:
             db_log_entry(log_id, f"URL: {video_url[:80]}…")

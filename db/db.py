@@ -339,6 +339,38 @@ def db_set_batch_story(batch_id, story_id):
         return False
 
 
+def db_set_batch_text_model(batch_id, model_id):
+    """Сохраняет id текстовой модели, сгенерировавшей сюжет."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE batches SET text_model_id = %s WHERE id = %s",
+                    (model_id, batch_id),
+                )
+            conn.commit()
+        return True
+    except Exception as e:
+        print(f"[DB] Ошибка db_set_batch_text_model: {e}")
+        return False
+
+
+def db_set_batch_video_model(batch_id, model_id):
+    """Сохраняет id видео-модели, сгенерировавшей видео."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE batches SET video_model_id = %s WHERE id = %s",
+                    (model_id, batch_id),
+                )
+            conn.commit()
+        return True
+    except Exception as e:
+        print(f"[DB] Ошибка db_set_batch_video_model: {e}")
+        return False
+
+
 # ---------------------------------------------------------------------------
 # Истории (stories)
 # ---------------------------------------------------------------------------
