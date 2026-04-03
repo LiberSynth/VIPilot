@@ -702,13 +702,17 @@
   /* Probe button */
   .model-probe-btn {
     margin-left: auto; margin-right: 4px;
-    background: none; border: none; cursor: pointer;
-    color: #555; padding: 2px 5px; border-radius: 4px;
-    font-size: 14px; line-height: 1; transition: color .15s;
-    flex-shrink: 0;
+    background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.1);
+    cursor: pointer; color: #8888b0; padding: 3px; border-radius: 5px;
+    width: 22px; height: 22px; display: flex; align-items: center; justify-content: center;
+    transition: background .15s, border-color .15s; flex-shrink: 0;
   }
-  .model-probe-btn:hover { color: #7a88f0; }
-  .model-probe-btn.probing { color: #f0c040; animation: probe-spin .8s linear infinite; }
+  .model-probe-btn svg { width: 12px; height: 12px; }
+  .model-probe-btn svg * { stroke: #8888b0; transition: stroke .15s; }
+  .model-probe-btn:hover { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.2); }
+  .model-probe-btn:hover svg * { stroke: #c8c8e8; }
+  .model-probe-btn.probing svg { animation: probe-spin .8s linear infinite; }
+  .model-probe-btn.probing svg * { stroke: #f0c040; }
   @keyframes probe-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
   /* Probe modal */
@@ -1638,7 +1642,7 @@ function validateLifetimes() {
           '<div class="model-radio-dot"></div>' +
         '</div>' +
         '<div class="model-name">' + caption + '</div>' +
-        '<button class="model-probe-btn" title="Пробный запрос" onclick="event.stopPropagation();probeTextModel(\'' + m.id + '\',\'' + escHtml(m.name) + '\',this)">⟳</button>' +
+        '<button class="model-probe-btn" title="Пробный запрос" onclick="event.stopPropagation();probeTextModel(\'' + m.id + '\',\'' + escHtml(m.name) + '\',this)"><svg viewBox="0 0 16 16" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 8A5.5 5.5 0 1 1 10 3.07"/><polyline points="10,1 10,4 13,4"/></svg></button>' +
         '<div class="model-drag-handle" title="Перетащить">⠿</div>';
 
       item.addEventListener('dragstart', function(e) {
