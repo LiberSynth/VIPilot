@@ -28,6 +28,7 @@ def run_upgrades():
     _add_schedule_created_at()
     _drop_video_urls()
     _rename_time_point_to_created_at()
+    _add_batch_model_columns()
 
 
 def _add_emulation_mode():
@@ -458,3 +459,34 @@ def _scheduled_at_nullable():
             conn.commit()
     except Exception as e:
         print(f"[DB] Ошибка миграции _scheduled_at_nullable: {e}")
+
+
+def _add_batch_model_columns():
+    """Добавляет text_model_id и video_model_id в таблицу batches (FK → ai_models)."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT column_name FROM information_schema.columns
+                    WHERE table_name = 'batches' AND column_name = 'text_model_id'
+                """)
+                if not cur.fetchone():
+                    cur.execute("""
+                        ALTER TABLE batches
+                        ADD COLUMN text_model_id UUID REFERENCES ai_models(id) ON DELETE SET NULL
+                    """)
+                    print("[DB] batches.text_model_id добавлен")
+
+                cur.execute("""
+                    SELECT column_name FROM information_schema.columns
+                    WHERE table_name = 'batches' AND column_name = 'video_model_id'
+                """)
+                if not cur.fetchone():
+                    cur.execute("""
+                        ALTER TABLE batches
+                        ADD COLUMN video_model_id UUID REFERENCES ai_models(id) ON DELETE SET NULL
+                    """)
+                    print("[DB] batches.video_model_id добавлен")
+            conn.commit()
+    except Exception as e:
+        print(f"[DB] Ошибка миграции _add_batch_model_columns: {e}")
