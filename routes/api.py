@@ -19,6 +19,7 @@ from db import (
     env_set,
     db_create_adhoc_batch,
     db_get_active_targets,
+    db_reset_batch_pipeline,
 )
 from log import db_get_log, db_get_monitor, db_log_pipeline, db_log_entry
 from utils.auth import is_authenticated
@@ -224,6 +225,16 @@ def api_workflow_emulation():
     label = "включена" if val == "1" else "выключена"
     db_log_root(f"Эмуляция {label}", status='info')
     return jsonify({"ok": True, "emulation_mode": val})
+
+
+@bp.route("/batch/<batch_id>/reset/<pipeline>", methods=["POST"])
+def api_reset_batch_pipeline(batch_id, pipeline):
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    ok = db_reset_batch_pipeline(batch_id, pipeline)
+    if not ok:
+        return jsonify({"error": "Неизвестный пайплайн или батч не найден"}), 400
+    return jsonify({"ok": True})
 
 
 @bp.route("/workflow/restart", methods=["POST"])

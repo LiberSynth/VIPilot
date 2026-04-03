@@ -521,7 +521,7 @@
   }
   .monitor-log-header:hover { background: rgba(255,255,255,.02); }
   .monitor-log-header-top { display: flex; align-items: center; gap: 8px; }
-  .monitor-log-header-top .monitor-log-chevron { margin-left: auto; }
+  .monitor-pip-actions { display: flex; align-items: center; gap: 1px; margin-left: auto; }
 
   .monitor-log-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; align-self: center; background: #444; position: relative; }
   .monitor-log-dot.ls-ok,
@@ -1717,18 +1717,30 @@ function validateLifetimes() {
     '</div>';
   }
 
-  function renderLogItem(log) {
+  const PIPELINE_RESTARTABLE = ['story', 'video', 'transcode', 'publish'];
+
+  function renderLogItem(log, batchId) {
     const st  = log.status || 'info';
     const pip = PIPELINE_LABELS[log.pipeline] || log.pipeline;
     const hasEntries = log.entries && log.entries.length > 0;
     const chevron = hasEntries ? '<span class="monitor-log-chevron">▼</span>' : '';
     const comment = log.message ? '<div class="monitor-log-comment">' + esc(log.message) + '</div>' : '';
+
+    const restartBtn = (batchId && PIPELINE_RESTARTABLE.indexOf(log.pipeline) >= 0)
+      ? '<button class="cycle-float-btn" title="Перезапустить" data-bid="' + esc(batchId) + '" data-pip="' + esc(log.pipeline) + '" onclick="monitorPipelineRestart(this)">' + MON_SVG_RESTART + '</button>'
+      : '';
+    const pipActions = '<div class="monitor-pip-actions" onclick="event.stopPropagation()">' +
+      restartBtn +
+      '<button class="cycle-float-btn" title="Скопировать" onclick="monitorPipelineCopy(this)">' + MON_SVG_COPY + '</button>' +
+    '</div>';
+
     return '<div class="monitor-log-item" data-lid="' + esc(log.id) + '" data-status="' + esc(st) + '" onclick="monitorToggleLog(event,this)">' +
       '<div class="monitor-log-header">' +
         '<div class="monitor-log-header-top">' +
           '<span class="monitor-log-dot ls-' + esc(st) + '"></span>' +
           '<span class="monitor-log-ts">'       + fmtMsk(log.created_at) + '</span>' +
           '<span class="monitor-log-pipeline">' + esc(pip)               + '</span>' +
+          pipActions +
           chevron +
         '</div>' +
         comment +
@@ -1740,6 +1752,7 @@ function validateLifetimes() {
   const MON_SVG_EXPAND   = `<svg viewBox="0 0 16 16"><polyline points="2,6 2,2 6,2"/><polyline points="10,2 14,2 14,6"/><polyline points="14,10 14,14 10,14"/><polyline points="6,14 2,14 2,10"/></svg>`;
   const MON_SVG_COLLAPSE = `<svg viewBox="0 0 16 16"><polyline points="6,2 6,6 2,6"/><polyline points="10,2 10,6 14,6"/><polyline points="14,10 10,10 10,14"/><polyline points="2,10 6,10 6,14"/></svg>`;
   const MON_SVG_COPY     = `<svg viewBox="0 0 16 16"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11V3a1 1 0 0 1 1-1h8"/></svg>`;
+  const MON_SVG_RESTART  = `<svg viewBox="0 0 16 16"><path d="M2.5 8a5.5 5.5 0 1 0 1.27-3.5"/><polyline points="4,1 4,4.5 0.5,4.5"/></svg>`;
 
   function groupLogsByPipeline(logs) {
     const order = [];
@@ -1801,7 +1814,7 @@ function validateLifetimes() {
              : waitStatuses.indexOf(bs) >= 0      ? 'md-wait'
              : 'md-warn';
 
-    const logHtml = '<div class="monitor-log-list">' + logs.map(renderLogItem).join('') + '</div>';
+    const logHtml = '<div class="monitor-log-list">' + logs.map(function(log) { return renderLogItem(log, batch.batch_id); }).join('') + '</div>';
 
     const hdrActions =
       '<div class="monitor-hdr-actions" onclick="event.stopPropagation()">' +
@@ -2016,6 +2029,52 @@ function validateLifetimes() {
       document.execCommand('copy'); document.body.removeChild(ta);
       doFlash();
     });
+  };
+
+  window.monitorPipelineCopy = function(btn) {
+    const item = btn.closest('.monitor-log-item');
+    if (!item) return;
+    var lines = [];
+    const ts  = item.querySelector('.monitor-log-ts')       ? item.querySelector('.monitor-log-ts').textContent.trim()       : '';
+    const pip = item.querySelector('.monitor-log-pipeline') ? item.querySelector('.monitor-log-pipeline').textContent.trim() : '';
+    const msg = item.querySelector('.monitor-log-comment')  ? item.querySelector('.monitor-log-comment').textContent.trim()  : '';
+    lines.push('[' + ts + '] ' + pip + (msg ? ' — ' + msg : ''));
+    item.querySelectorAll('.monitor-entry-row').forEach(function(row) {
+      const ets  = row.querySelector('.monitor-entry-ts')  ? row.querySelector('.monitor-entry-ts').textContent.trim()  : '';
+      const emsg = row.querySelector('.monitor-entry-msg') ? row.querySelector('.monitor-entry-msg').textContent.trim() : '';
+      lines.push('  [' + ets + '] ' + emsg);
+    });
+    const text = lines.join('\n');
+    const doFlash = function() {
+      btn.classList.add('copied');
+      setTimeout(function() { btn.classList.remove('copied'); }, 2000);
+    };
+    navigator.clipboard.writeText(text).then(doFlash).catch(function() {
+      var ta = document.createElement('textarea');
+      ta.value = text; ta.style.cssText = 'position:fixed;opacity:0';
+      document.body.appendChild(ta); ta.select();
+      document.execCommand('copy'); document.body.removeChild(ta);
+      doFlash();
+    });
+  };
+
+  window.monitorPipelineRestart = function(btn) {
+    const batchId  = btn.dataset.bid;
+    const pipeline = btn.dataset.pip;
+    if (!batchId || !pipeline) return;
+    btn.disabled = true;
+    fetch('/api/batch/' + encodeURIComponent(batchId) + '/reset/' + encodeURIComponent(pipeline), { method: 'POST' })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.ok) {
+          btn.classList.add('copied');
+          setTimeout(function() { btn.classList.remove('copied'); btn.disabled = false; }, 2000);
+        } else {
+          btn.disabled = false;
+          alert(data.error || 'Ошибка');
+        }
+      })
+      .catch(function() { btn.disabled = false; });
   };
 
   window.monitorToggleLog = function(e, el) {

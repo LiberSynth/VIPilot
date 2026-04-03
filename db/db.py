@@ -837,6 +837,39 @@ def db_set_batch_pending(batch_id):
 
 
 # ---------------------------------------------------------------------------
+# Ручной сброс батча по пайплайну (для кнопки "Перезапустить" в мониторе)
+# ---------------------------------------------------------------------------
+
+PIPELINE_RESET_STATUS = {
+    'story':     'pending',
+    'video':     'story_ready',
+    'transcode': 'video_ready',
+    'publish':   'transcode_ready',
+}
+
+
+def db_reset_batch_pipeline(batch_id: str, pipeline: str) -> bool:
+    """Сбрасывает статус батча до входного статуса для указанного пайплайна.
+    Возвращает True если батч обновлён, False если pipeline неизвестен или ошибка."""
+    target_status = PIPELINE_RESET_STATUS.get(pipeline)
+    if not target_status:
+        return False
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE batches SET status = %s WHERE id = %s",
+                    (target_status, batch_id),
+                )
+                updated = cur.rowcount
+            conn.commit()
+        return updated > 0
+    except Exception as e:
+        print(f"[DB] Ошибка db_reset_batch_pipeline: {e}")
+        return False
+
+
+# ---------------------------------------------------------------------------
 # AI-модели — управление (используется в routes/api.py)
 # ---------------------------------------------------------------------------
 
