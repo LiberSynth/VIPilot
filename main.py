@@ -2,6 +2,7 @@ import os
 import time
 import atexit
 import threading
+from datetime import timedelta
 from flask import Flask, request
 
 from db import init_db, run_upgrades, db_get, db_recover_video_generating, env_get, env_set
@@ -15,6 +16,7 @@ import utils.workflow_state as wf_state
 
 flask_app = Flask(__name__, static_folder=".")
 flask_app.secret_key = FLASK_SECRET
+flask_app.permanent_session_lifetime = timedelta(days=7)
 limiter.init_app(flask_app)
 
 flask_app.register_blueprint(admin_bp)

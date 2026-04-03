@@ -59,7 +59,7 @@ def login():
             session["auth"] = True
             session["pw_fp"] = password_fingerprint()
             session["auth_ts"] = time.time()
-            session.permanent = False
+            session.permanent = True
             return redirect(url_for("admin.admin_page"))
         error = True
     return render_template("login.html", error=error)

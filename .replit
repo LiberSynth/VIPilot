@@ -55,6 +55,7 @@ externalPort = 80
 SMTP_HOST = "smtp.mail.ru"
 SMTP_PORT = "587"
 SMTP_FROM = "red-brick@internet.ru"
+FLASK_SECRET = "aede62bdddb1832e7d0c43dcd04edcdb34b8a29f348c066bae75224a4dd9b0e8"
 
 [postMerge]
 path = "scripts/post-merge.sh"
