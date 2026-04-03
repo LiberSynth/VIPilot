@@ -1616,8 +1616,8 @@ function validateLifetimes() {
 })();
 
 // ── Grade cycle ──
-var _gradeSequence = ['good', 'limited', 'poor', 'rejected'];
-var _gradeColors   = { good: '#4a8', limited: '#a84', poor: '#a55', rejected: '#666' };
+var _gradeSequence = ['good', 'limited', 'poor', 'fallback', 'rejected'];
+var _gradeColors   = { good: '#4a8', limited: '#a84', poor: '#b60', fallback: '#a33', rejected: '#666' };
 window.cycleGrade = function(el) {
   var id    = el.getAttribute('data-grade-id');
   var cur   = el.getAttribute('data-grade') || 'good';
@@ -1654,7 +1654,7 @@ window.cycleGrade = function(el) {
       item.dataset.id = m.id;
       item.draggable = true;
       var caption = m.platform_name ? escHtml(m.platform_name) + ': ' + escHtml(m.name) : escHtml(m.name);
-      var gradeColors = { good: '#4a8', limited: '#a84', poor: '#a55', rejected: '#666' };
+      var gradeColors = { good: '#4a8', limited: '#a84', poor: '#b60', fallback: '#a33', rejected: '#666' };
       var grade = m.grade || 'good';
       var gradeHtml = '<span data-grade-id="' + m.id + '" data-grade="' + grade + '" onclick="event.stopPropagation();cycleGrade(this)" title="Нажмите для смены" style="cursor:pointer;font-size:10px;padding:1px 6px;border-radius:3px;background:' + (gradeColors[grade]||'#555') + ';color:#fff;margin-left:6px;opacity:.85">' + grade + '</span>';
       item.innerHTML =

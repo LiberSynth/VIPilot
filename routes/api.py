@@ -181,7 +181,7 @@ def api_text_model_grade(model_id):
         return jsonify({"error": "unauthorized"}), 401
     data = request.get_json(silent=True) or {}
     grade = data.get("grade", "good")
-    if grade not in ("good", "limited", "poor", "rejected"):
+    if grade not in ("good", "limited", "poor", "fallback", "rejected"):
         return jsonify({"error": "invalid grade"}), 400
     from db import db_set_model_grade
     ok = db_set_model_grade(model_id, grade)
