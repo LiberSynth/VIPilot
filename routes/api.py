@@ -1,7 +1,7 @@
 import os
 import threading
 import time
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, Response
 from log import db_log_root
 
 from db import (
@@ -21,6 +21,7 @@ from db import (
     db_get_active_targets,
     db_reset_batch_pipeline,
     db_get_story_text,
+    db_get_batch_video_data,
 )
 from log import db_get_log, db_get_monitor, db_log_pipeline, db_log_entry
 from utils.auth import is_authenticated
@@ -256,6 +257,42 @@ def api_workflow_restart():
         os.execv(_sys.executable, [_sys.executable] + _sys.argv)
     threading.Thread(target=_do_restart, daemon=True).start()
     return jsonify({"ok": True})
+
+
+@bp.route("/batch/<batch_id>/video", methods=["GET"])
+def api_get_batch_video(batch_id):
+    if not is_authenticated():
+        return Response("Unauthorized", status=401)
+    data = db_get_batch_video_data(batch_id)
+    if data is None:
+        return Response("Not found", status=404)
+    data = bytes(data)
+    total = len(data)
+    range_header = request.headers.get("Range")
+    if range_header:
+        try:
+            ranges = range_header.strip().replace("bytes=", "").split("-")
+            start = int(ranges[0])
+            end   = int(ranges[1]) if ranges[1] else total - 1
+        except (IndexError, ValueError):
+            start, end = 0, total - 1
+        end = min(end, total - 1)
+        chunk = data[start:end + 1]
+        resp = Response(
+            chunk,
+            status=206,
+            mimetype="video/mp4",
+            direct_passthrough=True,
+        )
+        resp.headers["Content-Range"]  = f"bytes {start}-{end}/{total}"
+        resp.headers["Accept-Ranges"]  = "bytes"
+        resp.headers["Content-Length"] = str(len(chunk))
+    else:
+        resp = Response(data, status=200, mimetype="video/mp4")
+        resp.headers["Accept-Ranges"]  = "bytes"
+        resp.headers["Content-Length"] = str(total)
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
 
 
 @bp.route("/story/<story_id>", methods=["GET"])

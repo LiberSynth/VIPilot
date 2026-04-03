@@ -168,6 +168,7 @@ def db_get_monitor(batch_limit=50):
                         t.aspect_ratio_y,
                         MAX(l.created_at) AS last_event_at,
                         b.story_id,
+                        (b.video_data IS NOT NULL) AS has_video_data,
                         COALESCE(
                             json_agg(
                                 json_build_object(
@@ -197,7 +198,7 @@ def db_get_monitor(batch_limit=50):
                     LEFT JOIN log l ON l.batch_id = b.id
                     LEFT JOIN targets t ON t.id = b.target_id
                     GROUP BY b.id, b.scheduled_at, b.adhoc, b.status, b.created_at,
-                             t.name, t.aspect_ratio_x, t.aspect_ratio_y, b.story_id
+                             t.name, t.aspect_ratio_x, t.aspect_ratio_y, b.story_id, b.video_data
                     ORDER BY COALESCE(MAX(l.created_at), b.created_at) DESC
                     LIMIT %s
                     """,
@@ -242,7 +243,8 @@ def db_get_monitor(batch_limit=50):
                 "aspect_ratio_y": r[7],
                 "last_event_at":  r[8].isoformat() if r[8] else None,
                 "story_id":       str(r[9]) if r[9] else None,
-                "logs":           r[10],
+                "has_video_data": bool(r[10]),
+                "logs":           r[11],
             }
             for r in batch_rows
         ]

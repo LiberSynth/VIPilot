@@ -723,6 +723,38 @@
     white-space: pre-wrap; word-break: break-word;
   }
   .story-modal-loading { color: #555; font-style: italic; }
+
+  /* Video modal */
+  .video-modal-overlay {
+    display: none; position: fixed; inset: 0; z-index: 1000;
+    background: rgba(0,0,0,.82); backdrop-filter: blur(3px);
+    align-items: center; justify-content: center;
+  }
+  .video-modal-overlay.open { display: flex; }
+  .video-modal {
+    background: #0a0a12; border: 1px solid #252038; border-radius: 10px;
+    width: 720px; max-width: calc(100vw - 32px);
+    display: flex; flex-direction: column; box-shadow: 0 8px 40px rgba(0,0,0,.7);
+  }
+  .video-modal-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 14px 10px; border-bottom: 1px solid #1c1a2e; flex-shrink: 0;
+  }
+  .video-modal-title { font-size: 14px; font-weight: 600; color: #d0d0ec; flex: 1; }
+  .video-modal-close {
+    background: none; border: none; color: #555; font-size: 18px; line-height: 1;
+    cursor: pointer; padding: 2px 4px; border-radius: 4px; transition: color .15s;
+  }
+  .video-modal-close:hover { color: #aaa; }
+  .video-modal-body { padding: 12px; }
+  .video-modal-body video {
+    width: 100%; border-radius: 6px; display: block; background: #000;
+    max-height: 70vh;
+  }
+  .video-modal-loading {
+    color: #555; font-style: italic; font-size: 13px;
+    padding: 24px; text-align: center;
+  }
 </style>
 </head>
 <body>
@@ -1750,7 +1782,7 @@ function validateLifetimes() {
   const PIPELINE_RESTARTABLE = ['story', 'video', 'transcode', 'publish'];
   const PIPELINE_ERROR_STATUSES = ['error', 'video_error', 'transcode_error', 'publish_error'];
 
-  function renderLogItem(log, batchId, storyId) {
+  function renderLogItem(log, batchId, storyId, hasVideoData) {
     const st  = log.status || 'info';
     const pip = PIPELINE_LABELS[log.pipeline] || log.pipeline;
     const hasEntries = log.entries && log.entries.length > 0;
@@ -1766,8 +1798,12 @@ function validateLifetimes() {
     const storyBtn = (log.pipeline === 'story' && st === 'ok' && storyId)
       ? '<button class="cycle-float-btn story-view-btn" title="Посмотреть сюжет" onclick="openStoryModal(\'' + esc(storyId) + '\')">' + MON_SVG_EYE + '</button>'
       : '';
+    const videoBtn = (log.pipeline === 'transcode' && st === 'ok' && hasVideoData)
+      ? '<button class="cycle-float-btn" title="Просмотр видео" onclick="openVideoModal(\'' + esc(batchId) + '\')">' + MON_SVG_PLAY + '</button>'
+      : '';
     const pipActions = '<div class="monitor-pip-actions" onclick="event.stopPropagation()">' +
       storyBtn +
+      videoBtn +
       restartBtn +
       '<button class="cycle-float-btn" title="Скопировать" onclick="monitorPipelineCopy(this)">' + MON_SVG_COPY + '</button>' +
     '</div>';
@@ -1792,6 +1828,7 @@ function validateLifetimes() {
   const MON_SVG_COPY     = `<svg viewBox="0 0 16 16"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11V3a1 1 0 0 1 1-1h8"/></svg>`;
   const MON_SVG_RESTART  = `<svg viewBox="0 0 16 16"><path d="M13 8A5 5 0 1 1 8 3"/><polyline points="6,1.5 8,3 6,4.5"/></svg>`;
   const MON_SVG_EYE      = `<svg viewBox="0 0 16 16"><rect x="3" y="2" width="10" height="12" rx="1.5"/><line x1="5.5" y1="5.5" x2="10.5" y2="5.5"/><line x1="5.5" y1="8" x2="10.5" y2="8"/><line x1="5.5" y1="10.5" x2="8.5" y2="10.5"/></svg>`;
+  const MON_SVG_PLAY     = `<svg viewBox="0 0 16 16"><polygon points="4,2 13,8 4,14"/></svg>`;
 
   function groupLogsByPipeline(logs) {
     const order = [];
@@ -1853,7 +1890,7 @@ function validateLifetimes() {
              : waitStatuses.indexOf(bs) >= 0      ? 'md-wait'
              : 'md-warn';
 
-    const logHtml = '<div class="monitor-log-list">' + logs.map(function(log) { return renderLogItem(log, batch.batch_id, batch.story_id); }).join('') + '</div>';
+    const logHtml = '<div class="monitor-log-list">' + logs.map(function(log) { return renderLogItem(log, batch.batch_id, batch.story_id, batch.has_video_data); }).join('') + '</div>';
 
     const hdrActions =
       '<div class="monitor-hdr-actions" onclick="event.stopPropagation()">' +
@@ -2412,6 +2449,53 @@ function confirmRestart() {
     </div>
   </div>
 </div>
+
+<!-- Video modal -->
+<div id="video-modal-overlay" class="video-modal-overlay" onclick="closeVideoModal(event)">
+  <div class="video-modal" onclick="event.stopPropagation()">
+    <div class="video-modal-head">
+      <span class="video-modal-title">Видео</span>
+      <button class="story-modal-close" onclick="closeVideoModal()">&times;</button>
+    </div>
+    <div class="video-modal-body" id="video-modal-body"></div>
+  </div>
+</div>
+
+<script>
+(function() {
+  window.openVideoModal = function(batchId) {
+    var overlay = document.getElementById('video-modal-overlay');
+    var body    = document.getElementById('video-modal-body');
+    if (!overlay || !body) return;
+    body.innerHTML = '<div class="video-modal-loading">Загрузка…</div>';
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
+    var src = '/api/batch/' + encodeURIComponent(batchId) + '/video';
+    body.innerHTML = '<video controls autoplay src="' + src + '"></video>';
+  };
+
+  window.closeVideoModal = function(e) {
+    if (e && e.target !== document.getElementById('video-modal-overlay')) return;
+    var overlay = document.getElementById('video-modal-overlay');
+    var body    = document.getElementById('video-modal-body');
+    if (overlay) overlay.classList.remove('open');
+    if (body) body.innerHTML = '';
+    document.body.style.overflow = '';
+  };
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      var overlay = document.getElementById('video-modal-overlay');
+      if (overlay && overlay.classList.contains('open')) {
+        var body = document.getElementById('video-modal-body');
+        overlay.classList.remove('open');
+        if (body) body.innerHTML = '';
+        document.body.style.overflow = '';
+      }
+    }
+  });
+})();
+</script>
 
 <!-- Story modal -->
 <div id="story-modal-overlay" class="story-modal-overlay" onclick="closeStoryModal(event)">
