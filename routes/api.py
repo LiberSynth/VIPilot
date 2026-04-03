@@ -24,6 +24,7 @@ from db import (
     db_get_story_text,
     db_get_batch_video_data,
     db_get_text_model_by_id,
+    db_get,
 )
 from log import db_get_log, db_get_monitor, db_log_pipeline, db_log_entry
 from utils.auth import is_authenticated
@@ -182,12 +183,12 @@ def api_text_model_probe(model_id):
         return jsonify({"ok": False, "error": "OPENROUTER_API_KEY не задан"}), 400
 
     try:
-        fails_to_next = max(1, int(env_get("story_fails_to_next", "3")))
+        fails_to_next = max(1, int(db_get("story_fails_to_next", "3")))
     except (ValueError, TypeError):
         fails_to_next = 3
 
-    system_prompt = env_get("system_prompt", "")
-    user_prompt   = env_get("metaprompt", "")
+    system_prompt = db_get("system_prompt", "")
+    user_prompt   = db_get("metaprompt", "")
 
     body_tpl = m["body_tpl"]
     body = dict(body_tpl)
