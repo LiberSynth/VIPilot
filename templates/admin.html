@@ -2583,54 +2583,35 @@ function confirmRestart() {
 
     if (title) title.textContent = 'Пробный запрос · ' + modelName;
     body.className = 'probe-modal-body';
-    body.innerHTML = '<span style="color:#888">Отправляю запрос…</span>';
+    body.innerHTML = '<span style="color:#888">Выполняю запрос…</span>';
     if (info) info.textContent = '';
     overlay.classList.add('open');
     document.body.style.overflow = 'hidden';
 
     fetch('/api/text-models/' + encodeURIComponent(modelId) + '/probe', { method: 'POST' })
-      .then(function(r) {
-        var reader = r.body.getReader();
-        var decoder = new TextDecoder();
-        var buf = '';
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        btn.classList.remove('probing');
+        body.innerHTML = '';
 
-        function appendLine(html) {
-          var cur = body.innerHTML;
-          if (cur === '<span style="color:#888">Отправляю запрос…</span>') cur = '';
-          body.innerHTML = cur + html;
+        var levelColor = { info: '#888', warn: '#c09050', ok: '#6a6', error: '#c05050' };
+        (data.lines || []).forEach(function(line) {
+          var color = levelColor[line.level] || '#888';
+          var div = document.createElement('div');
+          div.style.cssText = 'color:' + color + ';margin-bottom:3px;font-size:12px;line-height:1.4';
+          div.textContent = line.text;
+          body.appendChild(div);
+        });
+
+        if (data.result) {
+          var sep = document.createElement('div');
+          sep.style.cssText = 'border-top:1px solid rgba(255,255,255,.1);margin:10px 0 8px';
+          body.appendChild(sep);
+          var pre = document.createElement('div');
+          pre.style.cssText = 'white-space:pre-wrap;line-height:1.55;font-size:13px';
+          pre.textContent = data.result;
+          body.appendChild(pre);
         }
-
-        function pump() {
-          return reader.read().then(function(chunk) {
-            if (chunk.done) {
-              btn.classList.remove('probing');
-              return;
-            }
-            buf += decoder.decode(chunk.value, { stream: true });
-            var lines = buf.split('\n');
-            buf = lines.pop();
-            lines.forEach(function(line) {
-              if (!line.startsWith('data: ')) return;
-              var ev;
-              try { ev = JSON.parse(line.slice(6)); } catch(e) { return; }
-
-              if (ev.type === 'attempt') {
-                appendLine('<div style="color:#888;margin-bottom:4px">⏳ Попытка ' + ev.attempt + '/' + ev.total + '…</div>');
-              } else if (ev.type === 'error') {
-                appendLine('<div style="color:#c05050;margin-bottom:4px">✗ Попытка ' + ev.attempt + '/' + ev.total + ': ' + escHtml(ev.msg) + '</div>');
-              } else if (ev.type === 'success') {
-                appendLine('<div style="color:#6a6;font-size:11px;margin-bottom:6px">✓ Успех с попытки ' + ev.attempt + '/' + ev.total + '</div>'
-                  + '<div style="white-space:pre-wrap;line-height:1.55;border-top:1px solid rgba(255,255,255,.07);padding-top:8px">' + escHtml(ev.result) + '</div>');
-                btn.classList.remove('probing');
-              } else if (ev.type === 'fail') {
-                appendLine('<div style="color:#c05050;margin-top:6px;font-weight:600">Все попытки исчерпаны. Последняя ошибка:<br>' + escHtml(ev.msg) + '</div>');
-                btn.classList.remove('probing');
-              }
-            });
-            return pump();
-          });
-        }
-        return pump();
       })
       .catch(function(e) {
         btn.classList.remove('probing');

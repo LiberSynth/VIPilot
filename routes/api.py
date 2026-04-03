@@ -171,25 +171,16 @@ def api_text_models_reorder():
 
 @bp.route("/text-models/<model_id>/probe", methods=["POST"])
 def api_text_model_probe(model_id):
-    import json as _json
-    from flask import Response as _Response
-
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
 
     m = db_get_text_model_by_id(model_id)
     if not m:
-        def _err():
-            yield "data: " + _json.dumps({"type": "fail", "msg": "Модель не найдена"}) + "\n\n"
-        return _Response(_err(), mimetype="text/event-stream",
-                         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+        return jsonify({"ok": False, "lines": [{"text": "Модель не найдена", "level": "error"}], "result": None})
 
     api_key = os.environ.get("OPENROUTER_API_KEY", "")
     if not api_key:
-        def _err():
-            yield "data: " + _json.dumps({"type": "fail", "msg": "OPENROUTER_API_KEY не задан"}) + "\n\n"
-        return _Response(_err(), mimetype="text/event-stream",
-                         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+        return jsonify({"ok": False, "lines": [{"text": "OPENROUTER_API_KEY не задан", "level": "error"}], "result": None})
 
     try:
         fails_to_next = max(1, int(db_get("story_fails_to_next", "3")))
@@ -198,6 +189,7 @@ def api_text_model_probe(model_id):
 
     system_prompt = db_get("system_prompt", "")
     user_prompt   = db_get("metaprompt", "")
+    model_name    = m["name"]
 
     body_tpl = m["body_tpl"]
     body = dict(body_tpl)
@@ -219,82 +211,55 @@ def api_text_model_probe(model_id):
     }
     platform_url = m["platform_url"]
 
-    def _generate():
-        yield ": padding " + " " * 2048 + "\n\n"
-        last_error = "Неизвестная ошибка"
-        for attempt in range(fails_to_next):
-            yield "data: " + _json.dumps({
-                "type": "attempt",
-                "attempt": attempt + 1,
-                "total": fails_to_next
-            }) + "\n\n"
+    lines = []
+    lines.append({"text": f"Промпт: {user_prompt[:120]}{'…' if len(user_prompt) > 120 else ''}", "level": "info"})
+    lines.append({"text": f"Попыток: {fails_to_next}", "level": "info"})
 
-            try:
-                resp = _requests.post(platform_url, headers=req_headers, json=body, timeout=60)
-            except _requests.exceptions.Timeout:
-                last_error = "Таймаут 60с"
-                yield "data: " + _json.dumps({
-                    "type": "error", "attempt": attempt + 1, "total": fails_to_next,
-                    "msg": last_error
-                }) + "\n\n"
-                continue
-            except _requests.exceptions.RequestException as e:
-                last_error = f"Ошибка соединения: {e}"
-                yield "data: " + _json.dumps({
-                    "type": "error", "attempt": attempt + 1, "total": fails_to_next,
-                    "msg": last_error
-                }) + "\n\n"
-                continue
+    result = None
+    for attempt in range(fails_to_next):
+        lines.append({"text": f"[{model_name}] попытка {attempt + 1}/{fails_to_next}…", "level": "info"})
+        try:
+            resp = _requests.post(platform_url, headers=req_headers, json=body, timeout=60)
+        except _requests.exceptions.Timeout:
+            lines.append({"text": f"[{model_name}] таймаут (60 с)", "level": "warn"})
+            continue
+        except _requests.exceptions.RequestException as e:
+            lines.append({"text": f"[{model_name}] ошибка соединения: {e}", "level": "warn"})
+            continue
 
-            try:
-                data = resp.json()
-            except ValueError:
-                last_error = f"Не-JSON ответ (HTTP {resp.status_code})"
-                yield "data: " + _json.dumps({
-                    "type": "error", "attempt": attempt + 1, "total": fails_to_next,
-                    "msg": last_error
-                }) + "\n\n"
-                continue
+        try:
+            data = resp.json()
+        except ValueError:
+            preview = " ".join(resp.text.split())[:200]
+            lines.append({"text": f"[{model_name}] не-JSON (HTTP {resp.status_code}): {preview}", "level": "warn"})
+            continue
 
-            if resp.status_code >= 400:
-                err = data.get("error", {})
-                if isinstance(err, dict):
-                    err = err.get("message", str(data))
-                last_error = f"HTTP {resp.status_code}: {err}"
-                yield "data: " + _json.dumps({
-                    "type": "error", "attempt": attempt + 1, "total": fails_to_next,
-                    "msg": last_error
-                }) + "\n\n"
-                continue
+        if resp.status_code >= 400:
+            err = data.get("error", {})
+            if isinstance(err, dict):
+                err = err.get("message", str(data))
+            lines.append({"text": f"[{model_name}] HTTP {resp.status_code}: {err}", "level": "warn"})
+            continue
 
-            choices = data.get("choices")
-            if not choices:
-                last_error = "Нет поля choices в ответе"
-                yield "data: " + _json.dumps({
-                    "type": "error", "attempt": attempt + 1, "total": fails_to_next,
-                    "msg": last_error
-                }) + "\n\n"
-                continue
+        choices = data.get("choices")
+        if not choices:
+            lines.append({"text": f"[{model_name}] нет поля choices в ответе", "level": "warn"})
+            continue
 
-            result = ((choices[0].get("message") or {}).get("content") or "").strip()
-            if not result:
-                last_error = "Пустой текст в ответе"
-                yield "data: " + _json.dumps({
-                    "type": "error", "attempt": attempt + 1, "total": fails_to_next,
-                    "msg": last_error
-                }) + "\n\n"
-                continue
+        text = ((choices[0].get("message") or {}).get("content") or "").strip()
+        if not text:
+            lines.append({"text": f"[{model_name}] пустой текст", "level": "warn"})
+            continue
 
-            yield "data: " + _json.dumps({
-                "type": "success", "attempt": attempt + 1, "total": fails_to_next,
-                "result": result
-            }) + "\n\n"
-            return
+        result = text
+        preview = text[:200] + ("…" if len(text) > 200 else "")
+        lines.append({"text": f"[{model_name}] успех — сюжет: {preview}", "level": "ok"})
+        break
 
-        yield "data: " + _json.dumps({"type": "fail", "msg": last_error}) + "\n\n"
+    if result is None:
+        lines.append({"text": f"[{model_name}] все попытки исчерпаны", "level": "error"})
 
-    return _Response(_generate(), mimetype="text/event-stream",
-                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+    return jsonify({"ok": result is not None, "lines": lines, "result": result})
 
 
 @bp.route("/reseed", methods=["POST"])
@@ -436,14 +401,3 @@ def api_get_story(story_id):
     return jsonify({"text": text})
 
 
-@bp.route("/sse-test")
-def api_sse_test():
-    import json as _j
-    def _gen():
-        yield ": padding " + " " * 2048 + "\n\n"
-        for i in range(1, 4):
-            yield "data: " + _j.dumps({"n": i, "t": time.time()}) + "\n\n"
-            time.sleep(1)
-        yield "data: " + _j.dumps({"n": "done"}) + "\n\n"
-    return Response(_gen(), mimetype="text/event-stream",
-                    headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
