@@ -20,6 +20,7 @@ from db import (
     db_create_adhoc_batch,
     db_get_active_targets,
     db_reset_batch_pipeline,
+    db_get_story_text,
 )
 from log import db_get_log, db_get_monitor, db_log_pipeline, db_log_entry
 from utils.auth import is_authenticated
@@ -255,3 +256,13 @@ def api_workflow_restart():
         os.execv(_sys.executable, [_sys.executable] + _sys.argv)
     threading.Thread(target=_do_restart, daemon=True).start()
     return jsonify({"ok": True})
+
+
+@bp.route("/story/<story_id>", methods=["GET"])
+def api_get_story(story_id):
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    text = db_get_story_text(story_id)
+    if text is None:
+        return jsonify({"error": "not found"}), 404
+    return jsonify({"text": text})

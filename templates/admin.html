@@ -694,6 +694,48 @@
   }
   .pt-btn-add:active { background: rgba(74,124,247,.3); }
   .pt-btn-add:disabled { opacity: .4; cursor: default; }
+
+  /* Story modal */
+  .story-modal-overlay {
+    display: none; position: fixed; inset: 0; z-index: 1000;
+    background: rgba(0,0,0,.72); backdrop-filter: blur(3px);
+    align-items: center; justify-content: center;
+  }
+  .story-modal-overlay.open { display: flex; }
+  .story-modal {
+    background: #0e0e18; border: 1px solid #252038; border-radius: 10px;
+    width: 640px; max-width: calc(100vw - 32px); max-height: 80vh;
+    display: flex; flex-direction: column; box-shadow: 0 8px 40px rgba(0,0,0,.6);
+  }
+  .story-modal-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px 16px 12px; border-bottom: 1px solid #1c1a2e; flex-shrink: 0;
+  }
+  .story-modal-title { font-size: 14px; font-weight: 600; color: #d0d0ec; flex: 1; }
+  .story-modal-copy {
+    background: none; border: 1px solid rgba(255,255,255,.1); border-radius: 5px;
+    color: #9090b8; font-size: 12px; padding: 4px 10px; cursor: pointer;
+    transition: background .15s, color .15s;
+  }
+  .story-modal-copy:hover { background: rgba(255,255,255,.06); color: #d0d0ec; }
+  .story-modal-copy.copied { border-color: rgba(62,207,142,.5); color: #3ecf8e; }
+  .story-modal-close {
+    background: none; border: none; color: #555; font-size: 18px; line-height: 1;
+    cursor: pointer; padding: 2px 4px; border-radius: 4px; transition: color .15s;
+  }
+  .story-modal-close:hover { color: #aaa; }
+  .story-modal-body {
+    overflow-y: auto; padding: 16px; flex: 1;
+    font-size: 13px; color: #c8c8e4; line-height: 1.65;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .story-modal-loading { color: #555; font-style: italic; }
+  .story-view-btn {
+    background: none; border: none; color: #6a5fb8; font-size: 11px;
+    cursor: pointer; padding: 0 4px; line-height: 1; text-decoration: underline;
+    text-underline-offset: 2px; flex-shrink: 0;
+  }
+  .story-view-btn:hover { color: #9b8fdc; }
 </style>
 </head>
 <body>
@@ -1721,7 +1763,7 @@ function validateLifetimes() {
   const PIPELINE_RESTARTABLE = ['story', 'video', 'transcode', 'publish'];
   const PIPELINE_ERROR_STATUSES = ['error', 'video_error', 'transcode_error', 'publish_error'];
 
-  function renderLogItem(log, batchId) {
+  function renderLogItem(log, batchId, storyId) {
     const st  = log.status || 'info';
     const pip = PIPELINE_LABELS[log.pipeline] || log.pipeline;
     const hasEntries = log.entries && log.entries.length > 0;
@@ -1734,7 +1776,11 @@ function validateLifetimes() {
     const restartBtn = canRestart
       ? '<button class="cycle-float-btn" title="Перезапустить" data-bid="' + esc(batchId) + '" data-pip="' + esc(log.pipeline) + '" onclick="monitorPipelineRestart(this)">' + MON_SVG_RESTART + '</button>'
       : '';
+    const storyBtn = (log.pipeline === 'story' && st === 'ok' && storyId)
+      ? '<button class="story-view-btn" onclick="openStoryModal(\'' + esc(storyId) + '\')">Посмотреть</button>'
+      : '';
     const pipActions = '<div class="monitor-pip-actions" onclick="event.stopPropagation()">' +
+      storyBtn +
       restartBtn +
       '<button class="cycle-float-btn" title="Скопировать" onclick="monitorPipelineCopy(this)">' + MON_SVG_COPY + '</button>' +
     '</div>';
@@ -1819,7 +1865,7 @@ function validateLifetimes() {
              : waitStatuses.indexOf(bs) >= 0      ? 'md-wait'
              : 'md-warn';
 
-    const logHtml = '<div class="monitor-log-list">' + logs.map(function(log) { return renderLogItem(log, batch.batch_id); }).join('') + '</div>';
+    const logHtml = '<div class="monitor-log-list">' + logs.map(function(log) { return renderLogItem(log, batch.batch_id, batch.story_id); }).join('') + '</div>';
 
     const hdrActions =
       '<div class="monitor-hdr-actions" onclick="event.stopPropagation()">' +
@@ -2378,5 +2424,77 @@ function confirmRestart() {
     </div>
   </div>
 </div>
+
+<!-- Story modal -->
+<div id="story-modal-overlay" class="story-modal-overlay" onclick="closeStoryModal(event)">
+  <div class="story-modal" onclick="event.stopPropagation()">
+    <div class="story-modal-head">
+      <span class="story-modal-title">Сюжет</span>
+      <button class="story-modal-copy" id="story-modal-copy-btn" onclick="copyStoryText()">Скопировать</button>
+      <button class="story-modal-close" onclick="closeStoryModal()">&times;</button>
+    </div>
+    <div class="story-modal-body" id="story-modal-body"></div>
+  </div>
+</div>
+
+<script>
+(function() {
+  var _storyText = '';
+
+  window.openStoryModal = function(storyId) {
+    var overlay = document.getElementById('story-modal-overlay');
+    var body    = document.getElementById('story-modal-body');
+    var copyBtn = document.getElementById('story-modal-copy-btn');
+    if (!overlay || !body) return;
+    _storyText = '';
+    body.innerHTML = '<span class="story-modal-loading">Загрузка…</span>';
+    copyBtn.textContent = 'Скопировать';
+    copyBtn.classList.remove('copied');
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
+    fetch('/api/story/' + encodeURIComponent(storyId))
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d.text) {
+          _storyText = d.text;
+          body.textContent = d.text;
+        } else {
+          body.innerHTML = '<span class="story-modal-loading">Сюжет не найден</span>';
+        }
+      })
+      .catch(function() {
+        body.innerHTML = '<span class="story-modal-loading">Ошибка загрузки</span>';
+      });
+  };
+
+  window.closeStoryModal = function(e) {
+    if (e && e.target !== document.getElementById('story-modal-overlay')) return;
+    var overlay = document.getElementById('story-modal-overlay');
+    if (overlay) overlay.classList.remove('open');
+    document.body.style.overflow = '';
+  };
+
+  window.copyStoryText = function() {
+    if (!_storyText) return;
+    var btn = document.getElementById('story-modal-copy-btn');
+    navigator.clipboard.writeText(_storyText).then(function() {
+      if (btn) { btn.textContent = 'Скопировано'; btn.classList.add('copied'); }
+      setTimeout(function() {
+        if (btn) { btn.textContent = 'Скопировать'; btn.classList.remove('copied'); }
+      }, 2000);
+    }).catch(function() {});
+  };
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      var overlay = document.getElementById('story-modal-overlay');
+      if (overlay && overlay.classList.contains('open')) {
+        overlay.classList.remove('open');
+        document.body.style.overflow = '';
+      }
+    }
+  });
+})();
+</script>
 </body>
 </html>
