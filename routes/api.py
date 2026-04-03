@@ -1,8 +1,26 @@
 import os
 import threading
 import time
+import uuid
 import requests as _requests
 from flask import Blueprint, jsonify, request, Response
+
+# Хранилище фоновых probe-задач: job_id → {"events": [...], "done": bool, "ts": float}
+_probe_jobs = {}
+_probe_lock = threading.Lock()
+
+def _probe_append(job_id, text, level="info"):
+    with _probe_lock:
+        if job_id in _probe_jobs:
+            _probe_jobs[job_id]["events"].append({"text": text, "level": level})
+
+def _probe_finish(job_id, result=None):
+    with _probe_lock:
+        if job_id in _probe_jobs:
+            _probe_jobs[job_id]["done"] = True
+            _probe_jobs[job_id]["result"] = result
+
+
 from log import db_log_root
 
 from db import (
@@ -176,11 +194,11 @@ def api_text_model_probe(model_id):
 
     m = db_get_text_model_by_id(model_id)
     if not m:
-        return jsonify({"ok": False, "lines": [{"text": "Модель не найдена", "level": "error"}], "result": None})
+        return jsonify({"error": "Модель не найдена"}), 404
 
     api_key = os.environ.get("OPENROUTER_API_KEY", "")
     if not api_key:
-        return jsonify({"ok": False, "lines": [{"text": "OPENROUTER_API_KEY не задан", "level": "error"}], "result": None})
+        return jsonify({"error": "OPENROUTER_API_KEY не задан"}), 500
 
     try:
         fails_to_next = max(1, int(db_get("story_fails_to_next", "3")))
@@ -211,55 +229,71 @@ def api_text_model_probe(model_id):
     }
     platform_url = m["platform_url"]
 
-    lines = []
-    lines.append({"text": f"Промпт: {user_prompt[:120]}{'…' if len(user_prompt) > 120 else ''}", "level": "info"})
-    lines.append({"text": f"Попыток: {fails_to_next}", "level": "info"})
+    job_id = str(uuid.uuid4())
+    with _probe_lock:
+        _probe_jobs[job_id] = {"events": [], "done": False, "result": None, "ts": time.time()}
 
-    result = None
-    for attempt in range(fails_to_next):
-        lines.append({"text": f"[{model_name}] попытка {attempt + 1}/{fails_to_next}…", "level": "info"})
-        try:
-            resp = _requests.post(platform_url, headers=req_headers, json=body, timeout=60)
-        except _requests.exceptions.Timeout:
-            lines.append({"text": f"[{model_name}] таймаут (60 с)", "level": "warn"})
-            continue
-        except _requests.exceptions.RequestException as e:
-            lines.append({"text": f"[{model_name}] ошибка соединения: {e}", "level": "warn"})
-            continue
+    def _run():
+        _probe_append(job_id, f"Промпт: {user_prompt[:120]}{'…' if len(user_prompt) > 120 else ''}", "info")
+        _probe_append(job_id, f"Попыток: {fails_to_next}", "info")
+        result = None
+        for attempt in range(fails_to_next):
+            _probe_append(job_id, f"[{model_name}] попытка {attempt + 1}/{fails_to_next}…", "info")
+            try:
+                resp = _requests.post(platform_url, headers=req_headers, json=body, timeout=60)
+            except _requests.exceptions.Timeout:
+                _probe_append(job_id, f"[{model_name}] таймаут (60 с)", "warn")
+                continue
+            except _requests.exceptions.RequestException as e:
+                _probe_append(job_id, f"[{model_name}] ошибка соединения: {e}", "warn")
+                continue
+            try:
+                data = resp.json()
+            except ValueError:
+                preview = " ".join(resp.text.split())[:200]
+                _probe_append(job_id, f"[{model_name}] не-JSON (HTTP {resp.status_code}): {preview}", "warn")
+                continue
+            if resp.status_code >= 400:
+                err = data.get("error", {})
+                if isinstance(err, dict):
+                    err = err.get("message", str(data))
+                _probe_append(job_id, f"[{model_name}] HTTP {resp.status_code}: {err}", "warn")
+                continue
+            choices = data.get("choices")
+            if not choices:
+                _probe_append(job_id, f"[{model_name}] нет поля choices в ответе", "warn")
+                continue
+            text = ((choices[0].get("message") or {}).get("content") or "").strip()
+            if not text:
+                _probe_append(job_id, f"[{model_name}] пустой текст", "warn")
+                continue
+            result = text
+            preview = text[:200] + ("…" if len(text) > 200 else "")
+            _probe_append(job_id, f"[{model_name}] успех — сюжет: {preview}", "ok")
+            break
+        if result is None:
+            _probe_append(job_id, f"[{model_name}] все попытки исчерпаны", "error")
+        _probe_finish(job_id, result)
 
-        try:
-            data = resp.json()
-        except ValueError:
-            preview = " ".join(resp.text.split())[:200]
-            lines.append({"text": f"[{model_name}] не-JSON (HTTP {resp.status_code}): {preview}", "level": "warn"})
-            continue
+    threading.Thread(target=_run, daemon=True).start()
+    return jsonify({"job_id": job_id})
 
-        if resp.status_code >= 400:
-            err = data.get("error", {})
-            if isinstance(err, dict):
-                err = err.get("message", str(data))
-            lines.append({"text": f"[{model_name}] HTTP {resp.status_code}: {err}", "level": "warn"})
-            continue
 
-        choices = data.get("choices")
-        if not choices:
-            lines.append({"text": f"[{model_name}] нет поля choices в ответе", "level": "warn"})
-            continue
-
-        text = ((choices[0].get("message") or {}).get("content") or "").strip()
-        if not text:
-            lines.append({"text": f"[{model_name}] пустой текст", "level": "warn"})
-            continue
-
-        result = text
-        preview = text[:200] + ("…" if len(text) > 200 else "")
-        lines.append({"text": f"[{model_name}] успех — сюжет: {preview}", "level": "ok"})
-        break
-
-    if result is None:
-        lines.append({"text": f"[{model_name}] все попытки исчерпаны", "level": "error"})
-
-    return jsonify({"ok": result is not None, "lines": lines, "result": result})
+@bp.route("/text-models/probe/<job_id>", methods=["GET"])
+def api_text_model_probe_poll(job_id):
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    with _probe_lock:
+        job = _probe_jobs.get(job_id)
+        if not job:
+            return jsonify({"error": "not found"}), 404
+        cursor = request.args.get("cursor", 0, type=int)
+        new_events = job["events"][cursor:]
+        done = job["done"]
+        result = job["result"] if done else None
+        if done and (time.time() - job["ts"]) > 120:
+            del _probe_jobs[job_id]
+    return jsonify({"events": new_events, "cursor": cursor + len(new_events), "done": done, "result": result})
 
 
 @bp.route("/reseed", methods=["POST"])

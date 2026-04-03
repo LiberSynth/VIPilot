@@ -2588,30 +2588,56 @@ function confirmRestart() {
     overlay.classList.add('open');
     document.body.style.overflow = 'hidden';
 
+    var levelColor = { info: '#888', warn: '#c09050', ok: '#6a6', error: '#c05050' };
+
+    function appendEvent(line) {
+      var color = levelColor[line.level] || '#888';
+      var div = document.createElement('div');
+      div.style.cssText = 'color:' + color + ';margin-bottom:3px;font-size:12px;line-height:1.4';
+      div.textContent = line.text;
+      body.appendChild(div);
+      body.scrollTop = body.scrollHeight;
+    }
+
+    function showResult(text) {
+      var sep = document.createElement('div');
+      sep.style.cssText = 'border-top:1px solid rgba(255,255,255,.1);margin:10px 0 8px';
+      body.appendChild(sep);
+      var pre = document.createElement('div');
+      pre.style.cssText = 'white-space:pre-wrap;line-height:1.55;font-size:13px';
+      pre.textContent = text;
+      body.appendChild(pre);
+      body.scrollTop = body.scrollHeight;
+    }
+
     fetch('/api/text-models/' + encodeURIComponent(modelId) + '/probe', { method: 'POST' })
       .then(function(r) { return r.json(); })
       .then(function(data) {
-        btn.classList.remove('probing');
+        if (data.error) {
+          btn.classList.remove('probing');
+          body.innerHTML = '<span style="color:#c05050">' + escHtml(data.error) + '</span>';
+          return;
+        }
+        var jobId = data.job_id;
+        var cursor = 0;
         body.innerHTML = '';
 
-        var levelColor = { info: '#888', warn: '#c09050', ok: '#6a6', error: '#c05050' };
-        (data.lines || []).forEach(function(line) {
-          var color = levelColor[line.level] || '#888';
-          var div = document.createElement('div');
-          div.style.cssText = 'color:' + color + ';margin-bottom:3px;font-size:12px;line-height:1.4';
-          div.textContent = line.text;
-          body.appendChild(div);
-        });
-
-        if (data.result) {
-          var sep = document.createElement('div');
-          sep.style.cssText = 'border-top:1px solid rgba(255,255,255,.1);margin:10px 0 8px';
-          body.appendChild(sep);
-          var pre = document.createElement('div');
-          pre.style.cssText = 'white-space:pre-wrap;line-height:1.55;font-size:13px';
-          pre.textContent = data.result;
-          body.appendChild(pre);
+        function poll() {
+          fetch('/api/text-models/probe/' + jobId + '?cursor=' + cursor)
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+              (d.events || []).forEach(appendEvent);
+              cursor = d.cursor || cursor;
+              if (d.done) {
+                btn.classList.remove('probing');
+                if (d.result) showResult(d.result);
+              } else {
+                setTimeout(poll, 500);
+              }
+            })
+            .catch(function() { setTimeout(poll, 1000); });
         }
+        poll();
       })
       .catch(function(e) {
         btn.classList.remove('probing');
