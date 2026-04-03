@@ -2463,19 +2463,7 @@ function confirmRestart() {
 
 <script>
 (function() {
-  window.openVideoModal = function(batchId) {
-    var overlay = document.getElementById('video-modal-overlay');
-    var body    = document.getElementById('video-modal-body');
-    if (!overlay || !body) return;
-    body.innerHTML = '<div class="video-modal-loading">Загрузка…</div>';
-    overlay.classList.add('open');
-    document.body.style.overflow = 'hidden';
-    var src = '/api/batch/' + encodeURIComponent(batchId) + '/video';
-    body.innerHTML = '<video controls autoplay src="' + src + '"></video>';
-  };
-
-  window.closeVideoModal = function(e) {
-    if (e && e.target !== document.getElementById('video-modal-overlay')) return;
+  window._closeVideoModalInner = function() {
     var overlay = document.getElementById('video-modal-overlay');
     var body    = document.getElementById('video-modal-body');
     if (overlay) overlay.classList.remove('open');
@@ -2483,14 +2471,31 @@ function confirmRestart() {
     document.body.style.overflow = '';
   };
 
+  window.openVideoModal = function(batchId) {
+    var overlay = document.getElementById('video-modal-overlay');
+    var body    = document.getElementById('video-modal-body');
+    if (!overlay || !body) return;
+    body.innerHTML = '<div class="video-modal-loading">Загрузка…</div>';
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
+    history.pushState({ modal: 'video' }, '');
+    var src = '/api/batch/' + encodeURIComponent(batchId) + '/video';
+    body.innerHTML = '<video controls autoplay src="' + src + '"></video>';
+  };
+
+  window.closeVideoModal = function(e) {
+    if (e && e.target !== document.getElementById('video-modal-overlay')) return;
+    var overlay = document.getElementById('video-modal-overlay');
+    if (overlay && overlay.classList.contains('open')) {
+      history.back();
+    }
+  };
+
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
       var overlay = document.getElementById('video-modal-overlay');
       if (overlay && overlay.classList.contains('open')) {
-        var body = document.getElementById('video-modal-body');
-        overlay.classList.remove('open');
-        if (body) body.innerHTML = '';
-        document.body.style.overflow = '';
+        history.back();
       }
     }
   });
@@ -2523,6 +2528,7 @@ function confirmRestart() {
     copyBtn.classList.remove('copied');
     overlay.classList.add('open');
     document.body.style.overflow = 'hidden';
+    history.pushState({ modal: 'story' }, '');
     fetch('/api/story/' + encodeURIComponent(storyId))
       .then(function(r) { return r.json(); })
       .then(function(d) {
@@ -2538,11 +2544,18 @@ function confirmRestart() {
       });
   };
 
-  window.closeStoryModal = function(e) {
-    if (e && e.target !== document.getElementById('story-modal-overlay')) return;
+  window._closeStoryModalInner = function() {
     var overlay = document.getElementById('story-modal-overlay');
     if (overlay) overlay.classList.remove('open');
     document.body.style.overflow = '';
+  };
+
+  window.closeStoryModal = function(e) {
+    if (e && e.target !== document.getElementById('story-modal-overlay')) return;
+    var overlay = document.getElementById('story-modal-overlay');
+    if (overlay && overlay.classList.contains('open')) {
+      history.back();
+    }
   };
 
   window.copyStoryText = function() {
@@ -2560,8 +2573,24 @@ function confirmRestart() {
     if (e.key === 'Escape') {
       var overlay = document.getElementById('story-modal-overlay');
       if (overlay && overlay.classList.contains('open')) {
-        overlay.classList.remove('open');
-        document.body.style.overflow = '';
+        history.back();
+      }
+    }
+  });
+})();
+
+(function() {
+  window.addEventListener('popstate', function(e) {
+    var state = e.state || {};
+    if (state.modal === 'video') {
+      _closeVideoModalInner && _closeVideoModalInner();
+    } else {
+      var storyOverlay = document.getElementById('story-modal-overlay');
+      var videoOverlay = document.getElementById('video-modal-overlay');
+      if (storyOverlay && storyOverlay.classList.contains('open')) {
+        _closeStoryModalInner && _closeStoryModalInner();
+      } else if (videoOverlay && videoOverlay.classList.contains('open')) {
+        _closeVideoModalInner && _closeVideoModalInner();
       }
     }
   });
