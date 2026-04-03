@@ -168,6 +168,9 @@ def run():
         print(f"[video] Батч {batch_id[:8]}… ({target}) — "
               f"{'возобновление' if resumed else 'начало'} генерации видео")
 
+        used_model    = None
+        used_model_id = None
+
         # --- Возобновление ---
         if resumed:
             request_id   = batch['data']['request_id']
@@ -223,8 +226,6 @@ def run():
             request_id   = None
             status_url   = None
             response_url = None
-            used_model    = None
-            used_model_id = None
 
             for m in models:
                 model_name   = m['name']
