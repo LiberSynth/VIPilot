@@ -434,3 +434,16 @@ def api_get_story(story_id):
     if text is None:
         return jsonify({"error": "not found"}), 404
     return jsonify({"text": text})
+
+
+@bp.route("/sse-test")
+def api_sse_test():
+    import json as _j
+    def _gen():
+        yield ": padding " + " " * 2048 + "\n\n"
+        for i in range(1, 4):
+            yield "data: " + _j.dumps({"n": i, "t": time.time()}) + "\n\n"
+            time.sleep(1)
+        yield "data: " + _j.dumps({"n": "done"}) + "\n\n"
+    return Response(_gen(), mimetype="text/event-stream",
+                    headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})

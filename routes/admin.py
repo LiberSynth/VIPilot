@@ -9,6 +9,7 @@ from flask import (
     session,
     flash,
     send_file,
+    make_response,
 )
 
 from db import (
@@ -94,7 +95,7 @@ def admin_page():
     aspect_ratio_x  = target["aspect_ratio_x"] if target else 9
     aspect_ratio_y  = target["aspect_ratio_y"] if target else 16
 
-    return render_template(
+    resp = make_response(render_template(
         "admin.html",
         metaprompt=metaprompt,
         system_prompt=system_prompt,
@@ -117,7 +118,11 @@ def admin_page():
         aspect_ratio_x=aspect_ratio_x,
         aspect_ratio_y=aspect_ratio_y,
         app_version=APP_VERSION,
-    )
+    ))
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
 
 
 @bp.route("/save", methods=["POST"])
