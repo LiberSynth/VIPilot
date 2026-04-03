@@ -206,11 +206,11 @@ def api_text_model_probe(model_id):
     platform_url = m["platform_url"]
 
     last_error = "Неизвестная ошибка"
-    for attempt in range(1):
+    for attempt in range(3):
         try:
-            resp = _requests.post(platform_url, headers=headers, json=body, timeout=60)
+            resp = _requests.post(platform_url, headers=headers, json=body, timeout=30)
         except _requests.exceptions.Timeout:
-            last_error = "Таймаут (60 сек)"
+            last_error = f"Таймаут 30с (попытка {attempt + 1}/3)"
             continue
         except _requests.exceptions.RequestException as e:
             last_error = f"Ошибка соединения: {e}"
@@ -241,7 +241,7 @@ def api_text_model_probe(model_id):
 
         return jsonify({"ok": True, "result": result, "attempts": attempt + 1})
 
-    return jsonify({"ok": False, "error": last_error, "attempts": 1})
+    return jsonify({"ok": False, "error": last_error, "attempts": 3})
 
 
 @bp.route("/reseed", methods=["POST"])
