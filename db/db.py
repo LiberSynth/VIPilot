@@ -157,9 +157,8 @@ def db_update_target_aspect_ratio(target_id, x, y):
 
 def db_ensure_batch(scheduled_at, target_id):
     """Создаёт батч если не существует.
-    Батчи со статусом 'устарел' восстанавливаются в 'pending' — слот снова активен.
-    Батчи со статусом 'отменён' не трогаются.
-    Возвращает UUID созданного/восстановленного батча или None если батч уже активен."""
+    Отменённые батчи не восстанавливаются — остаются отменёнными.
+    Возвращает UUID нового батча или None если батч уже существует."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
@@ -173,16 +172,6 @@ def db_ensure_batch(scheduled_at, target_id):
                     (scheduled_at, target_id),
                 )
                 row = cur.fetchone()
-                if not row:
-                    cur.execute(
-                        """
-                        UPDATE batches SET status = 'pending'
-                        WHERE scheduled_at = %s AND target_id = %s AND status = 'устарел'
-                        RETURNING id
-                        """,
-                        (scheduled_at, target_id),
-                    )
-                    row = cur.fetchone()
             conn.commit()
         return str(row[0]) if row else None
     except Exception as e:
