@@ -214,7 +214,7 @@ def run():
         os.unlink(tmp_out_path)
 
         db_set_batch_transcode_ready(batch_id, video_data)
-        msg = f'Транскодирование завершено ({out_mb} МБ), сохранено в БД'
+        msg = f'Транскодировано ({out_mb} МБ)'
         db_log_update(log_id, msg, 'ok')
         if log_id:
             db_log_entry(log_id, msg)

@@ -99,7 +99,7 @@ def run():
 
         if ok:
             db_set_batch_published(batch_id)
-            db_log_update(log_id, 'Опубликовано', 'ok')
+            db_log_update(log_id, f'Опубликовано ({target})', 'ok')
             print(f"[publish] Батч {batch_id[:8]}… опубликован")
             if log_id:
                 entries = db_get_log_entries(log_id)

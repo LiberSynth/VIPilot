@@ -289,6 +289,7 @@ def run():
                 'request_id':   request_id,
                 'status_url':   status_url,
                 'response_url': response_url,
+                'model_name':   used_model,
             })
             if log_id:
                 db_log_entry(log_id, f"Запрос принят ({used_model}): {request_id}")
@@ -300,7 +301,8 @@ def run():
             return
 
         db_set_batch_video_ready(batch_id, video_url)
-        msg = 'Видео сгенерировано'
+        video_model = (batch.get('data') or {}).get('model_name') or used_model or ''
+        msg = f'Видео сгенерировано ({video_model})' if video_model else 'Видео сгенерировано'
         db_log_update(log_id, msg, 'ok')
         if log_id:
             db_log_entry(log_id, f"URL: {video_url[:80]}…")
