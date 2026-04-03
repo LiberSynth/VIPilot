@@ -2068,7 +2068,19 @@ function validateLifetimes() {
       .then(function(data) {
         if (data.ok) {
           btn.classList.add('copied');
-          setTimeout(function() { btn.classList.remove('copied'); btn.disabled = false; }, 2000);
+          const item = btn.closest('.monitor-log-item');
+          if (item) {
+            const dot = item.querySelector('.monitor-log-dot');
+            if (dot) { dot.className = 'monitor-log-dot ls-прервана'; }
+            item.dataset.status = 'прервана';
+            item.style.opacity  = '0.45';
+            item.style.transition = 'opacity .3s';
+          }
+          setTimeout(function() {
+            btn.classList.remove('copied');
+            btn.disabled = false;
+            refreshMonitor();
+          }, 1500);
         } else {
           btn.disabled = false;
           alert(data.error || 'Ошибка');
