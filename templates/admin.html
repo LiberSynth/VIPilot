@@ -1615,6 +1615,23 @@ function validateLifetimes() {
   })();
 })();
 
+// ── Grade cycle ──
+var _gradeSequence = ['good', 'limited', 'poor', 'rejected'];
+var _gradeColors   = { good: '#4a8', limited: '#a84', poor: '#a55', rejected: '#666' };
+window.cycleGrade = function(el) {
+  var id    = el.getAttribute('data-grade-id');
+  var cur   = el.getAttribute('data-grade') || 'good';
+  var next  = _gradeSequence[(_gradeSequence.indexOf(cur) + 1) % _gradeSequence.length];
+  el.setAttribute('data-grade', next);
+  el.textContent = next;
+  el.style.background = _gradeColors[next] || '#555';
+  fetch('/api/text-models/' + encodeURIComponent(id) + '/grade', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ grade: next })
+  });
+};
+
 // ── Text models list with drag-and-drop ──
 (function() {
   var dragSrcId = null;
@@ -1637,11 +1654,14 @@ function validateLifetimes() {
       item.dataset.id = m.id;
       item.draggable = true;
       var caption = m.platform_name ? escHtml(m.platform_name) + ': ' + escHtml(m.name) : escHtml(m.name);
+      var gradeColors = { good: '#4a8', limited: '#a84', poor: '#a55', rejected: '#666' };
+      var grade = m.grade || 'good';
+      var gradeHtml = '<span data-grade-id="' + m.id + '" data-grade="' + grade + '" onclick="event.stopPropagation();cycleGrade(this)" title="Нажмите для смены" style="cursor:pointer;font-size:10px;padding:1px 6px;border-radius:3px;background:' + (gradeColors[grade]||'#555') + ';color:#fff;margin-left:6px;opacity:.85">' + grade + '</span>';
       item.innerHTML =
         '<div class="model-radio" onclick="activateTextModel(\'' + m.id + '\')">' +
           '<div class="model-radio-dot"></div>' +
         '</div>' +
-        '<div class="model-name">' + caption + '</div>' +
+        '<div class="model-name">' + caption + gradeHtml + '</div>' +
         '<button class="model-probe-btn" title="Пробный запрос" onclick="event.stopPropagation();probeTextModel(\'' + m.id + '\',\'' + escHtml(m.name) + '\',this)"><svg viewBox="0 0 16 16" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="4,2 13,8 4,14"/></svg></button>' +
         '<div class="model-drag-handle" title="Перетащить">⠿</div>';
 

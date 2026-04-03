@@ -407,7 +407,7 @@ def db_get_active_text_model():
                     FROM ai_models m
                     JOIN ai_platforms p ON p.id = m.platform_id
                     WHERE m.active = TRUE AND m.type = 'text'
-                      AND (m.unsuitable IS NULL OR m.unsuitable = FALSE)
+                      AND (m.grade IS NULL OR m.grade != 'rejected')
                     ORDER BY m."order"
                     LIMIT 1
                 """)
@@ -569,7 +569,7 @@ def db_get_active_text_models():
                     FROM ai_models m
                     JOIN ai_platforms p ON p.id = m.platform_id
                     WHERE m.active = TRUE AND m.type = 'text'
-                      AND (m.unsuitable IS NULL OR m.unsuitable = FALSE)
+                      AND (m.grade IS NULL OR m.grade != 'rejected')
                     ORDER BY m."order"
                 """)
                 rows = cur.fetchall()
@@ -941,11 +941,11 @@ def db_get_models(model_type: str):
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
                 cur.execute("""
                     SELECT m.id, m.name, m.url, m.body, m."order", m.active,
-                           m.unsuitable, p.name AS platform_name
+                           m.grade, p.name AS platform_name
                     FROM ai_models m
                     LEFT JOIN ai_platforms p ON p.id = m.platform_id
                     WHERE m.type = %s
-                      AND (m.unsuitable IS NULL OR m.unsuitable = FALSE)
+                      AND (m.grade IS NULL OR m.grade != 'rejected')
                     ORDER BY m."order" ASC
                 """, (model_type,))
                 rows = cur.fetchall()
@@ -966,6 +966,22 @@ def db_activate_model(model_id: str, model_type: str):
         return True
     except Exception as e:
         print(f"[DB] Ошибка db_activate_model: {e}")
+        return False
+
+
+def db_set_model_grade(model_id: str, grade: str):
+    """Устанавливает grade для модели."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE ai_models SET grade = %s WHERE id = %s",
+                    (grade, model_id),
+                )
+            conn.commit()
+        return True
+    except Exception as e:
+        print(f"[DB] Ошибка db_set_model_grade: {e}")
         return False
 
 

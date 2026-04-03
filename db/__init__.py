@@ -48,6 +48,7 @@ from .db import (
     db_activate_model,
     db_toggle_model,
     db_reorder_models,
+    db_set_model_grade,
     db_cleanup_log_entries,
     db_cleanup_logs,
     db_cleanup_batches,

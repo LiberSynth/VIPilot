@@ -175,6 +175,19 @@ def api_text_model_activate(model_id):
     return jsonify({"ok": ok})
 
 
+@bp.route("/text-models/<model_id>/grade", methods=["POST"])
+def api_text_model_grade(model_id):
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    data = request.get_json(silent=True) or {}
+    grade = data.get("grade", "good")
+    if grade not in ("good", "limited", "poor", "rejected"):
+        return jsonify({"error": "invalid grade"}), 400
+    from db import db_set_model_grade
+    ok = db_set_model_grade(model_id, grade)
+    return jsonify({"ok": ok})
+
+
 @bp.route("/text-models/reorder", methods=["POST"])
 def api_text_models_reorder():
     if not is_authenticated():
