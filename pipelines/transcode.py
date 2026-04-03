@@ -23,7 +23,30 @@ from db import (
 from log import db_log_pipeline, db_log_entry, db_log_update, db_log_interrupt_running
 
 
+def _probe_duration(src):
+    """Возвращает длительность видео в секундах через ffprobe, или None при ошибке."""
+    try:
+        result = subprocess.run(
+            [
+                'ffprobe', '-v', 'error',
+                '-select_streams', 'v:0',
+                '-show_entries', 'format=duration',
+                '-of', 'default=noprint_wrappers=1:nokey=1',
+                src,
+            ],
+            capture_output=True,
+            timeout=30,
+        )
+        if result.returncode == 0:
+            return float(result.stdout.decode().strip())
+    except Exception:
+        pass
+    return None
+
+
 def _ffmpeg(src, dst, log_id):
+    duration = _probe_duration(src)
+
     cmd = [
         'ffmpeg', '-y',
         '-i', src,
@@ -36,21 +59,38 @@ def _ffmpeg(src, dst, log_id):
         '-r', '30',
         '-c:a', 'aac',
         '-b:a', '96k',
-        '-shortest',
         '-movflags', '+faststart',
-        dst,
     ]
+
+    if duration is not None:
+        cmd += ['-t', str(duration)]
+    else:
+        cmd += ['-shortest']
+
+    cmd.append(dst)
+
+    timeout_sec = 300
+    proc = None
     try:
-        result = subprocess.run(cmd, capture_output=True, timeout=600)
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        _, stderr_bytes = proc.communicate(timeout=timeout_sec)
+        returncode = proc.returncode
     except subprocess.TimeoutExpired:
+        if proc:
+            proc.kill()
+            proc.communicate()
         if log_id:
-            db_log_entry(log_id, 'Таймаут ffmpeg (10 мин)', level='error')
+            db_log_entry(log_id, f'Таймаут ffmpeg ({timeout_sec // 60} мин)', level='error')
+        return False
+    except Exception as e:
+        if log_id:
+            db_log_entry(log_id, f'ffmpeg исключение: {e}', level='error')
         return False
 
-    if result.returncode != 0:
-        err = result.stderr.decode(errors='replace')[-600:]
+    if returncode != 0:
+        err = stderr_bytes.decode(errors='replace')[-600:]
         if log_id:
-            db_log_entry(log_id, f'ffmpeg код {result.returncode}: {err}', level='error')
+            db_log_entry(log_id, f'ffmpeg код {returncode}: {err}', level='error')
         return False
     return True
 
