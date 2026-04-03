@@ -2436,7 +2436,6 @@ function confirmRestart() {
     if (!overlay || !body) return;
     _storyText = '';
     body.innerHTML = '<span class="story-modal-loading">Загрузка…</span>';
-    copyBtn.textContent = 'Скопировать';
     copyBtn.classList.remove('copied');
     overlay.classList.add('open');
     document.body.style.overflow = 'hidden';
