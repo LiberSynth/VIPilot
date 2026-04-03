@@ -176,6 +176,7 @@ def run():
                 db_log_entry(log_id, msg, level='error')
             db_set_batch_transcode_error(batch_id)
             print(f"[transcode] {msg}")
+            notify_failure(f"transcode: ошибка скачивания видео — {e}")
             return
 
         with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as tmp_src:
@@ -203,6 +204,7 @@ def run():
             db_log_update(log_id, msg, 'error')
             db_set_batch_transcode_error(batch_id)
             print(f"[transcode] {msg}")
+            notify_failure(f"transcode: ошибка ffmpeg при обработке батча {batch_id[:8]}")
             return
 
         out_mb = round(os.path.getsize(tmp_out_path) / 1024 / 1024, 1)
