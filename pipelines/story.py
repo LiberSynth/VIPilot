@@ -3,7 +3,7 @@ Pipeline 2 — Генерация сюжета.
 Берёт первый pending-батч, атомарно захватывает его (story_generating),
 перебирает активные text-модели по порядку (с retry на каждую),
 генерирует текст через OpenRouter и сохраняет результат.
-Если все модели не ответили — батч возвращается в pending для следующего цикла.
+Если все модели не ответили — цикл начинается заново с первой модели.
 """
 
 import os
@@ -177,36 +177,36 @@ def run():
         used_model_name = None
         used_model_id   = None
 
-        for m in models:
-            model_name = m['name']
-            if log_id:
-                db_log_entry(log_id, f"Модель: {model_name}")
-            print(f"[story] Запрос к OpenRouter: модель={model_name}")
+        while not story_id:
+            for m in models:
+                model_name = m['name']
+                if log_id:
+                    db_log_entry(log_id, f"Модель: {model_name}")
+                print(f"[story] Запрос к OpenRouter: модель={model_name}")
 
-            for attempt in range(fails_to_next):
-                result = _try_model(log_id, m, system_prompt, user_prompt)
-                if result:
-                    story_id = db_create_story(m['id'], result)
-                    if story_id:
-                        used_model_name = model_name
-                        used_model_id   = m['id']
-                        break
-                    if log_id:
-                        db_log_entry(log_id, f"[{model_name}] не удалось сохранить сюжет", level='warn')
-                else:
-                    if log_id:
-                        db_log_entry(log_id, f"[{model_name}] попытка {attempt + 1}/{fails_to_next} не удалась", level='warn')
+                for attempt in range(fails_to_next):
+                    result = _try_model(log_id, m, system_prompt, user_prompt)
+                    if result:
+                        story_id = db_create_story(m['id'], result)
+                        if story_id:
+                            used_model_name = model_name
+                            used_model_id   = m['id']
+                            break
+                        if log_id:
+                            db_log_entry(log_id, f"[{model_name}] не удалось сохранить сюжет", level='warn')
+                    else:
+                        if log_id:
+                            db_log_entry(log_id, f"[{model_name}] попытка {attempt + 1}/{fails_to_next} не удалась", level='warn')
 
-            if story_id:
-                break
+                if story_id:
+                    break
 
-        if not story_id:
-            msg = 'Все активные модели не дали результата — повтор с первой модели'
-            db_log_update(log_id, msg, 'warn')
-            if log_id:
-                db_log_entry(log_id, msg, level='warn')
-            print(f"[story] {msg}")
-            return
+            if not story_id:
+                msg = 'Все активные модели не дали результата — повтор с первой модели'
+                db_log_update(log_id, msg, 'warn')
+                if log_id:
+                    db_log_entry(log_id, msg, level='warn')
+                print(f"[story] {msg}")
 
         preview = result[:200] + ('…' if len(result) > 200 else '')
         print(f"[story] Сюжет получен: {result[:100]}{'…' if len(result) > 100 else ''}")
