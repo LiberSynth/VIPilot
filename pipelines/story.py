@@ -142,15 +142,6 @@ def run():
             status='running', batch_id=batch_id,
         )
 
-        if env_get('story_simulate_error', '0') == '1':
-            msg = 'Симуляция ошибки (story_simulate_error=1)'
-            db_log_update(log_id, msg, 'error')
-            db_log_entry(log_id, msg, level='error')
-            db_set_batch_obsolete(batch_id)
-            batch_done = True
-            print(f"[story] {msg}")
-            return
-
         if not _API_KEY:
             msg = 'OPENROUTER_API_KEY не задан — генерация невозможна'
             db_log_update(log_id, msg, 'error')
