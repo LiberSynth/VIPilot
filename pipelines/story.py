@@ -142,8 +142,6 @@ def run():
             status='running', batch_id=batch_id,
         )
 
-        raise Exception("Тестовая ошибка")
-
         if not _API_KEY:
             msg = 'OPENROUTER_API_KEY не задан — генерация невозможна'
             db_log_update(log_id, msg, 'error')
