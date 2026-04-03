@@ -730,12 +730,6 @@
     white-space: pre-wrap; word-break: break-word;
   }
   .story-modal-loading { color: #555; font-style: italic; }
-  .story-view-btn {
-    background: none; border: 1px solid rgba(255,255,255,.1); border-radius: 5px;
-    color: #9090b8; font-size: 12px; padding: 4px 10px; cursor: pointer;
-    transition: background .15s, color .15s; flex-shrink: 0; line-height: 1;
-  }
-  .story-view-btn:hover { background: rgba(255,255,255,.06); color: #d0d0ec; }
 </style>
 </head>
 <body>
@@ -1777,7 +1771,7 @@ function validateLifetimes() {
       ? '<button class="cycle-float-btn" title="Перезапустить" data-bid="' + esc(batchId) + '" data-pip="' + esc(log.pipeline) + '" onclick="monitorPipelineRestart(this)">' + MON_SVG_RESTART + '</button>'
       : '';
     const storyBtn = (log.pipeline === 'story' && st === 'ok' && storyId)
-      ? '<button class="story-view-btn" onclick="openStoryModal(\'' + esc(storyId) + '\')">Посмотреть</button>'
+      ? '<button class="cycle-float-btn story-view-btn" title="Посмотреть сюжет" onclick="openStoryModal(\'' + esc(storyId) + '\')">' + MON_SVG_EYE + '</button>'
       : '';
     const pipActions = '<div class="monitor-pip-actions" onclick="event.stopPropagation()">' +
       storyBtn +
@@ -1804,6 +1798,7 @@ function validateLifetimes() {
   const MON_SVG_COLLAPSE = `<svg viewBox="0 0 16 16"><polyline points="6,2 6,6 2,6"/><polyline points="10,2 10,6 14,6"/><polyline points="14,10 10,10 10,14"/><polyline points="2,10 6,10 6,14"/></svg>`;
   const MON_SVG_COPY     = `<svg viewBox="0 0 16 16"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11V3a1 1 0 0 1 1-1h8"/></svg>`;
   const MON_SVG_RESTART  = `<svg viewBox="0 0 16 16"><path d="M13 8A5 5 0 1 1 8 3"/><polyline points="6,1.5 8,3 6,4.5"/></svg>`;
+  const MON_SVG_EYE      = `<svg viewBox="0 0 16 16"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z"/><circle cx="8" cy="8" r="2"/></svg>`;
 
   function groupLogsByPipeline(logs) {
     const order = [];
