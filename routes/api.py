@@ -182,11 +182,6 @@ def api_text_model_probe(model_id):
     if not api_key:
         return jsonify({"ok": False, "error": "OPENROUTER_API_KEY не задан"}), 400
 
-    try:
-        fails_to_next = max(1, int(db_get("story_fails_to_next", "3")))
-    except (ValueError, TypeError):
-        fails_to_next = 3
-
     system_prompt = db_get("system_prompt", "")
     user_prompt   = db_get("metaprompt", "")
 
@@ -211,11 +206,11 @@ def api_text_model_probe(model_id):
     platform_url = m["platform_url"]
 
     last_error = "Неизвестная ошибка"
-    for attempt in range(fails_to_next):
+    for attempt in range(1):
         try:
             resp = _requests.post(platform_url, headers=headers, json=body, timeout=60)
         except _requests.exceptions.Timeout:
-            last_error = f"Таймаут (попытка {attempt + 1}/{fails_to_next})"
+            last_error = "Таймаут (60 сек)"
             continue
         except _requests.exceptions.RequestException as e:
             last_error = f"Ошибка соединения: {e}"
@@ -246,7 +241,7 @@ def api_text_model_probe(model_id):
 
         return jsonify({"ok": True, "result": result, "attempts": attempt + 1})
 
-    return jsonify({"ok": False, "error": last_error, "attempts": fails_to_next})
+    return jsonify({"ok": False, "error": last_error, "attempts": 1})
 
 
 @bp.route("/reseed", methods=["POST"])
