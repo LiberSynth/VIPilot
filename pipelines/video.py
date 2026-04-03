@@ -281,7 +281,7 @@ def run():
                     break
 
             if not request_id:
-                msg = 'Все активные видео-модели не приняли запрос — батч возвращён в очередь'
+                msg = 'Все активные видео-модели не приняли запрос — повтор с первой модели'
                 if log_id:
                     db_log_update(log_id, msg, 'warn')
                     db_log_entry(log_id, msg, level='warn')

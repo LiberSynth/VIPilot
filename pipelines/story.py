@@ -201,7 +201,7 @@ def run():
                 break
 
         if not story_id:
-            msg = 'Все активные модели не дали результата — батч возвращён в очередь'
+            msg = 'Все активные модели не дали результата — повтор с первой модели'
             db_log_update(log_id, msg, 'warn')
             if log_id:
                 db_log_entry(log_id, msg, level='warn')
