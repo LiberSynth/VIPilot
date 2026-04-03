@@ -5,5 +5,6 @@ from .log import (
     db_log_interrupt_running,
     db_log_root,
     db_get_log,
+    db_get_log_entries,
     db_get_monitor,
 )

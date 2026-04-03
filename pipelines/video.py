@@ -67,6 +67,7 @@ def _reset_to_pending(log_id, batch_id, msg):
         db_log_entry(log_id, msg, level='error')
         db_log_entry(log_id, 'Батч сброшен в «запланирован» — цикл генерации перезапустится', level='warn')
     db_set_batch_pending(batch_id)
+    notify_failure(f"video: {msg} (батч {str(batch_id)[:8]})")
 
 
 def _poll(log_id, batch_id, status_url, response_url):
@@ -184,6 +185,7 @@ def run():
                 msg = 'FAL_API_KEY не задан — генерация невозможна'
                 db_log_pipeline('video', msg, status='error', batch_id=batch_id)
                 print(f"[video] {msg}")
+                notify_failure(f"video: {msg}")
                 return
 
             models = db_get_active_video_models()
@@ -191,6 +193,7 @@ def run():
                 msg = 'Нет активных video-моделей в ai_models (type=text-to-video)'
                 db_log_pipeline('video', msg, status='error', batch_id=batch_id)
                 print(f"[video] {msg}")
+                notify_failure(f"video: {msg}")
                 return
 
             story_text = db_get_story_text(story_id)
@@ -198,6 +201,7 @@ def run():
                 msg = f'Не найден сюжет story_id={story_id[:8]}…'
                 db_log_pipeline('video', msg, status='error', batch_id=batch_id)
                 print(f"[video] {msg}")
+                notify_failure(f"video: {msg} (батч {batch_id[:8]})")
                 return
 
             try:

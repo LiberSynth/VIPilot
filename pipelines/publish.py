@@ -17,7 +17,7 @@ from db import (
     db_set_batch_published,
     db_set_batch_publish_error,
 )
-from log import db_log_pipeline, db_log_entry, db_log_update, db_log_interrupt_running
+from log import db_log_pipeline, db_log_entry, db_log_update, db_log_interrupt_running, db_get_log_entries
 from clients import vk
 
 
@@ -94,16 +94,27 @@ def run():
                 db_log_entry(log_id, msg, level='error')
             db_set_batch_publish_error(batch_id)
             print(f"[publish] {msg}")
+            notify_failure(f"publish: {msg} (батч {batch_id[:8]})")
             return
 
         if ok:
             db_set_batch_published(batch_id)
             db_log_update(log_id, 'Опубликовано', 'ok')
             print(f"[publish] Батч {batch_id[:8]}… опубликован")
+            if log_id:
+                entries = db_get_log_entries(log_id)
+                warn_entries = [e for e in entries if e['level'] in ('warn', 'error')]
+                if warn_entries:
+                    notify_failure(
+                        f"publish: батч {batch_id[:8]} опубликован, но в процессе были некритичные ошибки",
+                        log_entries=warn_entries,
+                        partial=True,
+                    )
         else:
             db_set_batch_publish_error(batch_id)
             db_log_update(log_id, 'Ошибка публикации', 'error')
             print(f"[publish] Батч {batch_id[:8]}… ошибка публикации")
+            notify_failure(f"publish: ошибка публикации батча {batch_id[:8]} ({target})")
 
     except Exception as e:
         db_log_pipeline('publish', f'Сбой пайплайна: {e}', status='error',

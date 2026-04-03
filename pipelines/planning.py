@@ -8,6 +8,7 @@ from datetime import datetime, timezone, timedelta
 
 from db import db_get, db_get_schedule, db_get_active_targets, db_ensure_batch
 from log import db_log_pipeline, db_log_entry
+from utils.notify import notify_failure
 from utils.utils import parse_hhmm
 from utils.consts import MSK
 
@@ -65,3 +66,4 @@ def run():
     except Exception as e:
         db_log_pipeline('planning', f"Сбой пайплайна: {e}", status='error')
         print(f"[planning] Ошибка: {e}")
+        notify_failure(f"сбой planning-пайплайна: {e}")

@@ -75,6 +75,25 @@ def db_log_root(message, status='info'):
     return db_log_pipeline('root', message, status=status, batch_id=None)
 
 
+def db_get_log_entries(log_id):
+    """Возвращает список субзаписей для указанного log_id."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT message, level, time_point FROM log_entries WHERE log_id = %s ORDER BY time_point",
+                    (log_id,),
+                )
+                rows = cur.fetchall()
+        return [
+            {"msg": r[0], "level": r[1], "ts": r[2].isoformat() if r[2] else None}
+            for r in rows
+        ]
+    except Exception as e:
+        print(f"[DB] Ошибка db_get_log_entries: {e}")
+        return []
+
+
 def db_get_log(limit=200):
     """Плоский список записей лога (устаревший формат, для обратной совместимости)."""
     try:
