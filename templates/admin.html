@@ -1710,7 +1710,7 @@ function validateLifetimes() {
       entries.map(function(e) {
         const lvl = e.level || 'info';
         return '<div class="monitor-entry-row">' +
-          '<span class="monitor-entry-ts">' + fmtMsk(e.time_point) + '</span>' +
+          '<span class="monitor-entry-ts">' + fmtMsk(e.created_at) + '</span>' +
           '<span class="monitor-entry-msg ' + esc(lvl) + '">' + esc(e.message) + '</span>' +
         '</div>';
       }).join('') +
@@ -1727,7 +1727,7 @@ function validateLifetimes() {
       '<div class="monitor-log-header">' +
         '<div class="monitor-log-header-top">' +
           '<span class="monitor-log-dot ls-' + esc(st) + '"></span>' +
-          '<span class="monitor-log-ts">'       + fmtMsk(log.time_point) + '</span>' +
+          '<span class="monitor-log-ts">'       + fmtMsk(log.created_at) + '</span>' +
           '<span class="monitor-log-pipeline">' + esc(pip)               + '</span>' +
           chevron +
         '</div>' +
@@ -1749,7 +1749,7 @@ function validateLifetimes() {
         map[log.pipeline] = {
           id:         log.id,
           pipeline:   log.pipeline,
-          time_point: log.time_point,
+          created_at: log.created_at,
           status:     log.status,
           message:    log.message,
           entries:    []
@@ -1763,7 +1763,7 @@ function validateLifetimes() {
     });
     order.forEach(function(pip) {
       map[pip].entries.sort(function(a, b) {
-        return (a.time_point || '').localeCompare(b.time_point || '');
+        return (a.created_at || '').localeCompare(b.created_at || '');
       });
     });
     return order.map(function(pip) { return map[pip]; });
@@ -1825,15 +1825,15 @@ function validateLifetimes() {
   }
 
   function renderSysGroup(items) {
-    const key      = items[0] ? items[0].time_point : '';
-    const headTime = items.length ? items[items.length - 1].time_point : null;
+    const key      = items[0] ? items[0].created_at : '';
+    const headTime = items.length ? items[items.length - 1].created_at : null;
     const n        = items.length;
     const sub     = n + ' ' + (n === 1 ? 'событие' : n < 5 ? 'события' : 'событий');
 
     const rows = items.map(function(e) {
       const st = e.status || 'info';
       return '<div class="monitor-sysgroup-item">' +
-        '<span class="monitor-sysgroup-ts">'  + fmtMsk(e.time_point)                          + '</span>' +
+        '<span class="monitor-sysgroup-ts">'  + fmtMsk(e.created_at)                          + '</span>' +
         '<span class="monitor-sysgroup-pip">' + esc(PIPELINE_LABELS[e.pipeline] || e.pipeline) + '</span>' +
         '<span class="monitor-sysgroup-msg '  + esc(st) + '">' + esc(e.message || '')          + '</span>' +
       '</div>';
@@ -1864,7 +1864,7 @@ function validateLifetimes() {
       items.push({ type: 'batch', time: b.created_at, data: b });
     });
     (system || []).forEach(function(s) {
-      items.push({ type: 'sys', time: s.time_point, data: s });
+      items.push({ type: 'sys', time: s.created_at, data: s });
     });
     items.sort(function(a, b) { return new Date(b.time) - new Date(a.time); });
 

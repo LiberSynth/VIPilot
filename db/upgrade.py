@@ -26,6 +26,8 @@ def run_upgrades():
     _add_adhoc_column()
     _scheduled_at_nullable()
     _add_schedule_created_at()
+    _drop_video_urls()
+    _rename_time_point_to_created_at()
 
 
 def _add_emulation_mode():
@@ -98,7 +100,7 @@ def _create_ai_models():
                         ai_platform_id UUID REFERENCES ai_platforms(id),
                         platform_id    UUID REFERENCES ai_platforms(id),
                         type           VARCHAR(50) NOT NULL,
-                        time_point     TIMESTAMPTZ NOT NULL DEFAULT now()
+                        created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
                     )
                 """)
             conn.commit()
@@ -131,7 +133,7 @@ def _create_stories():
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS stories (
                         id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                        time_point TIMESTAMPTZ NOT NULL DEFAULT now(),
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
                         result     TEXT NOT NULL,
                         model_id   UUID REFERENCES ai_models(id)
                     )
@@ -175,7 +177,7 @@ def _create_log():
                         pipeline VARCHAR(30) NOT NULL,
                         message TEXT,
                         status VARCHAR(20),
-                        time_point TIMESTAMPTZ NOT NULL DEFAULT now()
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
                     )
                 """)
             conn.commit()
@@ -193,7 +195,7 @@ def _create_log_entries():
                         log_id UUID NOT NULL REFERENCES log(id),
                         message TEXT NOT NULL,
                         level VARCHAR(10) NOT NULL DEFAULT 'info',
-                        time_point TIMESTAMPTZ NOT NULL DEFAULT now()
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
                     )
                 """)
             conn.commit()
@@ -380,6 +382,38 @@ def _create_environment_table():
             conn.commit()
     except Exception as e:
         print(f"[DB] Ошибка миграции _create_environment_table: {e}")
+
+
+def _drop_video_urls():
+    """Удаляет таблицу video_urls — она не используется в коде."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("DROP TABLE IF EXISTS video_urls")
+            conn.commit()
+    except Exception as e:
+        print(f"[DB] Ошибка миграции _drop_video_urls: {e}")
+
+
+def _rename_time_point_to_created_at():
+    """Переименовывает time_point → created_at во всех таблицах где оно есть."""
+    tables = ['ai_models', 'log', 'log_entries', 'stories']
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                for table in tables:
+                    cur.execute("""
+                        SELECT column_name FROM information_schema.columns
+                        WHERE table_name = %s AND column_name = 'time_point'
+                    """, (table,))
+                    if cur.fetchone():
+                        cur.execute(
+                            f"ALTER TABLE {table} RENAME COLUMN time_point TO created_at"
+                        )
+                        print(f"[DB] {table}.time_point → created_at")
+            conn.commit()
+    except Exception as e:
+        print(f"[DB] Ошибка миграции _rename_time_point_to_created_at: {e}")
 
 
 def _add_schedule_created_at():

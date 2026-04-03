@@ -918,7 +918,7 @@ def db_cleanup_log_entries(log_lifetime_days: int) -> int:
                     DELETE FROM log_entries
                     WHERE log_id IN (
                         SELECT id FROM log
-                        WHERE time_point < now() - make_interval(days => %s)
+                        WHERE created_at < now() - make_interval(days => %s)
                     )
                 """, (log_lifetime_days,))
                 count = cur.rowcount
@@ -939,12 +939,12 @@ def db_cleanup_logs(short_log_lifetime_days: int) -> int:
                     DELETE FROM log_entries
                     WHERE log_id IN (
                         SELECT id FROM log
-                        WHERE time_point < now() - make_interval(days => %s)
+                        WHERE created_at < now() - make_interval(days => %s)
                     )
                 """, (short_log_lifetime_days,))
                 cur.execute("""
                     DELETE FROM log
-                    WHERE time_point < now() - make_interval(days => %s)
+                    WHERE created_at < now() - make_interval(days => %s)
                 """, (short_log_lifetime_days,))
                 count = cur.rowcount
             conn.commit()

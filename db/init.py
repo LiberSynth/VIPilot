@@ -60,13 +60,6 @@ def init_db():
                 """)
 
                 cur.execute("""
-                    CREATE TABLE IF NOT EXISTS video_urls (
-                        id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                        url        TEXT NOT NULL UNIQUE,
-                        time_point FLOAT NOT NULL
-                    )
-                """)
-                cur.execute("""
                     CREATE TABLE IF NOT EXISTS ai_platforms (
                         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                         name VARCHAR(200) NOT NULL,
@@ -92,7 +85,7 @@ def init_db():
                         ai_platform_id UUID REFERENCES ai_platforms(id),
                         platform_id    UUID REFERENCES ai_platforms(id),
                         type           VARCHAR(50) NOT NULL,
-                        time_point     TIMESTAMPTZ NOT NULL DEFAULT now()
+                        created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
                     )
                 """)
                 cur.execute("""
@@ -131,7 +124,7 @@ def init_db():
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS stories (
                         id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                        time_point TIMESTAMPTZ NOT NULL DEFAULT now(),
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
                         result     TEXT NOT NULL,
                         model_id   UUID REFERENCES ai_models(id)
                     )
@@ -158,7 +151,7 @@ def init_db():
                         pipeline VARCHAR(30) NOT NULL,
                         message TEXT,
                         status VARCHAR(20),
-                        time_point TIMESTAMPTZ NOT NULL DEFAULT now()
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
                     )
                 """)
                 cur.execute("""
@@ -167,7 +160,7 @@ def init_db():
                         log_id UUID NOT NULL REFERENCES log(id),
                         message TEXT NOT NULL,
                         level VARCHAR(10) NOT NULL DEFAULT 'info',
-                        time_point TIMESTAMPTZ NOT NULL DEFAULT now()
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
                     )
                 """)
 

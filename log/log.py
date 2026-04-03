@@ -81,7 +81,7 @@ def db_get_log_entries(log_id):
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT message, level, time_point FROM log_entries WHERE log_id = %s ORDER BY time_point",
+                    "SELECT message, level, created_at FROM log_entries WHERE log_id = %s ORDER BY created_at",
                     (log_id,),
                 )
                 rows = cur.fetchall()
@@ -107,21 +107,21 @@ def db_get_log(limit=200):
                         l.pipeline,
                         l.message,
                         l.status,
-                        l.time_point,
+                        l.created_at,
                         COALESCE(
                             json_agg(
                                 json_build_object(
                                     'message',    le.message,
                                     'level',      le.level,
-                                    'time_point', le.time_point
-                                ) ORDER BY le.time_point
+                                    'created_at', le.created_at
+                                ) ORDER BY le.created_at
                             ) FILTER (WHERE le.id IS NOT NULL),
                             '[]'
                         ) AS entries
                     FROM log l
                     LEFT JOIN log_entries le ON le.log_id = l.id
                     GROUP BY l.id
-                    ORDER BY l.time_point DESC
+                    ORDER BY l.created_at DESC
                     LIMIT %s
                     """,
                     (limit,),
@@ -134,7 +134,7 @@ def db_get_log(limit=200):
                 "pipeline":   row[2],
                 "message":    row[3],
                 "status":     row[4],
-                "time_point": row[5].isoformat() if row[5] else None,
+                "created_at": row[5].isoformat() if row[5] else None,
                 "entries":    row[6],
             }
             for row in rows
@@ -166,7 +166,7 @@ def db_get_monitor(batch_limit=50):
                         t.name,
                         t.aspect_ratio_x,
                         t.aspect_ratio_y,
-                        MAX(l.time_point) AS last_event_at,
+                        MAX(l.created_at) AS last_event_at,
                         COALESCE(
                             json_agg(
                                 json_build_object(
@@ -174,21 +174,21 @@ def db_get_monitor(batch_limit=50):
                                     'pipeline',   l.pipeline,
                                     'message',    l.message,
                                     'status',     l.status,
-                                    'time_point', l.time_point,
+                                    'created_at', l.created_at,
                                     'entries', (
                                         SELECT COALESCE(
                                             json_agg(
                                                 json_build_object(
                                                     'message',    le.message,
                                                     'level',      le.level,
-                                                    'time_point', le.time_point
-                                                ) ORDER BY le.time_point
+                                                    'created_at', le.created_at
+                                                ) ORDER BY le.created_at
                                             ),
                                             '[]'::json
                                         )
                                         FROM log_entries le WHERE le.log_id = l.id
                                     )
-                                ) ORDER BY l.time_point
+                                ) ORDER BY l.created_at
                             ) FILTER (WHERE l.id IS NOT NULL),
                             '[]'::json
                         ) AS logs
@@ -197,7 +197,7 @@ def db_get_monitor(batch_limit=50):
                     LEFT JOIN targets t ON t.id = b.target_id
                     GROUP BY b.id, b.scheduled_at, b.adhoc, b.status, b.created_at,
                              t.name, t.aspect_ratio_x, t.aspect_ratio_y
-                    ORDER BY COALESCE(MAX(l.time_point), b.created_at) DESC
+                    ORDER BY COALESCE(MAX(l.created_at), b.created_at) DESC
                     LIMIT %s
                     """,
                     (batch_limit,),
@@ -208,14 +208,14 @@ def db_get_monitor(batch_limit=50):
                 cur.execute(
                     """
                     SELECT
-                        l.id, l.pipeline, l.message, l.status, l.time_point,
+                        l.id, l.pipeline, l.message, l.status, l.created_at,
                         COALESCE(
                             json_agg(
                                 json_build_object(
                                     'message',    le.message,
                                     'level',      le.level,
-                                    'time_point', le.time_point
-                                ) ORDER BY le.time_point
+                                    'created_at', le.created_at
+                                ) ORDER BY le.created_at
                             ) FILTER (WHERE le.id IS NOT NULL),
                             '[]'::json
                         ) AS entries
@@ -223,7 +223,7 @@ def db_get_monitor(batch_limit=50):
                     LEFT JOIN log_entries le ON le.log_id = l.id
                     WHERE l.batch_id IS NULL
                     GROUP BY l.id
-                    ORDER BY l.time_point DESC
+                    ORDER BY l.created_at DESC
                     LIMIT 100
                     """
                 )
@@ -250,7 +250,7 @@ def db_get_monitor(batch_limit=50):
                 "pipeline":   r[1],
                 "message":    r[2],
                 "status":     r[3],
-                "time_point": r[4].isoformat() if r[4] else None,
+                "created_at": r[4].isoformat() if r[4] else None,
                 "entries":    r[5],
             }
             for r in sys_rows
