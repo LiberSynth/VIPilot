@@ -945,7 +945,6 @@ def db_get_models(model_type: str):
                     FROM ai_models m
                     LEFT JOIN ai_platforms p ON p.id = m.platform_id
                     WHERE m.type = %s
-                      AND (m.grade IS NULL OR m.grade != 'rejected')
                     ORDER BY m."order" ASC
                 """, (model_type,))
                 rows = cur.fetchall()
