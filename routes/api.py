@@ -171,16 +171,30 @@ def api_text_models_reorder():
 
 @bp.route("/text-models/<model_id>/probe", methods=["POST"])
 def api_text_model_probe(model_id):
+    import json as _json
+    from flask import Response as _Response
+
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
 
     m = db_get_text_model_by_id(model_id)
     if not m:
-        return jsonify({"ok": False, "error": "Модель не найдена"}), 404
+        def _err():
+            yield "data: " + _json.dumps({"type": "fail", "msg": "Модель не найдена"}) + "\n\n"
+        return _Response(_err(), mimetype="text/event-stream",
+                         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
     api_key = os.environ.get("OPENROUTER_API_KEY", "")
     if not api_key:
-        return jsonify({"ok": False, "error": "OPENROUTER_API_KEY не задан"}), 400
+        def _err():
+            yield "data: " + _json.dumps({"type": "fail", "msg": "OPENROUTER_API_KEY не задан"}) + "\n\n"
+        return _Response(_err(), mimetype="text/event-stream",
+                         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+    try:
+        fails_to_next = max(1, int(db_get("story_fails_to_next", "3")))
+    except (ValueError, TypeError):
+        fails_to_next = 3
 
     system_prompt = db_get("system_prompt", "")
     user_prompt   = db_get("metaprompt", "")
@@ -199,49 +213,87 @@ def api_text_model_probe(model_id):
         body["messages"] = messages
     body["model"] = m["model_url"]
 
-    headers = {
+    req_headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
     }
     platform_url = m["platform_url"]
 
-    last_error = "Неизвестная ошибка"
-    for attempt in range(3):
-        try:
-            resp = _requests.post(platform_url, headers=headers, json=body, timeout=30)
-        except _requests.exceptions.Timeout:
-            last_error = f"Таймаут 30с (попытка {attempt + 1}/3)"
-            continue
-        except _requests.exceptions.RequestException as e:
-            last_error = f"Ошибка соединения: {e}"
-            continue
+    def _generate():
+        last_error = "Неизвестная ошибка"
+        for attempt in range(fails_to_next):
+            yield "data: " + _json.dumps({
+                "type": "attempt",
+                "attempt": attempt + 1,
+                "total": fails_to_next
+            }) + "\n\n"
 
-        try:
-            data = resp.json()
-        except ValueError:
-            last_error = f"Не-JSON ответ (HTTP {resp.status_code})"
-            continue
+            try:
+                resp = _requests.post(platform_url, headers=req_headers, json=body, timeout=60)
+            except _requests.exceptions.Timeout:
+                last_error = "Таймаут 60с"
+                yield "data: " + _json.dumps({
+                    "type": "error", "attempt": attempt + 1, "total": fails_to_next,
+                    "msg": last_error
+                }) + "\n\n"
+                continue
+            except _requests.exceptions.RequestException as e:
+                last_error = f"Ошибка соединения: {e}"
+                yield "data: " + _json.dumps({
+                    "type": "error", "attempt": attempt + 1, "total": fails_to_next,
+                    "msg": last_error
+                }) + "\n\n"
+                continue
 
-        if resp.status_code >= 400:
-            err = data.get("error", {})
-            if isinstance(err, dict):
-                err = err.get("message", str(data))
-            last_error = f"HTTP {resp.status_code}: {err}"
-            continue
+            try:
+                data = resp.json()
+            except ValueError:
+                last_error = f"Не-JSON ответ (HTTP {resp.status_code})"
+                yield "data: " + _json.dumps({
+                    "type": "error", "attempt": attempt + 1, "total": fails_to_next,
+                    "msg": last_error
+                }) + "\n\n"
+                continue
 
-        choices = data.get("choices")
-        if not choices:
-            last_error = "Нет поля choices в ответе"
-            continue
+            if resp.status_code >= 400:
+                err = data.get("error", {})
+                if isinstance(err, dict):
+                    err = err.get("message", str(data))
+                last_error = f"HTTP {resp.status_code}: {err}"
+                yield "data: " + _json.dumps({
+                    "type": "error", "attempt": attempt + 1, "total": fails_to_next,
+                    "msg": last_error
+                }) + "\n\n"
+                continue
 
-        result = ((choices[0].get("message") or {}).get("content") or "").strip()
-        if not result:
-            last_error = "Пустой текст в ответе"
-            continue
+            choices = data.get("choices")
+            if not choices:
+                last_error = "Нет поля choices в ответе"
+                yield "data: " + _json.dumps({
+                    "type": "error", "attempt": attempt + 1, "total": fails_to_next,
+                    "msg": last_error
+                }) + "\n\n"
+                continue
 
-        return jsonify({"ok": True, "result": result, "attempts": attempt + 1})
+            result = ((choices[0].get("message") or {}).get("content") or "").strip()
+            if not result:
+                last_error = "Пустой текст в ответе"
+                yield "data: " + _json.dumps({
+                    "type": "error", "attempt": attempt + 1, "total": fails_to_next,
+                    "msg": last_error
+                }) + "\n\n"
+                continue
 
-    return jsonify({"ok": False, "error": last_error, "attempts": 3})
+            yield "data: " + _json.dumps({
+                "type": "success", "attempt": attempt + 1, "total": fails_to_next,
+                "result": result
+            }) + "\n\n"
+            return
+
+        yield "data: " + _json.dumps({"type": "fail", "msg": last_error}) + "\n\n"
+
+    return _Response(_generate(), mimetype="text/event-stream",
+                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 @bp.route("/reseed", methods=["POST"])
