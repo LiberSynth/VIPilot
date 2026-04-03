@@ -145,6 +145,24 @@ def run():
             status='running', batch_id=batch_id,
         )
 
+        # ── Эмуляционный URL (батч создан в режиме эмуляции) ────────────────
+        if video_url and video_url.startswith('emulation://'):
+            sample = db_get_random_video_data()
+            if sample is None:
+                msg = 'video_url — эмуляция, но пул видео пуст'
+                db_log_update(log_id, msg, 'error')
+                if log_id:
+                    db_log_entry(log_id, msg, level='error')
+                db_set_batch_transcode_error(batch_id)
+                print(f"[transcode] {msg}")
+                return
+            if log_id:
+                db_log_entry(log_id, 'video_url — эмуляция, взято случайное видео из пула')
+            db_set_batch_transcode_ready(batch_id, sample)
+            db_log_update(log_id, 'Транскод (из пула)', 'ok')
+            print(f"[transcode] Батч {batch_id[:8]}… — взято видео из пула (эмуляционный url)")
+            return
+
         if log_id:
             db_log_entry(log_id, f'Скачиваю: {video_url[:80]}…')
 
