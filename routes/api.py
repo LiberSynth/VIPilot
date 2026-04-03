@@ -1,6 +1,7 @@
 import os
 import threading
 import time
+import requests as _requests
 from flask import Blueprint, jsonify, request, Response
 from log import db_log_root
 
@@ -22,6 +23,7 @@ from db import (
     db_reset_batch_pipeline,
     db_get_story_text,
     db_get_batch_video_data,
+    db_get_text_model_by_id,
 )
 from log import db_get_log, db_get_monitor, db_log_pipeline, db_log_entry
 from utils.auth import is_authenticated
@@ -164,6 +166,86 @@ def api_text_models_reorder():
         return jsonify({"error": "ids required"}), 400
     ok = db_reorder_models(ids)
     return jsonify({"ok": ok})
+
+
+@bp.route("/text-models/<model_id>/probe", methods=["POST"])
+def api_text_model_probe(model_id):
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+
+    m = db_get_text_model_by_id(model_id)
+    if not m:
+        return jsonify({"ok": False, "error": "Модель не найдена"}), 404
+
+    api_key = os.environ.get("OPENROUTER_API_KEY", "")
+    if not api_key:
+        return jsonify({"ok": False, "error": "OPENROUTER_API_KEY не задан"}), 400
+
+    try:
+        fails_to_next = max(1, int(env_get("story_fails_to_next", "3")))
+    except (ValueError, TypeError):
+        fails_to_next = 3
+
+    system_prompt = env_get("system_prompt", "")
+    user_prompt   = env_get("metaprompt", "")
+
+    body_tpl = m["body_tpl"]
+    body = dict(body_tpl)
+    if "messages" in body:
+        messages = []
+        for msg in body["messages"]:
+            msg = dict(msg)
+            if msg.get("role") == "system":
+                msg["content"] = str(msg["content"]).format(system_prompt)
+            elif msg.get("role") == "user":
+                msg["content"] = str(msg["content"]).format(user_prompt)
+            messages.append(msg)
+        body["messages"] = messages
+    body["model"] = m["model_url"]
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    platform_url = m["platform_url"]
+
+    last_error = "Неизвестная ошибка"
+    for attempt in range(fails_to_next):
+        try:
+            resp = _requests.post(platform_url, headers=headers, json=body, timeout=60)
+        except _requests.exceptions.Timeout:
+            last_error = f"Таймаут (попытка {attempt + 1}/{fails_to_next})"
+            continue
+        except _requests.exceptions.RequestException as e:
+            last_error = f"Ошибка соединения: {e}"
+            continue
+
+        try:
+            data = resp.json()
+        except ValueError:
+            last_error = f"Не-JSON ответ (HTTP {resp.status_code})"
+            continue
+
+        if resp.status_code >= 400:
+            err = data.get("error", {})
+            if isinstance(err, dict):
+                err = err.get("message", str(data))
+            last_error = f"HTTP {resp.status_code}: {err}"
+            continue
+
+        choices = data.get("choices")
+        if not choices:
+            last_error = "Нет поля choices в ответе"
+            continue
+
+        result = ((choices[0].get("message") or {}).get("content") or "").strip()
+        if not result:
+            last_error = "Пустой текст в ответе"
+            continue
+
+        return jsonify({"ok": True, "result": result, "attempts": attempt + 1})
+
+    return jsonify({"ok": False, "error": last_error, "attempts": fails_to_next})
 
 
 @bp.route("/reseed", methods=["POST"])

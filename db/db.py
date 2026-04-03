@@ -586,6 +586,33 @@ def db_get_active_text_models():
         return []
 
 
+def db_get_text_model_by_id(model_id: str):
+    """Возвращает данные text-модели по ID (без фильтра по active)."""
+    try:
+        with get_db() as conn:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute("""
+                    SELECT p.url AS platform_url, m.url AS model_url,
+                           m.body, m.name, m.id
+                    FROM ai_models m
+                    JOIN ai_platforms p ON p.id = m.platform_id
+                    WHERE m.id = %s AND m.type = 'text'
+                """, (model_id,))
+                row = cur.fetchone()
+        if not row:
+            return None
+        return {
+            'platform_url': row['platform_url'],
+            'model_url':    row['model_url'],
+            'body_tpl':     row['body'] if isinstance(row['body'], dict) else {},
+            'name':         row['name'],
+            'id':           str(row['id']),
+        }
+    except Exception as e:
+        print(f"[DB] Ошибка db_get_text_model_by_id: {e}")
+        return None
+
+
 def db_get_active_video_models():
     """Возвращает список всех активных text-to-video моделей в порядке order."""
     try:

@@ -23,6 +23,7 @@ from .db import (
     db_create_story,
     db_get_active_text_model,
     db_get_active_text_models,
+    db_get_text_model_by_id,
     db_get_story_ready_batch,
     db_get_video_pending_batch,
     db_is_batch_scheduled,
