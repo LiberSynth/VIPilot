@@ -731,13 +731,7 @@
     border-bottom: 1px solid #1e1e30;
   }
   .probe-modal-title { font-size: 14px; font-weight: 600; color: #d0d0ec; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .probe-modal-copy {
-    background: none; border: 1px solid #333; border-radius: 4px; cursor: pointer;
-    color: #888; font-size: 11px; padding: 2px 8px; margin-right: 6px;
-    transition: color 0.15s, border-color 0.15s;
-  }
-  .probe-modal-copy:hover { color: #bbb; border-color: #555; }
-  .probe-modal-copy.copied { color: #5cb85c; border-color: #5cb85c; }
+  .probe-modal-copy { margin-right: 4px; }
   .probe-modal-close {
     background: none; border: none; cursor: pointer; color: #666;
     font-size: 18px; line-height: 1; padding: 2px 6px;
@@ -2586,7 +2580,7 @@ function confirmRestart() {
   <div class="probe-modal" onclick="event.stopPropagation()">
     <div class="probe-modal-head">
       <span class="probe-modal-title" id="probe-modal-title">Пробный запрос</span>
-      <button class="probe-modal-copy" id="probe-modal-copy" onclick="copyProbeContent(this)">Скопировать</button>
+      <button class="cycle-float-btn probe-modal-copy" id="probe-modal-copy" title="Скопировать" onclick="copyProbeContent(this)"><svg viewBox="0 0 16 16"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11V3a1 1 0 0 1 1-1h8"/></svg></button>
       <button class="probe-modal-close" onclick="closeProbeModal()">&times;</button>
     </div>
     <div class="probe-modal-body" id="probe-modal-body"></div>
@@ -2679,14 +2673,11 @@ function confirmRestart() {
     var body = document.getElementById('probe-modal-body');
     if (!body) return;
     var text = body.innerText || body.textContent || '';
-    navigator.clipboard.writeText(text).then(function() {
-      btn.textContent = 'Скопировано!';
+    function markCopied() {
       btn.classList.add('copied');
-      setTimeout(function() {
-        btn.textContent = 'Скопировать';
-        btn.classList.remove('copied');
-      }, 2000);
-    }).catch(function() {
+      setTimeout(function() { btn.classList.remove('copied'); }, 2000);
+    }
+    navigator.clipboard.writeText(text).then(markCopied).catch(function() {
       var ta = document.createElement('textarea');
       ta.value = text;
       ta.style.position = 'fixed'; ta.style.opacity = '0';
@@ -2694,12 +2685,7 @@ function confirmRestart() {
       ta.select();
       document.execCommand('copy');
       document.body.removeChild(ta);
-      btn.textContent = 'Скопировано!';
-      btn.classList.add('copied');
-      setTimeout(function() {
-        btn.textContent = 'Скопировать';
-        btn.classList.remove('copied');
-      }, 2000);
+      markCopied();
     });
   };
 
