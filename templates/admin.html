@@ -715,7 +715,7 @@
     display: flex; align-items: center; gap: 10px;
     padding: 14px 16px 12px; border-bottom: 1px solid #1c1a2e; flex-shrink: 0;
   }
-  .story-modal-title { font-size: 14px; font-weight: 600; color: #d0d0ec; flex: 1; }
+  .story-modal-title { font-size: 14px; font-weight: 600; color: #d0d0ec; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .story-modal-close {
     background: none; border: none; color: #555; font-size: 18px; line-height: 1;
     cursor: pointer; padding: 2px 4px; border-radius: 4px; transition: color .15s;
@@ -744,7 +744,7 @@
     display: flex; align-items: center; gap: 10px;
     padding: 12px 14px 10px; border-bottom: 1px solid #1c1a2e; flex-shrink: 0;
   }
-  .video-modal-title { font-size: 14px; font-weight: 600; color: #d0d0ec; flex: 1; }
+  .video-modal-title { font-size: 14px; font-weight: 600; color: #d0d0ec; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .video-modal-close {
     background: none; border: none; color: #555; font-size: 18px; line-height: 1;
     cursor: pointer; padding: 2px 4px; border-radius: 4px; transition: color .15s;
@@ -1799,11 +1799,13 @@ function validateLifetimes() {
     const restartBtn = canRestart
       ? '<button class="cycle-float-btn" title="Перезапустить" data-bid="' + esc(batchId) + '" data-pip="' + esc(log.pipeline) + '" onclick="monitorPipelineRestart(this)">' + MON_SVG_RESTART + '</button>'
       : '';
+    const _modelMatch = (log.message || '').match(/\(([^)]+)\)\s*$/);
+    const _modelName  = _modelMatch ? _modelMatch[1] : '';
     const storyBtn = (log.pipeline === 'story' && st === 'ok' && storyId)
-      ? '<button class="cycle-float-btn story-view-btn" title="Посмотреть сюжет" onclick="openStoryModal(\'' + esc(storyId) + '\')">' + MON_SVG_EYE + '</button>'
+      ? '<button class="cycle-float-btn story-view-btn" title="Посмотреть сюжет" onclick="openStoryModal(\'' + esc(storyId) + '\',\'' + esc(_modelName) + '\')">' + MON_SVG_EYE + '</button>'
       : '';
     const videoBtn = (log.pipeline === 'video' && st === 'ok' && hasVideoData)
-      ? '<button class="cycle-float-btn" title="Просмотр видео" onclick="openVideoModal(\'' + esc(batchId) + '\')">' + MON_SVG_PLAY + '</button>'
+      ? '<button class="cycle-float-btn" title="Просмотр видео" onclick="openVideoModal(\'' + esc(batchId) + '\',\'' + esc(_modelName) + '\')">' + MON_SVG_PLAY + '</button>'
       : '';
     const pipActions = '<div class="monitor-pip-actions" onclick="event.stopPropagation()">' +
       storyBtn +
@@ -2458,7 +2460,7 @@ function confirmRestart() {
 <div id="video-modal-overlay" class="video-modal-overlay" onclick="closeVideoModal(event)">
   <div class="video-modal" onclick="event.stopPropagation()">
     <div class="video-modal-head">
-      <span class="video-modal-title">Видео</span>
+      <span class="video-modal-title" id="video-modal-title">Видео</span>
       <button class="story-modal-close" onclick="closeVideoModal()">&times;</button>
     </div>
     <div class="video-modal-body" id="video-modal-body"></div>
@@ -2475,10 +2477,12 @@ function confirmRestart() {
     document.body.style.overflow = '';
   };
 
-  window.openVideoModal = function(batchId) {
+  window.openVideoModal = function(batchId, modelName) {
     var overlay = document.getElementById('video-modal-overlay');
     var body    = document.getElementById('video-modal-body');
+    var title   = document.getElementById('video-modal-title');
     if (!overlay || !body) return;
+    if (title) title.textContent = modelName ? 'Видео · ' + modelName : 'Видео';
     body.innerHTML = '<div class="video-modal-loading">Загрузка…</div>';
     overlay.classList.add('open');
     document.body.style.overflow = 'hidden';
@@ -2510,7 +2514,7 @@ function confirmRestart() {
 <div id="story-modal-overlay" class="story-modal-overlay" onclick="closeStoryModal(event)">
   <div class="story-modal" onclick="event.stopPropagation()">
     <div class="story-modal-head">
-      <span class="story-modal-title">Сюжет</span>
+      <span class="story-modal-title" id="story-modal-title">Сюжет</span>
       <button class="cycle-float-btn" id="story-modal-copy-btn" onclick="copyStoryText()"><svg viewBox="0 0 16 16" fill="none" stroke="#8888b0" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11V3a1 1 0 0 1 1-1h8"/></svg></button>
       <button class="story-modal-close" onclick="closeStoryModal()">&times;</button>
     </div>
@@ -2522,11 +2526,13 @@ function confirmRestart() {
 (function() {
   var _storyText = '';
 
-  window.openStoryModal = function(storyId) {
+  window.openStoryModal = function(storyId, modelName) {
     var overlay = document.getElementById('story-modal-overlay');
     var body    = document.getElementById('story-modal-body');
     var copyBtn = document.getElementById('story-modal-copy-btn');
+    var title   = document.getElementById('story-modal-title');
     if (!overlay || !body) return;
+    if (title) title.textContent = modelName ? 'Сюжет · ' + modelName : 'Сюжет';
     _storyText = '';
     body.innerHTML = '<span class="story-modal-loading">Загрузка…</span>';
     copyBtn.classList.remove('copied');
