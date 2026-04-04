@@ -666,7 +666,7 @@ def db_get_video_model_by_id(model_id: str):
             'body_tpl':     row['body'] if isinstance(row['body'], dict) else {},
             'name':         row['name'],
             'id':           str(row['id']),
-            'submit_url':   f"{platform_url}/{model_url}",
+            'submit_url':   model_url if model_url.startswith('http') else f"{platform_url}/{model_url}",
         }
     except Exception as e:
         print(f"[DB] Ошибка db_get_video_model_by_id: {e}")
@@ -695,7 +695,7 @@ def db_get_active_video_models():
                 'body_tpl':     row['body'] if isinstance(row['body'], dict) else {},
                 'name':         row['name'],
                 'id':           str(row['id']),
-                'submit_url':   f"{row['platform_url']}/{row['model_url']}",
+                'submit_url':   row['model_url'] if row['model_url'].startswith('http') else f"{row['platform_url']}/{row['model_url']}",
             })
         return result
     except Exception as e:
