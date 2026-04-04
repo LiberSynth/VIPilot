@@ -412,6 +412,28 @@ def _m007_rename_video_data(cur):
     """)
 
 
+def _m008_fix_ai_model_grades(cur):
+    """
+    Исправляет grade для трёх текстовых моделей, которые на проде имеют
+    неверное значение из-за того, что _m004 только вставляет новые записи,
+    но не обновляет существующие.
+
+    Нужные значения:
+      - mistral-7b-instruct     → rejected
+      - openrouter/free         → fallback
+      - qwen3.6-plus-preview    → rejected
+    """
+    cur.execute("""
+        UPDATE ai_models SET grade = 'rejected' WHERE name = 'mistral-7b-instruct'
+    """)
+    cur.execute("""
+        UPDATE ai_models SET grade = 'fallback' WHERE name = 'openrouter/free'
+    """)
+    cur.execute("""
+        UPDATE ai_models SET grade = 'rejected' WHERE name = 'qwen3.6-plus-preview'
+    """)
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -420,6 +442,7 @@ MIGRATIONS = [
     (5, _m005_batch_original_video),
     (6, _m006_target_transcode),
     (7, _m007_rename_video_data),
+    (8, _m008_fix_ai_model_grades),
 ]
 
 
