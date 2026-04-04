@@ -168,7 +168,7 @@ def db_get_monitor(batch_limit=50):
                         t.aspect_ratio_y,
                         MAX(l.created_at) AS last_event_at,
                         b.story_id,
-                        (b.video_data IS NOT NULL) AS has_video_data,
+                        (b.video_data_transcoded IS NOT NULL) AS has_video_data,
                         COALESCE(
                             json_agg(
                                 json_build_object(
@@ -202,7 +202,7 @@ def db_get_monitor(batch_limit=50):
                     LEFT JOIN ai_models tm ON tm.id = b.text_model_id
                     LEFT JOIN ai_models vm ON vm.id = b.video_model_id
                     GROUP BY b.id, b.scheduled_at, b.adhoc, b.status, b.created_at,
-                             t.name, t.aspect_ratio_x, t.aspect_ratio_y, b.story_id, b.video_data,
+                             t.name, t.aspect_ratio_x, t.aspect_ratio_y, b.story_id, b.video_data_transcoded,
                              tm.name, vm.name
                     ORDER BY COALESCE(MAX(l.created_at), b.created_at) DESC
                     LIMIT %s

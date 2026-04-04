@@ -98,7 +98,7 @@ def _m001_baseline_schema(cur):
             story_id     UUID        REFERENCES stories(id),
             video_url    TEXT,
             video_file   TEXT,
-            video_data   BYTEA,
+            video_data_transcoded BYTEA,
             data         JSONB,
             created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
             completed_at TIMESTAMPTZ
@@ -401,6 +401,17 @@ def _m006_target_transcode(cur):
     """)
 
 
+def _m007_rename_video_data(cur):
+    """
+    Переименовывает колонку video_data → video_data_transcoded в таблице batches,
+    чтобы название явно отражало, что это транскодированное (обработанное ffmpeg) видео.
+    """
+    cur.execute("""
+        ALTER TABLE batches
+            RENAME COLUMN video_data TO video_data_transcoded
+    """)
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -408,6 +419,7 @@ MIGRATIONS = [
     (4, _m004_seed_ai_models),
     (5, _m005_batch_original_video),
     (6, _m006_target_transcode),
+    (7, _m007_rename_video_data),
 ]
 
 

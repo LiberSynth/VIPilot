@@ -8,7 +8,7 @@ transcode_ready без единой записи в лог.
 Если включено:
   - Отсутствие оригинала в БД → критичная ошибка (transcode_error).
   - Любой другой сбой (ffmpeg и т.п.) → некритично: лог-предупреждение,
-    батч всё равно переходит в transcode_ready с пустым video_data
+    батч всё равно переходит в transcode_ready с пустым video_data_transcoded
     (пайплайн публикации возьмёт оригинал как запасной вариант).
 
 Статус: video_ready → transcode_ready / transcode_error.

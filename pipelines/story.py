@@ -131,7 +131,7 @@ def run():
                 )
                 if log_id:
                     db_log_entry(log_id, f"Батч-донор: {donor_id}")
-                    db_log_entry(log_id, "video_data перенесён, статус: transcode_ready")
+                    db_log_entry(log_id, "video_data_transcoded перенесён, статус: transcode_ready")
                 print(f"[story] Батч {batch_id[:8]}… — {msg}")
                 batch_done = True
                 return

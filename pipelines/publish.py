@@ -2,7 +2,7 @@
 Pipeline 5 — Публикация.
 Берёт первый transcode_ready-батч и публикует видео на платформу таргета.
 Поддерживается: VKontakte (история + стена, настраивается через settings).
-Видео берётся из БД (video_data). Статус: transcode_ready → published / publish_error.
+Видео берётся из БД (video_data_transcoded). Статус: transcode_ready → published / publish_error.
 """
 
 from datetime import datetime, timezone
@@ -32,11 +32,11 @@ def _publish_vk(batch_id, log_id):
     video_data = db_get_batch_video_data(batch_id)
     if video_data is None:
         if log_id:
-            db_log_entry(log_id, 'video_data отсутствует — использую оригинал (video_data_original)')
+            db_log_entry(log_id, 'video_data_transcoded отсутствует — использую оригинал (video_data_original)')
         video_data = db_get_batch_original_video(batch_id)
         if video_data is None:
             if log_id:
-                db_log_entry(log_id, 'video_data_original тоже отсутствует в БД', level='error')
+                db_log_entry(log_id, 'Ни video_data_transcoded, ни video_data_original не найдены в БД', level='error')
             return False
 
     group_id = int(db_get('vk_group_id', '236929597'))
