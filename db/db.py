@@ -218,25 +218,18 @@ def db_create_adhoc_batch(target_id):
         return None
 
 
-def db_create_probe_batch(story_id, text_model_id, video_model_id, video_url, video_bytes):
-    """Создаёт батч для пробного запроса видео-модели (status='probe', target_id=NULL).
-    Сохраняет сюжет, модели, URL и оригинальное видео. Возвращает UUID батча или None."""
+def db_create_probe_batch(video_model_id):
+    """Создаёт pending-батч без таргета с зафиксированной video_model_id.
+    Возвращает UUID батча или None."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
                     INSERT INTO batches
-                        (target_id, status, adhoc, story_id, text_model_id, video_model_id,
-                         video_url, video_data_original, completed_at)
-                    VALUES (NULL, 'probe', TRUE, %s, %s, %s, %s, %s, now())
+                        (target_id, status, adhoc, video_model_id)
+                    VALUES (NULL, 'pending', TRUE, %s)
                     RETURNING id
-                """, (
-                    story_id,
-                    text_model_id,
-                    video_model_id,
-                    video_url,
-                    psycopg2.Binary(video_bytes) if video_bytes else None,
-                ))
+                """, (video_model_id,))
                 row = cur.fetchone()
             conn.commit()
         return str(row[0]) if row else None
@@ -268,7 +261,7 @@ def db_get_pending_batch():
                            t.name AS target_name,
                            t.aspect_ratio_x, t.aspect_ratio_y
                     FROM claimed c
-                    JOIN targets t ON t.id = c.target_id
+                    LEFT JOIN targets t ON t.id = c.target_id
                 """)
                 row = cur.fetchone()
             conn.commit()
@@ -316,10 +309,11 @@ def db_get_story_ready_batch_atomic():
                         RETURNING *
                     )
                     SELECT c.id, c.scheduled_at, c.target_id, c.story_id,
+                           c.video_model_id,
                            t.name AS target_name,
                            t.aspect_ratio_x, t.aspect_ratio_y
                     FROM claimed c
-                    JOIN targets t ON t.id = c.target_id
+                    LEFT JOIN targets t ON t.id = c.target_id
                 """)
                 row = cur.fetchone()
             conn.commit()
@@ -496,10 +490,11 @@ def db_get_video_pending_batch():
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
                 cur.execute("""
                     SELECT b.id, b.scheduled_at, b.target_id, b.story_id, b.data,
+                           b.video_model_id,
                            t.name AS target_name,
                            t.aspect_ratio_x, t.aspect_ratio_y
                     FROM batches b
-                    JOIN targets t ON t.id = b.target_id
+                    LEFT JOIN targets t ON t.id = b.target_id
                     WHERE b.status = 'video_pending'
                       AND b.data IS NOT NULL
                     ORDER BY b.scheduled_at
@@ -921,7 +916,7 @@ def db_get_transcode_ready_batch():
                            t.name AS target_name,
                            t.aspect_ratio_x, t.aspect_ratio_y
                     FROM batches b
-                    JOIN targets t ON t.id = b.target_id
+                    LEFT JOIN targets t ON t.id = b.target_id
                     WHERE b.status = 'transcode_ready'
                     ORDER BY b.scheduled_at NULLS FIRST
                     LIMIT 1
@@ -931,6 +926,76 @@ def db_get_transcode_ready_batch():
     except Exception as e:
         print(f"[DB] Ошибка db_get_transcode_ready_batch: {e}")
         return None
+
+
+def db_get_batch_logs(batch_id):
+    """Возвращает статус батча и все log-записи с вложенными entries для поллинга диалога."""
+    try:
+        with get_db() as conn:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(
+                    "SELECT status, (video_data_original IS NOT NULL OR video_data_transcoded IS NOT NULL) AS has_video FROM batches WHERE id = %s",
+                    (batch_id,),
+                )
+                row = cur.fetchone()
+                if not row:
+                    return None
+                batch_status = row['status']
+                has_video = bool(row['has_video'])
+                cur.execute("""
+                    SELECT l.id::text, l.pipeline, l.message, l.status,
+                           l.created_at,
+                           COALESCE(
+                               json_agg(
+                                   json_build_object(
+                                       'message', le.message,
+                                       'level',   le.level,
+                                       'created_at', le.created_at
+                                   ) ORDER BY le.created_at
+                               ) FILTER (WHERE le.id IS NOT NULL),
+                               '[]'::json
+                           ) AS entries
+                    FROM log l
+                    LEFT JOIN log_entries le ON le.log_id = l.id
+                    WHERE l.batch_id = %s
+                    GROUP BY l.id
+                    ORDER BY l.created_at
+                """, (batch_id,))
+                logs = cur.fetchall()
+        return {
+            'batch_status': batch_status,
+            'has_video': has_video,
+            'logs': [
+                {
+                    'id':         r['id'],
+                    'pipeline':   r['pipeline'],
+                    'message':    r['message'],
+                    'status':     r['status'],
+                    'created_at': r['created_at'].isoformat() if r['created_at'] else None,
+                    'entries':    r['entries'],
+                }
+                for r in logs
+            ],
+        }
+    except Exception as e:
+        print(f"[DB] Ошибка db_get_batch_logs: {e}")
+        return None
+
+
+def db_set_batch_probe(batch_id):
+    """Переводит батч в status='probe' и ставит completed_at."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE batches SET status = 'probe', completed_at = now() WHERE id = %s",
+                    (batch_id,),
+                )
+            conn.commit()
+        return True
+    except Exception as e:
+        print(f"[DB] Ошибка db_set_batch_probe: {e}")
+        return False
 
 
 def db_set_batch_published(batch_id):

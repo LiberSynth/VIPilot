@@ -48,6 +48,8 @@ from .db import (
     db_get_batch_video_data,
     db_get_random_real_original_video,
     db_steal_video_from_cancelled,
+    db_get_batch_logs,
+    db_set_batch_probe,
     db_set_batch_published,
     db_set_batch_publish_error,
     db_get_models,

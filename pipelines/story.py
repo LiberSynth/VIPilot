@@ -109,10 +109,11 @@ def run():
             batch_done = True
             return
 
-        batch_id = str(batch['id'])
-        target   = batch['target_name']
+        batch_id  = str(batch['id'])
+        target    = batch['target_name'] or 'probe'
+        is_probe  = batch['target_id'] is None
 
-        if not db_is_batch_scheduled(batch['scheduled_at'], batch['target_id']):
+        if not is_probe and not db_is_batch_scheduled(batch['scheduled_at'], batch['target_id']):
             db_set_batch_obsolete(batch_id)
             db_log_pipeline('story', 'Батч отменён — слот удалён из расписания или таргет отключён',
                             status='прервана', batch_id=batch_id)
@@ -120,7 +121,7 @@ def run():
             batch_done = True
             return
 
-        if env_get('emulation_mode', '0') != '1':
+        if not is_probe and env_get('emulation_mode', '0') != '1':
             donor_id = db_steal_video_from_cancelled(batch_id)
             if donor_id:
                 msg = f"Видео взято из отменённого батча {donor_id[:8]}… — генерация пропущена"

@@ -25,6 +25,7 @@ from db import (
     db_set_batch_obsolete,
     db_get_story_text,
     db_get_active_video_models,
+    db_get_video_model_by_id,
     db_set_batch_video_pending,
     db_set_batch_video_ready,
     db_set_batch_video_error,
@@ -167,18 +168,20 @@ def run():
         if not batch:
             return
 
-        batch_id = str(batch['id'])
-        target   = batch['target_name']
-        ar_x     = batch['aspect_ratio_x']
-        ar_y     = batch['aspect_ratio_y']
-        story_id = str(batch['story_id'])
+        batch_id  = str(batch['id'])
+        target    = batch['target_name'] or 'probe'
+        ar_x      = batch['aspect_ratio_x'] or 9
+        ar_y      = batch['aspect_ratio_y'] or 16
+        story_id  = str(batch['story_id'])
+        is_probe  = batch['target_id'] is None
+        pinned_model_id = batch.get('video_model_id')
 
         try:
             video_duration = max(1, min(60, int(db_get('video_duration', '6'))))
         except (ValueError, TypeError):
             video_duration = 6
 
-        if not db_is_batch_scheduled(batch['scheduled_at'], batch['target_id']):
+        if not is_probe and not db_is_batch_scheduled(batch['scheduled_at'], batch['target_id']):
             db_set_batch_obsolete(batch_id)
             db_log_pipeline('video', 'Батч отменён — слот удалён из расписания или таргет отключён',
                             status='прервана', batch_id=batch_id)
@@ -236,13 +239,29 @@ def run():
                 notify_failure(f"video: {msg}")
                 return
 
-            models = db_get_active_video_models()
-            if not models:
-                msg = 'Нет активных video-моделей в ai_models (type=text-to-video)'
-                db_log_pipeline('video', msg, status='error', batch_id=batch_id)
-                print(f"[video] {msg}")
-                notify_failure(f"video: {msg}")
-                return
+            # --- Выбор модели(ей) ---
+            if pinned_model_id:
+                # Probe-режим: используем только зафиксированную модель, одна попытка
+                pinned_m = db_get_video_model_by_id(pinned_model_id)
+                if not pinned_m:
+                    msg = f'Probe-модель {str(pinned_model_id)[:8]}… не найдена'
+                    db_log_pipeline('video', msg, status='error', batch_id=batch_id)
+                    print(f"[video] {msg}")
+                    return
+                models        = [pinned_m]
+                fails_to_next = 1
+            else:
+                models = db_get_active_video_models()
+                if not models:
+                    msg = 'Нет активных video-моделей в ai_models (type=text-to-video)'
+                    db_log_pipeline('video', msg, status='error', batch_id=batch_id)
+                    print(f"[video] {msg}")
+                    notify_failure(f"video: {msg}")
+                    return
+                try:
+                    fails_to_next = max(1, int(db_get('video_fails_to_next', '3')))
+                except (ValueError, TypeError):
+                    fails_to_next = 3
 
             story_text = db_get_story_text(story_id)
             if not story_text:
@@ -257,11 +276,6 @@ def run():
                 video_post_prompt = video_post_prompt.replace('{продолжительность}', str(video_duration))
                 story_text = story_text + '\n\n' + video_post_prompt
 
-            try:
-                fails_to_next = max(1, int(db_get('video_fails_to_next', '3')))
-            except (ValueError, TypeError):
-                fails_to_next = 3
-
             log_id = db_log_pipeline(
                 'video', 'Генерация видео…',
                 status='running', batch_id=batch_id,
@@ -269,7 +283,10 @@ def run():
             if log_id:
                 db_log_entry(log_id, f"Соотношение сторон: {ar_x}:{ar_y}")
                 db_log_entry(log_id, f"Промпт:\n{story_text}")
-                db_log_entry(log_id, f"Моделей: {len(models)}, попыток на модель: {fails_to_next}")
+                if pinned_model_id:
+                    db_log_entry(log_id, f"Probe-модель: {models[0]['name']}, одна попытка")
+                else:
+                    db_log_entry(log_id, f"Моделей: {len(models)}, попыток на модель: {fails_to_next}")
 
             request_id   = None
             status_url   = None
@@ -339,7 +356,10 @@ def run():
                     break
 
             if not request_id:
-                msg = 'Все активные видео-модели не приняли запрос — повтор с первой модели'
+                if pinned_model_id:
+                    msg = f'Probe-модель {models[0]["name"]} не приняла запрос'
+                else:
+                    msg = 'Все активные видео-модели не приняли запрос — повтор с первой модели'
                 if log_id:
                     db_log_update(log_id, msg, 'warn')
                     db_log_entry(log_id, msg, level='warn')

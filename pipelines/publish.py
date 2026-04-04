@@ -15,6 +15,7 @@ from db import (
     db_get_batch_original_video,
     db_is_batch_scheduled,
     db_set_batch_obsolete,
+    db_set_batch_probe,
     db_set_batch_published,
     db_set_batch_publish_error,
 )
@@ -68,7 +69,15 @@ def run():
             return
 
         batch_id = str(batch['id'])
-        target   = batch['target_name']
+        target   = batch['target_name'] or 'probe'
+
+        # Probe-батч без таргета — публикация не нужна, переводим в probe
+        if batch['target_id'] is None:
+            db_set_batch_probe(batch_id)
+            db_log_pipeline('publish', 'Probe-батч — публикация пропущена, статус → probe',
+                            status='ok', batch_id=batch_id)
+            print(f"[publish] Батч {batch_id[:8]}… probe — публикация пропущена")
+            return
 
         if not db_is_batch_scheduled(batch['scheduled_at'], batch['target_id']):
             db_set_batch_obsolete(batch_id)

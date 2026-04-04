@@ -2802,7 +2802,7 @@ function confirmRestart() {
 
     if (title) title.textContent = 'Пробный запрос · ' + modelName;
     body.className = 'probe-modal-body';
-    body.innerHTML = '<span style="color:#888">Выполняю запрос…</span>';
+    body.innerHTML = '<span style="color:#888">Создаю батч…</span>';
     if (info) info.textContent = '';
     var _vc = document.getElementById('probe-modal-video');
     if (_vc) { _vc.innerHTML = ''; _vc.style.display = 'none'; }
@@ -2817,12 +2817,8 @@ function confirmRestart() {
           body.innerHTML = '<span style="color:#c05050">' + _esc(data.error) + '</span>';
           return;
         }
-        _doProbePoll(data.job_id, '/api/video-models/probe/', btn, body, function(url) {
-          var vc = document.getElementById('probe-modal-video');
-          if (!vc) return;
-          vc.innerHTML = '<video controls autoplay src="' + url + '"></video>';
-          vc.style.display = '';
-        });
+        body.innerHTML = '';
+        _doBatchLogPoll(data.batch_id, body);
       })
       .catch(function(e) {
         if (_probeBtn) { _probeBtn.classList.remove('probing'); _probeBtn = null; }
@@ -2831,6 +2827,86 @@ function confirmRestart() {
         if (info) info.textContent = '';
       });
   };
+
+  function _doBatchLogPoll(batchId, body) {
+    var _TERMINAL = ['probe', 'video_error', 'transcode_error', 'publish_error', 'отменён'];
+    var _statusColor = { ok: '#6a6', error: '#c05050', warn: '#c09050', running: '#888', info: '#888', прервана: '#c09050' };
+    var _levelColor  = { info: '#aaa', warn: '#c09050', ok: '#6a6', error: '#c05050' };
+    var renderedLogIds = {};
+
+    function renderLogs(logs) {
+      logs.forEach(function(log) {
+        var domId = 'probe-log-' + log.id;
+        var existing = document.getElementById(domId);
+        var sc = _statusColor[log.status] || '#aaa';
+        var entries = log.entries || [];
+
+        if (!existing) {
+          var wrap = document.createElement('div');
+          wrap.id = domId;
+          wrap.style.cssText = 'margin-bottom:6px';
+          var hdr = document.createElement('div');
+          hdr.style.cssText = 'font-size:11px;color:#666;text-transform:uppercase;margin-bottom:2px';
+          hdr.textContent = log.pipeline;
+          var msg = document.createElement('div');
+          msg.id = domId + '-msg';
+          msg.style.cssText = 'font-size:12px;color:' + sc + ';margin-bottom:2px';
+          msg.textContent = log.message;
+          var entriesDiv = document.createElement('div');
+          entriesDiv.id = domId + '-entries';
+          entriesDiv.style.cssText = 'padding-left:10px';
+          wrap.appendChild(hdr);
+          wrap.appendChild(msg);
+          wrap.appendChild(entriesDiv);
+          body.appendChild(wrap);
+          renderedLogIds[log.id] = 0;
+        } else {
+          var msgEl = document.getElementById(domId + '-msg');
+          if (msgEl) { msgEl.style.color = sc; msgEl.textContent = log.message; }
+        }
+
+        var entriesDiv = document.getElementById(domId + '-entries');
+        var rendered = renderedLogIds[log.id] || 0;
+        var newEntries = entries.slice(rendered);
+        newEntries.forEach(function(e) {
+          var lc = _levelColor[e.level] || '#aaa';
+          var d = document.createElement('div');
+          d.style.cssText = 'color:' + lc + ';font-size:11px;margin-bottom:2px;white-space:pre-wrap;line-height:1.4';
+          d.textContent = e.message;
+          entriesDiv.appendChild(d);
+        });
+        renderedLogIds[log.id] = entries.length;
+        body.scrollTop = body.scrollHeight;
+      });
+    }
+
+    function poll() {
+      fetch('/api/batch/' + batchId + '/logs')
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d.error) {
+            setTimeout(poll, 2000);
+            return;
+          }
+          renderLogs(d.logs || []);
+          var status = d.batch_status;
+          if (_TERMINAL.indexOf(status) !== -1) {
+            if (_probeBtn) { _probeBtn.classList.remove('probing'); _probeBtn = null; }
+            if (d.has_video && status === 'probe') {
+              var vc = document.getElementById('probe-modal-video');
+              if (vc) {
+                vc.innerHTML = '<video controls autoplay src="/api/batch/' + batchId + '/video"></video>';
+                vc.style.display = '';
+              }
+            }
+          } else {
+            setTimeout(poll, 2000);
+          }
+        })
+        .catch(function() { setTimeout(poll, 3000); });
+    }
+    poll();
+  }
 
   window.copyProbeContent = function(btn) {
     var body = document.getElementById('probe-modal-body');
