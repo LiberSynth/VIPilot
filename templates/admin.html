@@ -2336,6 +2336,9 @@ window.cycleVideoGrade = function(el) {
     if (el.querySelector('.monitor-entries')) el.classList.toggle('open');
   };
 
+  window.groupLogsByPipeline = groupLogsByPipeline;
+  window.renderLogItem       = renderLogItem;
+
   refreshMonitor();
   setInterval(refreshMonitor, 5000);
 })();
