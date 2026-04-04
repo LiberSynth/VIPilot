@@ -867,8 +867,10 @@ def db_get_batch_video_data(batch_id) -> bytes | None:
 
 
 def db_steal_video_from_cancelled(batch_id) -> str | None:
-    """Ищет самый старый отменённый батч с готовым видео (video_data_transcoded IS NOT NULL),
-    переносит video_data_transcoded и video_url в указанный батч, переводит его в transcode_ready,
+    """Ищет самый старый батч-донор с готовым видео (video_data_transcoded IS NOT NULL):
+    — отменённые батчи (status = 'отменён')
+    — завершённые пробные батчи (status = 'probe', target_id IS NULL)
+    Переносит video_data_transcoded и video_url в указанный батч, переводит его в transcode_ready,
     зануляет video_data_transcoded у донора. Возвращает id донора (str) или None."""
     try:
         with get_db() as conn:
@@ -876,7 +878,11 @@ def db_steal_video_from_cancelled(batch_id) -> str | None:
                 cur.execute("""
                     SELECT id, video_data_transcoded, video_url
                     FROM batches
-                    WHERE status = 'отменён' AND video_data_transcoded IS NOT NULL
+                    WHERE video_data_transcoded IS NOT NULL
+                      AND (
+                        status = 'отменён'
+                        OR (status = 'probe' AND target_id IS NULL)
+                      )
                     ORDER BY created_at ASC
                     LIMIT 1
                     FOR UPDATE SKIP LOCKED
