@@ -702,6 +702,22 @@ def db_get_video_ready_batch():
         return None
 
 
+def db_set_batch_original_video(batch_id, video_data: bytes):
+    """Сохраняет оригинальное видео (до транскодирования) в поле video_data_original."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE batches SET video_data_original = %s WHERE id = %s",
+                    (psycopg2.Binary(video_data), batch_id),
+                )
+            conn.commit()
+        return True
+    except Exception as e:
+        print(f"[DB] Ошибка db_set_batch_original_video: {e}")
+        return False
+
+
 def db_set_batch_transcode_ready(batch_id, video_data: bytes):
     """Сохраняет транскодированный файл в БД и переводит батч в status='transcode_ready'."""
     try:

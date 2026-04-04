@@ -376,11 +376,23 @@ def _m004_seed_ai_models(cur):
 # Реестр миграций — добавляйте только в конец, никогда не переиспользуйте номера
 # ---------------------------------------------------------------------------
 
+def _m005_batch_original_video(cur):
+    """
+    Добавляет поле video_data_original (BYTEA) в таблицу batches
+    для хранения оригинального видео, скачанного с модели до транскодирования.
+    """
+    cur.execute("""
+        ALTER TABLE batches
+            ADD COLUMN IF NOT EXISTS video_data_original BYTEA
+    """)
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
     (3, _m003_schedule_created_at),
     (4, _m004_seed_ai_models),
+    (5, _m005_batch_original_video),
 ]
 
 
