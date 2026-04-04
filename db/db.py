@@ -867,18 +867,20 @@ def db_get_batch_video_data(batch_id) -> bytes | None:
 
 
 def db_steal_video_from_cancelled(batch_id) -> str | None:
-    """Ищет самый старый батч-донор с готовым видео (video_data_transcoded IS NOT NULL):
+    """Ищет самый старый батч-донор с видео:
     — отменённые батчи (status = 'отменён')
     — завершённые пробные батчи (status = 'probe', target_id IS NULL)
-    Переносит video_data_transcoded и video_url в указанный батч, переводит его в transcode_ready,
-    зануляет video_data_transcoded у донора. Возвращает id донора (str) или None."""
+    Донором считается батч у которого есть video_data_transcoded или video_data_original.
+    Если есть транскодированное — переносит его, статус получателя → transcode_ready.
+    Если только оригинал — переносит его, статус получателя → video_ready.
+    У донора обнуляет перенесённое поле. Возвращает id донора (str) или None."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                    SELECT id, video_data_transcoded, video_url
+                    SELECT id, video_data_transcoded, video_data_original, video_url
                     FROM batches
-                    WHERE video_data_transcoded IS NOT NULL
+                    WHERE (video_data_transcoded IS NOT NULL OR video_data_original IS NOT NULL)
                       AND (
                         status = 'отменён'
                         OR (status = 'probe' AND target_id IS NULL)
@@ -891,20 +893,34 @@ def db_steal_video_from_cancelled(batch_id) -> str | None:
                 if not donor:
                     return None
 
-                donor_id, video_data_transcoded, video_url = donor
+                donor_id, video_data_transcoded, video_data_original, video_url = donor
 
-                cur.execute("""
-                    UPDATE batches
-                    SET status                = 'transcode_ready',
-                        video_data_transcoded = %s,
-                        video_url             = %s
-                    WHERE id = %s
-                """, (psycopg2.Binary(bytes(video_data_transcoded)), video_url, batch_id))
-
-                cur.execute(
-                    "UPDATE batches SET video_data_transcoded = NULL WHERE id = %s",
-                    (donor_id,),
-                )
+                if video_data_transcoded is not None:
+                    # Транскодированное есть — переносим его, получатель сразу в transcode_ready
+                    cur.execute("""
+                        UPDATE batches
+                        SET status                = 'transcode_ready',
+                            video_data_transcoded = %s,
+                            video_url             = %s
+                        WHERE id = %s
+                    """, (psycopg2.Binary(bytes(video_data_transcoded)), video_url, batch_id))
+                    cur.execute(
+                        "UPDATE batches SET video_data_transcoded = NULL WHERE id = %s",
+                        (donor_id,),
+                    )
+                else:
+                    # Только оригинал — переносим его, получатель идёт на транскодирование
+                    cur.execute("""
+                        UPDATE batches
+                        SET status               = 'video_ready',
+                            video_data_original  = %s,
+                            video_url            = %s
+                        WHERE id = %s
+                    """, (psycopg2.Binary(bytes(video_data_original)), video_url, batch_id))
+                    cur.execute(
+                        "UPDATE batches SET video_data_original = NULL WHERE id = %s",
+                        (donor_id,),
+                    )
 
             conn.commit()
         return str(donor_id)
