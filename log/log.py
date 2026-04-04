@@ -195,7 +195,7 @@ def db_get_monitor(batch_limit=50):
                             '[]'::json
                         ) AS logs,
                         tm.name AS text_model_name,
-                        vm.name AS video_model_name
+                        COALESCE(vm.name, b.data->>'model_name') AS video_model_name
                     FROM batches b
                     LEFT JOIN log l ON l.batch_id = b.id
                     LEFT JOIN targets t ON t.id = b.target_id

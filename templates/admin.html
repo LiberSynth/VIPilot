@@ -542,6 +542,7 @@
 
   .monitor-log-ts       { color: #8080a8; flex-shrink: 0; font-variant-numeric: tabular-nums; }
   .monitor-log-pipeline { color: #d0d0ec; flex-shrink: 0; font-weight: 500; }
+  .monitor-log-model { color: #888; font-size: 10px; font-weight: 400; margin-left: 5px; }
   .monitor-log-comment  { color: #9090b8; font-size: 12px; padding-left: 39px; word-break: break-word; white-space: pre-wrap; line-height: 1.4; }
   .monitor-log-chevron  { font-size: 10px; color: #7070a0; flex-shrink: 0; transition: transform .15s; }
   .monitor-log-item.open .monitor-log-chevron { transform: rotate(180deg); }
@@ -1903,6 +1904,10 @@ window.cycleVideoGrade = function(el) {
   function renderLogItem(log, batchId, storyId, hasVideoData, textModelName, videoModelName) {
     const st  = log.status || 'info';
     const pip = PIPELINE_LABELS[log.pipeline] || log.pipeline;
+    const modelName = (log.pipeline === 'video' && videoModelName) ? videoModelName
+      : (log.pipeline === 'story' && textModelName) ? textModelName
+      : null;
+    const modelTag = modelName ? '<span class="monitor-log-model">' + esc(modelName) + '</span>' : '';
     const hasEntries = log.entries && log.entries.length > 0;
     const chevron = hasEntries ? '<span class="monitor-log-chevron">▼</span>' : '';
     const comment = log.message ? '<div class="monitor-log-comment">' + esc(log.message) + '</div>' : '';
@@ -1932,7 +1937,7 @@ window.cycleVideoGrade = function(el) {
         '<div class="monitor-log-header-top">' +
           '<span class="monitor-log-dot ls-' + esc(st) + '"></span>' +
           '<span class="monitor-log-ts">'       + fmtMsk(log.created_at) + '</span>' +
-          '<span class="monitor-log-pipeline">' + esc(pip)               + '</span>' +
+          '<span class="monitor-log-pipeline">' + esc(pip) + modelTag    + '</span>' +
           pipActions +
           chevron +
         '</div>' +
