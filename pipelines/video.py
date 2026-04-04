@@ -32,6 +32,7 @@ from db import (
     db_set_batch_pending,
     db_reset_video_generating,
     db_set_batch_original_video,
+    db_get_random_video_data,
 )
 from log import db_log_pipeline, db_log_entry, db_log_update, db_log_interrupt_running
 
@@ -159,8 +160,18 @@ def run():
                 'video', 'Видео [эмуляция]',
                 status='running', batch_id=batch_id,
             )
+            sample = db_get_random_video_data()
+            if sample is None:
+                msg = '[эмуляция] Нет видео в пуле — невозможно скопировать оригинал'
+                db_log_update(log_id, msg, 'error')
+                if log_id:
+                    db_log_entry(log_id, msg, level='error')
+                db_set_batch_video_error(batch_id)
+                print(f"[video] {msg}")
+                return
+            db_set_batch_original_video(batch_id, sample)
             if log_id:
-                db_log_entry(log_id, '[эмуляция] Запрос к модели пропущен')
+                db_log_entry(log_id, '[эмуляция] Оригинал скопирован из случайного донора')
                 db_log_entry(log_id, '[эмуляция] Батч переведён в video_ready')
             db_set_batch_video_ready(batch_id, 'emulation://skipped')
             db_log_update(log_id, 'Видео [эмуляция]', 'ok')

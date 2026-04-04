@@ -20,7 +20,6 @@ import tempfile
 
 from utils.notify import notify_failure
 from db import (
-    env_get,
     db_get_video_ready_batch,
     db_is_batch_scheduled,
     db_set_batch_obsolete,
@@ -28,7 +27,6 @@ from db import (
     db_set_batch_transcode_skip,
     db_set_batch_transcode_ready,
     db_set_batch_transcode_error,
-    db_get_random_video_data,
 )
 from log import db_log_pipeline, db_log_entry, db_log_update, db_log_interrupt_running
 
@@ -117,7 +115,6 @@ def run():
 
         batch_id        = str(batch['id'])
         target          = batch['target_name']
-        video_url       = batch['video_url']
         do_transcode    = batch.get('target_transcode', True)
 
         # ── Транскодирование выключено для таргета ───────────────────────────
@@ -134,50 +131,6 @@ def run():
             return
 
         print(f"[transcode] Батч {batch_id[:8]}… ({target}) — начало транскодирования")
-
-        # ── Режим эмуляции ──────────────────────────────────────────────────
-        if env_get("emulation_mode", "0") == "1":
-            log_id = db_log_pipeline(
-                'transcode', 'Транскод [эмуляция]',
-                status='running', batch_id=batch_id,
-            )
-            sample = db_get_random_video_data()
-            if sample is None:
-                msg = '[эмуляция] Нет видео в пуле — невозможно эмулировать транскод'
-                db_log_update(log_id, msg, 'error')
-                if log_id:
-                    db_log_entry(log_id, msg, level='error')
-                db_set_batch_transcode_error(batch_id)
-                print(f"[transcode] {msg}")
-                return
-            if log_id:
-                db_log_entry(log_id, '[эмуляция] Взято случайное видео из пула')
-            db_set_batch_transcode_ready(batch_id, sample)
-            db_log_update(log_id, 'Транскод [эмуляция]', 'ok')
-            print(f"[transcode] Батч {batch_id[:8]}… — эмуляция транскода завершена")
-            return
-
-        # ── Эмуляционный URL (батч создан в режиме эмуляции) ────────────────
-        if video_url and video_url.startswith('emulation://'):
-            log_id = db_log_pipeline(
-                'transcode', 'Транскодирование…',
-                status='running', batch_id=batch_id,
-            )
-            sample = db_get_random_video_data()
-            if sample is None:
-                msg = 'video_url — эмуляция, но пул видео пуст'
-                db_log_update(log_id, msg, 'error')
-                if log_id:
-                    db_log_entry(log_id, msg, level='error')
-                db_set_batch_transcode_error(batch_id)
-                print(f"[transcode] {msg}")
-                return
-            if log_id:
-                db_log_entry(log_id, 'video_url — эмуляция, взято случайное видео из пула')
-            db_set_batch_transcode_ready(batch_id, sample)
-            db_log_update(log_id, 'Транскод (из пула)', 'ok')
-            print(f"[transcode] Батч {batch_id[:8]}… — взято видео из пула (эмуляционный url)")
-            return
 
         log_id = db_log_pipeline(
             'transcode', 'Транскодирование…',
