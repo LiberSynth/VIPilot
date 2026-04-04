@@ -1876,7 +1876,8 @@ window.cycleGrade = function(el) {
       storyBtn +
       videoBtn +
       restartBtn +
-      '<button class="cycle-float-btn" title="Скопировать" onclick="monitorPipelineCopy(this)">' + MON_SVG_COPY + '</button>' +
+      '<button class="cycle-float-btn" title="Скопировать логи" onclick="monitorPipelineCopy(this)">'    + MON_SVG_COPY + '</button>' +
+      '<button class="cycle-float-btn" title="Скопировать инфо" onclick="monitorPipelineCopyInfo(this)">'+ MON_SVG_INFO + '</button>' +
     '</div>';
 
     return '<div class="monitor-log-item" data-lid="' + esc(log.id) + '" data-status="' + esc(st) + '" onclick="monitorToggleLog(event,this)">' +
@@ -1900,6 +1901,7 @@ window.cycleGrade = function(el) {
   const MON_SVG_RESTART  = `<svg viewBox="0 0 16 16" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="15.3,2.7 15.3,6.7 11.3,6.7"/><path d="M13.66 10a6 6 0 1 1-.08-5"/></svg>`;
   const MON_SVG_EYE      = `<svg viewBox="0 0 16 16"><rect x="3" y="2" width="10" height="12" rx="1.5"/><line x1="5.5" y1="5.5" x2="10.5" y2="5.5"/><line x1="5.5" y1="8" x2="10.5" y2="8"/><line x1="5.5" y1="10.5" x2="8.5" y2="10.5"/></svg>`;
   const MON_SVG_PLAY     = `<svg viewBox="0 0 16 16"><polygon points="4,2 13,8 4,14"/></svg>`;
+  const MON_SVG_INFO     = `<svg viewBox="0 0 16 16"><rect x="1.5" y="3.5" width="13" height="9" rx="1.5"/><circle cx="4.8" cy="8" r="1.2"/><line x1="7.5" y1="6.5" x2="13" y2="6.5"/><line x1="7.5" y1="9.5" x2="11" y2="9.5"/></svg>`;
 
   function groupLogsByPipeline(logs) {
     const order = [];
@@ -1965,12 +1967,19 @@ window.cycleGrade = function(el) {
 
     const hdrActions =
       '<div class="monitor-hdr-actions" onclick="event.stopPropagation()">' +
-        '<button class="cycle-float-btn" title="Развернуть все" onclick="monitorExpandAll(this)">' + MON_SVG_EXPAND   + '</button>' +
-        '<button class="cycle-float-btn" title="Свернуть все"   onclick="monitorCollapseAll(this)">' + MON_SVG_COLLAPSE + '</button>' +
-        '<button class="cycle-float-btn" title="Скопировать"    onclick="monitorCopy(this)">'         + MON_SVG_COPY + '</button>' +
+        '<button class="cycle-float-btn" title="Развернуть все"   onclick="monitorExpandAll(this)">'    + MON_SVG_EXPAND   + '</button>' +
+        '<button class="cycle-float-btn" title="Свернуть все"     onclick="monitorCollapseAll(this)">'  + MON_SVG_COLLAPSE + '</button>' +
+        '<button class="cycle-float-btn" title="Скопировать логи" onclick="monitorCopy(this)">'         + MON_SVG_COPY     + '</button>' +
+        '<button class="cycle-float-btn" title="Скопировать инфо" onclick="monitorBatchCopyInfo(this)">'+ MON_SVG_INFO     + '</button>' +
       '</div>';
 
-    return '<div class="monitor-batch bs-' + esc(bs) + '" data-bid="' + esc(batch.batch_id) + '" onclick="monitorToggleBatch(event,this)">' +
+    return '<div class="monitor-batch bs-' + esc(bs) + '" data-bid="' + esc(batch.batch_id) +
+      '" data-scheduled="'  + esc(batch.adhoc ? 'сейчас' : fmtMsk(batch.scheduled_at)) +
+      '" data-bstatus="'    + esc(bs) +
+      '" data-target="'     + esc(batch.target_name     || '') +
+      '" data-text-model="' + esc(batch.text_model_name || '') +
+      '" data-video-model="'+ esc(batch.video_model_name|| '') +
+      '" onclick="monitorToggleBatch(event,this)">' +
       '<div class="monitor-batch-header">' +
         '<span class="monitor-dot ' + md + '"></span>' +
         '<div class="monitor-batch-meta">' +
@@ -2203,6 +2212,61 @@ window.cycleGrade = function(el) {
       document.execCommand('copy'); document.body.removeChild(ta);
       doFlash();
     });
+  };
+
+  function _monitorCopyText(text, btn) {
+    const doFlash = function() {
+      btn.classList.add('copied');
+      setTimeout(function() { btn.classList.remove('copied'); }, 2000);
+    };
+    navigator.clipboard.writeText(text).then(doFlash).catch(function() {
+      var ta = document.createElement('textarea');
+      ta.value = text; ta.style.cssText = 'position:fixed;opacity:0';
+      document.body.appendChild(ta); ta.select();
+      document.execCommand('copy'); document.body.removeChild(ta);
+      doFlash();
+    });
+  }
+
+  function _batchInfoLines(batchEl) {
+    if (!batchEl) return [];
+    return [
+      'batch_id: '    + (batchEl.dataset.bid       || ''),
+      'scheduled: '   + (batchEl.dataset.scheduled  || ''),
+      'status: '      + (batchEl.dataset.bstatus    || ''),
+      'target: '      + (batchEl.dataset.target     || ''),
+      'text_model: '  + (batchEl.dataset.textModel  || ''),
+      'video_model: ' + (batchEl.dataset.videoModel || ''),
+    ];
+  }
+
+  window.monitorBatchCopyInfo = function(btn) {
+    const batchEl = btn.closest('.monitor-batch');
+    _monitorCopyText(_batchInfoLines(batchEl).join('\n'), btn);
+  };
+
+  window.monitorPipelineCopyInfo = function(btn) {
+    const item    = btn.closest('.monitor-log-item');
+    if (!item) return;
+    const batchEl = item.closest('.monitor-batch');
+    var lines = _batchInfoLines(batchEl);
+    lines.push('');
+    const ts  = item.querySelector('.monitor-log-ts')       ? item.querySelector('.monitor-log-ts').textContent.trim()       : '';
+    const pip = item.querySelector('.monitor-log-pipeline') ? item.querySelector('.monitor-log-pipeline').textContent.trim() : '';
+    const msg = item.querySelector('.monitor-log-comment')  ? item.querySelector('.monitor-log-comment').textContent.trim()  : '';
+    const st  = item.dataset.status || '';
+    lines.push('pipeline: ' + pip);
+    lines.push('status: '   + st);
+    lines.push('time: '     + ts);
+    if (msg) lines.push('message: ' + msg);
+    var entries = [];
+    item.querySelectorAll('.monitor-entry-row').forEach(function(row) {
+      const ets  = row.querySelector('.monitor-entry-ts')  ? row.querySelector('.monitor-entry-ts').textContent.trim()  : '';
+      const emsg = row.querySelector('.monitor-entry-msg') ? row.querySelector('.monitor-entry-msg').textContent.trim() : '';
+      entries.push('  [' + ets + '] ' + emsg);
+    });
+    if (entries.length) { lines.push('entries:'); entries.forEach(function(e) { lines.push(e); }); }
+    _monitorCopyText(lines.join('\n'), btn);
   };
 
   window.monitorPipelineRestart = function(btn) {
