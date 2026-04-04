@@ -43,6 +43,7 @@ from db import (
     db_get_batch_video_data,
     db_get_text_model_by_id,
     db_get_video_model_by_id,
+    db_get_active_text_models,
     db_get,
 )
 from log import db_get_log, db_get_monitor, db_log_pipeline, db_log_entry
@@ -350,11 +351,6 @@ def api_video_model_probe(model_id):
     body_tpl   = m["body_tpl"]
     submit_url = m["submit_url"]
 
-    synthetic_prompt = "A calm ocean at sunset"
-    body = dict(body_tpl)
-    if "prompt" in body:
-        body["prompt"] = str(body["prompt"]).format(synthetic_prompt)
-
     req_headers = {
         "Authorization": f"Key {fal_api_key}",
         "Content-Type": "application/json",
@@ -366,11 +362,115 @@ def api_video_model_probe(model_id):
 
     def _run():
         import json as _json
-        _probe_append(job_id, f"Модель: {model_name}", "info")
+
+        # --- Шаг 1: генерация сюжета через text-модели (как в story.py) ---
+        _probe_append(job_id, "Шаг 1: генерация сюжета через text-модель…", "info")
+        openrouter_key = os.environ.get("OPENROUTER_API_KEY", "")
+        if not openrouter_key:
+            _probe_append(job_id, "OPENROUTER_API_KEY не задан — генерация сюжета невозможна", "error")
+            _probe_finish(job_id)
+            return
+
+        text_models = db_get_active_text_models()
+        if not text_models:
+            _probe_append(job_id, "Нет активных text-моделей", "error")
+            _probe_finish(job_id)
+            return
+
+        system_prompt = db_get("system_prompt", "")
+        user_prompt   = db_get("metaprompt", "")
+        _probe_append(job_id, f"Промпт:\n{user_prompt}", "info")
+
+        story_text = None
+        for tm in text_models:
+            tm_name = tm["name"]
+            _probe_append(job_id, f"Text-модель: {tm_name}", "info")
+            try:
+                t_body = dict(tm["body_tpl"])
+                if "messages" in t_body:
+                    messages = []
+                    for msg in t_body["messages"]:
+                        mm = dict(msg)
+                        if mm.get("role") == "system":
+                            mm["content"] = str(mm["content"]).format(system_prompt)
+                        elif mm.get("role") == "user":
+                            mm["content"] = str(mm["content"]).format(user_prompt)
+                        messages.append(mm)
+                    t_body["messages"] = messages
+                t_body["model"] = tm["model_url"]
+                t_headers = {
+                    "Authorization": f"Bearer {openrouter_key}",
+                    "Content-Type": "application/json",
+                }
+                t_req_preview = _json.dumps(t_body, ensure_ascii=False, indent=2)
+                _probe_append(job_id, f"→ Запрос (text):\n{t_req_preview}", "info")
+                t_resp = _requests.post(tm["platform_url"], headers=t_headers, json=t_body, timeout=60)
+                _probe_append(job_id, f"← HTTP {t_resp.status_code}", "info")
+                t_data = t_resp.json()
+                if t_resp.status_code >= 400:
+                    err = t_data.get("error") or {}
+                    if isinstance(err, dict):
+                        err = err.get("message", t_data)
+                    _probe_append(job_id, f"[{tm_name}] HTTP {t_resp.status_code}: {err}", "warn")
+                    continue
+                choices = t_data.get("choices")
+                if not choices:
+                    _probe_append(job_id, f"[{tm_name}] нет поля choices", "warn")
+                    continue
+                story_text = ((choices[0].get("message") or {}).get("content") or "").strip()
+                if not story_text:
+                    _probe_append(job_id, f"[{tm_name}] пустой текст", "warn")
+                    story_text = None
+                    continue
+                _probe_append(job_id, f"Сюжет:\n{story_text}", "ok")
+                break
+            except _requests.exceptions.Timeout:
+                _probe_append(job_id, f"[{tm_name}] таймаут (60 с)", "warn")
+                continue
+            except Exception as e:
+                _probe_append(job_id, f"[{tm_name}] ошибка: {e}", "warn")
+                continue
+
+        if not story_text:
+            _probe_append(job_id, "Не удалось получить сюжет ни от одной text-модели", "error")
+            _probe_finish(job_id)
+            return
+
+        # --- Шаг 2: применяем video_post_prompt и строим тело запроса (как в video.py) ---
+        try:
+            video_duration = max(1, min(60, int(db_get("video_duration", "6"))))
+        except (ValueError, TypeError):
+            video_duration = 6
+
+        video_post_prompt = db_get("video_post_prompt", "").strip()
+        if video_post_prompt:
+            video_post_prompt = video_post_prompt.replace("{продолжительность}", str(video_duration))
+            story_text = story_text + "\n\n" + video_post_prompt
+
+        targets = db_get_active_targets()
+        if targets:
+            ar_x = targets[0]["aspect_ratio_x"]
+            ar_y = targets[0]["aspect_ratio_y"]
+        else:
+            ar_x, ar_y = 9, 16
+
+        _probe_append(job_id, f"Шаг 2: отправка в видео-модель: {model_name}", "info")
         _probe_append(job_id, f"URL: {submit_url}", "info")
+        _probe_append(job_id, f"Соотношение сторон: {ar_x}:{ar_y}, длительность: {video_duration} с", "info")
+
+        body = dict(body_tpl)
+        if "prompt" in body:
+            body["prompt"] = str(body["prompt"]).format(story_text)
+        if "duration" in body:
+            if body["duration"] == "{int}":
+                body["duration"] = video_duration
+            else:
+                body["duration"] = str(body["duration"]).format(video_duration)
+        if "aspect_ratio" in body:
+            body["aspect_ratio"] = str(body["aspect_ratio"]).format(ar_x, ar_y)
 
         req_preview = _json.dumps(body, ensure_ascii=False, indent=2)
-        _probe_append(job_id, f"→ Запрос:\n{req_preview}", "info")
+        _probe_append(job_id, f"→ Запрос (video):\n{req_preview}", "info")
 
         try:
             resp = _requests.post(submit_url, headers=req_headers, json=body, timeout=60)

@@ -1,37 +1,3 @@
 uploads = []
-
-[[generated]]
-id = "34JG2ErZQCxImyk9_wCMw"
-uri = "file://.canvas/assets/icon_conveyor.png"
-type = "image"
-title = "generated_image"
-
-[[generated]]
-id = "F7ZpcMHx-sUm2iuaWtRgh"
-uri = "file://.canvas/assets/icon_factory.png"
-type = "image"
-title = "generated_image"
-
-[[generated]]
-id = "N-BYaWPjZLHFxOSqp8-zq"
-uri = "file://.canvas/assets/icon_gear_ai.png"
-type = "image"
-title = "generated_image"
-
-[[generated]]
-id = "BS3dFtoJ2HLiVKKBkL-Nl"
-uri = "file://.canvas/assets/icon_bricks_screen.png"
-type = "image"
-title = "generated_image"
-
-[[generated]]
-id = "T0PsbbLzpylRkQLNLfpt9"
-uri = "file://.canvas/assets/icon_v2_phone_factory.png"
-type = "image"
-title = "generated_image"
-
-[[outputs]]
-id = "hDYZyNqMyQnJ2J3UE3gW9"
-uri = "file://scripts/compare_output.mp4"
-type = "video"
-title = "Оригинал (fal.ai) vs Транскод — визуальное сравнение"
+generated = []
+outputs = []
