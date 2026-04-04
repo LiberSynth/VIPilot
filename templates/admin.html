@@ -2204,33 +2204,29 @@ window.cycleVideoGrade = function(el) {
   };
 
   window.monitorCopy = function(btn) {
-    const body = btn.closest('.monitor-batch').querySelector('.monitor-batch-body');
+    const batchEl = btn.closest('.monitor-batch');
+    const body = batchEl ? batchEl.querySelector('.monitor-batch-body') : null;
     if (!body) return;
-    var lines = [];
+    var lines = _batchInfoLines(batchEl);
     body.querySelectorAll('.monitor-log-item').forEach(function(item) {
-      const ts  = item.querySelector('.monitor-log-ts')  ? item.querySelector('.monitor-log-ts').textContent.trim()  : '';
+      lines.push('');
+      const ts  = item.querySelector('.monitor-log-ts')       ? item.querySelector('.monitor-log-ts').textContent.trim()       : '';
       const pip = item.querySelector('.monitor-log-pipeline') ? item.querySelector('.monitor-log-pipeline').textContent.trim() : '';
-      const st  = item.querySelector('.monitor-log-status') ? item.querySelector('.monitor-log-status').textContent.trim() : '';
-      const msg = item.querySelector('.monitor-log-msg') ? item.querySelector('.monitor-log-msg').textContent.trim() : '';
-      lines.push('[' + ts + '] ' + pip + ' ' + st + ' ' + msg);
+      const msg = item.querySelector('.monitor-log-comment')  ? item.querySelector('.monitor-log-comment').textContent.trim()  : '';
+      const st  = item.dataset.status || '';
+      lines.push('pipeline: ' + pip);
+      lines.push('status: '   + st);
+      lines.push('time: '     + ts);
+      if (msg) lines.push('message: ' + msg);
+      lines.push('');
+      lines.push('[' + ts + '] ' + pip + ' ' + st + (msg ? ' — ' + msg : ''));
       item.querySelectorAll('.monitor-entry-row').forEach(function(row) {
-        const ets = row.querySelector('.monitor-entry-ts')  ? row.querySelector('.monitor-entry-ts').textContent.trim()  : '';
-        const emsg= row.querySelector('.monitor-entry-msg') ? row.querySelector('.monitor-entry-msg').textContent.trim() : '';
+        const ets  = row.querySelector('.monitor-entry-ts')  ? row.querySelector('.monitor-entry-ts').textContent.trim()  : '';
+        const emsg = row.querySelector('.monitor-entry-msg') ? row.querySelector('.monitor-entry-msg').textContent.trim() : '';
         lines.push('  [' + ets + '] ' + emsg);
       });
     });
-    const text = lines.join('\n');
-    const doFlash = function() {
-      btn.classList.add('copied');
-      setTimeout(function() { btn.classList.remove('copied'); }, 2000);
-    };
-    navigator.clipboard.writeText(text).then(doFlash).catch(function() {
-      var ta = document.createElement('textarea');
-      ta.value = text; ta.style.cssText = 'position:fixed;opacity:0';
-      document.body.appendChild(ta); ta.select();
-      document.execCommand('copy'); document.body.removeChild(ta);
-      doFlash();
-    });
+    _monitorCopyText(lines.join('\n'), btn);
   };
 
   window.monitorPipelineCopy = function(btn) {
