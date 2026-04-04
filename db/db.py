@@ -545,35 +545,6 @@ def db_get_story_text(story_id):
         return None
 
 
-def db_get_active_video_model():
-    """Возвращает (submit_url, platform_url, body_tpl, model_name, model_id)
-    для активной video-модели из таблицы ai_models (type='text-to-video'), или все None."""
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT p.url, m.url, m.body, m.name, m.id
-                    FROM ai_models m
-                    JOIN ai_platforms p ON p.id = m.platform_id
-                    WHERE m.active = TRUE AND m.type = 'text-to-video'
-                    ORDER BY m."order"
-                    LIMIT 1
-                """)
-                row = cur.fetchone()
-        if not row:
-            return None, None, None, None, None
-        platform_url = row[0]
-        model_url    = row[1]
-        body_tpl     = row[2] if isinstance(row[2], dict) else {}
-        model_name   = row[3]
-        model_id     = str(row[4])
-        submit_url   = f"{platform_url}/{model_url}"
-        return submit_url, platform_url, body_tpl, model_name, model_id
-    except Exception as e:
-        print(f"[DB] Ошибка db_get_active_video_model: {e}")
-        return None, None, None, None, None
-
-
 def db_get_active_text_models():
     """Возвращает список всех активных text-моделей в порядке order."""
     try:
