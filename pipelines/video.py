@@ -31,7 +31,7 @@ from db import (
     db_set_batch_pending,
     db_reset_video_generating,
     db_set_batch_original_video,
-    db_get_random_video_data,
+    db_get_random_real_original_video,
 )
 from log import db_log_pipeline, db_log_entry, db_log_update, db_log_interrupt_running
 
@@ -159,7 +159,7 @@ def run():
                 'video', 'Видео [эмуляция]',
                 status='running', batch_id=batch_id,
             )
-            sample = db_get_random_video_data()
+            sample = db_get_random_real_original_video()
             if sample is None:
                 msg = '[эмуляция] Нет видео в пуле — невозможно скопировать оригинал'
                 db_log_update(log_id, msg, 'error')

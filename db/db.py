@@ -754,18 +754,23 @@ def db_set_batch_transcode_ready(batch_id, video_data: bytes):
         return False
 
 
-def db_get_random_video_data() -> bytes | None:
-    """Возвращает video_data_transcoded случайного батча из пула (для режима эмуляции)."""
+def db_get_random_real_original_video() -> bytes | None:
+    """Возвращает video_data_original случайного батча с реальным (не эмулированным) видео."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT video_data_transcoded FROM batches WHERE video_data_transcoded IS NOT NULL ORDER BY random() LIMIT 1"
+                    """
+                    SELECT video_data_original FROM batches
+                    WHERE video_data_original IS NOT NULL
+                      AND (video_url IS NULL OR video_url NOT LIKE 'emulation://%')
+                    ORDER BY random() LIMIT 1
+                    """
                 )
                 row = cur.fetchone()
                 return bytes(row[0]) if row else None
     except Exception as e:
-        print(f"[DB] Ошибка db_get_random_video_data: {e}")
+        print(f"[DB] Ошибка db_get_random_real_original_video: {e}")
         return None
 
 
