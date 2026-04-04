@@ -202,6 +202,10 @@ def save():
             vid_dur = 6
         db_set("video_duration", str(vid_dur))
 
+    video_post_prompt_val = request.form.get("video_post_prompt")
+    if video_post_prompt_val is not None:
+        db_set("video_post_prompt", video_post_prompt_val)
+
     buf_str = request.form.get("buffer_hours", "").strip()
     if buf_str:
         try:

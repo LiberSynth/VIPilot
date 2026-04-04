@@ -219,6 +219,11 @@ def run():
                 notify_failure(f"video: {msg} (батч {batch_id[:8]})")
                 return
 
+            video_post_prompt = db_get('video_post_prompt', '').strip()
+            if video_post_prompt:
+                video_post_prompt = video_post_prompt.replace('{продолжительность}', str(video_duration))
+                story_text = story_text + '\n\n' + video_post_prompt
+
             try:
                 fails_to_next = max(1, int(db_get('video_fails_to_next', '3')))
             except (ValueError, TypeError):
