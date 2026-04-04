@@ -95,7 +95,7 @@ def admin_page():
     target_id       = target["id"] if target else None
     aspect_ratio_x  = target["aspect_ratio_x"] if target else 9
     aspect_ratio_y  = target["aspect_ratio_y"] if target else 16
-    vk_transcode    = target["transcode"] if target else True
+    vk_transcode    = db_get("vk_transcode", "1") == "1"
 
     resp = make_response(render_template(
         "admin.html",
@@ -188,6 +188,7 @@ def save():
             pass
 
     vk_transcode_raw = request.form.get("vk_transcode", "0")
+    db_set("vk_transcode", "1" if vk_transcode_raw == "1" else "0")
     if ar_target_id:
         db_update_target_transcode(ar_target_id, vk_transcode_raw == "1")
 
