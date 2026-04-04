@@ -1590,14 +1590,12 @@ function validateLifetimes() {
         const rect = item.getBoundingClientRect();
         const mid = rect.top + rect.height / 2;
         const insertBefore = e.clientY < mid;
-        // Build new ordered id list
-        const items = Array.from(container.querySelectorAll('.model-item'));
-        const ids = items.map(function(el) { return el.dataset.id; });
-        const srcIdx = ids.indexOf(dragSrcId);
-        ids.splice(srcIdx, 1);
-        var destIdx = ids.indexOf(m.id);
-        if (!insertBefore) destIdx += 1;
-        ids.splice(destIdx, 0, dragSrcId);
+        const srcEl = container.querySelector('[data-id="' + dragSrcId + '"]');
+        if (srcEl) {
+          if (insertBefore) container.insertBefore(srcEl, item);
+          else container.insertBefore(srcEl, item.nextSibling);
+        }
+        const ids = Array.from(container.querySelectorAll('.model-item')).map(function(el) { return el.dataset.id; });
         dragSrcId = null;
         saveOrder(ids);
       });
@@ -1612,9 +1610,7 @@ function validateLifetimes() {
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({ids: ids})
     })
-      .then(function(r) { return r.json(); })
-      .then(function() { loadModels(); })
-      .catch(function(e) { console.error('reorder error', e); });
+      .catch(function(e) { console.error('reorder error', e); loadModels(); });
   }
 
   window.activateModel = function(id) {
@@ -1752,13 +1748,12 @@ window.cycleVideoGrade = function(el) {
         const rect = item.getBoundingClientRect();
         const mid = rect.top + rect.height / 2;
         const insertBefore = e.clientY < mid;
-        const items = Array.from(container.querySelectorAll('.model-item'));
-        const ids = items.map(function(el) { return el.dataset.id; });
-        const srcIdx = ids.indexOf(dragSrcId);
-        ids.splice(srcIdx, 1);
-        var destIdx = ids.indexOf(m.id);
-        if (!insertBefore) destIdx += 1;
-        ids.splice(destIdx, 0, dragSrcId);
+        const srcEl = container.querySelector('[data-id="' + dragSrcId + '"]');
+        if (srcEl) {
+          if (insertBefore) container.insertBefore(srcEl, item);
+          else container.insertBefore(srcEl, item.nextSibling);
+        }
+        const ids = Array.from(container.querySelectorAll('.model-item')).map(function(el) { return el.dataset.id; });
         dragSrcId = null;
         saveTextOrder(ids);
       });
@@ -1773,9 +1768,7 @@ window.cycleVideoGrade = function(el) {
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({ids: ids})
     })
-      .then(function(r) { return r.json(); })
-      .then(function() { loadTextModels(); })
-      .catch(function(e) { console.error('text reorder error', e); });
+      .catch(function(e) { console.error('text reorder error', e); loadTextModels(); });
   }
 
   window.activateTextModel = function(id) {
