@@ -319,9 +319,14 @@ def run():
                 db_log_entry(log_id, f"Оригинал сохранён ({orig_mb} МБ)")
             print(f"[video] Оригинал сохранён в БД ({orig_mb} МБ)")
         except Exception as e:
+            msg = f"Ошибка скачивания оригинала: {e}"
+            db_log_update(log_id, msg, 'error')
             if log_id:
-                db_log_entry(log_id, f"Не удалось сохранить оригинал: {e}", level='warn')
-            print(f"[video] Предупреждение: не удалось сохранить оригинал — {e}")
+                db_log_entry(log_id, msg, level='error')
+            db_set_batch_video_error(batch_id)
+            print(f"[video] {msg}")
+            notify_failure(f"video: {msg} (батч {batch_id[:8]})")
+            return
 
         db_set_batch_video_ready(batch_id, video_url)
         if used_model_id:
