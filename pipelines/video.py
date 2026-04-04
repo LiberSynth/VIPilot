@@ -85,26 +85,36 @@ def _build_body(body_tpl, prompt, ar_x, ar_y, video_duration):
     body = dict(body_tpl)
     if 'prompt' in body:
         body['prompt'] = str(body['prompt']).format(prompt)
-    if 'duration' in body:
-        if body['duration'] == '{:int}':
-            body['duration'] = video_duration
-        else:
-            body['duration'] = str(body['duration']).format(video_duration)
-    if 'aspect_ratio' in body:
-        body['aspect_ratio'] = str(body['aspect_ratio']).format(ar_x, ar_y)
-    # Поддержка width/height для моделей, принимающих размеры вместо aspect_ratio
-    if body.get('width') == '{:width}' or body.get('height') == '{:height}':
-        if ar_x <= ar_y:   # портрет или квадрат
-            h = 1024
-            w = round(1024 * ar_x / ar_y / 32) * 32
-        else:              # альбомная
-            w = 1024
-            h = round(1024 * ar_y / ar_x / 32) * 32
-        body['width']  = w
-        body['height'] = h
-    # num_frames: количество кадров из длительности (25 fps)
-    if body.get('num_frames') == '{:frames}':
-        body['num_frames'] = video_duration * 25
+    # Вычисляем width/height из aspect ratio (нужны для {:int} в этих полях)
+    if ar_x <= ar_y:   # портрет или квадрат
+        calc_h = 1024
+        calc_w = round(1024 * ar_x / ar_y / 32) * 32
+    else:              # альбомная
+        calc_w = 1024
+        calc_h = round(1024 * ar_y / ar_x / 32) * 32
+
+    # Маппинг имени поля → целое значение для {:int}
+    _INT_VALUES = {
+        'duration':   video_duration,
+        'width':      calc_w,
+        'height':     calc_h,
+        'num_frames': video_duration * 25,
+    }
+
+    for field, val in list(body.items()):
+        if val == '{:int}' and field in _INT_VALUES:
+            body[field] = _INT_VALUES[field]
+        elif isinstance(val, str) and val != '{:int}':
+            if field == 'aspect_ratio':
+                body[field] = val.format(ar_x, ar_y)
+            elif field == 'prompt':
+                pass  # уже заменён выше
+            else:
+                try:
+                    body[field] = val.format(video_duration)
+                except (IndexError, KeyError):
+                    pass
+
     return body
 
 
