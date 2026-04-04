@@ -86,7 +86,7 @@ def _build_body(body_tpl, prompt, ar_x, ar_y, video_duration):
     if 'prompt' in body:
         body['prompt'] = str(body['prompt']).format(prompt)
     if 'duration' in body:
-        if body['duration'] == '{int}':
+        if body['duration'] == '{:int}':
             body['duration'] = video_duration
         else:
             body['duration'] = str(body['duration']).format(video_duration)
