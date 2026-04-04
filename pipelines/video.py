@@ -29,7 +29,7 @@ from db import (
     db_set_batch_video_pending,
     db_set_batch_video_ready,
     db_set_batch_video_error,
-    db_set_batch_pending,
+    db_set_batch_story_ready_from_error,
     db_reset_video_generating,
     db_set_batch_original_video,
     db_get_random_real_original_video,
@@ -108,18 +108,10 @@ def _build_body(body_tpl, prompt, ar_x, ar_y, video_duration):
     return body
 
 
-def _reset_to_pending(log_id, batch_id, msg):
-    """Логирует фатальный сбой и сбрасывает батч в pending для повторного цикла."""
-    db_log_update(log_id, msg, 'error')
-    if log_id:
-        db_log_entry(log_id, msg, level='error')
-        db_log_entry(log_id, 'Батч сброшен в «запланирован» — цикл генерации перезапустится', level='warn')
-    db_set_batch_pending(batch_id)
-    notify_failure(f"video: {msg} (батч {str(batch_id)[:8]})")
-
-
-def _poll(log_id, batch_id, status_url, response_url):
-    """Поллит fal.ai до завершения. Возвращает video_url или None."""
+def _poll(log_id, status_url, response_url):
+    """Поллит fal.ai до завершения.
+    Возвращает (video_url, None) при успехе или (None, error_msg) при сбое.
+    Не меняет статус батча — это обязанность вызывающего кода."""
     for attempt in range(_POLL_MAX):
         time.sleep(_POLL_INTERVAL)
         try:
@@ -142,27 +134,32 @@ def _poll(log_id, batch_id, status_url, response_url):
                 if detail:
                     types = [d.get('type', '') for d in detail] if isinstance(detail, list) else []
                     if any('content_policy' in t for t in types):
-                        _reset_to_pending(log_id, batch_id,
-                                          'fal.ai отклонил промпт: нарушение политики контента')
-                        return None
+                        msg = 'fal.ai отклонил промпт: нарушение политики контента'
+                        if log_id:
+                            db_log_entry(log_id, msg, level='error')
+                        return None, msg
                 video_url = result.get('video', {}).get('url')
                 if not video_url:
-                    _reset_to_pending(log_id, batch_id,
-                                      f'Нет URL видео в ответе fal.ai: {str(result)}')
-                    return None
-                return video_url
+                    msg = f'Нет URL видео в ответе fal.ai: {str(result)}'
+                    if log_id:
+                        db_log_entry(log_id, msg, level='error')
+                    return None, msg
+                return video_url, None
 
             elif status == 'FAILED':
-                _reset_to_pending(log_id, batch_id,
-                                  f'fal.ai: генерация провалилась: {str(s)}')
-                return None
+                msg = f'fal.ai: генерация провалилась: {str(s)}'
+                if log_id:
+                    db_log_entry(log_id, msg, level='error')
+                return None, msg
 
         except Exception as e:
             if log_id:
                 db_log_entry(log_id, f"Ошибка опроса статуса: {e}", level='warn')
 
-    _reset_to_pending(log_id, batch_id, 'Таймаут генерации видео (2 часа)')
-    return None
+    msg = 'Таймаут генерации видео (2 часа)'
+    if log_id:
+        db_log_entry(log_id, msg, level='error')
+    return None, msg
 
 
 def run():
@@ -400,8 +397,19 @@ def run():
             print(f"[video] Генерация запущена: request_id={request_id}")
 
         # --- Поллинг ---
-        video_url = _poll(log_id, batch_id, status_url, response_url)
+        video_url, poll_err = _poll(log_id, status_url, response_url)
         if not video_url:
+            if poll_err:
+                if log_id:
+                    db_log_update(log_id, poll_err, 'error')
+                notify_failure(f"video: {poll_err} (батч {batch_id[:8]})")
+            if is_probe:
+                # Проба: фиксируем ошибку, сюжет сохраняется
+                db_set_batch_video_error(batch_id)
+            else:
+                # Обычный батч: откатываем в story_ready, сохраняя story_id
+                # (сюжет НЕ регенерируется, видео попробуем снова на следующем цикле)
+                db_set_batch_story_ready_from_error(batch_id)
             return
 
         # --- Скачиваем и сохраняем оригинал ---

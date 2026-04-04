@@ -37,6 +37,7 @@ from .db import (
     db_set_batch_video_pending,
     db_set_batch_video_ready,
     db_set_batch_video_error,
+    db_set_batch_story_ready_from_error,
     db_set_batch_pending,
     db_get_video_ready_batch,
     db_set_batch_original_video,

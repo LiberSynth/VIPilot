@@ -1092,6 +1092,23 @@ def db_set_batch_video_error(batch_id):
         return False
 
 
+def db_set_batch_story_ready_from_error(batch_id):
+    """Откатывает батч в story_ready после сбоя видео, сохраняя story_id.
+    Очищает data (request_id/url), но НЕ трогает story_id — сюжет не регенерируется."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE batches SET status = 'story_ready', data = NULL WHERE id = %s",
+                    (batch_id,),
+                )
+            conn.commit()
+        return True
+    except Exception as e:
+        print(f"[DB] Ошибка db_set_batch_story_ready_from_error: {e}")
+        return False
+
+
 def db_set_batch_pending(batch_id):
     """Сбрасывает батч в статус 'pending', очищая story_id, video_url и data.
     Используется для перезапуска цикла генерации после фатального сбоя видео."""
