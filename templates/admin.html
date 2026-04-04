@@ -1331,9 +1331,15 @@ function collectAllSettings(activeTab) {
   data.set('video_duration',      v('video_duration'));
   data.set('story_fails_to_next', v('story_fails_to_next'));
   data.set('video_fails_to_next', v('video_fails_to_next'));
-  data.set('vk_publish_story', v('vk_story_pub_hidden'));
-  data.set('vk_publish_wall',  v('vk_wall_pub_hidden'));
-  data.set('vk_transcode',     v('vk_transcode_hidden'));
+  const chkStory     = document.getElementById('vk_story_pub_check');
+  const chkWall      = document.getElementById('vk_wall_pub_check');
+  const chkTranscode = document.getElementById('vk_transcode_check');
+  const storyVal     = chkStory     ? (chkStory.checked     ? '1' : '0') : v('vk_story_pub_hidden');
+  const wallVal      = chkWall      ? (chkWall.checked      ? '1' : '0') : v('vk_wall_pub_hidden');
+  const transcodeVal = chkTranscode ? (chkTranscode.checked ? '1' : '0') : v('vk_transcode_hidden');
+  data.set('vk_publish_story', storyVal);
+  data.set('vk_publish_wall',  wallVal);
+  data.set('vk_transcode',     transcodeVal);
   data.set('aspect_ratio_x',   v('ar-x'));
   data.set('aspect_ratio_y',   v('ar-y'));
   data.set('target_id',        v('target_id'));
