@@ -210,6 +210,168 @@ def _m003_schedule_created_at(cur):
     """)
 
 
+def _m004_seed_ai_models(cur):
+    """
+    Полный набор платформ и моделей ИИ.
+    Текстовые (OpenRouter): 34 модели с правильными order/grade/url.
+    Видео (fal): sora-2, kling-video/v1.6/standard, veo2, minimax/video-01.
+    Идемпотентно: WHERE NOT EXISTS по name.
+    Deployed: 2026-04-04
+    """
+    TEXT_BODY = (
+        '{"messages": [{"role": "system", "content": "{}"},'
+        ' {"role": "user", "content": "{}"}],'
+        ' "max_tokens": 300, "temperature": 0.9}'
+    )
+
+    cur.execute("""
+        INSERT INTO ai_platforms (name, url)
+        SELECT v.name, v.url FROM (VALUES
+            ('OpenRouter', 'https://openrouter.ai/api/v1/chat/completions'),
+            ('fal',        'https://queue.fal.run/fal-ai')
+        ) AS v(name, url)
+        WHERE NOT EXISTS (SELECT 1 FROM ai_platforms WHERE name = v.name)
+    """)
+
+    cur.execute("""
+        INSERT INTO ai_models
+            (name, url, body, "order", active, ai_platform_id, platform_id, type, grade)
+        SELECT
+            v.name, v.url, v.body::jsonb,
+            v.ord, v.active,
+            p.id, p.id,
+            v.type, v.grade
+        FROM (VALUES
+            -- text-to-video (fal)
+            ('sora-2',
+             'sora-2/text-to-video',
+             '{"prompt": "{}", "duration": "{int}", "aspect_ratio": "{:d}:{:d}"}',
+             1, TRUE, 'fal', 'text-to-video', 'good'),
+            ('kling-video/v1.6/standard',
+             'kling-video/v1.6/standard/text-to-video',
+             '{"prompt": "{}", "duration": "{:d}", "aspect_ratio": "{:d}:{:d}"}',
+             2, TRUE, 'fal', 'text-to-video', 'good'),
+            ('veo2',
+             'veo2',
+             '{"prompt": "{}", "duration": "{:d}s", "aspect_ratio": "{:d}:{:d}"}',
+             3, TRUE, 'fal', 'text-to-video', 'good'),
+            ('minimax/video-01',
+             'minimax/video-01',
+             '{"prompt": "{}", "duration": "{:d}s", "aspect_ratio": "{:d}:{:d}"}',
+             4, FALSE, 'fal', 'text-to-video', 'good'),
+            -- text — good (active)
+            ('gemma-2-9b-it',
+             'google/gemma-2-9b-it',
+             %s, 1, TRUE, 'OpenRouter', 'text', 'good'),
+            ('qwen3.6-plus',
+             'qwen/qwen3.6-plus:free',
+             %s, 2, TRUE, 'OpenRouter', 'text', 'good'),
+            ('phi-4',
+             'microsoft/phi-4',
+             %s, 3, TRUE, 'OpenRouter', 'text', 'good'),
+            ('llama-3.1-8b-instruct',
+             'meta-llama/llama-3.1-8b-instruct',
+             %s, 4, TRUE, 'OpenRouter', 'text', 'good'),
+            -- text — limited
+            ('nemotron-3-super-120b',
+             'nvidia/nemotron-3-super-120b-a12b:free',
+             %s, 5, FALSE, 'OpenRouter', 'text', 'limited'),
+            ('trinity-large-preview',
+             'arcee-ai/trinity-large-preview:free',
+             %s, 6, FALSE, 'OpenRouter', 'text', 'limited'),
+            ('lfm-2.5-1.2b-instruct',
+             'liquid/lfm-2.5-1.2b-instruct:free',
+             %s, 7, FALSE, 'OpenRouter', 'text', 'limited'),
+            ('nemotron-3-nano-30b',
+             'nvidia/nemotron-3-nano-30b-a3b:free',
+             %s, 8, FALSE, 'OpenRouter', 'text', 'limited'),
+            ('trinity-mini',
+             'arcee-ai/trinity-mini:free',
+             %s, 9, FALSE, 'OpenRouter', 'text', 'limited'),
+            ('nemotron-nano-12b-v2-vl',
+             'nvidia/nemotron-nano-12b-v2-vl:free',
+             %s, 10, FALSE, 'OpenRouter', 'text', 'limited'),
+            ('qwen3-next-80b',
+             'qwen/qwen3-next-80b-a3b-instruct:free',
+             %s, 11, FALSE, 'OpenRouter', 'text', 'limited'),
+            ('nemotron-nano-9b-v2',
+             'nvidia/nemotron-nano-9b-v2:free',
+             %s, 12, FALSE, 'OpenRouter', 'text', 'limited'),
+            ('glm-4.5-air',
+             'z-ai/glm-4.5-air:free',
+             %s, 13, FALSE, 'OpenRouter', 'text', 'limited'),
+            ('gemma-3n-e2b-it',
+             'google/gemma-3n-e2b-it:free',
+             %s, 14, FALSE, 'OpenRouter', 'text', 'limited'),
+            ('gemma-3n-e4b-it',
+             'google/gemma-3n-e4b-it:free',
+             %s, 15, FALSE, 'OpenRouter', 'text', 'limited'),
+            ('gemma-3-4b-it',
+             'google/gemma-3-4b-it:free',
+             %s, 16, FALSE, 'OpenRouter', 'text', 'limited'),
+            ('gemma-3-12b-it',
+             'google/gemma-3-12b-it:free',
+             %s, 17, FALSE, 'OpenRouter', 'text', 'limited'),
+            ('llama-3.3-70b-instruct',
+             'meta-llama/llama-3.3-70b-instruct:free',
+             %s, 18, FALSE, 'OpenRouter', 'text', 'limited'),
+            ('llama-3.2-3b-instruct',
+             'meta-llama/llama-3.2-3b-instruct:free',
+             %s, 19, FALSE, 'OpenRouter', 'text', 'limited'),
+            -- text — poor
+            ('hermes-3-llama-3.1-405b',
+             'nousresearch/hermes-3-llama-3.1-405b:free',
+             %s, 20, FALSE, 'OpenRouter', 'text', 'poor'),
+            ('lfm-2.5-1.2b-thinking',
+             'liquid/lfm-2.5-1.2b-thinking:free',
+             %s, 21, FALSE, 'OpenRouter', 'text', 'poor'),
+            ('qwen3-coder',
+             'qwen/qwen3-coder:free',
+             %s, 22, FALSE, 'OpenRouter', 'text', 'poor'),
+            ('dolphin-mistral-24b-venice',
+             'cognitivecomputations/dolphin-mistral-24b-venice-edition:free',
+             %s, 23, FALSE, 'OpenRouter', 'text', 'poor'),
+            -- text — fallback (без платформы)
+            ('openrouter/free',
+             'openrouter/free',
+             %s, 24, FALSE, NULL, 'text', 'fallback'),
+            -- text — rejected
+            ('deepseek-r1-distill-llama-70b',
+             'deepseek/deepseek-r1-distill-llama-70b',
+             %s, 25, FALSE, 'OpenRouter', 'text', 'rejected'),
+            ('gemma-3-27b-it',
+             'google/gemma-3-27b-it:free',
+             %s, 26, FALSE, 'OpenRouter', 'text', 'rejected'),
+            ('phi-3-mini-128k-instruct',
+             'microsoft/phi-3-mini-128k-instruct:free',
+             %s, 27, FALSE, 'OpenRouter', 'text', 'rejected'),
+            ('mistral-7b-instruct',
+             'mistralai/mistral-7b-instruct-v0.1',
+             %s, 28, FALSE, 'OpenRouter', 'text', 'rejected'),
+            ('minimax-m2.5',
+             'minimax/minimax-m2.5:free',
+             %s, 29, FALSE, 'OpenRouter', 'text', 'rejected'),
+            ('openchat-7b',
+             'openchat/openchat-7b:free',
+             %s, 30, FALSE, 'OpenRouter', 'text', 'rejected'),
+            ('qwen3.6-plus-preview',
+             'qwen/qwen3.6-plus-preview:free',
+             %s, 31, FALSE, 'OpenRouter', 'text', 'rejected'),
+            ('step-3.5-flash',
+             'stepfun/step-3.5-flash:free',
+             %s, 32, FALSE, 'OpenRouter', 'text', 'rejected'),
+            ('gpt-oss-120b',
+             'openai/gpt-oss-120b:free',
+             %s, 33, FALSE, 'OpenRouter', 'text', 'rejected'),
+            ('gpt-oss-20b',
+             'openai/gpt-oss-20b:free',
+             %s, 34, FALSE, 'OpenRouter', 'text', 'rejected')
+        ) AS v(name, url, body, ord, active, platform_name, type, grade)
+        LEFT JOIN ai_platforms p ON p.name = v.platform_name
+        WHERE NOT EXISTS (SELECT 1 FROM ai_models WHERE name = v.name)
+    """, (TEXT_BODY,) * 34)
+
+
 # ---------------------------------------------------------------------------
 # Реестр миграций — добавляйте только в конец, никогда не переиспользуйте номера
 # ---------------------------------------------------------------------------
@@ -218,6 +380,7 @@ MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
     (3, _m003_schedule_created_at),
+    (4, _m004_seed_ai_models),
 ]
 
 
