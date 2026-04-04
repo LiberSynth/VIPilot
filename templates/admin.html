@@ -2602,7 +2602,7 @@ function confirmRestart() {
 }
 </script>
 
-<div class="confirm-overlay" id="clearHistoryOverlay" onclick="if(event.target===this)closeClearHistoryDialog()">
+<div class="confirm-overlay" id="clearHistoryOverlay">
   <div class="confirm-box">
     <div class="confirm-box-title">Очистить всю историю?</div>
     <div class="confirm-box-text">
@@ -2617,7 +2617,7 @@ function confirmRestart() {
   </div>
 </div>
 
-<div class="confirm-overlay" id="restartOverlay" onclick="if(event.target===this)closeRestartDialog()">
+<div class="confirm-overlay" id="restartOverlay">
   <div class="confirm-box">
     <div class="confirm-box-title">Перезапустить движок?</div>
     <div class="confirm-box-text">
@@ -2632,7 +2632,7 @@ function confirmRestart() {
 </div>
 
 <!-- Video modal -->
-<div id="video-modal-overlay" class="video-modal-overlay" onclick="closeVideoModal(event)">
+<div id="video-modal-overlay" class="video-modal-overlay">
   <div class="video-modal" onclick="event.stopPropagation()">
     <div class="video-modal-head">
       <span class="video-modal-title" id="video-modal-title">Видео</span>
@@ -2666,8 +2666,7 @@ function confirmRestart() {
     body.innerHTML = '<video controls autoplay src="' + src + '"></video>';
   };
 
-  window.closeVideoModal = function(e) {
-    if (e && e.target !== document.getElementById('video-modal-overlay')) return;
+  window.closeVideoModal = function() {
     var overlay = document.getElementById('video-modal-overlay');
     if (overlay && overlay.classList.contains('open')) {
       history.back();
@@ -2686,7 +2685,7 @@ function confirmRestart() {
 </script>
 
 <!-- Probe modal -->
-<div id="probe-modal-overlay" class="probe-modal-overlay" onclick="closeProbeModal(event)">
+<div id="probe-modal-overlay" class="probe-modal-overlay">
   <div class="probe-modal" onclick="event.stopPropagation()">
     <div class="probe-modal-head">
       <span class="probe-modal-title" id="probe-modal-title">Пробный запрос</span>
@@ -2904,14 +2903,11 @@ function confirmRestart() {
     });
   };
 
-  window.closeProbeModal = function(e) {
-    if (e && e.target !== document.getElementById('probe-modal-overlay')) return;
+  window.closeProbeModal = function() {
     var overlay = document.getElementById('probe-modal-overlay');
     if (overlay) overlay.classList.remove('open');
     document.body.style.overflow = '';
     if (_probeBtn) { _probeBtn.classList.remove('probing'); _probeBtn = null; }
-    var vc = document.getElementById('probe-modal-video');
-    if (vc) { vc.innerHTML = ''; vc.style.display = 'none'; }
   };
 
   document.addEventListener('keydown', function(e) {
@@ -2924,7 +2920,7 @@ function confirmRestart() {
 </script>
 
 <!-- Story modal -->
-<div id="story-modal-overlay" class="story-modal-overlay" onclick="closeStoryModal(event)">
+<div id="story-modal-overlay" class="story-modal-overlay">
   <div class="story-modal" onclick="event.stopPropagation()">
     <div class="story-modal-head">
       <span class="story-modal-title" id="story-modal-title">Сюжет</span>
@@ -2973,8 +2969,7 @@ function confirmRestart() {
     document.body.style.overflow = '';
   };
 
-  window.closeStoryModal = function(e) {
-    if (e && e.target !== document.getElementById('story-modal-overlay')) return;
+  window.closeStoryModal = function() {
     var overlay = document.getElementById('story-modal-overlay');
     if (overlay && overlay.classList.contains('open')) {
       history.back();
