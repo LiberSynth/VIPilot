@@ -236,6 +236,7 @@ def run():
             request_id   = batch['data']['request_id']
             status_url   = batch['data']['status_url']
             response_url = batch['data']['response_url']
+            used_model   = batch['data'].get('model_name')
             log_id = db_log_pipeline(
                 'video', 'Генерация видео… (возобновление)',
                 status='running', batch_id=batch_id,
