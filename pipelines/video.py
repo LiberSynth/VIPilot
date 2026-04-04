@@ -36,6 +36,38 @@ from db import (
 from log import db_log_pipeline, db_log_entry, db_log_update, db_log_interrupt_running
 
 _FAL_KEY      = os.environ.get('FAL_API_KEY', '')
+
+
+class ProviderFatalError(Exception):
+    """Raised when a provider returns a permanent, non-retryable billing/account error."""
+
+
+# ---------------------------------------------------------------------------
+# Per-provider fatal-error detectors
+# Each function receives (status_code: int, response_body: dict | str) and
+# returns True if the response represents a fatal billing/account error.
+# Add a new function here to support additional providers.
+# ---------------------------------------------------------------------------
+
+def _is_fatal_fal(status_code: int, body) -> bool:
+    """Detect fal.ai balance-exhausted / account-locked errors (HTTP 403)."""
+    if status_code != 403:
+        return False
+    text = str(body).lower()
+    return 'exhausted balance' in text or 'locked' in text
+
+
+# Registry: list of detector functions to try in order.
+_FATAL_DETECTORS = [
+    _is_fatal_fal,
+]
+
+
+def _is_provider_fatal(status_code: int, body) -> bool:
+    """Return True if any registered detector considers the error fatal."""
+    return any(fn(status_code, body) for fn in _FATAL_DETECTORS)
+
+
 _POLL_INTERVAL = 30   # секунд между опросами
 _POLL_MAX      = 240  # максимум попыток (~2 часа)
 
@@ -121,6 +153,7 @@ def _poll(log_id, batch_id, status_url, response_url):
 
 def run():
     batch_id = None
+    log_id = None
     try:
         db_log_interrupt_running('video')
 
@@ -268,12 +301,22 @@ def run():
                     try:
                         data = resp.json()
                     except ValueError:
+                        if _is_provider_fatal(resp.status_code, resp.text):
+                            msg = f"[{model_name}] Фатальная ошибка провайдера (HTTP {resp.status_code}): {resp.text}"
+                            if log_id:
+                                db_log_entry(log_id, msg, level='error')
+                            raise ProviderFatalError(msg)
                         if log_id:
                             db_log_entry(log_id, f"[{model_name}] не-JSON (HTTP {resp.status_code}): {resp.text}", level='warn')
                         continue
 
                     if resp.status_code >= 400:
                         err = data.get('error', data)
+                        if _is_provider_fatal(resp.status_code, err):
+                            msg = f"[{model_name}] Фатальная ошибка провайдера (HTTP {resp.status_code}): {err}"
+                            if log_id:
+                                db_log_entry(log_id, msg, level='error')
+                            raise ProviderFatalError(msg)
                         if log_id:
                             db_log_entry(log_id, f"[{model_name}] HTTP {resp.status_code}: {err}", level='warn')
                         continue
@@ -350,6 +393,15 @@ def run():
             db_log_entry(log_id, f"URL: {video_url}")
         print(f"[video] Готово: batch → video_ready, url={video_url[:60]}…")
 
+    except ProviderFatalError as e:
+        msg = str(e)
+        db_log_pipeline('video', msg, status='error', batch_id=batch_id)
+        if log_id:
+            db_log_update(log_id, msg, 'error')
+        if batch_id:
+            db_set_batch_video_error(batch_id)
+        print(f"[video] Фатальная ошибка провайдера: {msg}")
+        notify_failure(f"video: фатальная ошибка провайдера — {msg}")
     except Exception as e:
         db_log_pipeline('video', f"Сбой пайплайна: {e}", status='error',
                         batch_id=batch_id)
