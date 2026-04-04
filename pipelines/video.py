@@ -102,13 +102,13 @@ def _poll(log_id, batch_id, status_url, response_url):
                 video_url = result.get('video', {}).get('url')
                 if not video_url:
                     _reset_to_pending(log_id, batch_id,
-                                      f'Нет URL видео в ответе fal.ai: {str(result)[:200]}')
+                                      f'Нет URL видео в ответе fal.ai: {str(result)}')
                     return None
                 return video_url
 
             elif status == 'FAILED':
                 _reset_to_pending(log_id, batch_id,
-                                  f'fal.ai: генерация провалилась: {str(s)[:200]}')
+                                  f'fal.ai: генерация провалилась: {str(s)}')
                 return None
 
         except Exception as e:
@@ -268,9 +268,8 @@ def run():
                     try:
                         data = resp.json()
                     except ValueError:
-                        body_preview = ' '.join(resp.text.split())[:200]
                         if log_id:
-                            db_log_entry(log_id, f"[{model_name}] не-JSON (HTTP {resp.status_code}): {body_preview}", level='warn')
+                            db_log_entry(log_id, f"[{model_name}] не-JSON (HTTP {resp.status_code}): {resp.text}", level='warn')
                         continue
 
                     if resp.status_code >= 400:
@@ -281,7 +280,7 @@ def run():
 
                     if 'request_id' not in data:
                         if log_id:
-                            db_log_entry(log_id, f"[{model_name}] нет request_id: {str(data)[:200]}", level='warn')
+                            db_log_entry(log_id, f"[{model_name}] нет request_id: {str(data)}", level='warn')
                         continue
 
                     request_id   = data['request_id']
@@ -321,7 +320,7 @@ def run():
 
         # --- Скачиваем и сохраняем оригинал ---
         if log_id:
-            db_log_entry(log_id, f"Скачиваю оригинал: {video_url[:80]}…")
+            db_log_entry(log_id, f"Скачиваю оригинал: {video_url}")
         print(f"[video] Скачиваю оригинал с fal.ai…")
         try:
             r = requests.get(video_url, timeout=120, stream=True)
@@ -348,7 +347,7 @@ def run():
         msg = f'Видео сгенерировано ({used_model})' if used_model else 'Видео сгенерировано'
         db_log_update(log_id, msg, 'ok')
         if log_id:
-            db_log_entry(log_id, f"URL: {video_url[:80]}…")
+            db_log_entry(log_id, f"URL: {video_url}")
         print(f"[video] Готово: batch → video_ready, url={video_url[:60]}…")
 
     except Exception as e:

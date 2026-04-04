@@ -69,9 +69,8 @@ def _try_model(log_id, m, system_prompt, user_prompt):
     try:
         data = resp.json()
     except ValueError:
-        preview = ' '.join(resp.text.split())[:200]
         if log_id:
-            db_log_entry(log_id, f"[{model_name}] не-JSON (HTTP {resp.status_code}): {preview}", level='warn')
+            db_log_entry(log_id, f"[{model_name}] не-JSON (HTTP {resp.status_code}): {resp.text}", level='warn')
         return None
 
     if resp.status_code >= 400:
@@ -169,8 +168,7 @@ def run():
         user_prompt   = db_get('metaprompt', '')
 
         if log_id:
-            preview = user_prompt[:120] + ('…' if len(user_prompt) > 120 else '')
-            db_log_entry(log_id, f"Промпт: {preview}")
+            db_log_entry(log_id, f"Промпт:\n{user_prompt}")
             db_log_entry(log_id, f"Моделей: {len(models)}, попыток на модель: {fails_to_next}")
 
         story_id        = None
@@ -208,10 +206,9 @@ def run():
                     db_log_entry(log_id, msg, level='warn')
                 print(f"[story] {msg}")
 
-        preview = result[:200] + ('…' if len(result) > 200 else '')
         print(f"[story] Сюжет получен: {result[:100]}{'…' if len(result) > 100 else ''}")
         if log_id:
-            db_log_entry(log_id, f"Сюжет: {preview}")
+            db_log_entry(log_id, f"Сюжет:\n{result}")
 
         db_set_batch_story(batch_id, story_id)
         db_set_batch_text_model(batch_id, used_model_id)
