@@ -2100,6 +2100,7 @@ window.cycleVideoGrade = function(el) {
   var _collapsedBids  = {};
   var _collapsedLids  = {};
   var _seenLids       = {};
+  var _seenBids       = {};
 
   function getOpenState() {
     var bids = {}, sgkeys = {}, lids = {};
@@ -2114,6 +2115,9 @@ window.cycleVideoGrade = function(el) {
     });
     document.querySelectorAll('.monitor-log-item').forEach(function(el) {
       if (el.dataset.lid) _seenLids[el.dataset.lid] = true;
+    });
+    document.querySelectorAll('.monitor-batch').forEach(function(el) {
+      if (el.dataset.bid) _seenBids[el.dataset.bid] = true;
     });
     return { bids: bids, sgkeys: sgkeys, lids: lids };
   }
@@ -2141,6 +2145,28 @@ window.cycleVideoGrade = function(el) {
     });
   }
 
+  var AUTO_OPEN_BATCH_STATUSES = ['running', 'error', 'video_error', 'transcode_error', 'publish_error'];
+
+  function autoOpenActiveBatches() {
+    document.querySelectorAll('.monitor-batch').forEach(function(el) {
+      var bid = el.dataset.bid;
+      if (!bid || _seenBids[bid] || _collapsedBids[bid]) return;
+      var bs = el.dataset.bstatus || '';
+      var hasRunning = !!el.querySelector('.monitor-log-item[data-status="running"]');
+      var hasError   = !!el.querySelector('.monitor-log-item[data-status="error"]');
+      var isAutoStatus = AUTO_OPEN_BATCH_STATUSES.indexOf(bs) >= 0;
+      if (hasRunning || hasError || isAutoStatus) {
+        el.classList.add('open');
+        el.querySelectorAll('.monitor-log-item').forEach(function(li) {
+          var lid = li.dataset.lid;
+          if (li.querySelector('.monitor-entries') && !_seenLids[lid] && !_collapsedLids[lid]) {
+            li.classList.add('open');
+          }
+        });
+      }
+    });
+  }
+
   function renderTimeline(data) {
     var el = document.getElementById('monitor-timeline');
     if (!el) return;
@@ -2154,6 +2180,7 @@ window.cycleVideoGrade = function(el) {
       return g.type === 'batch' ? renderBatch(g.data) : renderSysGroup(g.items);
     }).join('');
     restoreOpenState(prev);
+    autoOpenActiveBatches();
     autoExpandRunningLogs();
   }
 
