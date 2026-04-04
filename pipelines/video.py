@@ -93,7 +93,7 @@ def _build_body(body_tpl, prompt, ar_x, ar_y, video_duration):
     if 'aspect_ratio' in body:
         body['aspect_ratio'] = str(body['aspect_ratio']).format(ar_x, ar_y)
     # Поддержка width/height для моделей, принимающих размеры вместо aspect_ratio
-    if body.get('width') == '{:w}' or body.get('height') == '{:h}':
+    if body.get('width') == '{:width}' or body.get('height') == '{:height}':
         if ar_x <= ar_y:   # портрет или квадрат
             h = 1024
             w = round(1024 * ar_x / ar_y / 32) * 32
