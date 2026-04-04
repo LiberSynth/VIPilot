@@ -2218,13 +2218,13 @@ window.cycleVideoGrade = function(el) {
       lines.push('status: '   + st);
       lines.push('time: '     + ts);
       if (msg) lines.push('message: ' + msg);
-      lines.push('');
-      lines.push('[' + ts + '] ' + pip + ' ' + st + (msg ? ' — ' + msg : ''));
+      var entries = [];
       item.querySelectorAll('.monitor-entry-row').forEach(function(row) {
         const ets  = row.querySelector('.monitor-entry-ts')  ? row.querySelector('.monitor-entry-ts').textContent.trim()  : '';
         const emsg = row.querySelector('.monitor-entry-msg') ? row.querySelector('.monitor-entry-msg').textContent.trim() : '';
-        lines.push('  [' + ets + '] ' + emsg);
+        entries.push('  [' + ets + '] ' + emsg);
       });
+      if (entries.length) { lines.push(''); entries.forEach(function(e) { lines.push(e); }); }
     });
     _monitorCopyText(lines.join('\n'), btn);
   };
@@ -2236,24 +2236,19 @@ window.cycleVideoGrade = function(el) {
     const ts  = item.querySelector('.monitor-log-ts')       ? item.querySelector('.monitor-log-ts').textContent.trim()       : '';
     const pip = item.querySelector('.monitor-log-pipeline') ? item.querySelector('.monitor-log-pipeline').textContent.trim() : '';
     const msg = item.querySelector('.monitor-log-comment')  ? item.querySelector('.monitor-log-comment').textContent.trim()  : '';
-    lines.push('[' + ts + '] ' + pip + (msg ? ' — ' + msg : ''));
+    const st  = item.dataset.status || '';
+    lines.push('pipeline: ' + pip);
+    lines.push('status: '   + st);
+    lines.push('time: '     + ts);
+    if (msg) lines.push('message: ' + msg);
+    var entries = [];
     item.querySelectorAll('.monitor-entry-row').forEach(function(row) {
       const ets  = row.querySelector('.monitor-entry-ts')  ? row.querySelector('.monitor-entry-ts').textContent.trim()  : '';
       const emsg = row.querySelector('.monitor-entry-msg') ? row.querySelector('.monitor-entry-msg').textContent.trim() : '';
-      lines.push('  [' + ets + '] ' + emsg);
+      entries.push('  [' + ets + '] ' + emsg);
     });
-    const text = lines.join('\n');
-    const doFlash = function() {
-      btn.classList.add('copied');
-      setTimeout(function() { btn.classList.remove('copied'); }, 2000);
-    };
-    navigator.clipboard.writeText(text).then(doFlash).catch(function() {
-      var ta = document.createElement('textarea');
-      ta.value = text; ta.style.cssText = 'position:fixed;opacity:0';
-      document.body.appendChild(ta); ta.select();
-      document.execCommand('copy'); document.body.removeChild(ta);
-      doFlash();
-    });
+    if (entries.length) { lines.push(''); entries.forEach(function(e) { lines.push(e); }); }
+    _monitorCopyText(lines.join('\n'), btn);
   };
 
   function _monitorCopyText(text, btn) {
