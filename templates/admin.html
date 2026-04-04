@@ -724,7 +724,7 @@
   .probe-modal-overlay.open { display: flex; }
   .probe-modal {
     background: #0e0e18; border: 1px solid #252038; border-radius: 10px;
-    width: min(520px, 94vw); max-height: 80vh; display: flex; flex-direction: column;
+    width: min(520px, 94vw); height: 92vh; display: flex; flex-direction: column;
   }
   .probe-modal-head {
     display: flex; align-items: center; padding: 10px 14px;
@@ -738,9 +738,8 @@
   }
   .probe-modal-close:hover { color: #aaa; }
   .probe-modal-body {
-    padding: 14px; overflow-y: auto; font-size: 13px; color: #b0b0cc;
+    flex: 1; min-height: 0; overflow-y: auto; padding: 14px; font-size: 13px; color: #b0b0cc;
     line-height: 1.6; white-space: pre-wrap; word-break: break-word;
-    min-height: 80px;
   }
   .probe-modal-info { font-size: 11px; color: #555; padding: 0 14px 10px; }
   .probe-modal-error { color: #c05050; }
@@ -2879,6 +2878,11 @@ function confirmRestart() {
           var status = d.batch_status;
           if (_TERMINAL.indexOf(status) !== -1) {
             if (_probeBtn) { _probeBtn.classList.remove('probing'); _probeBtn = null; }
+            // Схлопываем все разделы, скроллим в начало, чтобы видеоплеер был виден
+            container.querySelectorAll('.monitor-log-item.open').forEach(function(el) {
+              el.classList.remove('open');
+            });
+            body.scrollTop = 0;
             if (d.has_video_data) showVideo();
           } else {
             setTimeout(poll, 2000);
