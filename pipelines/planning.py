@@ -6,7 +6,7 @@ Pipeline 1 — Планирование.
 
 from datetime import datetime, timezone, timedelta
 
-from db import db_get, db_get_schedule, db_get_active_targets, db_ensure_batch
+from db import db_get, db_get_schedule, db_get_active_targets, db_ensure_batch, db_get_last_pipeline_run
 from log import db_log_pipeline, db_log_entry
 from utils.notify import notify_failure
 from utils.utils import parse_hhmm
@@ -21,24 +21,32 @@ def run():
         if not schedule or not targets:
             return
 
-        buffer_hours      = int(db_get('buffer_hours', '24'))
-        now               = datetime.now(timezone.utc)
-        window_end        = now + timedelta(hours=buffer_hours)
-        catchup_threshold = now - timedelta(hours=buffer_hours)
-        days_to_check     = int(buffer_hours / 24) + 2
+        buffer_hours = int(db_get('buffer_hours', '24'))
+        now          = datetime.now(timezone.utc)
+        window_end   = now + timedelta(hours=buffer_hours)
+        A            = db_get_last_pipeline_run('planning')
 
         created = 0
-        for day_offset in range(days_to_check):
+        for day_offset in range(-1, 2):
             day = (now + timedelta(days=day_offset)).date()
             for slot in schedule:
                 h, m = parse_hhmm(slot['time_utc'])
                 dt = datetime(day.year, day.month, day.day, h, m, tzinfo=timezone.utc)
+
                 in_future_window = now <= dt < window_end
-                is_catchup = (
-                    dt < now
-                    and slot.get('created_at') is not None
-                    and slot['created_at'] < catchup_threshold
-                )
+
+                is_catchup = False
+                if dt < now:
+                    if A is None:
+                        is_catchup = False
+                    elif dt < A:
+                        is_catchup = False
+                    elif dt < A + timedelta(hours=buffer_hours):
+                        is_catchup = True
+                    else:
+                        created_at = slot.get('created_at')
+                        is_catchup = (created_at is not None and created_at <= dt)
+
                 if in_future_window or is_catchup:
                     for target in targets:
                         batch_id = db_ensure_batch(dt, target['id'])

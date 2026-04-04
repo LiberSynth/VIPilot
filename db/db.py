@@ -1182,6 +1182,23 @@ def db_cleanup_video_data(file_lifetime_days: int) -> int:
         return 0
 
 
+def db_get_last_pipeline_run(pipeline):
+    """Возвращает MAX(created_at) из таблицы log для указанного пайплайна,
+    или None если записей нет."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT MAX(created_at) FROM log WHERE pipeline = %s",
+                    (pipeline,),
+                )
+                row = cur.fetchone()
+        return row[0] if row and row[0] is not None else None
+    except Exception as e:
+        print(f"[DB] Ошибка db_get_last_pipeline_run: {e}")
+        return None
+
+
 def db_cleanup_batches(batch_lifetime_days: int) -> int:
     """Удаляет батчи со статусом 'published'/'отменён' старше batch_lifetime_days.
     Удаляет связанные логи и осиротевшие stories.

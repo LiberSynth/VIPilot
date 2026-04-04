@@ -60,4 +60,5 @@ from .db import (
     db_cleanup_video_data,
     db_clear_all_history,
     db_reset_batch_pipeline,
+    db_get_last_pipeline_run,
 )
