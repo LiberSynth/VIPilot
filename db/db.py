@@ -704,7 +704,8 @@ def db_get_video_ready_batch():
                 cur.execute("""
                     SELECT b.id, b.scheduled_at, b.target_id, b.story_id, b.video_url,
                            t.name AS target_name,
-                           t.aspect_ratio_x, t.aspect_ratio_y
+                           t.aspect_ratio_x, t.aspect_ratio_y,
+                           t.transcode AS target_transcode
                     FROM batches b
                     JOIN targets t ON t.id = b.target_id
                     WHERE b.status = 'video_ready'
@@ -731,6 +732,38 @@ def db_set_batch_original_video(batch_id, video_data: bytes):
         return True
     except Exception as e:
         print(f"[DB] Ошибка db_set_batch_original_video: {e}")
+        return False
+
+
+def db_get_batch_original_video(batch_id) -> bytes | None:
+    """Возвращает оригинальные байты видео (video_data_original) для батча, или None."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT video_data_original FROM batches WHERE id = %s", (batch_id,))
+                row = cur.fetchone()
+        if row and row[0] is not None:
+            return bytes(row[0])
+        return None
+    except Exception as e:
+        print(f"[DB] Ошибка db_get_batch_original_video: {e}")
+        return None
+
+
+def db_set_batch_transcode_skip(batch_id):
+    """Переводит батч в status='transcode_ready' без изменения video_data.
+    Используется когда транскодирование отключено или завершилось некритичной ошибкой."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE batches SET status = 'transcode_ready' WHERE id = %s",
+                    (batch_id,),
+                )
+            conn.commit()
+        return True
+    except Exception as e:
+        print(f"[DB] Ошибка db_set_batch_transcode_skip: {e}")
         return False
 
 

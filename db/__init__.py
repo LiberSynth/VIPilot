@@ -39,6 +39,8 @@ from .db import (
     db_set_batch_pending,
     db_get_video_ready_batch,
     db_set_batch_original_video,
+    db_get_batch_original_video,
+    db_set_batch_transcode_skip,
     db_set_batch_transcode_ready,
     db_set_batch_transcode_error,
     db_get_transcode_ready_batch,

@@ -12,6 +12,7 @@ from db import (
     db_get,
     db_get_transcode_ready_batch,
     db_get_batch_video_data,
+    db_get_batch_original_video,
     db_is_batch_scheduled,
     db_set_batch_obsolete,
     db_set_batch_published,
@@ -31,8 +32,12 @@ def _publish_vk(batch_id, log_id):
     video_data = db_get_batch_video_data(batch_id)
     if video_data is None:
         if log_id:
-            db_log_entry(log_id, 'video_data отсутствует в БД', level='error')
-        return False
+            db_log_entry(log_id, 'video_data отсутствует — использую оригинал (video_data_original)')
+        video_data = db_get_batch_original_video(batch_id)
+        if video_data is None:
+            if log_id:
+                db_log_entry(log_id, 'video_data_original тоже отсутствует в БД', level='error')
+            return False
 
     group_id = int(db_get('vk_group_id', '236929597'))
     do_story  = db_get('vk_publish_story', '1') == '1'
