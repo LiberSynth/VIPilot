@@ -405,10 +405,19 @@ def _m007_rename_video_data(cur):
     """
     Переименовывает колонку video_data → video_data_transcoded в таблице batches,
     чтобы название явно отражало, что это транскодированное (обработанное ffmpeg) видео.
+    Идемпотентно: пропускает переименование, если video_data уже отсутствует
+    (т.е. столбец изначально создан с правильным именем через _m001).
     """
     cur.execute("""
-        ALTER TABLE batches
-            RENAME COLUMN video_data TO video_data_transcoded
+        DO $$
+        BEGIN
+            IF EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'batches' AND column_name = 'video_data'
+            ) THEN
+                ALTER TABLE batches RENAME COLUMN video_data TO video_data_transcoded;
+            END IF;
+        END $$
     """)
 
 
