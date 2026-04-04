@@ -2693,7 +2693,6 @@ function confirmRestart() {
       <button class="cycle-float-btn probe-modal-copy" id="probe-modal-copy" title="Скопировать" onclick="copyProbeContent(this)"><svg viewBox="0 0 16 16"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11V3a1 1 0 0 1 1-1h8"/></svg></button>
       <button class="probe-modal-close" onclick="closeProbeModal()">&times;</button>
     </div>
-    <div id="probe-modal-video" style="display:none;padding:12px 14px 0"></div>
     <div class="probe-modal-body" id="probe-modal-body"></div>
     <div class="probe-modal-info" id="probe-modal-info"></div>
   </div>
@@ -2847,7 +2846,7 @@ function confirmRestart() {
           wrap.style.cssText = 'margin-bottom:6px';
           var hdr = document.createElement('div');
           hdr.style.cssText = 'font-size:11px;color:#666;text-transform:uppercase;margin-bottom:2px';
-          hdr.textContent = log.pipeline;
+          hdr.textContent = PIPELINE_LABELS[log.pipeline] || log.pipeline;
           var msg = document.createElement('div');
           msg.id = domId + '-msg';
           msg.style.cssText = 'font-size:12px;color:' + sc + ';margin-bottom:2px';
@@ -2893,11 +2892,16 @@ function confirmRestart() {
           if (_TERMINAL.indexOf(status) !== -1) {
             if (_probeBtn) { _probeBtn.classList.remove('probing'); _probeBtn = null; }
             if (d.has_video && status === 'probe') {
-              var vc = document.getElementById('probe-modal-video');
-              if (vc) {
-                vc.innerHTML = '<video controls autoplay src="/api/batch/' + batchId + '/video"></video>';
-                vc.style.display = '';
-              }
+              var sep = document.createElement('hr');
+              sep.style.cssText = 'border:none;border-top:1px solid #252038;margin:10px 0';
+              body.appendChild(sep);
+              var vid = document.createElement('video');
+              vid.controls = true;
+              vid.autoplay = true;
+              vid.src = '/api/batch/' + batchId + '/video';
+              vid.style.cssText = 'width:100%;border-radius:6px;display:block;background:#000;max-height:300px';
+              body.appendChild(vid);
+              body.scrollTop = body.scrollHeight;
             }
           } else {
             setTimeout(poll, 2000);
