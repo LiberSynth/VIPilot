@@ -169,7 +169,7 @@ def run():
             return
 
         batch_id  = str(batch['id'])
-        target    = batch['target_name'] or 'probe'
+        target    = batch['target_name'] or 'пробный'
         ar_x      = batch['aspect_ratio_x'] or 9
         ar_y      = batch['aspect_ratio_y'] or 16
         story_id  = str(batch['story_id'])
@@ -244,12 +244,15 @@ def run():
                 # Probe-режим: используем только зафиксированную модель, одна попытка
                 pinned_m = db_get_video_model_by_id(pinned_model_id)
                 if not pinned_m:
-                    msg = f'Probe-модель {str(pinned_model_id)[:8]}… не найдена'
+                    msg = f'Пробная модель {str(pinned_model_id)[:8]}… не найдена'
                     db_log_pipeline('video', msg, status='error', batch_id=batch_id)
                     print(f"[video] {msg}")
                     return
-                models        = [pinned_m]
-                fails_to_next = 1
+                models = [pinned_m]
+                try:
+                    fails_to_next = max(1, int(db_get('video_fails_to_next', '3')))
+                except (ValueError, TypeError):
+                    fails_to_next = 3
             else:
                 models = db_get_active_video_models()
                 if not models:
@@ -284,7 +287,7 @@ def run():
                 db_log_entry(log_id, f"Соотношение сторон: {ar_x}:{ar_y}")
                 db_log_entry(log_id, f"Промпт:\n{story_text}")
                 if pinned_model_id:
-                    db_log_entry(log_id, f"Probe-модель: {models[0]['name']}, одна попытка")
+                    db_log_entry(log_id, f"Пробная модель: {models[0]['name']}, попыток: {fails_to_next}")
                 else:
                     db_log_entry(log_id, f"Моделей: {len(models)}, попыток на модель: {fails_to_next}")
 
@@ -357,14 +360,20 @@ def run():
 
             if not request_id:
                 if pinned_model_id:
-                    msg = f'Probe-модель {models[0]["name"]} не приняла запрос'
+                    msg = f'Пробная модель {models[0]["name"]} исчерпала все попытки ({fails_to_next})'
+                    if log_id:
+                        db_log_update(log_id, msg, 'error')
+                        db_log_entry(log_id, msg, level='error')
+                    db_set_batch_video_error(batch_id)
+                    print(f"[video] {msg}")
+                    return
                 else:
                     msg = 'Все активные видео-модели не приняли запрос — повтор с первой модели'
-                if log_id:
-                    db_log_update(log_id, msg, 'warn')
-                    db_log_entry(log_id, msg, level='warn')
-                print(f"[video] {msg}")
-                return
+                    if log_id:
+                        db_log_update(log_id, msg, 'warn')
+                        db_log_entry(log_id, msg, level='warn')
+                    print(f"[video] {msg}")
+                    return
 
             db_set_batch_video_pending(batch_id, {
                 'request_id':   request_id,

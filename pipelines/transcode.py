@@ -20,6 +20,7 @@ import tempfile
 
 from utils.notify import notify_failure
 from db import (
+    db_get,
     db_get_video_ready_batch,
     db_is_batch_scheduled,
     db_set_batch_obsolete,
@@ -115,8 +116,8 @@ def run():
 
         batch_id        = str(batch['id'])
         is_probe        = batch['target_id'] is None
-        target          = batch['target_name'] or 'probe'
-        do_transcode    = True if is_probe else bool(batch.get('target_transcode', True))
+        target          = batch['target_name'] or 'пробный'
+        do_transcode    = (db_get('vk_transcode', '1') == '1') if is_probe else bool(batch.get('target_transcode', True))
 
         # ── Транскодирование выключено для таргета ───────────────────────────
         if not do_transcode:

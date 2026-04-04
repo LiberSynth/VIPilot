@@ -110,7 +110,7 @@ def run():
             return
 
         batch_id  = str(batch['id'])
-        target    = batch['target_name'] or 'probe'
+        target    = batch['target_name'] or 'пробный'
         is_probe  = batch['target_id'] is None
 
         if not is_probe and not db_is_batch_scheduled(batch['scheduled_at'], batch['target_id']):

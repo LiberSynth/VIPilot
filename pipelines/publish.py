@@ -69,14 +69,14 @@ def run():
             return
 
         batch_id = str(batch['id'])
-        target   = batch['target_name'] or 'probe'
+        target   = batch['target_name'] or 'пробный'
 
-        # Probe-батч без таргета — публикация не нужна, переводим в probe
+        # Пробный батч без таргета — публикация не нужна, переводим в probe
         if batch['target_id'] is None:
             db_set_batch_probe(batch_id)
-            db_log_pipeline('publish', 'Probe-батч — публикация пропущена, статус → probe',
+            db_log_pipeline('publish', 'Пробный батч — публикация пропущена, статус → пробный',
                             status='ok', batch_id=batch_id)
-            print(f"[publish] Батч {batch_id[:8]}… probe — публикация пропущена")
+            print(f"[publish] Батч {batch_id[:8]}… пробный — публикация пропущена")
             return
 
         if not db_is_batch_scheduled(batch['scheduled_at'], batch['target_id']):
