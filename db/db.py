@@ -323,6 +323,25 @@ def db_get_story_ready_batch_atomic():
         return None
 
 
+def db_recover_story_generating():
+    """Сбрасывает застрявшие story_generating-батчи в pending при старте."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE batches SET status = 'pending', story_id = NULL
+                    WHERE status = 'story_generating'
+                """)
+                n = cur.rowcount
+            conn.commit()
+        if n:
+            print(f"[DB] Восстановлено story_generating → pending: {n}")
+        return n
+    except Exception as e:
+        print(f"[DB] Ошибка db_recover_story_generating: {e}")
+        return 0
+
+
 def db_recover_video_generating():
     """Сбрасывает застрявшие video_generating-батчи в story_ready при старте."""
     try:

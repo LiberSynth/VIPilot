@@ -5,7 +5,7 @@ import threading
 from datetime import timedelta
 from flask import Flask, request
 
-from db import init_db, run_upgrades, db_get, db_recover_video_generating, env_get, env_set
+from db import init_db, run_upgrades, db_get, db_recover_story_generating, db_recover_video_generating, env_get, env_set
 from log import db_log_root
 from pipelines import planning, story, video, transcode, publish, cleanup
 from routes.admin import bp as admin_bp
@@ -102,6 +102,7 @@ def start_main_loop():
         _main_loop_started = True
         init_db()
         run_upgrades()
+        db_recover_story_generating()
         db_recover_video_generating()
         if env_get('workflow_state', 'running') == 'pause':
             wf_state.set_paused()
