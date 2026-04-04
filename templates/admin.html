@@ -2305,13 +2305,6 @@ window.cycleVideoGrade = function(el) {
     lines.push('status: '   + st);
     lines.push('time: '     + ts);
     if (msg) lines.push('message: ' + msg);
-    var entries = [];
-    item.querySelectorAll('.monitor-entry-row').forEach(function(row) {
-      const ets  = row.querySelector('.monitor-entry-ts')  ? row.querySelector('.monitor-entry-ts').textContent.trim()  : '';
-      const emsg = row.querySelector('.monitor-entry-msg') ? row.querySelector('.monitor-entry-msg').textContent.trim() : '';
-      entries.push('  [' + ets + '] ' + emsg);
-    });
-    if (entries.length) { lines.push('entries:'); entries.forEach(function(e) { lines.push(e); }); }
     _monitorCopyText(lines.join('\n'), btn);
   };
 
