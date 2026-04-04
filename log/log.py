@@ -168,7 +168,7 @@ def db_get_monitor(batch_limit=50):
                         t.aspect_ratio_y,
                         MAX(l.created_at) AS last_event_at,
                         b.story_id,
-                        (b.video_data_transcoded IS NOT NULL) AS has_video_data,
+                        (b.video_data_transcoded IS NOT NULL OR b.video_data_original IS NOT NULL) AS has_video_data,
                         COALESCE(
                             json_agg(
                                 json_build_object(

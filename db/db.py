@@ -799,14 +799,20 @@ def db_get_random_video_data() -> bytes | None:
 
 
 def db_get_batch_video_data(batch_id) -> bytes | None:
-    """Возвращает транскодированные байты видео для батча, или None."""
+    """Возвращает байты видео для батча: транскодированное если есть, иначе оригинал."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
-                cur.execute("SELECT video_data_transcoded FROM batches WHERE id = %s", (batch_id,))
+                cur.execute(
+                    "SELECT video_data_transcoded, video_data_original FROM batches WHERE id = %s",
+                    (batch_id,),
+                )
                 row = cur.fetchone()
-        if row and row[0] is not None:
-            return bytes(row[0])
+        if row:
+            if row[0] is not None:
+                return bytes(row[0])
+            if row[1] is not None:
+                return bytes(row[1])
         return None
     except Exception as e:
         print(f"[DB] Ошибка db_get_batch_video_data: {e}")
