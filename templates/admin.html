@@ -1983,7 +1983,9 @@ window.cycleVideoGrade = function(el) {
     const logs = groupLogsByPipeline(batch.logs || []);
 
     const headTime = batch.created_at;
-    const schedStr = batch.adhoc ? 'Публикация: сейчас' : 'Публикация: ' + fmtMskShort(batch.scheduled_at);
+    const schedStr = batch.adhoc
+      ? (batch.target_name ? 'Публикация: сейчас' : 'Публикация: пробный')
+      : 'Публикация: ' + fmtMskShort(batch.scheduled_at);
     const sub = [schedStr, batch.target_name, STATUS_LABELS[bs] || bs]
       .filter(Boolean).join(' · ');
 
