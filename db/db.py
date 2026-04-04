@@ -784,19 +784,12 @@ def db_set_batch_transcode_ready(batch_id, video_data: bytes):
 
 
 def db_get_random_video_data() -> bytes | None:
-    """Возвращает байты случайного видео из пула для режима эмуляции.
-    Предпочитает video_data_original (реальные fal.ai видео), при отсутствии
-    берёт video_data_transcoded."""
+    """Возвращает video_data_transcoded случайного батча из пула (для режима эмуляции)."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    """
-                    SELECT COALESCE(video_data_original, video_data_transcoded)
-                    FROM batches
-                    WHERE video_data_original IS NOT NULL OR video_data_transcoded IS NOT NULL
-                    ORDER BY random() LIMIT 1
-                    """
+                    "SELECT video_data_transcoded FROM batches WHERE video_data_transcoded IS NOT NULL ORDER BY random() LIMIT 1"
                 )
                 row = cur.fetchone()
                 return bytes(row[0]) if row else None
