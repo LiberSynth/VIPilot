@@ -18,6 +18,7 @@ from db import (
     env_get,
     env_set,
     db_get_active_targets,
+    db_update_target_transcode,
     db_update_target_aspect_ratio,
 )
 from utils.consts import ADMIN_PASSWORD
@@ -94,6 +95,7 @@ def admin_page():
     target_id       = target["id"] if target else None
     aspect_ratio_x  = target["aspect_ratio_x"] if target else 9
     aspect_ratio_y  = target["aspect_ratio_y"] if target else 16
+    vk_transcode    = target["transcode"] if target else True
 
     resp = make_response(render_template(
         "admin.html",
@@ -108,6 +110,7 @@ def admin_page():
         notify_phone=notify_phone,
         vk_publish_story=vk_publish_story,
         vk_publish_wall=vk_publish_wall,
+        vk_transcode=vk_transcode,
         video_duration=video_duration,
         buffer_hours=buffer_hours,
         loop_interval=loop_interval,
@@ -183,6 +186,10 @@ def save():
                 db_update_target_aspect_ratio(ar_target_id, ax, ay)
         except (ValueError, TypeError):
             pass
+
+    vk_transcode_raw = request.form.get("vk_transcode", "0")
+    if ar_target_id:
+        db_update_target_transcode(ar_target_id, vk_transcode_raw == "1")
 
     vid_dur_str = request.form.get("video_duration")
     if vid_dur_str is not None:

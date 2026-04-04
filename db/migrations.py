@@ -387,12 +387,27 @@ def _m005_batch_original_video(cur):
     """)
 
 
+def _m006_target_transcode(cur):
+    """
+    Добавляет поле transcode (BOOLEAN) в таблицу targets.
+    По умолчанию FALSE, для VKontakte — TRUE.
+    """
+    cur.execute("""
+        ALTER TABLE targets
+            ADD COLUMN IF NOT EXISTS transcode BOOLEAN NOT NULL DEFAULT FALSE
+    """)
+    cur.execute("""
+        UPDATE targets SET transcode = TRUE WHERE name = 'VKontakte'
+    """)
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
     (3, _m003_schedule_created_at),
     (4, _m004_seed_ai_models),
     (5, _m005_batch_original_video),
+    (6, _m006_target_transcode),
 ]
 
 

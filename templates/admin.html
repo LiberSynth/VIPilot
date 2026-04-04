@@ -1026,6 +1026,17 @@
             <span class="toggle-track"></span>
           </label>
         </div>
+        <div class="toggle-row" style="margin-top:10px">
+          <div>
+            <div class="toggle-label">Транскодирование</div>
+          </div>
+          <label class="toggle-wrap">
+            <input type="hidden" name="vk_transcode" id="vk_transcode_hidden" value="{{ '1' if vk_transcode else '0' }}">
+            <input type="checkbox" id="vk_transcode_check" {% if vk_transcode %}checked{% endif %}
+                   onchange="document.getElementById('vk_transcode_hidden').value = this.checked ? '1' : '0'">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
       </div>
 
     </form>
@@ -1323,6 +1334,7 @@ function collectAllSettings(activeTab) {
   data.set('video_fails_to_next', v('video_fails_to_next'));
   data.set('vk_publish_story', v('vk_story_pub_hidden'));
   data.set('vk_publish_wall',  v('vk_wall_pub_hidden'));
+  data.set('vk_transcode',     v('vk_transcode_hidden'));
   data.set('aspect_ratio_x',   v('ar-x'));
   data.set('aspect_ratio_y',   v('ar-y'));
   data.set('target_id',        v('target_id'));

@@ -123,16 +123,32 @@ def db_get_active_targets():
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT id, name, aspect_ratio_x, aspect_ratio_y FROM targets WHERE active = TRUE"
+                    "SELECT id, name, aspect_ratio_x, aspect_ratio_y, transcode FROM targets WHERE active = TRUE"
                 )
                 rows = cur.fetchall()
         return [
-            {"id": str(row[0]), "name": row[1], "aspect_ratio_x": row[2], "aspect_ratio_y": row[3]}
+            {"id": str(row[0]), "name": row[1], "aspect_ratio_x": row[2], "aspect_ratio_y": row[3], "transcode": bool(row[4])}
             for row in rows
         ]
     except Exception as e:
         print(f"[DB] Ошибка db_get_active_targets: {e}")
         return []
+
+
+def db_update_target_transcode(target_id, value: bool):
+    """Обновляет флаг транскодирования для указанного target."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE targets SET transcode = %s WHERE id = %s",
+                    (value, target_id),
+                )
+            conn.commit()
+        return True
+    except Exception as e:
+        print(f"[DB] Ошибка db_update_target_transcode: {e}")
+        return False
 
 
 def db_update_target_aspect_ratio(target_id, x, y):
