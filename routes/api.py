@@ -42,6 +42,7 @@ from db import (
     db_get_story_text,
     db_get_batch_video_data,
     db_get_text_model_by_id,
+    db_get_video_model_by_id,
     db_get,
 )
 from log import db_get_log, db_get_monitor, db_log_pipeline, db_log_entry
@@ -304,6 +305,155 @@ def api_text_model_probe(model_id):
 
 @bp.route("/text-models/probe/<job_id>", methods=["GET"])
 def api_text_model_probe_poll(job_id):
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    with _probe_lock:
+        job = _probe_jobs.get(job_id)
+        if not job:
+            return jsonify({"error": "not found"}), 404
+        cursor = request.args.get("cursor", 0, type=int)
+        new_events = job["events"][cursor:]
+        done = job["done"]
+        result = job["result"] if done else None
+        if done and (time.time() - job["ts"]) > 120:
+            del _probe_jobs[job_id]
+    return jsonify({"events": new_events, "cursor": cursor + len(new_events), "done": done, "result": result})
+
+
+@bp.route("/video-models/<model_id>/grade", methods=["POST"])
+def api_video_model_grade(model_id):
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    data = request.get_json(silent=True) or {}
+    grade = data.get("grade", "good")
+    if grade not in ("good", "limited", "poor", "fallback", "rejected"):
+        return jsonify({"error": "invalid grade"}), 400
+    from db import db_set_model_grade
+    ok = db_set_model_grade(model_id, grade)
+    return jsonify({"ok": ok})
+
+
+@bp.route("/video-models/<model_id>/probe", methods=["POST"])
+def api_video_model_probe(model_id):
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+
+    m = db_get_video_model_by_id(model_id)
+    if not m:
+        return jsonify({"error": "Модель не найдена"}), 404
+
+    fal_api_key = os.environ.get("FAL_API_KEY", "")
+    if not fal_api_key:
+        return jsonify({"error": "FAL_API_KEY не задан"}), 500
+
+    model_name = m["name"]
+    body_tpl   = m["body_tpl"]
+    submit_url = m["submit_url"]
+
+    synthetic_prompt = "A calm ocean at sunset"
+    body = dict(body_tpl)
+    if "prompt" in body:
+        body["prompt"] = str(body["prompt"]).format(synthetic_prompt)
+
+    req_headers = {
+        "Authorization": f"Key {fal_api_key}",
+        "Content-Type": "application/json",
+    }
+
+    job_id = str(uuid.uuid4())
+    with _probe_lock:
+        _probe_jobs[job_id] = {"events": [], "done": False, "result": None, "ts": time.time()}
+
+    def _run():
+        import json as _json
+        _probe_append(job_id, f"Модель: {model_name}", "info")
+        _probe_append(job_id, f"URL: {submit_url}", "info")
+
+        req_preview = _json.dumps(body, ensure_ascii=False, indent=2)
+        _probe_append(job_id, f"→ Запрос:\n{req_preview}", "info")
+
+        try:
+            resp = _requests.post(submit_url, headers=req_headers, json=body, timeout=60)
+        except _requests.exceptions.Timeout:
+            _probe_append(job_id, "таймаут при отправке запроса (60 с)", "error")
+            _probe_finish(job_id)
+            return
+        except _requests.exceptions.RequestException as e:
+            _probe_append(job_id, f"ошибка соединения: {e}", "error")
+            _probe_finish(job_id)
+            return
+
+        raw_preview = " ".join(resp.text.split())[:500]
+        _probe_append(job_id, f"← HTTP {resp.status_code}: {raw_preview}", "info")
+
+        if resp.status_code >= 400:
+            _probe_append(job_id, f"Ошибка HTTP {resp.status_code}", "error")
+            _probe_finish(job_id)
+            return
+
+        try:
+            submit_data = resp.json()
+        except ValueError:
+            _probe_append(job_id, "не-JSON ответ от сервера", "error")
+            _probe_finish(job_id)
+            return
+
+        request_id = submit_data.get("request_id")
+        if not request_id:
+            _probe_append(job_id, f"нет request_id в ответе: {submit_data}", "error")
+            _probe_finish(job_id)
+            return
+
+        _probe_append(job_id, f"request_id: {request_id}", "ok")
+
+        _default_status = f"https://queue.fal.run/{m['model_url']}/requests/{request_id}/status"
+        _default_result = f"https://queue.fal.run/{m['model_url']}/requests/{request_id}"
+        status_url = submit_data.get("status_url") or _default_status
+        result_url = submit_data.get("response_url") or _default_result
+
+        for attempt in range(18):
+            time.sleep(10)
+            _probe_append(job_id, f"[опрос {attempt + 1}/18] проверяю статус…", "info")
+            try:
+                s_resp = _requests.get(status_url, headers=req_headers, timeout=30)
+                s_data = s_resp.json()
+            except Exception as e:
+                _probe_append(job_id, f"[опрос {attempt + 1}/18] ошибка опроса: {e}", "warn")
+                continue
+
+            status = s_data.get("status", "")
+            _probe_append(job_id, f"[опрос {attempt + 1}/18] статус: {status}", "info")
+
+            if status == "COMPLETED":
+                try:
+                    r_resp = _requests.get(result_url, headers=req_headers, timeout=30)
+                    r_data = r_resp.json()
+                except Exception as e:
+                    _probe_append(job_id, f"ошибка получения результата: {e}", "error")
+                    _probe_finish(job_id)
+                    return
+                video = r_data.get("video") or {}
+                video_url = video.get("url") if isinstance(video, dict) else None
+                if not video_url:
+                    video_url = str(r_data)
+                _probe_append(job_id, f"Готово! Video URL: {video_url}", "ok")
+                _probe_finish(job_id, video_url)
+                return
+            elif status == "FAILED":
+                err = s_data.get("error") or s_data.get("detail") or str(s_data)
+                _probe_append(job_id, f"Задача завершилась с ошибкой: {err}", "error")
+                _probe_finish(job_id)
+                return
+
+        _probe_append(job_id, "все попытки опроса исчерпаны (3 мин)", "error")
+        _probe_finish(job_id)
+
+    threading.Thread(target=_run, daemon=True).start()
+    return jsonify({"job_id": job_id})
+
+
+@bp.route("/video-models/probe/<job_id>", methods=["GET"])
+def api_video_model_probe_poll(job_id):
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
     with _probe_lock:

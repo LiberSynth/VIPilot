@@ -1538,11 +1538,15 @@ function validateLifetimes() {
       item.dataset.id = m.id;
       item.draggable = true;
       var caption = m.platform_name ? escHtml(m.platform_name) + ': ' + escHtml(m.name) : escHtml(m.name);
+      var gradeColors = { good: '#4a8', limited: '#a84', poor: '#b60', fallback: '#a33', rejected: '#666' };
+      var grade = m.grade || 'good';
+      var gradeHtml = '<span data-grade-id="' + m.id + '" data-grade="' + grade + '" onclick="event.stopPropagation();cycleVideoGrade(this)" title="Нажмите для смены" style="cursor:pointer;font-size:10px;padding:1px 6px;border-radius:3px;background:' + (gradeColors[grade]||'#555') + ';color:#fff;margin-left:6px;opacity:.85">' + grade + '</span>';
       item.innerHTML =
         '<div class="model-radio" onclick="activateModel(\'' + m.id + '\')">' +
           '<div class="model-radio-dot"></div>' +
         '</div>' +
-        '<div class="model-name">' + caption + '</div>' +
+        '<div class="model-name">' + caption + gradeHtml + '</div>' +
+        '<button class="model-probe-btn" title="Пробный запрос" onclick="event.stopPropagation();probeVideoModel(\'' + m.id + '\',\'' + escHtml(m.name) + '\',this)"><svg viewBox="0 0 16 16" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="4,2 13,8 4,14"/></svg></button>' +
         '<div class="model-drag-handle" title="Перетащить">⠿</div>';
 
       item.addEventListener('dragstart', function(e) {
@@ -1654,6 +1658,20 @@ window.cycleGrade = function(el) {
   el.textContent = next;
   el.style.background = _gradeColors[next] || '#555';
   fetch('/api/text-models/' + encodeURIComponent(id) + '/grade', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ grade: next })
+  });
+};
+
+window.cycleVideoGrade = function(el) {
+  var id   = el.getAttribute('data-grade-id');
+  var cur  = el.getAttribute('data-grade') || 'good';
+  var next = _gradeSequence[(_gradeSequence.indexOf(cur) + 1) % _gradeSequence.length];
+  el.setAttribute('data-grade', next);
+  el.textContent = next;
+  el.style.background = _gradeColors[next] || '#555';
+  fetch('/api/video-models/' + encodeURIComponent(id) + '/grade', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ grade: next })
@@ -2701,6 +2719,28 @@ function confirmRestart() {
     overlay.classList.add('open');
     document.body.style.overflow = 'hidden';
 
+    fetch('/api/text-models/' + encodeURIComponent(modelId) + '/probe', { method: 'POST' })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.error) {
+          if (_probeBtn) { _probeBtn.classList.remove('probing'); _probeBtn = null; }
+          body.innerHTML = '<span style="color:#c05050">' + String(data.error).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</span>';
+          return;
+        }
+        _doProbePoll(data.job_id, '/api/text-models/probe/', btn, body);
+      })
+      .catch(function(e) {
+        if (_probeBtn) { _probeBtn.classList.remove('probing'); _probeBtn = null; }
+        body.className = 'probe-modal-body probe-modal-error';
+        body.textContent = 'Ошибка запроса: ' + e;
+        if (info) info.textContent = '';
+      });
+  };
+
+  function _doProbePoll(jobId, pollUrl, btn, body) {
+    var cursor = 0;
+    body.innerHTML = '';
+
     var levelColor = { info: '#888', warn: '#c09050', ok: '#6a6', error: '#c05050' };
 
     function appendEvent(line) {
@@ -2723,37 +2763,56 @@ function confirmRestart() {
       body.scrollTop = body.scrollHeight;
     }
 
-    fetch('/api/text-models/' + encodeURIComponent(modelId) + '/probe', { method: 'POST' })
+    function poll() {
+      fetch(pollUrl + jobId + '?cursor=' + cursor)
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          (d.events || []).forEach(appendEvent);
+          cursor = d.cursor || cursor;
+          if (d.done) {
+            if (_probeBtn) { _probeBtn.classList.remove('probing'); _probeBtn = null; }
+            if (d.result) showResult(d.result);
+          } else {
+            setTimeout(poll, 500);
+          }
+        })
+        .catch(function() { setTimeout(poll, 1000); });
+    }
+    poll();
+  }
+
+  window.probeVideoModel = function(modelId, modelName, btn) {
+    var overlay = document.getElementById('probe-modal-overlay');
+    var body    = document.getElementById('probe-modal-body');
+    var info    = document.getElementById('probe-modal-info');
+    var title   = document.getElementById('probe-modal-title');
+    if (!overlay || !body) return;
+
+    function _esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    if (_probeBtn) _probeBtn.classList.remove('probing');
+    _probeBtn = btn;
+    btn.classList.add('probing');
+
+    if (title) title.textContent = 'Пробный запрос · ' + modelName;
+    body.className = 'probe-modal-body';
+    body.innerHTML = '<span style="color:#888">Выполняю запрос…</span>';
+    if (info) info.textContent = '';
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
+
+    fetch('/api/video-models/' + encodeURIComponent(modelId) + '/probe', { method: 'POST' })
       .then(function(r) { return r.json(); })
       .then(function(data) {
         if (data.error) {
-          btn.classList.remove('probing');
-          body.innerHTML = '<span style="color:#c05050">' + escHtml(data.error) + '</span>';
+          if (_probeBtn) { _probeBtn.classList.remove('probing'); _probeBtn = null; }
+          body.innerHTML = '<span style="color:#c05050">' + _esc(data.error) + '</span>';
           return;
         }
-        var jobId = data.job_id;
-        var cursor = 0;
-        body.innerHTML = '';
-
-        function poll() {
-          fetch('/api/text-models/probe/' + jobId + '?cursor=' + cursor)
-            .then(function(r) { return r.json(); })
-            .then(function(d) {
-              (d.events || []).forEach(appendEvent);
-              cursor = d.cursor || cursor;
-              if (d.done) {
-                btn.classList.remove('probing');
-                if (d.result) showResult(d.result);
-              } else {
-                setTimeout(poll, 500);
-              }
-            })
-            .catch(function() { setTimeout(poll, 1000); });
-        }
-        poll();
+        _doProbePoll(data.job_id, '/api/video-models/probe/', btn, body);
       })
       .catch(function(e) {
-        btn.classList.remove('probing');
+        if (_probeBtn) { _probeBtn.classList.remove('probing'); _probeBtn = null; }
         body.className = 'probe-modal-body probe-modal-error';
         body.textContent = 'Ошибка запроса: ' + e;
         if (info) info.textContent = '';
