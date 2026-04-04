@@ -445,6 +445,107 @@ def _m009_batches_target_nullable(cur):
     """)
 
 
+def _m010_sync_ai_models_from_dev(cur):
+    """
+    Синхронизация ai_models с дева на прод: обновление всех совпадающих по name записей
+    (url, body, order, active, ai_platform_id, platform_id, type, grade),
+    а также добавление отсутствующих моделей (ltx-video, wan-2.6).
+    Deployed: -
+    """
+    updates = [
+        ('deepseek-r1-distill-llama-70b', 'deepseek/deepseek-r1-distill-llama-70b', '{"messages": [{"role": "system", "content": "{}"}, {"role": "user", "content": "{}"}], "max_tokens": 300, "temperature": 0.9}', 25, False, '1b696238-1fdd-4b95-bff0-86a37be13c78', '1b696238-1fdd-4b95-bff0-86a37be13c78', 'text', 'rejected'),
+        ('dolphin-mistral-24b-venice', 'cognitivecomputations/dolphin-mistral-24b-venice-edition:free', '{"messages": [{"role": "system", "content": "{}"}, {"role": "user", "content": "{}"}], "max_tokens": 300, "temperature": 0.9}', 23, False, '1b696238-1fdd-4b95-bff0-86a37be13c78', '1b696238-1fdd-4b95-bff0-86a37be13c78', 'text', 'poor'),
+        ('gemma-3-12b-it', 'google/gemma-3-12b-it:free', '{"messages": [{"role": "system", "content": "{}"}, {"role": "user", "content": "{}"}], "max_tokens": 300, "temperature": 0.9}', 17, False, '1b696238-1fdd-4b95-bff0-86a37be13c78', '1b696238-1fdd-4b95-bff0-86a37be13c78', 'text', 'limited'),
+        ('gemma-3-27b-it', 'google/gemma-3-27b-it:free', '{"messages": [{"role": "system", "content": "{}"}, {"role": "user", "content": "{}"}], "max_tokens": 300, "temperature": 0.9}', 26, False, '1b696238-1fdd-4b95-bff0-86a37be13c78', '1b696238-1fdd-4b95-bff0-86a37be13c78', 'text', 'rejected'),
+        ('gemma-3-4b-it', 'google/gemma-3-4b-it:free', '{"messages": [{"role": "system", "content": "{}"}, {"role": "user", "content": "{}"}], "max_tokens": 300, "temperature": 0.9}', 16, False, '1b696238-1fdd-4b95-bff0-86a37be13c78', '1b696238-1fdd-4b95-bff0-86a37be13c78', 'text', 'limited'),
+        ('gemma-3n-e2b-it', 'google/gemma-3n-e2b-it:free', '{"messages": [{"role": "system", "content": "{}"}, {"role": "user", "content": "{}"}], "max_tokens": 300, "temperature": 0.9}', 14, False, '1b696238-1fdd-4b95-bff0-86a37be13c78', '1b696238-1fdd-4b95-bff0-86a37be13c78', 'text', 'limited'),
+        ('gemma-3n-e4b-it', 'google/gemma-3n-e4b-it:free', '{"messages": [{"role": "system", "content": "{}"}, {"role": "user", "content": "{}"}], "max_tokens": 300, "temperature": 0.9}', 15, False, '1b696238-1fdd-4b95-bff0-86a37be13c78', '1b696238-1fdd-4b95-bff0-86a37be13c78', 'text', 'limited'),
+        ('glm-4.5-air', 'z-ai/glm-4.5-air:free', '{"messages": [{"role": "system", "content": "{}"}, {"role": "user", "content": "{}"}], "max_tokens": 300, "temperature": 0.9}', 13, False, '1b696238-1fdd-4b95-bff0-86a37be13c78', '1b696238-1fdd-4b95-bff0-86a37be13c78', 'text', 'limited'),
+        ('hermes-3-llama-3.1-405b', 'nousresearch/hermes-3-llama-3.1-405b:free', '{"messages": [{"role": "system", "content": "{}"}, {"role": "user", "content": "{}"}], "max_tokens": 300, "temperature": 0.9}', 20, False, '1b696238-1fdd-4b95-bff0-86a37be13c78', '1b696238-1fdd-4b95-bff0-86a37be13c78', 'text', 'poor'),
+        ('kling-video/v1.6/standard', 'fal-ai/kling-video/v1.6/standard/text-to-video', '{"prompt": "{}", "duration": "{:d}", "aspect_ratio": "{:d}:{:d}"}', 2, True, '0c8d1e1c-fe65-45d3-a1c3-be69e7941e17', '0c8d1e1c-fe65-45d3-a1c3-be69e7941e17', 'text-to-video', 'good'),
+        ('lfm-2.5-1.2b-instruct', 'liquid/lfm-2.5-1.2b-instruct:free', '{"messages": [{"role": "system", "content": "{}"}, {"role": "user", "content": "{}"}], "max_tokens": 300, "temperature": 0.9}', 7, False, '1b696238-1fdd-4b95-bff0-86a37be13c78', '1b696238-1fdd-4b95-bff0-86a37be13c78', 'text', 'limited'),
+        ('lfm-2.5-1.2b-thinking', 'liquid/lfm-2.5-1.2b-thinking:free', '{"messages": [{"role": "system", "content": "{}"}, {"role": "user", "content": "{}"}], "max_tokens": 300, "temperature": 0.9}', 21, False, '1b696238-1fdd-4b95-bff0-86a37be13c78', '1b696238-1fdd-4b95-bff0-86a37be13c78', 'text', 'poor'),
+        ('llama-3.1-8b-instruct', 'meta-llama/llama-3.1-8b-instruct', '{"messages": [{"role": "system", "content": "{}"}, {"role": "user", "content": "{}"}], "max_tokens": 300, "temperature": 0.9}', 4, True, '1b696238-1fdd-4b95-bff0-86a37be13c78', '1b696238-1fdd-4b95-bff0-86a37be13c78', 'text', 'good'),
+        ('llama-3.2-3b-instruct', 'meta-llama/llama-3.2-3b-instruct:free', '{"messages": [{"role": "system", "content": "{}"}, {"role": "user", "content": "{}"}], "max_tokens": 300, "temperature": 0.9}', 19, False, '1b696238-1fdd-4b95-bff0-86a37be13c78', '1b696238-1fdd-4b95-bff0-86a37be13c78', 'text', 'limited'),
+        ('llama-3.3-70b-instruct', 'meta-llama/llama-3.3-70b-instruct:free', '{"messages": [{"role": "system", "content": "{}"}, {"role": "user", "content": "{}"}], "max_tokens": 300, "temperature": 0.9}', 18, False, '1b696238-1fdd-4b95-bff0-86a37be13c78', '1b696238-1fdd-4b95-bff0-86a37be13c78', 'text', 'limited'),
+        ('minimax-m2.5', 'minimax/minimax-m2.5:free', '{"messages": [{"role": "system", "content": "{}"}, {"role": "user", "content": "{}"}], "max_tokens": 300, "temperature": 0.9}', 29, False, '1b696238-1fdd-4b95-bff0-86a37be13c78', '1b696238-1fdd-4b95-bff0-86a37be13c78', 'text', 'rejected'),
+        ('minimax/video-01', 'fal-ai/minimax/video-01', '{"prompt": "{}", "duration": "{:d}s", "aspect_ratio": "{:d}:{:d}"}', 4, False, '0c8d1e1c-fe65-45d3-a1c3-be69e7941e17', '0c8d1e1c-fe65-45d3-a1c3-be69e7941e17', 'text-to-video', 'poor'),
+        ('mistral-7b-instruct', 'mistralai/mistral-7b-instruct-v0.1', '{"messages": [{"role": "system", "content": "{}"}, {"role": "user", "content": "{}"}], "max_tokens": 300, "temperature": 0.9}', 28, False, '1b696238-1fdd-4b95-bff0-86a37be13c78', '1b696238-1fdd-4b95-bff0-86a37be13c78', 'text', 'rejected'),
+        ('nemotron-3-nano-30b', 'nvidia/nemotron-3-nano-30b-a3b:free', '{"messages": [{"role": "system", "content": "{}"}, {"role": "user", "content": "{}"}], "max_tokens": 300, "temperature": 0.9}', 8, False, '1b696238-1fdd-4b95-bff0-86a37be13c78', '1b696238-1fdd-4b95-bff0-86a37be13c78', 'text', 'limited'),
+        ('nemotron-3-super-120b', 'nvidia/nemotron-3-super-120b-a12b:free', '{"messages": [{"role": "system", "content": "{}"}, {"role": "user", "content": "{}"}], "max_tokens": 300, "temperature": 0.9}', 5, False, '1b696238-1fdd-4b95-bff0-86a37be13c78', '1b696238-1fdd-4b95-bff0-86a37be13c78', 'text', 'limited'),
+        ('nemotron-nano-12b-v2-vl', 'nvidia/nemotron-nano-12b-v2-vl:free', '{"messages": [{"role": "system", "content": "{}"}, {"role": "user", "content": "{}"}], "max_tokens": 300, "temperature": 0.9}', 10, False, '1b696238-1fdd-4b95-bff0-86a37be13c78', '1b696238-1fdd-4b95-bff0-86a37be13c78', 'text', 'limited'),
+        ('nemotron-nano-9b-v2', 'nvidia/nemotron-nano-9b-v2:free', '{"messages": [{"role": "system", "content": "{}"}, {"role": "user", "content": "{}"}], "max_tokens": 300, "temperature": 0.9}', 12, False, '1b696238-1fdd-4b95-bff0-86a37be13c78', '1b696238-1fdd-4b95-bff0-86a37be13c78', 'text', 'limited'),
+        ('openchat-7b', 'openchat/openchat-7b:free', '{"messages": [{"role": "system", "content": "{}"}, {"role": "user", "content": "{}"}], "max_tokens": 300, "temperature": 0.9}', 30, False, '1b696238-1fdd-4b95-bff0-86a37be13c78', '1b696238-1fdd-4b95-bff0-86a37be13c78', 'text', 'rejected'),
+        ('phi-3-mini-128k-instruct', 'microsoft/phi-3-mini-128k-instruct:free', '{"messages": [{"role": "system", "content": "{}"}, {"role": "user", "content": "{}"}], "max_tokens": 300, "temperature": 0.9}', 27, False, '1b696238-1fdd-4b95-bff0-86a37be13c78', '1b696238-1fdd-4b95-bff0-86a37be13c78', 'text', 'rejected'),
+        ('qwen3-coder', 'qwen/qwen3-coder:free', '{"messages": [{"role": "system", "content": "{}"}, {"role": "user", "content": "{}"}], "max_tokens": 300, "temperature": 0.9}', 22, False, '1b696238-1fdd-4b95-bff0-86a37be13c78', '1b696238-1fdd-4b95-bff0-86a37be13c78', 'text', 'poor'),
+        ('qwen3-next-80b', 'qwen/qwen3-next-80b-a3b-instruct:free', '{"messages": [{"role": "system", "content": "{}"}, {"role": "user", "content": "{}"}], "max_tokens": 300, "temperature": 0.9}', 11, False, '1b696238-1fdd-4b95-bff0-86a37be13c78', '1b696238-1fdd-4b95-bff0-86a37be13c78', 'text', 'limited'),
+        ('qwen3.6-plus-preview', 'qwen/qwen3.6-plus-preview:free', '{"messages": [{"role": "system", "content": "{}"}, {"role": "user", "content": "{}"}], "max_tokens": 300, "temperature": 0.9}', 31, False, '1b696238-1fdd-4b95-bff0-86a37be13c78', '1b696238-1fdd-4b95-bff0-86a37be13c78', 'text', 'rejected'),
+        ('sora-2', 'fal-ai/sora-2/text-to-video', '{"prompt": "{}", "duration": "{:int}", "aspect_ratio": "{:d}:{:d}"}', 1, True, '0c8d1e1c-fe65-45d3-a1c3-be69e7941e17', '0c8d1e1c-fe65-45d3-a1c3-be69e7941e17', 'text-to-video', 'good'),
+        ('trinity-large-preview', 'arcee-ai/trinity-large-preview:free', '{"messages": [{"role": "system", "content": "{}"}, {"role": "user", "content": "{}"}], "max_tokens": 300, "temperature": 0.9}', 6, False, '1b696238-1fdd-4b95-bff0-86a37be13c78', '1b696238-1fdd-4b95-bff0-86a37be13c78', 'text', 'limited'),
+        ('trinity-mini', 'arcee-ai/trinity-mini:free', '{"messages": [{"role": "system", "content": "{}"}, {"role": "user", "content": "{}"}], "max_tokens": 300, "temperature": 0.9}', 9, False, '1b696238-1fdd-4b95-bff0-86a37be13c78', '1b696238-1fdd-4b95-bff0-86a37be13c78', 'text', 'limited'),
+        ('veo2', 'fal-ai/veo2', '{"prompt": "{}", "duration": "{:d}s", "aspect_ratio": "{:d}:{:d}"}', 3, True, '0c8d1e1c-fe65-45d3-a1c3-be69e7941e17', '0c8d1e1c-fe65-45d3-a1c3-be69e7941e17', 'text-to-video', 'good'),
+    ]
+    for (name, url, body, order, active, ai_platform_id, platform_id, type_, grade) in updates:
+        cur.execute("""
+            UPDATE ai_models
+            SET url            = %s,
+                body           = %s::jsonb,
+                "order"        = %s,
+                active         = %s,
+                ai_platform_id = %s,
+                platform_id    = %s,
+                type           = %s,
+                grade          = %s
+            WHERE name = %s
+        """, (url, body, order, active, ai_platform_id, platform_id, type_, grade, name))
+
+    # openrouter/free — ai_platform_id специально NULL на деве
+    cur.execute("""
+        UPDATE ai_models
+        SET url            = 'openrouter/free',
+            body           = '{"messages": [{"role": "system", "content": "{}"}, {"role": "user", "content": "{}"}], "max_tokens": 300, "temperature": 0.9}'::jsonb,
+            "order"        = 24,
+            active         = false,
+            ai_platform_id = NULL,
+            platform_id    = '1b696238-1fdd-4b95-bff0-86a37be13c78',
+            type           = 'text',
+            grade          = 'fallback'
+        WHERE name = 'openrouter/free'
+    """)
+
+    # Вставляем ltx-video (если нет)
+    cur.execute("""
+        INSERT INTO ai_models (id, name, url, body, "order", active, ai_platform_id, platform_id, type, grade)
+        SELECT
+            'e268ac99-2a94-47c1-9e37-b019e6d024be',
+            'ltx-video',
+            'fal-ai/ltx-video',
+            '{"width": "{:int}", "height": "{:int}", "prompt": "{}", "num_frames": "{:int}"}'::jsonb,
+            5, false,
+            '0c8d1e1c-fe65-45d3-a1c3-be69e7941e17',
+            '0c8d1e1c-fe65-45d3-a1c3-be69e7941e17',
+            'text-to-video',
+            'poor'
+        WHERE NOT EXISTS (SELECT 1 FROM ai_models WHERE name = 'ltx-video')
+    """)
+
+    # Вставляем wan-2.6 (если нет)
+    cur.execute("""
+        INSERT INTO ai_models (id, name, url, body, "order", active, ai_platform_id, platform_id, type, grade)
+        SELECT
+            '224e7552-a2aa-49fe-9d5c-5cb274491cef',
+            'wan-2.6',
+            'wan/v2.6/text-to-video',
+            '{"prompt": "{}", "duration": "{}", "resolution": "1080p", "aspect_ratio": "{0}:{1}"}'::jsonb,
+            6, false,
+            '0c8d1e1c-fe65-45d3-a1c3-be69e7941e17',
+            '0c8d1e1c-fe65-45d3-a1c3-be69e7941e17',
+            'text-to-video',
+            'poor'
+        WHERE NOT EXISTS (SELECT 1 FROM ai_models WHERE name = 'wan-2.6')
+    """)
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -455,6 +556,7 @@ MIGRATIONS = [
     (7, _m007_rename_video_data),
     (8, _m008_fix_ai_model_grades),
     (9, _m009_batches_target_nullable),
+    (10, _m010_sync_ai_models_from_dev),
 ]
 
 
