@@ -1839,6 +1839,7 @@ window.cycleVideoGrade = function(el) {
     transcode_error:   'транскод: ошибка',
     published:         'опубликовано',
     publish_error:     'публикация: ошибка',
+    probe:             'пробный',
     'отменён':         'отменён',
   };
 
@@ -1999,7 +2000,7 @@ window.cycleVideoGrade = function(el) {
     }
 
     const isActive = logs.some(function(l) { return l.status === 'running'; });
-    const doneStatuses  = ['published'];
+    const doneStatuses  = ['published', 'probe'];
     const waitStatuses  = ['story_ready', 'video_pending', 'video_ready', 'transcode_ready'];
     const errorStatuses = ['error', 'video_error', 'transcode_error', 'publish_error'];
     const md = isActive ? 'md-active'
