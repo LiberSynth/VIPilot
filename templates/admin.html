@@ -744,7 +744,8 @@
   }
   .probe-modal-info { font-size: 11px; color: #555; padding: 0 14px 10px; }
   .probe-modal-error { color: #c05050; }
-  #probe-modal-video video { width: 100%; border-radius: 6px; display: block; background: #000; max-height: 320px; }
+  .probe-modal-video-section { padding: 12px 12px 0; }
+  .probe-modal-video-section video { width: 100%; border-radius: 6px; display: block; background: #000; max-height: 320px; }
 
   /* Story modal */
   .story-modal-overlay {
@@ -2816,7 +2817,13 @@ function confirmRestart() {
   function _doBatchLogPoll(batchId, body) {
     var _TERMINAL = ['probe', 'video_error', 'transcode_error', 'publish_error', 'отменён'];
 
-    // Используем те же функции рендеринга, что и монитор
+    // Видео-блок вверху (изначально скрыт)
+    var videoSection = document.createElement('div');
+    videoSection.className = 'probe-modal-video-section';
+    videoSection.style.display = 'none';
+    body.appendChild(videoSection);
+
+    // Лог-контейнер под видео
     var container = document.createElement('div');
     container.className = 'monitor-log-list';
     body.style.padding = '0';
@@ -2824,10 +2831,15 @@ function confirmRestart() {
     body.appendChild(container);
 
     function render(d) {
-      // Запоминаем какие пайплайн-блоки были раскрыты
-      var openIds = {};
-      container.querySelectorAll('.monitor-log-item.open').forEach(function(el) {
-        openIds[el.dataset.lid] = true;
+      // Запоминаем открытые И явно схлопнутые блоки
+      var openIds   = {};
+      var closedIds = {};
+      container.querySelectorAll('.monitor-log-item').forEach(function(el) {
+        if (el.classList.contains('open')) {
+          openIds[el.dataset.lid] = true;
+        } else if (el.querySelector('.monitor-entries')) {
+          closedIds[el.dataset.lid] = true; // пользователь схлопнул
+        }
       });
 
       var groups = groupLogsByPipeline(d.logs || []);
@@ -2836,20 +2848,29 @@ function confirmRestart() {
           log,
           d.batch_id,
           d.story_id,
-          d.has_video_data,
+          false,            // скрываем кнопку "Просмотр видео" в диалоге пробы
           d.text_model_name,
           d.video_model_name
         );
       }).join('');
 
-      // Раскрываем все блоки с вложенными entries; восстанавливаем ранее раскрытые
+      // Авто-раскрываем новые блоки с entries; восстанавливаем открытые; не трогаем схлопнутые
       container.querySelectorAll('.monitor-log-item').forEach(function(el) {
-        if (openIds[el.dataset.lid] || el.querySelector('.monitor-entries')) {
+        var lid = el.dataset.lid;
+        if (openIds[lid]) {
+          el.classList.add('open');
+        } else if (!closedIds[lid] && el.querySelector('.monitor-entries')) {
           el.classList.add('open');
         }
       });
 
       body.scrollTop = body.scrollHeight;
+    }
+
+    function showVideo() {
+      var src = '/api/batch/' + encodeURIComponent(batchId) + '/video';
+      videoSection.innerHTML = '<video controls autoplay src="' + src + '"></video>';
+      videoSection.style.display = 'block';
     }
 
     function poll() {
@@ -2861,6 +2882,7 @@ function confirmRestart() {
           var status = d.batch_status;
           if (_TERMINAL.indexOf(status) !== -1) {
             if (_probeBtn) { _probeBtn.classList.remove('probing'); _probeBtn = null; }
+            if (d.has_video_data) showVideo();
           } else {
             setTimeout(poll, 2000);
           }
