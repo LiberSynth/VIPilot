@@ -2715,6 +2715,7 @@ function confirmRestart() {
 
     if (title) title.textContent = 'Пробный запрос · ' + modelName;
     body.className = 'probe-modal-body';
+    body.style.padding = '';
     body.innerHTML = '<span style="color:#888">Выполняю запрос…</span>';
     if (info) info.textContent = '';
     overlay.classList.add('open');
@@ -2801,10 +2802,9 @@ function confirmRestart() {
 
     if (title) title.textContent = 'Пробный запрос · ' + modelName;
     body.className = 'probe-modal-body';
+    body.style.padding = '';
     body.innerHTML = '<span style="color:#888">Создаю батч…</span>';
     if (info) info.textContent = '';
-    var _vc = document.getElementById('probe-modal-video');
-    if (_vc) { _vc.innerHTML = ''; _vc.style.display = 'none'; }
     overlay.classList.add('open');
     document.body.style.overflow = 'hidden';
 
@@ -2829,80 +2829,52 @@ function confirmRestart() {
 
   function _doBatchLogPoll(batchId, body) {
     var _TERMINAL = ['probe', 'video_error', 'transcode_error', 'publish_error', 'отменён'];
-    var _statusColor = { ok: '#6a6', error: '#c05050', warn: '#c09050', running: '#888', info: '#888', прервана: '#c09050' };
-    var _levelColor  = { info: '#aaa', warn: '#c09050', ok: '#6a6', error: '#c05050' };
-    var renderedLogIds = {};
 
-    function renderLogs(logs) {
-      logs.forEach(function(log) {
-        var domId = 'probe-log-' + log.id;
-        var existing = document.getElementById(domId);
-        var sc = _statusColor[log.status] || '#aaa';
-        var entries = log.entries || [];
+    // Используем те же функции рендеринга, что и монитор
+    var container = document.createElement('div');
+    container.className = 'monitor-log-list';
+    body.style.padding = '0';
+    body.style.minHeight = '80px';
+    body.appendChild(container);
 
-        if (!existing) {
-          var wrap = document.createElement('div');
-          wrap.id = domId;
-          wrap.style.cssText = 'margin-bottom:6px';
-          var hdr = document.createElement('div');
-          hdr.style.cssText = 'font-size:11px;color:#666;text-transform:uppercase;margin-bottom:2px';
-          hdr.textContent = PIPELINE_LABELS[log.pipeline] || log.pipeline;
-          var msg = document.createElement('div');
-          msg.id = domId + '-msg';
-          msg.style.cssText = 'font-size:12px;color:' + sc + ';margin-bottom:2px';
-          msg.textContent = log.message;
-          var entriesDiv = document.createElement('div');
-          entriesDiv.id = domId + '-entries';
-          entriesDiv.style.cssText = 'padding-left:10px';
-          wrap.appendChild(hdr);
-          wrap.appendChild(msg);
-          wrap.appendChild(entriesDiv);
-          body.appendChild(wrap);
-          renderedLogIds[log.id] = 0;
-        } else {
-          var msgEl = document.getElementById(domId + '-msg');
-          if (msgEl) { msgEl.style.color = sc; msgEl.textContent = log.message; }
-        }
-
-        var entriesDiv = document.getElementById(domId + '-entries');
-        var rendered = renderedLogIds[log.id] || 0;
-        var newEntries = entries.slice(rendered);
-        newEntries.forEach(function(e) {
-          var lc = _levelColor[e.level] || '#aaa';
-          var d = document.createElement('div');
-          d.style.cssText = 'color:' + lc + ';font-size:11px;margin-bottom:2px;white-space:pre-wrap;line-height:1.4';
-          d.textContent = e.message;
-          entriesDiv.appendChild(d);
-        });
-        renderedLogIds[log.id] = entries.length;
-        body.scrollTop = body.scrollHeight;
+    function render(d) {
+      // Запоминаем какие пайплайн-блоки были раскрыты
+      var openIds = {};
+      container.querySelectorAll('.monitor-log-item.open').forEach(function(el) {
+        openIds[el.dataset.lid] = true;
       });
+
+      var groups = groupLogsByPipeline(d.logs || []);
+      container.innerHTML = groups.map(function(log) {
+        return renderLogItem(
+          log,
+          d.batch_id,
+          d.story_id,
+          d.has_video_data,
+          d.text_model_name,
+          d.video_model_name
+        );
+      }).join('');
+
+      // Раскрываем все блоки с вложенными entries; восстанавливаем ранее раскрытые
+      container.querySelectorAll('.monitor-log-item').forEach(function(el) {
+        if (openIds[el.dataset.lid] || el.querySelector('.monitor-entries')) {
+          el.classList.add('open');
+        }
+      });
+
+      body.scrollTop = body.scrollHeight;
     }
 
     function poll() {
       fetch('/api/batch/' + batchId + '/logs')
         .then(function(r) { return r.json(); })
         .then(function(d) {
-          if (d.error) {
-            setTimeout(poll, 2000);
-            return;
-          }
-          renderLogs(d.logs || []);
+          if (d.error) { setTimeout(poll, 2000); return; }
+          render(d);
           var status = d.batch_status;
           if (_TERMINAL.indexOf(status) !== -1) {
             if (_probeBtn) { _probeBtn.classList.remove('probing'); _probeBtn = null; }
-            if (d.has_video && status === 'probe') {
-              var sep = document.createElement('hr');
-              sep.style.cssText = 'border:none;border-top:1px solid #252038;margin:10px 0';
-              body.appendChild(sep);
-              var vid = document.createElement('video');
-              vid.controls = true;
-              vid.autoplay = true;
-              vid.src = '/api/batch/' + batchId + '/video';
-              vid.style.cssText = 'width:100%;border-radius:6px;display:block;background:#000;max-height:300px';
-              body.appendChild(vid);
-              body.scrollTop = body.scrollHeight;
-            }
           } else {
             setTimeout(poll, 2000);
           }

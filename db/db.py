@@ -929,27 +929,45 @@ def db_get_transcode_ready_batch():
 
 
 def db_get_batch_logs(batch_id):
-    """Возвращает статус батча и все log-записи с вложенными entries для поллинга диалога."""
+    """
+    Возвращает один батч в формате монитора — для поллинга диалога пробы.
+    Набор полей идентичен тому, что возвращает db_get_monitor для каждого батча,
+    чтобы фронтенд мог использовать те же функции renderLogItem/groupLogsByPipeline.
+    """
     try:
         with get_db() as conn:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-                cur.execute(
-                    "SELECT status, (video_data_original IS NOT NULL OR video_data_transcoded IS NOT NULL) AS has_video FROM batches WHERE id = %s",
-                    (batch_id,),
-                )
+                cur.execute("""
+                    SELECT
+                        b.id::text                                              AS batch_id,
+                        b.scheduled_at,
+                        b.adhoc,
+                        b.status                                                AS batch_status,
+                        b.created_at,
+                        t.name                                                  AS target_name,
+                        b.story_id::text                                        AS story_id,
+                        (b.video_data_transcoded IS NOT NULL
+                         OR b.video_data_original IS NOT NULL)                  AS has_video_data,
+                        tm.name                                                 AS text_model_name,
+                        vm.name                                                 AS video_model_name
+                    FROM batches b
+                    LEFT JOIN targets   t  ON t.id  = b.target_id
+                    LEFT JOIN ai_models tm ON tm.id = b.text_model_id
+                    LEFT JOIN ai_models vm ON vm.id = b.video_model_id
+                    WHERE b.id = %s
+                """, (batch_id,))
                 row = cur.fetchone()
                 if not row:
                     return None
-                batch_status = row['status']
-                has_video = bool(row['has_video'])
+
                 cur.execute("""
                     SELECT l.id::text, l.pipeline, l.message, l.status,
                            l.created_at,
                            COALESCE(
                                json_agg(
                                    json_build_object(
-                                       'message', le.message,
-                                       'level',   le.level,
+                                       'message',    le.message,
+                                       'level',      le.level,
                                        'created_at', le.created_at
                                    ) ORDER BY le.created_at
                                ) FILTER (WHERE le.id IS NOT NULL),
@@ -962,9 +980,18 @@ def db_get_batch_logs(batch_id):
                     ORDER BY l.created_at
                 """, (batch_id,))
                 logs = cur.fetchall()
+
         return {
-            'batch_status': batch_status,
-            'has_video': has_video,
+            'batch_id':         row['batch_id'],
+            'batch_status':     row['batch_status'],
+            'created_at':       row['created_at'].isoformat() if row['created_at'] else None,
+            'adhoc':            row['adhoc'],
+            'scheduled_at':     row['scheduled_at'].isoformat() if row['scheduled_at'] else None,
+            'target_name':      row['target_name'],
+            'story_id':         row['story_id'],
+            'has_video_data':   bool(row['has_video_data']),
+            'text_model_name':  row['text_model_name'],
+            'video_model_name': row['video_model_name'],
             'logs': [
                 {
                     'id':         r['id'],
