@@ -2830,16 +2830,13 @@ function confirmRestart() {
     body.style.minHeight = '80px';
     body.appendChild(container);
 
+    var seenIds = {}; // lids уже показанных разделов (живёт между рендерами)
+
     function render(d) {
-      // Запоминаем открытые И явно схлопнутые блоки
-      var openIds   = {};
-      var closedIds = {};
-      container.querySelectorAll('.monitor-log-item').forEach(function(el) {
-        if (el.classList.contains('open')) {
-          openIds[el.dataset.lid] = true;
-        } else if (el.querySelector('.monitor-entries')) {
-          closedIds[el.dataset.lid] = true; // пользователь схлопнул
-        }
+      // Запоминаем открытые разделы до перерисовки
+      var openIds = {};
+      container.querySelectorAll('.monitor-log-item.open').forEach(function(el) {
+        openIds[el.dataset.lid] = true;
       });
 
       var groups = groupLogsByPipeline(d.logs || []);
@@ -2854,14 +2851,14 @@ function confirmRestart() {
         );
       }).join('');
 
-      // Авто-раскрываем новые блоки с entries; восстанавливаем открытые; не трогаем схлопнутые
       container.querySelectorAll('.monitor-log-item').forEach(function(el) {
         var lid = el.dataset.lid;
         if (openIds[lid]) {
-          el.classList.add('open');
-        } else if (!closedIds[lid] && el.querySelector('.monitor-entries')) {
-          el.classList.add('open');
+          el.classList.add('open');                            // был открыт — восстанавливаем
+        } else if (!seenIds[lid] && el.querySelector('.monitor-entries')) {
+          el.classList.add('open');                            // новый раздел — авто-раскрываем
         }
+        seenIds[lid] = true;                                   // отмечаем как виденный
       });
 
       body.scrollTop = body.scrollHeight;
