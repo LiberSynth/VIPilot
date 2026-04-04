@@ -2097,17 +2097,20 @@ window.cycleVideoGrade = function(el) {
   }
 
   function getOpenState() {
-    var bids = {}, sgkeys = {}, lids = {};
+    var bids = {}, sgkeys = {}, lids = {}, seenLids = {};
     document.querySelectorAll('.monitor-batch.open').forEach(function(el) {
       if (el.dataset.bid) bids[el.dataset.bid] = true;
     });
     document.querySelectorAll('.monitor-sysgroup.open').forEach(function(el) {
       if (el.dataset.sgKey) sgkeys[el.dataset.sgKey] = true;
     });
-    document.querySelectorAll('.monitor-log-item.open').forEach(function(el) {
-      if (el.dataset.lid) lids[el.dataset.lid] = true;
+    document.querySelectorAll('.monitor-log-item').forEach(function(el) {
+      if (el.dataset.lid) {
+        seenLids[el.dataset.lid] = true;
+        if (el.classList.contains('open')) lids[el.dataset.lid] = true;
+      }
     });
-    return { bids: bids, sgkeys: sgkeys, lids: lids };
+    return { bids: bids, sgkeys: sgkeys, lids: lids, seenLids: seenLids };
   }
 
   function restoreOpenState(state) {
@@ -2122,10 +2125,12 @@ window.cycleVideoGrade = function(el) {
     });
   }
 
-  function autoExpandRunningLogs() {
+  function autoExpandRunningLogs(seenLids) {
     document.querySelectorAll('.monitor-batch.open').forEach(function(batch) {
       batch.querySelectorAll('.monitor-log-item[data-status="running"]').forEach(function(li) {
-        if (li.querySelector('.monitor-entries')) li.classList.add('open');
+        if (li.querySelector('.monitor-entries') && !seenLids[li.dataset.lid]) {
+          li.classList.add('open');
+        }
       });
     });
   }
@@ -2143,7 +2148,7 @@ window.cycleVideoGrade = function(el) {
       return g.type === 'batch' ? renderBatch(g.data) : renderSysGroup(g.items);
     }).join('');
     restoreOpenState(prev);
-    autoExpandRunningLogs();
+    autoExpandRunningLogs(prev.seenLids || {});
   }
 
   function refreshMonitor() {
@@ -2309,14 +2314,6 @@ window.cycleVideoGrade = function(el) {
       .then(function(data) {
         if (data.ok) {
           btn.classList.add('copied');
-          const item = btn.closest('.monitor-log-item');
-          if (item) {
-            const dot = item.querySelector('.monitor-log-dot');
-            if (dot) { dot.className = 'monitor-log-dot ls-прервана'; }
-            item.dataset.status = 'прервана';
-            item.style.opacity  = '0.45';
-            item.style.transition = 'opacity .3s';
-          }
           setTimeout(function() {
             btn.classList.remove('copied');
             btn.disabled = false;
