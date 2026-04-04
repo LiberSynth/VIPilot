@@ -228,7 +228,7 @@ def _m004_seed_ai_models(cur):
         INSERT INTO ai_platforms (name, url)
         SELECT v.name, v.url FROM (VALUES
             ('OpenRouter', 'https://openrouter.ai/api/v1/chat/completions'),
-            ('fal',        'https://queue.fal.run/fal-ai')
+            ('fal',        'https://queue.fal.run')
         ) AS v(name, url)
         WHERE NOT EXISTS (SELECT 1 FROM ai_platforms WHERE name = v.name)
     """)
@@ -555,6 +555,22 @@ def _m010_sync_ai_models_from_dev(cur):
     """)
 
 
+def _m011_fix_fal_platform_url(cur):
+    """
+    Убирает лишний суффикс /fal-ai из URL платформы fal.
+    model_url в ai_models уже содержит 'fal-ai/...',
+    поэтому platform_url должен быть https://queue.fal.run (без /fal-ai),
+    иначе submit_url = platform_url + '/' + model_url даёт двойной fal-ai.
+    Deployed: -
+    """
+    cur.execute("""
+        UPDATE ai_platforms
+           SET url = 'https://queue.fal.run'
+         WHERE name = 'fal'
+           AND url = 'https://queue.fal.run/fal-ai'
+    """)
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -566,6 +582,7 @@ MIGRATIONS = [
     (8, _m008_fix_ai_model_grades),
     (9, _m009_batches_target_nullable),
     (10, _m010_sync_ai_models_from_dev),
+    (11, _m011_fix_fal_platform_url),
 ]
 
 
