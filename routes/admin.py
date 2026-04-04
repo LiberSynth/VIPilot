@@ -83,6 +83,7 @@ def admin_page():
     vk_publish_story   = db_get("vk_publish_story", "1") == "1"
     vk_publish_wall    = db_get("vk_publish_wall",  "1") == "1"
     video_duration     = max(1, min(60, int(db_get("video_duration", "6"))))
+    video_post_prompt  = db_get("video_post_prompt", "")
     buffer_hours       = max(1, min(720, int(db_get("buffer_hours", "24"))))
     loop_interval      = max(1, min(3600, int(db_get("loop_interval", "5"))))
     story_fails_to_next = max(1, int(db_get("story_fails_to_next", "3")))
@@ -112,6 +113,7 @@ def admin_page():
         vk_publish_wall=vk_publish_wall,
         vk_transcode=vk_transcode,
         video_duration=video_duration,
+        video_post_prompt=video_post_prompt,
         buffer_hours=buffer_hours,
         loop_interval=loop_interval,
         story_fails_to_next=story_fails_to_next,

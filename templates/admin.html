@@ -956,6 +956,12 @@
     </div>
 
     <div class="card" style="margin-top:12px">
+      <div class="card-title">Пост-промпт видео</div>
+      <div class="hint">Дополнительный текст, который добавляется после сюжета при отправке запроса в видео-модель. Например: «Следи за окончанием ролика. Делай конец плавным. Не обрезай конец на какой-либо фразе.»</div>
+      <textarea name="video_post_prompt" id="ta_postprompt" spellcheck="true" style="min-height:80px">{{ video_post_prompt }}</textarea>
+    </div>
+
+    <div class="card" style="margin-top:12px">
       <div class="card-title">Модели</div>
       <div class="hint" style="margin-bottom:4px">Попыток на модель</div>
       <div style="margin-bottom:10px">
@@ -1331,6 +1337,7 @@ function collectAllSettings(activeTab) {
   data.set('metaprompt',      ta      ? ta.value      : '');
   data.set('system_prompt',   taSys   ? taSys.value   : '');
   data.set('video_duration',      v('video_duration'));
+  data.set('video_post_prompt',   (function(){ var el = document.getElementById('ta_postprompt'); return el ? el.value : ''; })());
   data.set('story_fails_to_next', v('story_fails_to_next'));
   data.set('video_fails_to_next', v('video_fails_to_next'));
   const chkStory     = document.getElementById('vk_story_pub_check');
@@ -1414,6 +1421,7 @@ function scheduleRequestSave() {
   const fields = [
     document.getElementById('video_duration'),
     document.getElementById('video_fails_to_next'),
+    document.getElementById('ta_postprompt'),
   ].filter(Boolean);
   fields.forEach(f => {
     f.addEventListener('input', scheduleRequestSave);
