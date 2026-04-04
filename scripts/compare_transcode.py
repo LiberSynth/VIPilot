@@ -19,6 +19,8 @@ import glob
 
 def find_source_video(path_arg):
     if path_arg:
+        if path_arg.startswith("http://") or path_arg.startswith("https://"):
+            return download_video(path_arg)
         if not os.path.isfile(path_arg):
             print(f"Файл не найден: {path_arg}")
             sys.exit(1)
@@ -28,6 +30,21 @@ def find_source_video(path_arg):
         print("Нет видеофайлов в папке videos/")
         sys.exit(1)
     return videos[0]
+
+
+def download_video(url):
+    import urllib.request
+    print(f"Скачиваю оригинал: {url[:80]}...")
+    with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as tmp:
+        tmp_path = tmp.name
+    try:
+        urllib.request.urlretrieve(url, tmp_path)
+        mb = os.path.getsize(tmp_path) / 1024 / 1024
+        print(f"  Скачано: {mb:.1f} МБ")
+        return tmp_path
+    except Exception as e:
+        print(f"Ошибка скачивания: {e}")
+        sys.exit(1)
 
 
 def probe_duration(src):
