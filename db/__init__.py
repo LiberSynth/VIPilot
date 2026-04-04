@@ -1,4 +1,5 @@
-from .init import get_db, init_db
+from .connection import get_db
+from .init import init_db
 from .upgrade import run_upgrades
 from .db import (
     env_get,

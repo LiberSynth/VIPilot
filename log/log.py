@@ -1,7 +1,7 @@
 """
 Все функции логирования приложения.
 """
-from db.init import get_db
+from db.connection import get_db
 
 
 def db_log_pipeline(pipeline, message, status='info', batch_id=None):

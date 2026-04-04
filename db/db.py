@@ -3,7 +3,7 @@ import json
 import psycopg2
 import psycopg2.extras
 
-from .init import get_db
+from .connection import get_db
 
 
 # ---------------------------------------------------------------------------
