@@ -31,6 +31,7 @@ from db import (
     db_set_batch_video_error,
     db_set_batch_pending,
     db_reset_video_generating,
+    db_set_batch_original_video,
 )
 from log import db_log_pipeline, db_log_entry, db_log_update, db_log_interrupt_running
 
@@ -303,6 +304,24 @@ def run():
         video_url = _poll(log_id, batch_id, status_url, response_url)
         if not video_url:
             return
+
+        # --- Скачиваем и сохраняем оригинал ---
+        if log_id:
+            db_log_entry(log_id, f"Скачиваю оригинал: {video_url[:80]}…")
+        print(f"[video] Скачиваю оригинал с fal.ai…")
+        try:
+            r = requests.get(video_url, timeout=120, stream=True)
+            r.raise_for_status()
+            original_data = b''.join(r.iter_content(chunk_size=256 * 1024))
+            orig_mb = round(len(original_data) / 1024 / 1024, 1)
+            db_set_batch_original_video(batch_id, original_data)
+            if log_id:
+                db_log_entry(log_id, f"Оригинал сохранён ({orig_mb} МБ)")
+            print(f"[video] Оригинал сохранён в БД ({orig_mb} МБ)")
+        except Exception as e:
+            if log_id:
+                db_log_entry(log_id, f"Не удалось сохранить оригинал: {e}", level='warn')
+            print(f"[video] Предупреждение: не удалось сохранить оригинал — {e}")
 
         db_set_batch_video_ready(batch_id, video_url)
         if used_model_id:

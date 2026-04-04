@@ -16,7 +16,6 @@ from db import (
     db_get_video_ready_batch,
     db_is_batch_scheduled,
     db_set_batch_obsolete,
-    db_set_batch_original_video,
     db_set_batch_transcode_ready,
     db_set_batch_transcode_error,
     db_get_random_video_data,
@@ -187,16 +186,8 @@ def run():
 
         src_mb = round(os.path.getsize(tmp_src_path) / 1024 / 1024, 1)
         if log_id:
-            db_log_entry(log_id, f'Скачано: {src_mb} МБ, сохраняю оригинал…')
-        print(f"[transcode] Скачано {src_mb} МБ, сохраняю оригинал в БД…")
-
-        with open(tmp_src_path, 'rb') as f:
-            original_data = f.read()
-        db_set_batch_original_video(batch_id, original_data)
-
-        if log_id:
-            db_log_entry(log_id, f'Оригинал сохранён ({src_mb} МБ), запускаю ffmpeg…')
-        print(f"[transcode] Оригинал сохранён, запускаю ffmpeg…")
+            db_log_entry(log_id, f'Скачано: {src_mb} МБ, запускаю ffmpeg…')
+        print(f"[transcode] Скачано {src_mb} МБ, запускаю ffmpeg…")
 
         with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as tmp_out:
             tmp_out_path = tmp_out.name
