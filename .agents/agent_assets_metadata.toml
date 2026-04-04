@@ -1,5 +1,4 @@
 uploads = []
-outputs = []
 
 [[generated]]
 id = "34JG2ErZQCxImyk9_wCMw"
@@ -30,3 +29,9 @@ id = "T0PsbbLzpylRkQLNLfpt9"
 uri = "file://.canvas/assets/icon_v2_phone_factory.png"
 type = "image"
 title = "generated_image"
+
+[[outputs]]
+id = "hDYZyNqMyQnJ2J3UE3gW9"
+uri = "file://scripts/compare_output.mp4"
+type = "video"
+title = "Сравнение: оригинал vs транскод (crf 26, ultrafast)"
