@@ -744,6 +744,7 @@
   }
   .probe-modal-info { font-size: 11px; color: #555; padding: 0 14px 10px; }
   .probe-modal-error { color: #c05050; }
+  #probe-modal-video video { width: 100%; border-radius: 6px; display: block; background: #000; max-height: 320px; }
 
   /* Story modal */
   .story-modal-overlay {
@@ -2819,17 +2820,8 @@ function confirmRestart() {
         _doProbePoll(data.job_id, '/api/video-models/probe/', btn, body, function(url) {
           var vc = document.getElementById('probe-modal-video');
           if (!vc) return;
-          vc.innerHTML = '';
-          var vid = document.createElement('video');
-          vid.src = url;
-          vid.controls = true;
-          vid.muted = true;
-          vid.autoplay = true;
-          vid.setAttribute('playsinline', '');
-          vid.style.cssText = 'width:100%;max-height:320px;border-radius:6px;background:#000;display:block';
-          vc.appendChild(vid);
+          vc.innerHTML = '<video controls autoplay src="' + url + '"></video>';
           vc.style.display = '';
-          vid.play().catch(function() {});
         });
       })
       .catch(function(e) {

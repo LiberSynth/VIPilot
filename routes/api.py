@@ -536,8 +536,20 @@ def api_video_model_probe(model_id):
                 video_url = video.get("url") if isinstance(video, dict) else None
                 if not video_url:
                     video_url = str(r_data)
-                _probe_append(job_id, f"Готово! Video URL: {video_url}", "ok")
-                _probe_finish(job_id, video_url)
+                _probe_append(job_id, f"Готово! Скачиваю видео…", "ok")
+                try:
+                    dl = _requests.get(video_url, timeout=120, stream=True)
+                    dl.raise_for_status()
+                    video_bytes = b"".join(dl.iter_content(chunk_size=256 * 1024))
+                    mb = round(len(video_bytes) / 1024 / 1024, 1)
+                    with _probe_lock:
+                        if job_id in _probe_jobs:
+                            _probe_jobs[job_id]["video_bytes"] = video_bytes
+                    _probe_append(job_id, f"Видео загружено ({mb} МБ)", "ok")
+                    _probe_finish(job_id, f"/api/video-models/probe/{job_id}/video")
+                except Exception as e:
+                    _probe_append(job_id, f"Ошибка загрузки видео: {e}", "error")
+                    _probe_finish(job_id)
                 return
             elif status == "FAILED":
                 err = s_data.get("error") or s_data.get("detail") or str(s_data)
@@ -567,6 +579,39 @@ def api_video_model_probe_poll(job_id):
         if done and (time.time() - job["ts"]) > 120:
             del _probe_jobs[job_id]
     return jsonify({"events": new_events, "cursor": cursor + len(new_events), "done": done, "result": result})
+
+
+@bp.route("/video-models/probe/<job_id>/video", methods=["GET"])
+def api_video_model_probe_video(job_id):
+    if not is_authenticated():
+        return Response("Unauthorized", status=401)
+    with _probe_lock:
+        job = _probe_jobs.get(job_id)
+        data = job.get("video_bytes") if job else None
+    if not data:
+        return Response("Not found", status=404)
+    data = bytes(data)
+    total = len(data)
+    range_header = request.headers.get("Range")
+    if range_header:
+        try:
+            ranges = range_header.strip().replace("bytes=", "").split("-")
+            start = int(ranges[0])
+            end   = int(ranges[1]) if ranges[1] else total - 1
+        except (IndexError, ValueError):
+            start, end = 0, total - 1
+        end = min(end, total - 1)
+        chunk = data[start:end + 1]
+        resp = Response(chunk, status=206, mimetype="video/mp4", direct_passthrough=True)
+        resp.headers["Content-Range"]  = f"bytes {start}-{end}/{total}"
+        resp.headers["Accept-Ranges"]  = "bytes"
+        resp.headers["Content-Length"] = str(len(chunk))
+    else:
+        resp = Response(data, status=200, mimetype="video/mp4")
+        resp.headers["Accept-Ranges"]  = "bytes"
+        resp.headers["Content-Length"] = str(total)
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
 
 
 @bp.route("/reseed", methods=["POST"])
