@@ -218,6 +218,33 @@ def db_create_adhoc_batch(target_id):
         return None
 
 
+def db_create_probe_batch(story_id, text_model_id, video_model_id, video_url, video_bytes):
+    """Создаёт батч для пробного запроса видео-модели (status='probe', target_id=NULL).
+    Сохраняет сюжет, модели, URL и оригинальное видео. Возвращает UUID батча или None."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO batches
+                        (target_id, status, adhoc, story_id, text_model_id, video_model_id,
+                         video_url, video_data_original, completed_at)
+                    VALUES (NULL, 'probe', TRUE, %s, %s, %s, %s, %s, now())
+                    RETURNING id
+                """, (
+                    story_id,
+                    text_model_id,
+                    video_model_id,
+                    video_url,
+                    psycopg2.Binary(video_bytes) if video_bytes else None,
+                ))
+                row = cur.fetchone()
+            conn.commit()
+        return str(row[0]) if row else None
+    except Exception as e:
+        print(f"[DB] Ошибка db_create_probe_batch: {e}")
+        return None
+
+
 def db_get_pending_batch():
     """Атомарно захватывает первый pending-батч: переводит его в 'story_generating'
     и возвращает данные. Гарантирует, что два потока не возьмут один и тот же батч.

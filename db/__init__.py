@@ -14,6 +14,7 @@ from .db import (
     db_update_target_aspect_ratio,
     db_ensure_batch,
     db_create_adhoc_batch,
+    db_create_probe_batch,
     db_get_pending_batch,
     db_recover_story_generating,
     db_get_story_ready_batch_atomic,

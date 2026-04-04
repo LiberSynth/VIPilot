@@ -434,6 +434,17 @@ def _m008_fix_ai_model_grades(cur):
     """)
 
 
+def _m009_batches_target_nullable(cur):
+    """
+    Снимает ограничение NOT NULL с поля target_id в таблице batches,
+    чтобы можно было создавать служебные батчи (пробные запросы) без привязки к таргету.
+    """
+    cur.execute("""
+        ALTER TABLE batches
+            ALTER COLUMN target_id DROP NOT NULL
+    """)
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -443,6 +454,7 @@ MIGRATIONS = [
     (6, _m006_target_transcode),
     (7, _m007_rename_video_data),
     (8, _m008_fix_ai_model_grades),
+    (9, _m009_batches_target_nullable),
 ]
 
 

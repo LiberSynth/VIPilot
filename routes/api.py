@@ -44,6 +44,8 @@ from db import (
     db_get_text_model_by_id,
     db_get_video_model_by_id,
     db_get_active_text_models,
+    db_create_story,
+    db_create_probe_batch,
     db_get,
 )
 from log import db_get_log, db_get_monitor, db_log_pipeline, db_log_entry
@@ -382,6 +384,7 @@ def api_video_model_probe(model_id):
         _probe_append(job_id, f"Промпт:\n{user_prompt}", "info")
 
         story_text = None
+        used_text_model_id = None
         for tm in text_models:
             tm_name = tm["name"]
             _probe_append(job_id, f"Text-модель: {tm_name}", "info")
@@ -422,6 +425,7 @@ def api_video_model_probe(model_id):
                     _probe_append(job_id, f"[{tm_name}] пустой текст", "warn")
                     story_text = None
                     continue
+                used_text_model_id = tm["id"]
                 _probe_append(job_id, f"Сюжет:\n{story_text}", "ok")
                 break
             except _requests.exceptions.Timeout:
@@ -435,6 +439,10 @@ def api_video_model_probe(model_id):
             _probe_append(job_id, "Не удалось получить сюжет ни от одной text-модели", "error")
             _probe_finish(job_id)
             return
+
+        # Сохраняем сюжет в БД (до добавления video_post_prompt)
+        pure_story_text = story_text
+        probe_story_id = db_create_story(used_text_model_id, pure_story_text)
 
         # --- Шаг 2: применяем video_post_prompt и строим тело запроса (как в video.py) ---
         try:
@@ -546,6 +554,15 @@ def api_video_model_probe(model_id):
                         if job_id in _probe_jobs:
                             _probe_jobs[job_id]["video_bytes"] = video_bytes
                     _probe_append(job_id, f"Видео загружено ({mb} МБ)", "ok")
+                    batch_id_db = db_create_probe_batch(
+                        probe_story_id,
+                        used_text_model_id,
+                        m["id"],
+                        video_url,
+                        video_bytes,
+                    )
+                    if batch_id_db:
+                        _probe_append(job_id, f"Батч сохранён: {batch_id_db[:8]}…", "ok")
                     _probe_finish(job_id, f"/api/video-models/probe/{job_id}/video")
                 except Exception as e:
                     _probe_append(job_id, f"Ошибка загрузки видео: {e}", "error")
