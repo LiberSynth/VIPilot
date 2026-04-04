@@ -235,8 +235,7 @@ def run():
             )
             if log_id:
                 db_log_entry(log_id, f"Соотношение сторон: {ar_x}:{ar_y}")
-                preview = story_text[:120] + ('…' if len(story_text) > 120 else '')
-                db_log_entry(log_id, f"Промпт: {preview}")
+                db_log_entry(log_id, f"Промпт:\n{story_text}")
                 db_log_entry(log_id, f"Моделей: {len(models)}, попыток на модель: {fails_to_next}")
 
             request_id   = None
