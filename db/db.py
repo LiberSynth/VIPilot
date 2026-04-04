@@ -730,7 +730,7 @@ def db_get_video_ready_batch():
                            t.aspect_ratio_x, t.aspect_ratio_y,
                            t.transcode AS target_transcode
                     FROM batches b
-                    JOIN targets t ON t.id = b.target_id
+                    LEFT JOIN targets t ON t.id = b.target_id
                     WHERE b.status = 'video_ready'
                     ORDER BY b.scheduled_at
                     LIMIT 1

@@ -114,8 +114,9 @@ def run():
             return
 
         batch_id        = str(batch['id'])
-        target          = batch['target_name']
-        do_transcode    = batch.get('target_transcode', True)
+        is_probe        = batch['target_id'] is None
+        target          = batch['target_name'] or 'probe'
+        do_transcode    = True if is_probe else bool(batch.get('target_transcode', True))
 
         # ── Транскодирование выключено для таргета ───────────────────────────
         if not do_transcode:
@@ -123,7 +124,7 @@ def run():
             print(f"[transcode] Батч {batch_id[:8]}… ({target}) — транскод отключён, пропускаю")
             return
 
-        if not db_is_batch_scheduled(batch['scheduled_at'], batch['target_id']):
+        if not is_probe and not db_is_batch_scheduled(batch['scheduled_at'], batch['target_id']):
             db_set_batch_obsolete(batch_id)
             db_log_pipeline('transcode', 'Батч отменён — слот удалён из расписания или таргет отключён',
                             status='прервана', batch_id=batch_id)
