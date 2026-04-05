@@ -571,6 +571,32 @@ def _m011_fix_fal_platform_url(cur):
     """)
 
 
+def _m013_add_seedance_v15_pro(cur):
+    """
+    Добавляет Seedance 1.5 Pro (ByteDance) в ai_models как text-to-video модель.
+    Endpoint: fal-ai/bytedance/seedance/v1.5/pro/text-to-video
+    - duration: строка без суффикса ("6"), enum 4–12
+    - aspect_ratio: "9:16" и др.
+    - resolution: статическая "720p"
+    - generate_audio: true по умолчанию (не передаём — API подхватывает сам)
+    Deployed: -
+    """
+    cur.execute("""
+        INSERT INTO ai_models (id, name, url, body, "order", active, ai_platform_id, platform_id, type, grade)
+        SELECT
+            'b5e3f891-2c4a-4d67-9e8f-1a2b3c4d5e6f',
+            'seedance/v1.5/pro',
+            'fal-ai/bytedance/seedance/v1.5/pro/text-to-video',
+            '{"prompt": "{}", "aspect_ratio": "{0}:{1}", "duration": "{}", "resolution": "720p"}'::jsonb,
+            4, true,
+            '0c8d1e1c-fe65-45d3-a1c3-be69e7941e17',
+            '0c8d1e1c-fe65-45d3-a1c3-be69e7941e17',
+            'text-to-video',
+            'good'
+        WHERE NOT EXISTS (SELECT 1 FROM ai_models WHERE name = 'seedance/v1.5/pro')
+    """)
+
+
 def _m012_gemma_no_system_role(cur):
     """
     Убирает role=system из body.messages у всех Gemma-моделей (google/gemma-*).
