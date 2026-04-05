@@ -219,6 +219,14 @@ def run():
                     break
 
             if not story_id:
+                if is_story_probe:
+                    msg = f'Модель не ответила после {fails_to_next} попыток — пробный сюжет не получен'
+                    db_log_update(log_id, msg, 'error')
+                    if log_id:
+                        db_log_entry(log_id, msg, level='error')
+                    print(f"[story] {msg}")
+                    batch_done = True
+                    return
                 msg = 'Все активные модели не дали результата — повтор с первой модели'
                 db_log_update(log_id, msg, 'warn')
                 if log_id:
