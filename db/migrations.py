@@ -571,30 +571,73 @@ def _m011_fix_fal_platform_url(cur):
     """)
 
 
-def _m013_add_seedance_v15_pro(cur):
+def _m013_sync_video_models(cur):
     """
-    Добавляет Seedance 1.5 Pro (ByteDance) в ai_models как text-to-video модель.
-    Endpoint: fal-ai/bytedance/seedance/v1.5/pro/text-to-video
-    - duration: строка без суффикса ("6"), enum 4–12
-    - aspect_ratio: "9:16" и др.
-    - resolution: статическая "720p"
-    - generate_audio: true по умолчанию (не передаём — API подхватывает сам)
+    Полная синхронизация video-моделей с девом:
+    1. Добавляет колонку price (TEXT) в ai_models.
+    2. Вставляет seedance/v1.5/pro и ltx-2.3 (идемпотентно).
+    3. Обновляет order, active, price для всех text-to-video моделей.
     Deployed: -
     """
+    # 1. Добавить колонку price
     cur.execute("""
-        INSERT INTO ai_models (id, name, url, body, "order", active, ai_platform_id, platform_id, type, grade)
+        ALTER TABLE ai_models
+            ADD COLUMN IF NOT EXISTS price TEXT
+    """)
+
+    # 2. Вставить seedance/v1.5/pro (если нет)
+    cur.execute("""
+        INSERT INTO ai_models
+            (id, name, url, body, "order", active, ai_platform_id, platform_id, type, grade)
         SELECT
             'b5e3f891-2c4a-4d67-9e8f-1a2b3c4d5e6f',
             'seedance/v1.5/pro',
             'fal-ai/bytedance/seedance/v1.5/pro/text-to-video',
             '{"prompt": "{}", "aspect_ratio": "{0}:{1}", "duration": "{}", "resolution": "720p"}'::jsonb,
-            4, true,
+            1, true,
             '0c8d1e1c-fe65-45d3-a1c3-be69e7941e17',
             '0c8d1e1c-fe65-45d3-a1c3-be69e7941e17',
             'text-to-video',
             'good'
         WHERE NOT EXISTS (SELECT 1 FROM ai_models WHERE name = 'seedance/v1.5/pro')
     """)
+
+    # 3. Вставить ltx-2.3 (если нет)
+    cur.execute("""
+        INSERT INTO ai_models
+            (id, name, url, body, "order", active, ai_platform_id, platform_id, type, grade)
+        SELECT
+            'd3e4f5a6-b7c8-4d91-ae2f-1b2c3d4e5f6a',
+            'ltx-2.3',
+            'fal-ai/ltx-2.3/text-to-video',
+            '{"prompt": "{}", "duration": "{:int}", "resolution": "1080p", "aspect_ratio": "{}:{}"}'::jsonb,
+            2, false,
+            '0c8d1e1c-fe65-45d3-a1c3-be69e7941e17',
+            '0c8d1e1c-fe65-45d3-a1c3-be69e7941e17',
+            'text-to-video',
+            'good'
+        WHERE NOT EXISTS (SELECT 1 FROM ai_models WHERE name = 'ltx-2.3')
+    """)
+
+    # 4. Обновить order, active, price для всех video-моделей
+    video_updates = [
+        ('seedance/v1.5/pro',         1, True,  '0.520 $/10сек'),
+        ('ltx-2.3',                   2, False, '0.600 $/10сек'),
+        ('sora-2',                    3, False, '1.000 $/10сек'),
+        ('kling-video/v1.6/standard', 4, False, '0.450 $/10сек'),
+        ('veo2',                      5, False, '5.000 $/10сек'),
+        ('minimax/video-01',          6, False, '0.830 $/10сек'),
+        ('ltx-video',                 7, False, None),
+        ('wan-2.6',                   8, False, '1.500 $/10сек'),
+    ]
+    for name, order, active, price in video_updates:
+        cur.execute("""
+            UPDATE ai_models
+               SET "order" = %s,
+                   active  = %s,
+                   price   = %s
+             WHERE name = %s
+        """, (order, active, price, name))
 
 
 def _m012_gemma_no_system_role(cur):
@@ -634,6 +677,7 @@ MIGRATIONS = [
     (10, _m010_sync_ai_models_from_dev),
     (11, _m011_fix_fal_platform_url),
     (12, _m012_gemma_no_system_role),
+    (13, _m013_sync_video_models),
 ]
 
 
