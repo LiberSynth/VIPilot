@@ -73,9 +73,11 @@ def run():
 
         # Пробный батч без таргета — публикация не нужна, переводим в probe
         if batch['target_id'] is None:
+            log_id = db_log_pipeline('publish', 'Публикация (пробный)…',
+                                     status='running', batch_id=batch_id)
+            db_log_entry(log_id, 'Таргет не назначен — публикация на платформу не выполняется')
             db_set_batch_probe(batch_id)
-            db_log_pipeline('publish', 'Пробный батч — публикация пропущена, статус → пробный',
-                            status='ok', batch_id=batch_id)
+            db_log_update(log_id, 'Без публикации (пробный батч)', 'ok')
             print(f"[publish] Батч {batch_id[:8]}… пробный — публикация пропущена")
             return
 
