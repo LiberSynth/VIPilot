@@ -270,10 +270,7 @@ def run():
                     print(f"[video] {msg}")
                     return
                 models = [pinned_m]
-                try:
-                    fails_to_next = max(1, int(db_get('video_fails_to_next', '3')))
-                except (ValueError, TypeError):
-                    fails_to_next = 3
+                fails_to_next = 1
             else:
                 models = db_get_active_video_models()
                 if not models:
