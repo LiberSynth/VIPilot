@@ -1,0 +1,132 @@
+function showToast(msg, type) {
+  var el = document.createElement('div');
+  el.className = 'flash ' + (type || 'success');
+  el.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:2000;max-width:420px;width:90%;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.4);transition:opacity .3s';
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(function() {
+    el.style.opacity = '0';
+    setTimeout(function() { el.remove(); }, 300);
+  }, 3500);
+}
+
+function wfUpdateUI(state) {
+  var dot      = document.getElementById('wf-dot');
+  var text     = document.getElementById('wf-state-text');
+  var btnStart = document.getElementById('wf-btn-start');
+  var btnPause = document.getElementById('wf-btn-pause');
+  if (state === 'running') {
+    dot.className    = 'wf-dot running';
+    text.textContent = 'Работает';
+    btnStart.disabled = true;
+    btnPause.disabled = false;
+  } else {
+    dot.className    = 'wf-dot pause';
+    text.textContent = 'Приостановлен';
+    btnStart.disabled = false;
+    btnPause.disabled = true;
+  }
+}
+
+function wfStart() {
+  var btn = document.getElementById('wf-btn-start');
+  btn.disabled = true;
+  fetch('/api/workflow/start', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.ok) { wfUpdateUI('running'); showToast('Движок запущен', 'success'); }
+    })
+    .catch(function() { btn.disabled = false; showToast('Ошибка соединения', 'error'); });
+}
+
+function wfPause() {
+  var btn = document.getElementById('wf-btn-pause');
+  btn.disabled = true;
+  fetch('/api/workflow/pause', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.ok) { wfUpdateUI('pause'); showToast('Движок приостановлен', 'success'); }
+    })
+    .catch(function() { btn.disabled = false; showToast('Ошибка соединения', 'error'); });
+}
+
+function wfEmulation(checked) {
+  fetch('/api/workflow/emulation', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled: checked ? '1' : '0' }),
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var badge = document.getElementById('emulation-badge');
+      var card  = document.getElementById('wf-card');
+      var on    = d.emulation_mode === '1';
+      if (badge) badge.style.display = on ? '' : 'none';
+      if (card)  card.classList.toggle('emulation-active', on);
+      showToast(on ? 'Эмуляция включена' : 'Эмуляция выключена', on ? 'warn' : 'success');
+    })
+    .catch(function() { showToast('Ошибка соединения', 'error'); });
+}
+
+function openRestartDialog() {
+  document.getElementById('restartOverlay').classList.add('open');
+}
+
+function closeRestartDialog() {
+  document.getElementById('restartOverlay').classList.remove('open');
+  var btn = document.getElementById('restartConfirmBtn');
+  btn.disabled    = false;
+  btn.textContent = 'Перезапустить';
+}
+
+function confirmRestart() {
+  var btn = document.getElementById('restartConfirmBtn');
+  btn.disabled    = true;
+  btn.textContent = 'Перезапуск…';
+  fetch('/api/workflow/restart', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function() {
+      document.getElementById('restartOverlay').classList.remove('open');
+      showToast('Перезапуск… страница обновится автоматически', 'success');
+      setTimeout(function() { location.reload(); }, 4000);
+    })
+    .catch(function() { closeRestartDialog(); showToast('Ошибка соединения', 'error'); });
+}
+
+function openClearHistoryDialog() {
+  document.getElementById('clearHistoryOverlay').classList.add('open');
+}
+
+function closeClearHistoryDialog() {
+  document.getElementById('clearHistoryOverlay').classList.remove('open');
+}
+
+function confirmClearHistory() {
+  var btn = document.getElementById('clearHistoryConfirmBtn');
+  btn.disabled    = true;
+  btn.textContent = 'Удаляем…';
+  fetch('/api/clear_history', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      closeClearHistoryDialog();
+      btn.disabled    = false;
+      btn.textContent = 'Очистить';
+      if (data.ok) {
+        var d     = data.deleted || {};
+        var parts = [];
+        if (d.logs)        parts.push('логов: '   + d.logs);
+        if (d.log_entries) parts.push('записей: ' + d.log_entries);
+        if (d.batches)     parts.push('батчей: '  + d.batches);
+        if (d.stories)     parts.push('сюжетов: ' + d.stories);
+        showToast('История очищена' + (parts.length ? ': ' + parts.join(', ') : ''), 'success');
+      } else {
+        showToast('Ошибка: ' + (data.error || 'неизвестная ошибка'), 'error');
+      }
+    })
+    .catch(function() {
+      closeClearHistoryDialog();
+      btn.disabled    = false;
+      btn.textContent = 'Очистить';
+      showToast('Ошибка соединения', 'error');
+    });
+}

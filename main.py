@@ -14,7 +14,7 @@ from utils.consts import FLASK_SECRET
 from utils.limiter import limiter
 import utils.workflow_state as wf_state
 
-flask_app = Flask(__name__, static_folder=".")
+flask_app = Flask(__name__, static_folder="static", static_url_path="/static")
 flask_app.secret_key = FLASK_SECRET
 flask_app.permanent_session_lifetime = timedelta(days=7)
 limiter.init_app(flask_app)
