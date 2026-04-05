@@ -478,6 +478,10 @@
   .monitor-batch.open .monitor-hdr-actions,
   .monitor-sysgroup.open .monitor-hdr-actions { display: flex; }
 
+  .monitor-hdr-actions-always {
+    display: flex; gap: 4px; flex-shrink: 0; align-items: center;
+  }
+
   .cycle-float-btn {
     width: 26px; height: 26px;
     background: transparent;
