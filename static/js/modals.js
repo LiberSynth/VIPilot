@@ -238,26 +238,6 @@
     poll();
   }
 
-  window.copyProbeContent = function(btn) {
-    var body = document.getElementById('probe-modal-body');
-    if (!body) return;
-    var text = body.innerText || body.textContent || '';
-    function markCopied() {
-      btn.classList.add('copied');
-      setTimeout(function() { btn.classList.remove('copied'); }, 2000);
-    }
-    navigator.clipboard.writeText(text).then(markCopied).catch(function() {
-      var ta = document.createElement('textarea');
-      ta.value = text;
-      ta.style.position = 'fixed'; ta.style.opacity = '0';
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
-      markCopied();
-    });
-  };
-
   window.closeProbeModal = function() {
     var overlay = document.getElementById('probe-modal-overlay');
     if (overlay) overlay.classList.remove('open');
