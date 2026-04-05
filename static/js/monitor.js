@@ -93,11 +93,8 @@
     const restartBtn = canRestart
       ? '<button class="cycle-float-btn" title="Перезапустить" data-bid="' + esc(batchId) + '" data-pip="' + esc(log.pipeline) + '" onclick="monitorPipelineRestart(this)">' + MON_SVG_RESTART + '</button>'
       : '';
-    const storyBtn = (log.pipeline === 'story' && st === 'ok' && storyId)
-      ? '<button class="cycle-float-btn story-view-btn" title="Посмотреть сюжет" onclick="openStoryModal(\'' + esc(storyId) + '\',\'' + esc(textModelName || '') + '\')">' + MON_SVG_EYE + '</button>'
-      : '';
     const pipActions = '<div class="monitor-pip-actions" onclick="event.stopPropagation()">' +
-      storyBtn + restartBtn +
+      restartBtn +
       '<button class="cycle-float-btn" title="Скопировать логи" onclick="monitorPipelineCopy(this)">'     + MON_SVG_COPY + '</button>' +
       '<button class="cycle-float-btn" title="Скопировать инфо" onclick="monitorPipelineCopyInfo(this)">' + MON_SVG_INFO + '</button>' +
     '</div>';
@@ -182,6 +179,9 @@
       return renderLogItem(log, batch.batch_id, batch.story_id, batch.has_video_data, batch.text_model_name, batch.video_model_name);
     }).join('') + '</div>';
 
+    const batchStoryBtn = batch.story_id
+      ? '<button class="cycle-float-btn story-view-btn" title="Посмотреть сюжет" onclick="openStoryModal(\'' + esc(batch.story_id) + '\',\'' + esc(batch.text_model_name || '') + '\')">' + MON_SVG_EYE + '</button>'
+      : '';
     const batchVideoBtn = batch.has_video_data
       ? '<button class="cycle-float-btn" title="Просмотр видео" onclick="openVideoModal(\'' + esc(batch.batch_id) + '\',\'' + esc(batch.video_model_name || '') + '\')">' + MON_SVG_PLAY + '</button>'
       : '';
@@ -192,6 +192,7 @@
         '<button class="cycle-float-btn" title="Свернуть все"     onclick="monitorCollapseAll(this)">' + MON_SVG_COLLAPSE + '</button>' +
       '</div>' +
       '<div class="monitor-hdr-actions-always" onclick="event.stopPropagation()">' +
+        batchStoryBtn +
         batchVideoBtn +
         '<button class="cycle-float-btn" title="Скопировать логи" onclick="monitorCopy(this)">'          + MON_SVG_COPY + '</button>' +
         '<button class="cycle-float-btn" title="Скопировать инфо" onclick="monitorBatchCopyInfo(this)">' + MON_SVG_INFO + '</button>' +
