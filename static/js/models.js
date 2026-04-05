@@ -100,11 +100,12 @@ window.cycleVideoGrade = function(el) {
       var caption = m.platform_name ? escHtml(m.platform_name) + ': ' + escHtml(m.name) : escHtml(m.name);
       var grade = m.grade || 'good';
       var gradeHtml = '<span data-grade-id="' + m.id + '" data-grade="' + grade + '" onclick="event.stopPropagation();cycleVideoGrade(this)" title="Нажмите для смены" style="cursor:pointer;font-size:10px;padding:1px 6px;border-radius:3px;background:' + (_gradeColors[grade]||'#555') + ';color:#fff;margin-left:6px;opacity:.85">' + grade + '</span>';
+      var priceHtml = m.price ? '<span style="font-size:10px;color:#888;margin-left:8px">' + escHtml(m.price) + '</span>' : '';
       item.innerHTML =
         '<div class="model-radio" onclick="activateModel(\'' + m.id + '\')">' +
           '<div class="model-radio-dot"></div>' +
         '</div>' +
-        '<div class="model-name">' + caption + gradeHtml + '</div>' +
+        '<div class="model-name">' + caption + gradeHtml + priceHtml + '</div>' +
         '<button class="model-probe-btn" title="Пробный запрос" onclick="event.stopPropagation();probeVideoModel(\'' + m.id + '\',\'' + escHtml(m.name) + '\',this)"><svg viewBox="0 0 16 16" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="4,2 13,8 4,14"/></svg></button>' +
         '<div class="model-drag-handle" title="Перетащить">⠿</div>';
       makeDragHandlers(item, 'model-list', m, saveVideoOrder);
