@@ -38,13 +38,20 @@ def _headers():
 def _build_body(body_tpl, model_url, system_prompt, user_prompt):
     body = dict(body_tpl)
     if 'messages' in body:
+        has_system = any(m.get('role') == 'system' for m in body['messages'])
         messages = []
         for msg in body['messages']:
             m = dict(msg)
             if m.get('role') == 'system':
                 m['content'] = str(m['content']).format(system_prompt)
             elif m.get('role') == 'user':
-                m['content'] = str(m['content']).format(user_prompt)
+                if has_system:
+                    m['content'] = str(m['content']).format(user_prompt)
+                else:
+                    # Модель не поддерживает system-роль — склеиваем оба промпта в user
+                    merged = (system_prompt.strip() + '\n\n' + user_prompt.strip()).strip() \
+                             if system_prompt else user_prompt
+                    m['content'] = str(m['content']).format(merged)
             messages.append(m)
         body['messages'] = messages
     body['model'] = model_url

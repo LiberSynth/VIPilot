@@ -571,6 +571,30 @@ def _m011_fix_fal_platform_url(cur):
     """)
 
 
+def _m012_gemma_no_system_role(cur):
+    """
+    Убирает role=system из body.messages у всех Gemma-моделей (google/gemma-*).
+    Google AI Studio не поддерживает system-роль ('Developer instruction is not enabled').
+    После миграции шаблон содержит только user-сообщение; _build_body в story.py
+    при отсутствии system-роли склеивает system_prompt + user_prompt в одно user-сообщение.
+    Deployed: -
+    """
+    cur.execute("""
+        UPDATE ai_models
+           SET body = jsonb_set(
+               body,
+               '{messages}',
+               (
+                   SELECT jsonb_agg(msg ORDER BY ordinality)
+                   FROM jsonb_array_elements(body->'messages') WITH ORDINALITY AS t(msg, ordinality)
+                   WHERE msg->>'role' != 'system'
+               )
+           )
+         WHERE url ILIKE 'google/gemma%'
+           AND body->'messages' @> '[{"role": "system"}]'
+    """)
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -583,6 +607,7 @@ MIGRATIONS = [
     (9, _m009_batches_target_nullable),
     (10, _m010_sync_ai_models_from_dev),
     (11, _m011_fix_fal_platform_url),
+    (12, _m012_gemma_no_system_role),
 ]
 
 
