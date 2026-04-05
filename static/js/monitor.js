@@ -148,9 +148,12 @@
 
     const headTime = batch.created_at;
     const schedStr = batch.adhoc
-      ? (batch.target_name ? 'Публикация: сейчас' : 'Публикация: пробный')
+      ? (batch.target_name ? 'Публикация: сейчас'
+          : bs === 'story_probe' ? 'Публикация: пробный сюжет'
+          : 'Публикация: пробный')
       : 'Публикация: ' + fmtMskShort(batch.scheduled_at);
-    const sub = [schedStr, batch.target_name, STATUS_LABELS[bs] || bs]
+    const statusLabel = (bs === 'probe' || bs === 'story_probe') ? 'выполнен' : (STATUS_LABELS[bs] || bs);
+    const sub = [schedStr, batch.target_name, statusLabel]
       .filter(Boolean).join(' · ');
 
     if (logs.length === 0) {
@@ -166,7 +169,7 @@
     }
 
     const isActive      = logs.some(function(l) { return l.status === 'running'; });
-    const doneStatuses  = ['published', 'probe'];
+    const doneStatuses  = ['published', 'probe', 'story_probe'];
     const waitStatuses  = ['story_ready', 'video_pending', 'video_ready', 'transcode_ready'];
     const errorStatuses = ['error', 'video_error', 'transcode_error', 'publish_error'];
     const md = isActive ? 'md-active'
