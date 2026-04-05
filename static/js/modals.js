@@ -222,7 +222,8 @@
         }
       });
 
-      body.scrollTop = body.scrollHeight;
+      var nearBottom = body.scrollHeight - body.scrollTop - body.clientHeight < 60;
+      if (nearBottom) body.scrollTop = body.scrollHeight;
     }
 
     function showVideo() {
