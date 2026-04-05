@@ -294,6 +294,18 @@ def api_workflow_pause():
     return jsonify({"ok": True, "state": "pause"})
 
 
+@bp.route("/workflow/use_donor", methods=["POST"])
+def api_workflow_use_donor():
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    body = request.get_json(silent=True) or {}
+    val = "1" if body.get("enabled") == "1" else "0"
+    env_set("use_donor", val)
+    label = "включён" if val == "1" else "выключен"
+    db_log_root(f"Использовать донора {label}", status='info')
+    return jsonify({"ok": True, "use_donor": val})
+
+
 @bp.route("/workflow/emulation", methods=["POST"])
 def api_workflow_emulation():
     if not is_authenticated():

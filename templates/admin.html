@@ -261,6 +261,18 @@
           <span class="toggle-track"></span>
         </label>
       </div>
+      <div class="wf-row" style="margin-top:12px;padding-top:10px;border-top:1px solid #1e1e2e">
+        <div style="flex:1">
+          <div class="toggle-label">Использовать донора</div>
+          <div class="hint" style="margin-top:2px">Заимствовать видео из отменённого батча.</div>
+        </div>
+        <span id="use-donor-badge" class="emulation-badge" {% if not use_donor %}style="display:none"{% endif %}>ВКЛ</span>
+        <label class="toggle-wrap" style="margin-left:8px">
+          <input type="checkbox" id="use_donor_check" {% if use_donor %}checked{% endif %}
+                 onchange="wfUseDonor(this.checked)">
+          <span class="toggle-track"></span>
+        </label>
+      </div>
     </div>
 
     <form id="service-form" style="margin-top:0">

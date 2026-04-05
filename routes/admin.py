@@ -78,6 +78,7 @@ def admin_page():
     entries_lifetime   = parse_entries_lifetime(db_get("entries_lifetime", "30"))
     file_lifetime      = parse_file_lifetime(db_get("file_lifetime", "7"))
     emulation_mode     = env_get("emulation_mode", "0") == "1"
+    use_donor          = env_get("use_donor", "1") == "1"
     notify_email       = db_get("notify_email", "")
     notify_phone       = db_get("notify_phone", "")
     vk_publish_story   = db_get("vk_publish_story", "1") == "1"
@@ -107,6 +108,7 @@ def admin_page():
         entries_lifetime=entries_lifetime,
         file_lifetime=file_lifetime,
         emulation_mode=emulation_mode,
+        use_donor=use_donor,
         notify_email=notify_email,
         notify_phone=notify_phone,
         vk_publish_story=vk_publish_story,

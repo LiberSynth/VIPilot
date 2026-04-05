@@ -130,7 +130,7 @@ def run():
             batch_done = True
             return
 
-        if not is_probe and env_get('emulation_mode', '0') != '1':
+        if not is_probe and env_get('emulation_mode', '0') != '1' and env_get('use_donor', '1') == '1':
             donor_id = db_steal_video_from_cancelled(batch_id)
             if donor_id:
                 msg = f"Видео взято из отменённого батча {donor_id[:8]}… — генерация пропущена"
