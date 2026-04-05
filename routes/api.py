@@ -27,9 +27,8 @@ from db import (
     db_get_batch_video_data,
     db_get_text_model_by_id,
     db_get_video_model_by_id,
-    db_get_active_text_models,
-    db_create_story,
     db_create_probe_batch,
+    db_create_story_probe_batch,
     db_get_batch_logs,
     db_get,
 )
@@ -198,7 +197,6 @@ def api_text_model_probe(model_id):
     if not m:
         return jsonify({"error": "Модель не найдена"}), 404
 
-    from db import db_create_story_probe_batch
     batch_id = db_create_story_probe_batch(model_id)
     if not batch_id:
         return jsonify({"error": "Не удалось создать батч"}), 500

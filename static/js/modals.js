@@ -38,7 +38,6 @@
   var _probeBtn = null;
 
   var _SVG_COPY = '<svg viewBox="0 0 16 16" fill="none" stroke="#8888b0" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11V3a1 1 0 0 1 1-1h8"/></svg>';
-  var _SVG_INFO = '<svg viewBox="0 0 16 16" fill="none" stroke="#8888b0" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><line x1="8" y1="7" x2="8" y2="11"/><circle cx="8" cy="5" r=".5" fill="#8888b0" stroke="none"/></svg>';
 
   function _esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
@@ -68,14 +67,12 @@
   function _openProbeOverlay(modelName) {
     var overlay = document.getElementById('probe-modal-overlay');
     var body    = document.getElementById('probe-modal-body');
-    var info    = document.getElementById('probe-modal-info');
     var title   = document.getElementById('probe-modal-title');
     if (!overlay || !body) return false;
     if (title) title.textContent = 'Пробный запрос · ' + modelName;
     body.className     = 'probe-modal-body';
     body.style.padding = '';
     body.innerHTML     = '<span style="color:#888">Создаю батч…</span>';
-    if (info) info.textContent = '';
     if (overlay.dataset) overlay.dataset.batchId = '';
     overlay.classList.add('open');
     document.body.style.overflow = 'hidden';
