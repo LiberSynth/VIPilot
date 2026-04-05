@@ -57,6 +57,7 @@ def api_run_now():
     batch_id = db_create_adhoc_batch(target_id)
     if not batch_id:
         return jsonify({"error": "Не удалось создать батч"}), 500
+    wf_state.wakeup_loop()
     log_id = db_log_pipeline(
         'planning',
         'Оперативный запуск',
@@ -200,7 +201,7 @@ def api_text_model_probe(model_id):
     batch_id = db_create_story_probe_batch(model_id)
     if not batch_id:
         return jsonify({"error": "Не удалось создать батч"}), 500
-
+    wf_state.wakeup_loop()
     return jsonify({"batch_id": batch_id})
 
 
@@ -229,7 +230,7 @@ def api_video_model_probe(model_id):
     batch_id = db_create_probe_batch(model_id)
     if not batch_id:
         return jsonify({"error": "Не удалось создать батч"}), 500
-
+    wf_state.wakeup_loop()
     return jsonify({"batch_id": batch_id})
 
 

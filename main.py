@@ -41,13 +41,10 @@ def log_request():
     print(msg)
 
 
-_wakeup = threading.Event()
-
-
 def _wrap(module):
     def _runner():
         module.run()
-        _wakeup.set()
+        wf_state.wakeup_loop()
     return _runner
 
 
@@ -62,7 +59,6 @@ def main_loop():
     }
 
     while True:
-        _wakeup.clear()
         interval = 5
         try:
             wf_state.wait_if_paused()
@@ -85,7 +81,7 @@ def main_loop():
             db_log_root(f"Ошибка главного цикла: {e}", status='error')
             print(f"[main_loop] Ошибка: {e}")
 
-        _wakeup.wait(timeout=interval)
+        wf_state.wait_for_wakeup(interval)
 
 
 _main_loop_started = False
