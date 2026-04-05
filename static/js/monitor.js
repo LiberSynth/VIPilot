@@ -280,6 +280,7 @@
   var _collapsedLids = {};
   var _seenLids      = {};
   var _seenBids      = {};
+  var _firstRender   = true;
 
   function getOpenState() {
     var bids = {}, sgkeys = {}, lids = {};
@@ -313,36 +314,19 @@
     });
   }
 
-  function autoExpandRunningLogs() {
-    document.querySelectorAll('.monitor-batch.open').forEach(function(batch) {
-      batch.querySelectorAll('.monitor-log-item[data-status="running"]').forEach(function(li) {
+  function autoExpandNewActivity() {
+    document.querySelectorAll('.monitor-batch').forEach(function(batch) {
+      var bid = batch.dataset.bid;
+      if (!bid || _collapsedBids[bid]) return;
+      var hasNew = false;
+      batch.querySelectorAll('.monitor-log-item').forEach(function(li) {
         var lid = li.dataset.lid;
-        if (li.querySelector('.monitor-entries') && !_seenLids[lid] && !_collapsedLids[lid]) {
-          li.classList.add('open');
-        }
+        if (!lid || _seenLids[lid]) return;
+        if (!li.querySelector('.monitor-entries')) return;
+        if (!_collapsedLids[lid]) li.classList.add('open');
+        hasNew = true;
       });
-    });
-  }
-
-  var AUTO_OPEN_BATCH_STATUSES = ['running', 'error', 'video_error', 'transcode_error', 'publish_error'];
-
-  function autoOpenActiveBatches() {
-    document.querySelectorAll('.monitor-batch').forEach(function(el) {
-      var bid = el.dataset.bid;
-      if (!bid || _seenBids[bid] || _collapsedBids[bid]) return;
-      var bs         = el.dataset.bstatus || '';
-      var hasRunning = !!el.querySelector('.monitor-log-item[data-status="running"]');
-      var hasError   = !!el.querySelector('.monitor-log-item[data-status="error"]');
-      var isAutoStatus = AUTO_OPEN_BATCH_STATUSES.indexOf(bs) >= 0;
-      if (hasRunning || hasError || isAutoStatus) {
-        el.classList.add('open');
-        el.querySelectorAll('.monitor-log-item').forEach(function(li) {
-          var lid = li.dataset.lid;
-          if (li.querySelector('.monitor-entries') && !_seenLids[lid] && !_collapsedLids[lid]) {
-            li.classList.add('open');
-          }
-        });
-      }
+      if (hasNew) batch.classList.add('open');
     });
   }
 
@@ -359,8 +343,8 @@
       return g.type === 'batch' ? renderBatch(g.data) : renderSysGroup(g.items);
     }).join('');
     restoreOpenState(prev);
-    autoOpenActiveBatches();
-    autoExpandRunningLogs();
+    if (!_firstRender) autoExpandNewActivity();
+    _firstRender = false;
   }
 
   function refreshMonitor() {
