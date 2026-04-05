@@ -37,111 +37,128 @@
 (function() {
   var _probeBtn = null;
 
-  window.probeTextModel = function(modelId, modelName, btn) {
+  var _SVG_COPY = '<svg viewBox="0 0 16 16" fill="none" stroke="#8888b0" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11V3a1 1 0 0 1 1-1h8"/></svg>';
+  var _SVG_INFO = '<svg viewBox="0 0 16 16" fill="none" stroke="#8888b0" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><line x1="8" y1="7" x2="8" y2="11"/><circle cx="8" cy="5" r=".5" fill="#8888b0" stroke="none"/></svg>';
+
+  function _esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  function _flashCopied(btn) {
+    btn.classList.add('copied');
+    setTimeout(function() { btn.classList.remove('copied'); }, 2000);
+  }
+
+  window.copyProbeModalLogs = function(btn) {
+    var body = document.getElementById('probe-modal-body');
+    if (!body) return;
+    var logList = body.querySelector('.monitor-log-list');
+    var text = (logList || body).innerText || (logList || body).textContent || '';
+    navigator.clipboard.writeText(text.trim()).then(function() { _flashCopied(btn); }).catch(function() {});
+  };
+
+  window.copyProbeModalInfo = function(btn) {
+    var overlay = document.getElementById('probe-modal-overlay');
+    var title   = document.getElementById('probe-modal-title');
+    var batchId = overlay ? (overlay.dataset.batchId || '') : '';
+    var lines = [];
+    if (title) lines.push(title.textContent);
+    if (batchId) lines.push('batch: ' + batchId);
+    navigator.clipboard.writeText(lines.join('\n')).then(function() { _flashCopied(btn); }).catch(function() {});
+  };
+
+  function _openProbeOverlay(modelName) {
     var overlay = document.getElementById('probe-modal-overlay');
     var body    = document.getElementById('probe-modal-body');
     var info    = document.getElementById('probe-modal-info');
     var title   = document.getElementById('probe-modal-title');
-    if (!overlay || !body) return;
+    if (!overlay || !body) return false;
+    if (title) title.textContent = 'Пробный запрос · ' + modelName;
+    body.className     = 'probe-modal-body';
+    body.style.padding = '';
+    body.innerHTML     = '<span style="color:#888">Создаю батч…</span>';
+    if (info) info.textContent = '';
+    if (overlay.dataset) overlay.dataset.batchId = '';
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
+    return true;
+  }
+
+  window.probeTextModel = function(modelId, modelName, btn) {
+    if (!_openProbeOverlay(modelName)) return;
+    var body = document.getElementById('probe-modal-body');
 
     if (_probeBtn) _probeBtn.classList.remove('probing');
     _probeBtn = btn;
     btn.classList.add('probing');
-
-    if (title) title.textContent = 'Пробный запрос · ' + modelName;
-    body.className    = 'probe-modal-body';
-    body.style.padding = '';
-    body.innerHTML    = '<span style="color:#888">Выполняю запрос…</span>';
-    if (info) info.textContent = '';
-    overlay.classList.add('open');
-    document.body.style.overflow = 'hidden';
 
     fetch('/api/text-models/' + encodeURIComponent(modelId) + '/probe', { method: 'POST' })
       .then(function(r) { return r.json(); })
       .then(function(data) {
         if (data.error) {
           if (_probeBtn) { _probeBtn.classList.remove('probing'); _probeBtn = null; }
-          body.innerHTML = '<span style="color:#c05050">' + String(data.error).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</span>';
+          body.innerHTML = '<span style="color:#c05050">' + _esc(data.error) + '</span>';
           return;
         }
-        _doProbePoll(data.job_id, '/api/text-models/probe/', btn, body);
+        var overlay = document.getElementById('probe-modal-overlay');
+        if (overlay && overlay.dataset) overlay.dataset.batchId = data.batch_id;
+        body.innerHTML = '';
+        _doBatchLogPoll(data.batch_id, body, function(d) {
+          if (d.story_id) _showStoryResult(d.story_id, body);
+        });
       })
       .catch(function(e) {
         if (_probeBtn) { _probeBtn.classList.remove('probing'); _probeBtn = null; }
-        body.className  = 'probe-modal-body probe-modal-error';
+        body.className   = 'probe-modal-body probe-modal-error';
         body.textContent = 'Ошибка запроса: ' + e;
-        if (info) info.textContent = '';
       });
   };
 
-  function _doProbePoll(jobId, pollUrl, btn, body, onResult) {
-    var cursor = 0;
-    body.innerHTML = '';
-
-    var levelColor = { info: '#888', warn: '#c09050', ok: '#6a6', error: '#c05050' };
-
-    function appendEvent(line) {
-      var color = levelColor[line.level] || '#888';
-      var div   = document.createElement('div');
-      div.style.cssText = 'color:' + color + ';margin-bottom:3px;font-size:12px;line-height:1.4';
-      div.textContent   = line.text;
-      body.appendChild(div);
-      body.scrollTop = body.scrollHeight;
-    }
-
-    function showResult(text) {
-      if (onResult) {
-        onResult(text);
-      } else {
+  function _showStoryResult(storyId, body) {
+    fetch('/api/story/' + encodeURIComponent(storyId))
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (!d.text) return;
         var sep = document.createElement('div');
-        sep.style.cssText = 'border-top:1px solid rgba(255,255,255,.1);margin:10px 0 8px';
+        sep.className = 'probe-story-sep';
         body.appendChild(sep);
-        var pre = document.createElement('div');
-        pre.style.cssText = 'white-space:pre-wrap;line-height:1.55;font-size:13px';
-        pre.textContent   = text;
-        body.appendChild(pre);
-        body.scrollTop = body.scrollHeight;
-      }
-    }
 
-    function poll() {
-      fetch(pollUrl + jobId + '?cursor=' + cursor)
-        .then(function(r) { return r.json(); })
-        .then(function(d) {
-          (d.events || []).forEach(appendEvent);
-          cursor = d.cursor || cursor;
-          if (d.done) {
-            if (_probeBtn) { _probeBtn.classList.remove('probing'); _probeBtn = null; }
-            if (d.result) showResult(d.result);
-          } else {
-            setTimeout(poll, 500);
-          }
-        })
-        .catch(function() { setTimeout(poll, 1000); });
-    }
-    poll();
+        var wrap = document.createElement('div');
+        wrap.className = 'probe-story-result';
+
+        var hdr = document.createElement('div');
+        hdr.className = 'probe-story-hdr';
+        var lbl = document.createElement('span');
+        lbl.className = 'probe-story-label';
+        lbl.textContent = 'Сюжет';
+        var copyBtn = document.createElement('button');
+        copyBtn.className = 'cycle-float-btn';
+        copyBtn.title = 'Скопировать';
+        copyBtn.innerHTML = _SVG_COPY;
+        copyBtn.onclick = function() {
+          navigator.clipboard.writeText(d.text).then(function() { _flashCopied(copyBtn); }).catch(function() {});
+        };
+        hdr.appendChild(lbl);
+        hdr.appendChild(copyBtn);
+
+        var pre = document.createElement('div');
+        pre.className = 'probe-story-text';
+        pre.textContent = d.text;
+
+        wrap.appendChild(hdr);
+        wrap.appendChild(pre);
+        body.appendChild(wrap);
+        body.scrollTop = body.scrollHeight;
+      })
+      .catch(function() {});
   }
 
   window.probeVideoModel = function(modelId, modelName, btn) {
+    if (!_openProbeOverlay(modelName)) return;
+    var body = document.getElementById('probe-modal-body');
     var overlay = document.getElementById('probe-modal-overlay');
-    var body    = document.getElementById('probe-modal-body');
-    var info    = document.getElementById('probe-modal-info');
-    var title   = document.getElementById('probe-modal-title');
-    if (!overlay || !body) return;
-
-    function _esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
     if (_probeBtn) _probeBtn.classList.remove('probing');
     _probeBtn = btn;
     btn.classList.add('probing');
-
-    if (title) title.textContent = 'Пробный запрос · ' + modelName;
-    body.className    = 'probe-modal-body';
-    body.style.padding = '';
-    body.innerHTML    = '<span style="color:#888">Создаю батч…</span>';
-    if (info) info.textContent = '';
-    overlay.classList.add('open');
-    document.body.style.overflow = 'hidden';
 
     fetch('/api/video-models/' + encodeURIComponent(modelId) + '/probe', { method: 'POST' })
       .then(function(r) { return r.json(); })
@@ -151,19 +168,19 @@
           body.innerHTML = '<span style="color:#c05050">' + _esc(data.error) + '</span>';
           return;
         }
+        if (overlay && overlay.dataset) overlay.dataset.batchId = data.batch_id;
         body.innerHTML = '';
-        _doBatchLogPoll(data.batch_id, body);
+        _doBatchLogPoll(data.batch_id, body, null);
       })
       .catch(function(e) {
         if (_probeBtn) { _probeBtn.classList.remove('probing'); _probeBtn = null; }
-        body.className  = 'probe-modal-body probe-modal-error';
+        body.className   = 'probe-modal-body probe-modal-error';
         body.textContent = 'Ошибка запроса: ' + e;
-        if (info) info.textContent = '';
       });
   };
 
-  function _doBatchLogPoll(batchId, body) {
-    var _TERMINAL = ['probe', 'video_error', 'transcode_error', 'publish_error', 'отменён'];
+  function _doBatchLogPoll(batchId, body, onDone) {
+    var _TERMINAL = ['probe', 'story_probe', 'video_error', 'transcode_error', 'publish_error', 'отменён'];
 
     var videoSection = document.createElement('div');
     videoSection.className    = 'probe-modal-video-section';
@@ -230,7 +247,8 @@
               el.classList.remove('open');
             });
             body.scrollTop = 0;
-            if (d.has_video_data) showVideo();
+            if (onDone) { onDone(d); }
+            else if (d.has_video_data) { showVideo(); }
           } else {
             setTimeout(poll, 2000);
           }

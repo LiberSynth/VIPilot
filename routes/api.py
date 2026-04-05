@@ -1,24 +1,8 @@
 import os
 import threading
 import time
-import uuid
-import requests as _requests
 from flask import Blueprint, jsonify, request, Response
 
-# Хранилище фоновых probe-задач: job_id → {"events": [...], "done": bool, "ts": float}
-_probe_jobs = {}
-_probe_lock = threading.Lock()
-
-def _probe_append(job_id, text, level="info"):
-    with _probe_lock:
-        if job_id in _probe_jobs:
-            _probe_jobs[job_id]["events"].append({"text": text, "level": level})
-
-def _probe_finish(job_id, result=None):
-    with _probe_lock:
-        if job_id in _probe_jobs:
-            _probe_jobs[job_id]["done"] = True
-            _probe_jobs[job_id]["result"] = result
 
 
 from log import db_log_root
@@ -214,114 +198,12 @@ def api_text_model_probe(model_id):
     if not m:
         return jsonify({"error": "Модель не найдена"}), 404
 
-    api_key = os.environ.get("OPENROUTER_API_KEY", "")
-    if not api_key:
-        return jsonify({"error": "OPENROUTER_API_KEY не задан"}), 500
+    from db import db_create_story_probe_batch
+    batch_id = db_create_story_probe_batch(model_id)
+    if not batch_id:
+        return jsonify({"error": "Не удалось создать батч"}), 500
 
-    try:
-        fails_to_next = max(1, int(db_get("story_fails_to_next", "3")))
-    except (ValueError, TypeError):
-        fails_to_next = 3
-
-    system_prompt = db_get("system_prompt", "")
-    user_prompt   = db_get("metaprompt", "")
-    model_name    = m["name"]
-
-    body_tpl = m["body_tpl"]
-    body = dict(body_tpl)
-    if "messages" in body:
-        messages = []
-        for msg in body["messages"]:
-            msg = dict(msg)
-            if msg.get("role") == "system":
-                msg["content"] = str(msg["content"]).format(system_prompt)
-            elif msg.get("role") == "user":
-                msg["content"] = str(msg["content"]).format(user_prompt)
-            messages.append(msg)
-        body["messages"] = messages
-    body["model"] = m["model_url"]
-
-    req_headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-    }
-    platform_url = m["platform_url"]
-
-    job_id = str(uuid.uuid4())
-    with _probe_lock:
-        _probe_jobs[job_id] = {"events": [], "done": False, "result": None, "ts": time.time()}
-
-    def _run():
-        import json as _json
-        _probe_append(job_id, f"Модель: {model_name}", "info")
-        _probe_append(job_id, f"URL: {platform_url}", "info")
-        _probe_append(job_id, f"Попыток: {fails_to_next}", "info")
-
-        # Показываем сам запрос
-        req_preview = _json.dumps(body, ensure_ascii=False, indent=2)
-        _probe_append(job_id, f"→ Запрос:\n{req_preview}", "info")
-
-        result = None
-        for attempt in range(fails_to_next):
-            _probe_append(job_id, f"[попытка {attempt + 1}/{fails_to_next}] отправляю…", "info")
-            try:
-                resp = _requests.post(platform_url, headers=req_headers, json=body, timeout=60)
-            except _requests.exceptions.Timeout:
-                _probe_append(job_id, f"[попытка {attempt + 1}/{fails_to_next}] таймаут (60 с)", "warn")
-                continue
-            except _requests.exceptions.RequestException as e:
-                _probe_append(job_id, f"[попытка {attempt + 1}/{fails_to_next}] ошибка соединения: {e}", "warn")
-                continue
-
-            # Показываем сырой ответ
-            raw_preview = " ".join(resp.text.split())[:500]
-            _probe_append(job_id, f"← HTTP {resp.status_code}: {raw_preview}", "info")
-
-            try:
-                data = resp.json()
-            except ValueError:
-                _probe_append(job_id, f"[попытка {attempt + 1}/{fails_to_next}] не-JSON ответ", "warn")
-                continue
-            if resp.status_code >= 400:
-                err = data.get("error", {})
-                if isinstance(err, dict):
-                    err = err.get("message", str(data))
-                _probe_append(job_id, f"[попытка {attempt + 1}/{fails_to_next}] ошибка: {err}", "warn")
-                continue
-            choices = data.get("choices")
-            if not choices:
-                _probe_append(job_id, f"[попытка {attempt + 1}/{fails_to_next}] нет поля choices в ответе", "warn")
-                continue
-            text = ((choices[0].get("message") or {}).get("content") or "").strip()
-            if not text:
-                _probe_append(job_id, f"[попытка {attempt + 1}/{fails_to_next}] пустой текст", "warn")
-                continue
-            result = text
-            _probe_append(job_id, f"[попытка {attempt + 1}/{fails_to_next}] успех", "ok")
-            break
-        if result is None:
-            _probe_append(job_id, f"все попытки исчерпаны", "error")
-        _probe_finish(job_id, result)
-
-    threading.Thread(target=_run, daemon=True).start()
-    return jsonify({"job_id": job_id})
-
-
-@bp.route("/text-models/probe/<job_id>", methods=["GET"])
-def api_text_model_probe_poll(job_id):
-    if not is_authenticated():
-        return jsonify({"error": "unauthorized"}), 401
-    with _probe_lock:
-        job = _probe_jobs.get(job_id)
-        if not job:
-            return jsonify({"error": "not found"}), 404
-        cursor = request.args.get("cursor", 0, type=int)
-        new_events = job["events"][cursor:]
-        done = job["done"]
-        result = job["result"] if done else None
-        if done and (time.time() - job["ts"]) > 120:
-            del _probe_jobs[job_id]
-    return jsonify({"events": new_events, "cursor": cursor + len(new_events), "done": done, "result": result})
+    return jsonify({"batch_id": batch_id})
 
 
 @bp.route("/video-models/<model_id>/grade", methods=["POST"])

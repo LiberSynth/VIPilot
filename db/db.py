@@ -238,6 +238,41 @@ def db_create_probe_batch(video_model_id):
         return None
 
 
+def db_create_story_probe_batch(text_model_id):
+    """Создаёт pending-батч без таргета для пробного запроса сценария.
+    data-флаг story_probe=true сигнализирует пайплайну завершить батч
+    в статусе story_probe (без передачи в видео-конвейер)."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO batches
+                        (target_id, status, adhoc, text_model_id, data)
+                    VALUES (NULL, 'pending', TRUE, %s, '{"story_probe": true}')
+                    RETURNING id
+                """, (text_model_id,))
+                row = cur.fetchone()
+            conn.commit()
+        return str(row[0]) if row else None
+    except Exception as e:
+        print(f"[DB] Ошибка db_create_story_probe_batch: {e}")
+        return None
+
+
+def db_set_batch_story_probe(batch_id, story_id):
+    """Переводит батч в status='story_probe', сохраняет story_id и проставляет completed_at."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE batches SET status = 'story_probe', story_id = %s, completed_at = now() WHERE id = %s",
+                    (story_id, batch_id),
+                )
+            conn.commit()
+    except Exception as e:
+        print(f"[DB] Ошибка db_set_batch_story_probe: {e}")
+
+
 def db_get_pending_batch():
     """Атомарно захватывает первый pending-батч: переводит его в 'story_generating'
     и возвращает данные. Гарантирует, что два потока не возьмут один и тот же батч.
@@ -257,7 +292,8 @@ def db_get_pending_batch():
                         )
                         RETURNING *
                     )
-                    SELECT c.id, c.scheduled_at, c.target_id, c.adhoc,
+                    SELECT c.id, c.scheduled_at, c.target_id, c.adhoc, c.data,
+                           c.text_model_id,
                            t.name AS target_name,
                            t.aspect_ratio_x, t.aspect_ratio_y
                     FROM claimed c

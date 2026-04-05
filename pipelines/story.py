@@ -17,6 +17,7 @@ from db import (
     db_get_active_text_models,
     db_create_story,
     db_set_batch_story,
+    db_set_batch_story_probe,
     db_set_batch_pending,
     db_is_batch_scheduled,
     db_set_batch_obsolete,
@@ -218,16 +219,27 @@ def run():
         if log_id:
             db_log_entry(log_id, f"Сюжет:\n{result}")
 
-        db_set_batch_story(batch_id, story_id)
-        db_set_batch_text_model(batch_id, used_model_id)
-        batch_done = True
+        batch_data = batch.get('data') or {}
+        is_story_probe = batch_data.get('story_probe', False) if isinstance(batch_data, dict) else False
 
-        msg = f'Сюжет сгенерирован ({used_model_name})'
-        db_log_update(log_id, msg, 'ok')
-        if log_id:
-            db_log_entry(log_id, f"Сохранён как story {story_id[:8]}…, батч → story_ready")
-
-        print(f"[story] Готово: story_id={story_id[:8]}…, batch → story_ready")
+        if is_story_probe:
+            db_set_batch_story_probe(batch_id, story_id)
+            db_set_batch_text_model(batch_id, used_model_id)
+            batch_done = True
+            msg = f'Сюжет сгенерирован ({used_model_name})'
+            db_log_update(log_id, msg, 'ok')
+            if log_id:
+                db_log_entry(log_id, f"Сохранён как story {story_id[:8]}…, батч → story_probe")
+            print(f"[story] Пробный сюжет: story_id={story_id[:8]}…, batch → story_probe")
+        else:
+            db_set_batch_story(batch_id, story_id)
+            db_set_batch_text_model(batch_id, used_model_id)
+            batch_done = True
+            msg = f'Сюжет сгенерирован ({used_model_name})'
+            db_log_update(log_id, msg, 'ok')
+            if log_id:
+                db_log_entry(log_id, f"Сохранён как story {story_id[:8]}…, батч → story_ready")
+            print(f"[story] Готово: story_id={story_id[:8]}…, batch → story_ready")
 
     except Exception as e:
         msg = f"Сбой пайплайна: {e}"
