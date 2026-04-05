@@ -9,12 +9,19 @@ const PANEL_TITLES = {
 
 function openSidebar() {
   document.getElementById('sidebar').classList.add('open');
-  document.getElementById('sidebar-overlay').classList.add('open');
+  var existing = document.getElementById('sidebar-overlay');
+  if (existing) { existing.classList.add('open'); return; }
+  var el = document.createElement('div');
+  el.className = 'sidebar-overlay open';
+  el.id = 'sidebar-overlay';
+  el.addEventListener('click', closeSidebar);
+  document.body.insertBefore(el, document.body.firstChild);
 }
 
 function closeSidebar() {
   document.getElementById('sidebar').classList.remove('open');
-  document.getElementById('sidebar-overlay').classList.remove('open');
+  var el = document.getElementById('sidebar-overlay');
+  if (el) el.remove();
 }
 
 function switchPanel(name) {

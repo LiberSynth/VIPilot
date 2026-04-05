@@ -8,9 +8,6 @@
 </head>
 <body>
 
-<!-- Sidebar overlay (closes on click) -->
-<div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
-
 <!-- Sidebar -->
 <div class="sidebar" id="sidebar">
   <div class="sidebar-header">
@@ -382,75 +379,6 @@
     <div id="monitor-timeline" class="monitor-timeline"></div>
   </div>
 
-</div>
-
-<!-- Confirm: очистить историю -->
-<div class="confirm-overlay" id="clearHistoryOverlay">
-  <div class="confirm-box">
-    <div class="confirm-box-title">Очистить всю историю?</div>
-    <div class="confirm-box-text">
-      Будут удалены все логи (краткие и подробные) и все завершённые батчи со связанными сюжетами.<br><br>
-      Активные батчи (в очереди, в процессе генерации) не затрагиваются.<br><br>
-      Действие нельзя отменить.
-    </div>
-    <div class="confirm-box-btns">
-      <button class="confirm-cancel" onclick="closeClearHistoryDialog()">Отмена</button>
-      <button class="confirm-confirm" id="clearHistoryConfirmBtn" onclick="confirmClearHistory()">Очистить</button>
-    </div>
-  </div>
-</div>
-
-<!-- Confirm: перезапуск движка -->
-<div class="confirm-overlay" id="restartOverlay">
-  <div class="confirm-box">
-    <div class="confirm-box-title">Перезапустить движок?</div>
-    <div class="confirm-box-text">
-      Приложение будет остановлено и автоматически перезапущено.<br><br>
-      Текущие задачи будут прерваны. Состояние движка (работает / приостановлен) сохранится.
-    </div>
-    <div class="confirm-box-btns">
-      <button class="confirm-cancel" onclick="closeRestartDialog()">Отмена</button>
-      <button class="confirm-confirm" id="restartConfirmBtn" onclick="confirmRestart()" style="background:#b05820">Перезапустить</button>
-    </div>
-  </div>
-</div>
-
-<!-- Video modal -->
-<div id="video-modal-overlay" class="video-modal-overlay">
-  <div class="video-modal" onclick="event.stopPropagation()">
-    <div class="video-modal-head">
-      <span class="video-modal-title" id="video-modal-title">Видео</span>
-      <button class="story-modal-close" onclick="closeVideoModal()">&times;</button>
-    </div>
-    <div class="video-modal-body" id="video-modal-body"></div>
-  </div>
-</div>
-
-<!-- Probe modal -->
-<div id="probe-modal-overlay" class="probe-modal-overlay">
-  <div class="probe-modal" onclick="event.stopPropagation()">
-    <div class="probe-modal-head">
-      <span class="probe-modal-title" id="probe-modal-title">Пробный запрос</span>
-      <div class="probe-modal-hdr-actions">
-        <button class="cycle-float-btn" title="Скопировать логи" onclick="copyProbeModalLogs(this)"><svg viewBox="0 0 16 16" fill="none" stroke="#8888b0" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11V3a1 1 0 0 1 1-1h8"/></svg></button>
-        <button class="cycle-float-btn" title="Скопировать инфо" onclick="copyProbeModalInfo(this)"><svg viewBox="0 0 16 16" fill="none" stroke="#8888b0" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><line x1="8" y1="7" x2="8" y2="11"/><circle cx="8" cy="5" r=".5" fill="#8888b0" stroke="none"/></svg></button>
-      </div>
-      <button class="probe-modal-close" onclick="closeProbeModal()">&times;</button>
-    </div>
-    <div class="probe-modal-body" id="probe-modal-body"></div>
-  </div>
-</div>
-
-<!-- Story modal -->
-<div id="story-modal-overlay" class="story-modal-overlay">
-  <div class="story-modal" onclick="event.stopPropagation()">
-    <div class="story-modal-head">
-      <span class="story-modal-title" id="story-modal-title">Сюжет</span>
-      <button class="cycle-float-btn" id="story-modal-copy-btn" onclick="copyStoryText()"><svg viewBox="0 0 16 16" fill="none" stroke="#8888b0" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11V3a1 1 0 0 1 1-1h8"/></svg></button>
-      <button class="story-modal-close" onclick="closeStoryModal()">&times;</button>
-    </div>
-    <div class="story-modal-body" id="story-modal-body"></div>
-  </div>
 </div>
 
 <script src="/static/js/ui.js"></script>

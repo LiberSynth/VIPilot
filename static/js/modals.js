@@ -1,35 +1,57 @@
 (function() {
+  function _buildVideoModalHTML(modelName) {
+    var el = document.createElement('div');
+    el.id = 'video-modal-overlay';
+    el.className = 'video-modal-overlay open';
+    el.innerHTML =
+      '<div class="video-modal" onclick="event.stopPropagation()">' +
+        '<div class="video-modal-head">' +
+          '<span class="video-modal-title" id="video-modal-title"></span>' +
+          '<button class="story-modal-close" onclick="closeVideoModal()">&times;</button>' +
+        '</div>' +
+        '<div class="video-modal-body" id="video-modal-body"></div>' +
+      '</div>';
+    var titleEl = el.querySelector('#video-modal-title');
+    if (titleEl) titleEl.textContent = modelName ? 'Видео · ' + modelName : 'Видео';
+    return el;
+  }
+
   window._closeVideoModalInner = function() {
     var overlay = document.getElementById('video-modal-overlay');
-    var body    = document.getElementById('video-modal-body');
-    if (overlay) overlay.classList.remove('open');
-    if (body)    body.innerHTML = '';
+    if (overlay) overlay.remove();
     document.body.style.overflow = '';
   };
 
   window.openVideoModal = function(batchId, modelName) {
-    var overlay = document.getElementById('video-modal-overlay');
-    var body    = document.getElementById('video-modal-body');
-    var title   = document.getElementById('video-modal-title');
-    if (!overlay || !body) return;
-    if (title) title.textContent = modelName ? 'Видео · ' + modelName : 'Видео';
+    var existing = document.getElementById('video-modal-overlay');
+    if (existing) existing.remove();
+
+    var overlay = _buildVideoModalHTML(modelName);
+    document.body.appendChild(overlay);
+
+    var body = document.getElementById('video-modal-body');
+    if (!body) return;
+
     body.innerHTML = '<div class="video-modal-loading">Загрузка…</div>';
-    overlay.classList.add('open');
     document.body.style.overflow = 'hidden';
     history.pushState({ modal: 'video' }, '');
     var src = '/api/batch/' + encodeURIComponent(batchId) + '/video';
     body.innerHTML = '<video controls autoplay src="' + src + '"></video>';
+
+    overlay.addEventListener('click', function(e) {
+      if (e.target === overlay) closeVideoModal();
+    });
   };
 
   window.closeVideoModal = function() {
     var overlay = document.getElementById('video-modal-overlay');
-    if (overlay && overlay.classList.contains('open')) history.back();
+    if (overlay) history.back();
   };
 
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
       var overlay = document.getElementById('video-modal-overlay');
-      if (overlay && overlay.classList.contains('open')) history.back();
+      if (overlay) history.back();
     }
   });
 })();
@@ -64,17 +86,33 @@
     navigator.clipboard.writeText(lines.join('\n')).then(function() { _flashCopied(btn); }).catch(function() {});
   };
 
+  function _buildProbeModalHTML(modelName) {
+    var el = document.createElement('div');
+    el.id = 'probe-modal-overlay';
+    el.className = 'probe-modal-overlay open';
+    el.innerHTML =
+      '<div class="probe-modal" onclick="event.stopPropagation()">' +
+        '<div class="probe-modal-head">' +
+          '<span class="probe-modal-title" id="probe-modal-title">Пробный запрос · ' + _esc(modelName) + '</span>' +
+          '<div class="probe-modal-hdr-actions">' +
+            '<button class="cycle-float-btn" title="Скопировать логи" onclick="copyProbeModalLogs(this)">' + _SVG_COPY + '</button>' +
+            '<button class="cycle-float-btn" title="Скопировать инфо" onclick="copyProbeModalInfo(this)">' +
+              '<svg viewBox="0 0 16 16" fill="none" stroke="#8888b0" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><line x1="8" y1="7" x2="8" y2="11"/><circle cx="8" cy="5" r=".5" fill="#8888b0" stroke="none"/></svg>' +
+            '</button>' +
+          '</div>' +
+          '<button class="probe-modal-close" onclick="closeProbeModal()">&times;</button>' +
+        '</div>' +
+        '<div class="probe-modal-body" id="probe-modal-body"><span style="color:#888">Создаю батч…</span></div>' +
+      '</div>';
+    return el;
+  }
+
   function _openProbeOverlay(modelName) {
-    var overlay = document.getElementById('probe-modal-overlay');
-    var body    = document.getElementById('probe-modal-body');
-    var title   = document.getElementById('probe-modal-title');
-    if (!overlay || !body) return false;
-    if (title) title.textContent = 'Пробный запрос · ' + modelName;
-    body.className     = 'probe-modal-body';
-    body.style.padding = '';
-    body.innerHTML     = '<span style="color:#888">Создаю батч…</span>';
-    if (overlay.dataset) overlay.dataset.batchId = '';
-    overlay.classList.add('open');
+    var existing = document.getElementById('probe-modal-overlay');
+    if (existing) existing.remove();
+
+    var overlay = _buildProbeModalHTML(modelName);
+    document.body.appendChild(overlay);
     document.body.style.overflow = 'hidden';
     return true;
   }
@@ -258,7 +296,7 @@
 
   window.closeProbeModal = function() {
     var overlay = document.getElementById('probe-modal-overlay');
-    if (overlay) overlay.classList.remove('open');
+    if (overlay) overlay.remove();
     document.body.style.overflow = '';
     if (_probeBtn) { _probeBtn.classList.remove('probing'); _probeBtn = null; }
   };
@@ -266,7 +304,7 @@
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
       var overlay = document.getElementById('probe-modal-overlay');
-      if (overlay && overlay.classList.contains('open')) closeProbeModal();
+      if (overlay) closeProbeModal();
     }
   });
 })();
@@ -274,19 +312,38 @@
 (function() {
   var _storyText = '';
 
+  function _buildStoryModalHTML(modelName) {
+    var el = document.createElement('div');
+    el.id = 'story-modal-overlay';
+    el.className = 'story-modal-overlay open';
+    el.innerHTML =
+      '<div class="story-modal" onclick="event.stopPropagation()">' +
+        '<div class="story-modal-head">' +
+          '<span class="story-modal-title" id="story-modal-title"></span>' +
+          '<button class="cycle-float-btn" id="story-modal-copy-btn" onclick="copyStoryText()">' +
+            '<svg viewBox="0 0 16 16" fill="none" stroke="#8888b0" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11V3a1 1 0 0 1 1-1h8"/></svg>' +
+          '</button>' +
+          '<button class="story-modal-close" onclick="closeStoryModal()">&times;</button>' +
+        '</div>' +
+        '<div class="story-modal-body" id="story-modal-body"><span class="story-modal-loading">Загрузка…</span></div>' +
+      '</div>';
+    var titleEl = el.querySelector('#story-modal-title');
+    if (titleEl) titleEl.textContent = modelName ? 'Сюжет · ' + modelName : 'Сюжет';
+    return el;
+  }
+
   window.openStoryModal = function(storyId, modelName) {
-    var overlay = document.getElementById('story-modal-overlay');
-    var body    = document.getElementById('story-modal-body');
-    var copyBtn = document.getElementById('story-modal-copy-btn');
-    var title   = document.getElementById('story-modal-title');
-    if (!overlay || !body) return;
-    if (title) title.textContent = modelName ? 'Сюжет · ' + modelName : 'Сюжет';
-    _storyText    = '';
-    body.innerHTML = '<span class="story-modal-loading">Загрузка…</span>';
-    copyBtn.classList.remove('copied');
-    overlay.classList.add('open');
+    var existing = document.getElementById('story-modal-overlay');
+    if (existing) existing.remove();
+
+    _storyText = '';
+    var overlay = _buildStoryModalHTML(modelName);
+    document.body.appendChild(overlay);
+
     document.body.style.overflow = 'hidden';
     history.pushState({ modal: 'story' }, '');
+
+    var body = document.getElementById('story-modal-body');
     fetch('/api/story/' + encodeURIComponent(storyId))
       .then(function(r) { return r.json(); })
       .then(function(d) {
@@ -304,13 +361,14 @@
 
   window._closeStoryModalInner = function() {
     var overlay = document.getElementById('story-modal-overlay');
-    if (overlay) overlay.classList.remove('open');
+    if (overlay) overlay.remove();
     document.body.style.overflow = '';
+    _storyText = '';
   };
 
   window.closeStoryModal = function() {
     var overlay = document.getElementById('story-modal-overlay');
-    if (overlay && overlay.classList.contains('open')) history.back();
+    if (overlay) history.back();
   };
 
   window.copyStoryText = function() {
@@ -327,7 +385,7 @@
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
       var overlay = document.getElementById('story-modal-overlay');
-      if (overlay && overlay.classList.contains('open')) history.back();
+      if (overlay) history.back();
     }
   });
 
@@ -338,9 +396,9 @@
     } else {
       var storyOverlay = document.getElementById('story-modal-overlay');
       var videoOverlay = document.getElementById('video-modal-overlay');
-      if (storyOverlay && storyOverlay.classList.contains('open')) {
+      if (storyOverlay) {
         _closeStoryModalInner && _closeStoryModalInner();
-      } else if (videoOverlay && videoOverlay.classList.contains('open')) {
+      } else if (videoOverlay) {
         _closeVideoModalInner && _closeVideoModalInner();
       }
     }
