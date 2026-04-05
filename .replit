@@ -11,7 +11,7 @@ language = "python3"
 requiredFiles = [".replit", "replit.nix"]
 
 [deployment]
-run = ["gunicorn", "--bind=0.0.0.0:8080", "--reuse-port", "--workers=1", "main:app"]
+run = ["gunicorn", "--bind=0.0.0.0:8080", "--reuse-port", "--workers=1", "--timeout=120", "main:app"]
 deploymentTarget = "vm"
 
 [agent]
