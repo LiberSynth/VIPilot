@@ -15,6 +15,7 @@ from db import (
     db_get,
     db_get_pending_batch,
     db_get_active_text_models,
+    db_get_text_model_by_id,
     db_create_story,
     db_set_batch_story,
     db_set_batch_story_probe,
@@ -159,7 +160,16 @@ def run():
             print(f"[story] {msg}")
             return
 
-        models = db_get_active_text_models()
+        batch_data     = batch.get('data') or {}
+        is_story_probe = batch_data.get('story_probe', False) if isinstance(batch_data, dict) else False
+        probe_model_id = str(batch['text_model_id']) if batch.get('text_model_id') else None
+
+        if is_story_probe and probe_model_id:
+            probe_model = db_get_text_model_by_id(probe_model_id)
+            models = [probe_model] if probe_model else []
+        else:
+            models = db_get_active_text_models()
+
         if not models:
             msg = 'Нет активных text-моделей в ai_models'
             db_log_update(log_id, msg, 'error')
@@ -218,9 +228,6 @@ def run():
         print(f"[story] Сюжет получен: {result[:100]}{'…' if len(result) > 100 else ''}")
         if log_id:
             db_log_entry(log_id, f"Сюжет:\n{result}")
-
-        batch_data = batch.get('data') or {}
-        is_story_probe = batch_data.get('story_probe', False) if isinstance(batch_data, dict) else False
 
         if is_story_probe:
             db_set_batch_story_probe(batch_id, story_id)
