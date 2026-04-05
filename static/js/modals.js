@@ -116,7 +116,6 @@
         if (!d.text) return;
         var sep = document.createElement('div');
         sep.className = 'probe-story-sep';
-        body.appendChild(sep);
 
         var wrap = document.createElement('div');
         wrap.className = 'probe-story-result';
@@ -142,8 +141,9 @@
 
         wrap.appendChild(hdr);
         wrap.appendChild(pre);
-        body.appendChild(wrap);
-        body.scrollTop = body.scrollHeight;
+        body.prepend(sep);
+        body.prepend(wrap);
+        body.scrollTop = 0;
       })
       .catch(function() {});
   }
