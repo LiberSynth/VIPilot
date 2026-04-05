@@ -150,6 +150,7 @@
     const schedStr = batch.adhoc
       ? (batch.target_name ? 'Публикация: сейчас'
           : bs === 'story_probe' ? 'Публикация: пробный сюжет'
+          : bs === 'probe'       ? 'Публикация: пробное видео'
           : 'Публикация: пробный')
       : 'Публикация: ' + fmtMskShort(batch.scheduled_at);
     const statusLabel = (bs === 'probe' || bs === 'story_probe') ? 'выполнен' : (STATUS_LABELS[bs] || bs);
