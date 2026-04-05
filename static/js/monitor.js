@@ -96,11 +96,8 @@
     const storyBtn = (log.pipeline === 'story' && st === 'ok' && storyId)
       ? '<button class="cycle-float-btn story-view-btn" title="Посмотреть сюжет" onclick="openStoryModal(\'' + esc(storyId) + '\',\'' + esc(textModelName || '') + '\')">' + MON_SVG_EYE + '</button>'
       : '';
-    const videoBtn = (log.pipeline === 'video' && st === 'ok' && hasVideoData)
-      ? '<button class="cycle-float-btn" title="Просмотр видео" onclick="openVideoModal(\'' + esc(batchId) + '\',\'' + esc(videoModelName || '') + '\')">' + MON_SVG_PLAY + '</button>'
-      : '';
     const pipActions = '<div class="monitor-pip-actions" onclick="event.stopPropagation()">' +
-      storyBtn + videoBtn + restartBtn +
+      storyBtn + restartBtn +
       '<button class="cycle-float-btn" title="Скопировать логи" onclick="monitorPipelineCopy(this)">'     + MON_SVG_COPY + '</button>' +
       '<button class="cycle-float-btn" title="Скопировать инфо" onclick="monitorPipelineCopyInfo(this)">' + MON_SVG_INFO + '</button>' +
     '</div>';
@@ -185,6 +182,10 @@
       return renderLogItem(log, batch.batch_id, batch.story_id, batch.has_video_data, batch.text_model_name, batch.video_model_name);
     }).join('') + '</div>';
 
+    const batchVideoBtn = batch.has_video_data
+      ? '<button class="cycle-float-btn" title="Просмотр видео" onclick="event.stopPropagation();openVideoModal(\'' + esc(batch.batch_id) + '\',\'' + esc(batch.video_model_name || '') + '\')">' + MON_SVG_PLAY + '</button>'
+      : '';
+
     const hdrActions =
       '<div class="monitor-hdr-actions" onclick="event.stopPropagation()">' +
         '<button class="cycle-float-btn" title="Развернуть все"   onclick="monitorExpandAll(this)">'     + MON_SVG_EXPAND   + '</button>' +
@@ -206,6 +207,7 @@
           '<div class="monitor-batch-title">' + fmtMsk(headTime) + '</div>' +
           '<div class="monitor-batch-sub">'   + esc(sub)         + '</div>' +
         '</div>' +
+        batchVideoBtn +
         hdrActions +
         '<span class="monitor-batch-arrow">▼</span>' +
       '</div>' +
