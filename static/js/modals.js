@@ -198,12 +198,14 @@
 
       container.querySelectorAll('.monitor-log-item').forEach(function(el) {
         var lid = el.dataset.lid;
+        var hasEntries = !!el.querySelector('.monitor-entries');
         if (openIds[lid]) {
           el.classList.add('open');
-        } else if (!seenIds[lid] && el.querySelector('.monitor-entries')) {
+          seenIds[lid] = true;
+        } else if (!seenIds[lid] && hasEntries) {
           el.classList.add('open');
+          seenIds[lid] = true;
         }
-        seenIds[lid] = true;
       });
 
       body.scrollTop = body.scrollHeight;
