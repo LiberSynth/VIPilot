@@ -139,11 +139,24 @@ var _dzenCsrfSaveTimer = null;
 function saveDzenCsrf() {
   const targetId = document.getElementById('dzen_target_id');
   const csrfInput = document.getElementById('dzen_csrf_token');
+  const statusEl = document.getElementById('dzen_csrf_status');
   if (!targetId || !csrfInput) return;
   const fd = new FormData();
   fd.append('dzen_target_id', targetId.value);
   fd.append('dzen_csrf_token', csrfInput.value.trim());
-  fetch('/save-dzen', { method: 'POST', body: fd }).catch(() => {});
+  fetch('/save-dzen', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(data => {
+      if (!statusEl) return;
+      if (data.ok) {
+        statusEl.style.color = '#69db7c';
+        statusEl.textContent = 'CSRF-токен сохранён (только что).';
+      } else {
+        statusEl.style.color = '#ff6b6b';
+        statusEl.textContent = 'Ошибка сохранения токена.';
+      }
+    })
+    .catch(() => {});
 }
 function scheduleDzenCsrfSave() {
   clearTimeout(_dzenCsrfSaveTimer);

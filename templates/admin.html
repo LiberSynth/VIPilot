@@ -239,27 +239,28 @@
       <input type="hidden" id="dzen_target_id" value="{{ dzen_target_id or '' }}">
       <div class="card-title">Публикация в Дзен</div>
 
-      {% if dzen_csrf_age is not none %}
-        {% if dzen_csrf_age > 1440 %}
-          <div class="hint" style="margin-bottom:10px;color:#ff6b6b">
+      <div id="dzen_csrf_status" class="hint" style="margin-bottom:10px;color:
+        {%- if dzen_csrf_age is not none -%}
+          {%- if dzen_csrf_age > 1440 -%}#ff6b6b{%- elif dzen_csrf_age > 480 -%}#ffa94d{%- else -%}#69db7c{%- endif -%}
+        {%- else -%}#aaa{%- endif -%}
+      ">
+        {%- if dzen_csrf_age is not none -%}
+          {%- if dzen_csrf_age > 1440 -%}
             ⚠ CSRF-токен устарел ({{ dzen_csrf_age // 60 }} ч {{ dzen_csrf_age % 60 }} мин). Обновите его ниже.
-          </div>
-        {% elif dzen_csrf_age > 480 %}
-          <div class="hint" style="margin-bottom:10px;color:#ffa94d">
+          {%- elif dzen_csrf_age > 480 -%}
             CSRF-токен: {{ dzen_csrf_age // 60 }} ч {{ dzen_csrf_age % 60 }} мин. Рекомендуется обновить.
-          </div>
-        {% else %}
-          <div class="hint" style="margin-bottom:10px;color:#69db7c">
+          {%- else -%}
             CSRF-токен актуален ({{ dzen_csrf_age }} мин назад).
-          </div>
-        {% endif %}
-      {% else %}
-        <div class="hint" style="margin-bottom:10px;color:#aaa">CSRF-токен не задан.</div>
-      {% endif %}
+          {%- endif -%}
+        {%- else -%}
+          CSRF-токен не задан.
+        {%- endif -%}
+      </div>
 
       <div class="hint" style="margin-bottom:10px">
-        Как обновить: <b>dzen.ru/profile/editor</b> → DevTools (F12) → Network → любое действие →
-        запрос к <code>editor-api</code> → заголовок <code>X-Csrf-Token</code>.
+        Как обновить: <b>dzen.ru/profile/editor</b> → DevTools (F12) → вкладка <b>Network</b> →
+        в поле фильтра введи <code>log-studio-event</code> → кликни на любой запрос из списка →
+        справа вкладка <b>Headers</b> → раздел <b>Request Headers</b> → строка <code>x-csrf-token</code>.
       </div>
 
       <div class="toggle-label" style="margin-bottom:4px">CSRF-токен</div>
