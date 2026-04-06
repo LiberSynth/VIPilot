@@ -137,10 +137,9 @@ def run(batch_id):
             if donor_id:
                 updated = db_get_batch_by_id(batch_id)
                 new_status = updated['status'] if updated else None
-                donor_short = donor_id[:8]
                 detail = (
                     f"Включён режим «Использовать донора». "
-                    f"Видео позаимствовано из отменённого батча {donor_short}…"
+                    f"Видео позаимствовано из отменённого батча {donor_id}"
                 )
 
                 log_id = db_log_pipeline(
@@ -165,7 +164,7 @@ def run(batch_id):
                     if tr_log_id:
                         db_log_entry(tr_log_id, detail)
 
-                print(f"[story] Батч {batch_id[:8]}… — найден донор {donor_short}, новый статус: {new_status}")
+                print(f"[story] Батч {batch_id[:8]}… — найден донор {donor_id}, новый статус: {new_status}")
                 batch_done = True
                 return
 
