@@ -39,7 +39,8 @@
   #monitor-clock {
     display: none;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-end;
+    gap: 8px;
     font-size: 12px; font-weight: 500; color: #555;
     font-variant-numeric: tabular-nums;
     letter-spacing: 0.04em;
