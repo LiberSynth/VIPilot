@@ -27,6 +27,7 @@ from .db import (
     db_get_video_model_by_id,
     db_is_batch_scheduled,
     db_set_batch_obsolete,
+    db_cancel_obsolete_waiting_batches,
     db_get_story_text,
     db_get_active_video_models,
     db_set_batch_video_pending,

@@ -412,6 +412,39 @@ def db_set_batch_obsolete(batch_id):
     return db_set_batch_status(batch_id, 'отменён')
 
 
+def db_cancel_obsolete_waiting_batches():
+    """Отменяет batches в статусе transcode_ready/story_posted, у которых слот расписания
+    больше не существует или таргет деактивирован. Возвращает список отменённых batch_id."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE batches
+                    SET status = 'отменён'
+                    WHERE status IN ('transcode_ready', 'story_posted')
+                      AND scheduled_at IS NOT NULL
+                      AND (
+                          NOT EXISTS (
+                              SELECT 1 FROM schedule
+                              WHERE time_utc = to_char(
+                                  batches.scheduled_at AT TIME ZONE 'UTC', 'HH24:MI'
+                              )
+                          )
+                          OR NOT EXISTS (
+                              SELECT 1 FROM targets
+                              WHERE id = batches.target_id AND active = TRUE
+                          )
+                      )
+                    RETURNING id
+                """)
+                rows = cur.fetchall()
+            conn.commit()
+        return [str(r[0]) for r in rows]
+    except Exception as e:
+        print(f"[DB] Ошибка db_cancel_obsolete_waiting_batches: {e}")
+        return []
+
+
 def db_get_story_text(story_id):
     """Возвращает text из stories.result по UUID, или None."""
     try:

@@ -9,6 +9,7 @@ from db import (
     init_db, run_upgrades, db_get,
     db_get_schedule, db_get_active_targets, db_ensure_batch, db_get_last_pipeline_run,
     db_get_actionable_batches, db_get_distinct_batch_statuses,
+    db_cancel_obsolete_waiting_batches,
     KNOWN_BATCH_STATUSES,
     env_get, env_set,
 )
@@ -170,6 +171,16 @@ def main_loop():
                 max_threads = 2
 
             _run_planning(interval)
+
+            cancelled = db_cancel_obsolete_waiting_batches()
+            for bid in cancelled:
+                db_log_pipeline(
+                    'publish',
+                    'Батч отменён — слот удалён из расписания или таргет отключён',
+                    status='прервана',
+                    batch_id=bid,
+                )
+                print(f"[planning] Батч {bid[:8]}… отменён (слот расписания исчез)")
 
             if wf_state.get_active_threads() < max_threads:
                 batches = db_get_actionable_batches()
