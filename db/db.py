@@ -1532,6 +1532,19 @@ def db_get_actionable_batches():
         return []
 
 
+def db_get_distinct_batch_statuses():
+    """Возвращает множество всех уникальных статусов батчей в БД."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT DISTINCT status FROM batches")
+                rows = cur.fetchall()
+        return {row[0] for row in rows}
+    except Exception as e:
+        print(f"[DB] Ошибка db_get_distinct_batch_statuses: {e}")
+        return set()
+
+
 def db_set_batch_story_generating_by_id(batch_id):
     """Переводит конкретный батч pending → story_generating (атомарно)."""
     try:

@@ -9,7 +9,7 @@ from db import (
     init_db, run_upgrades, db_get,
     db_recover_story_generating, db_recover_video_generating, db_recover_transcoding,
     db_get_schedule, db_get_active_targets, db_ensure_batch, db_get_last_pipeline_run,
-    db_get_actionable_batches,
+    db_get_actionable_batches, db_get_distinct_batch_statuses,
     env_get, env_set,
 )
 from log import db_log_root, db_log_pipeline, db_log_entry
@@ -70,6 +70,29 @@ _STATUS_TO_PIPELINE = {
     'video_ready':    transcode,
     'transcode_ready': publish,
 }
+
+_RECOVERY_STATUSES = {'story_generating', 'video_generating', 'transcoding'}
+
+_TERMINAL_STATUSES = {
+    'отменён', 'error', 'probe', 'story_probe', 'story_error',
+    'video_error', 'transcode_error', 'publish_error', 'published',
+}
+
+_ALL_KNOWN_STATUSES = (
+    set(_STATUS_TO_PIPELINE.keys()) | _RECOVERY_STATUSES | _TERMINAL_STATUSES
+)
+
+
+def _validate_batch_statuses():
+    """Проверяет, нет ли батчей с неизвестным статусом. Вызывается при старте."""
+    found = db_get_distinct_batch_statuses()
+    unknown = found - _ALL_KNOWN_STATUSES
+    if unknown:
+        msg = f"[validate] ВНИМАНИЕ: батчи с неизвестным статусом: {', '.join(sorted(unknown))}"
+        db_log_root(msg, status='error')
+        print(msg)
+    else:
+        print("[validate] Все статусы батчей известны.")
 
 
 def _run_planning(loop_interval: int):
@@ -209,6 +232,7 @@ def start_main_loop():
         db_recover_story_generating()
         db_recover_video_generating()
         db_recover_transcoding()
+        _validate_batch_statuses()
         wf_state.reset_active_threads()
         if env_get('workflow_state', 'running') == 'pause':
             wf_state.set_paused()
