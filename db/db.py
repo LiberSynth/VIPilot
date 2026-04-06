@@ -1545,6 +1545,39 @@ def db_get_distinct_batch_statuses():
         return set()
 
 
+KNOWN_BATCH_STATUSES = frozenset({
+    # actionable
+    'pending', 'story_ready', 'video_pending', 'video_ready', 'transcode_ready',
+    # in-flight (recovery statuses)
+    'story_generating', 'video_generating', 'transcoding',
+    # terminal
+    'отменён', 'error', 'probe', 'story_probe', 'story_error',
+    'video_error', 'transcode_error', 'publish_error', 'published',
+})
+
+
+def db_set_batch_status(batch_id: str, status: str) -> bool:
+    """Универсальный сеттер статуса батча с валидацией.
+    Используй вместо специфичных сеттеров, когда статус задаётся динамически.
+    При передаче незарегистрированного статуса выводит предупреждение в лог.
+    """
+    if status not in KNOWN_BATCH_STATUSES:
+        print(f"[DB] ВНИМАНИЕ: попытка установить неизвестный статус '{status}' "
+              f"для батча {batch_id[:8]}... — добавь его в KNOWN_BATCH_STATUSES")
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE batches SET status = %s WHERE id = %s",
+                    (status, batch_id),
+                )
+            conn.commit()
+        return True
+    except Exception as e:
+        print(f"[DB] Ошибка db_set_batch_status: {e}")
+        return False
+
+
 def db_set_batch_story_generating_by_id(batch_id):
     """Переводит конкретный батч pending → story_generating (атомарно)."""
     try:
