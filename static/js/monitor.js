@@ -240,7 +240,7 @@
     }).join('');
 
     const sysActions =
-      '<div class="monitor-hdr-actions" onclick="event.stopPropagation()">' +
+      '<div class="monitor-hdr-actions-always" onclick="event.stopPropagation()">' +
         '<button class="cycle-float-btn" title="Скопировать" onclick="monitorSysCopy(this)">' + MON_SVG_COPY + '</button>' +
       '</div>';
 
@@ -277,8 +277,9 @@
     return groups;
   }
 
-  var _collapsedBids = {};
-  var _collapsedLids = {};
+  var _collapsedBids    = {};
+  var _collapsedSgKeys  = {};
+  var _collapsedLids    = {};
   var _seenLids      = {};
   var _seenBids      = {};
   var _firstRender   = true;
@@ -308,7 +309,7 @@
       if (state.bids[el.dataset.bid] && !_collapsedBids[el.dataset.bid]) el.classList.add('open');
     });
     document.querySelectorAll('.monitor-sysgroup').forEach(function(el) {
-      if (state.sgkeys[el.dataset.sgKey]) el.classList.add('open');
+      if (state.sgkeys[el.dataset.sgKey] && !_collapsedSgKeys[el.dataset.sgKey]) el.classList.add('open');
     });
     document.querySelectorAll('.monitor-log-item').forEach(function(el) {
       if (state.lids && state.lids[el.dataset.lid] && !_collapsedLids[el.dataset.lid]) el.classList.add('open');
@@ -394,6 +395,11 @@
   window.monitorToggleSys = function(e, el) {
     if (e.target.closest('.monitor-sysgroup-body')) return;
     el.classList.toggle('open');
+    var key = el.dataset.sgKey;
+    if (key) {
+      if (el.classList.contains('open')) delete _collapsedSgKeys[key];
+      else _collapsedSgKeys[key] = true;
+    }
   };
 
   window.monitorExpandAll = function(btn) {
@@ -422,6 +428,11 @@
       batch.classList.add('open');
       if (bid) delete _collapsedBids[bid];
     });
+    document.querySelectorAll('.monitor-sysgroup').forEach(function(sg) {
+      var key = sg.dataset.sgKey;
+      sg.classList.add('open');
+      if (key) delete _collapsedSgKeys[key];
+    });
   };
 
   window.monitorCollapseAllBatches = function() {
@@ -429,6 +440,11 @@
       var bid = batch.dataset.bid;
       batch.classList.remove('open');
       if (bid) _collapsedBids[bid] = true;
+    });
+    document.querySelectorAll('.monitor-sysgroup').forEach(function(sg) {
+      var key = sg.dataset.sgKey;
+      sg.classList.remove('open');
+      if (key) _collapsedSgKeys[key] = true;
     });
   };
 
