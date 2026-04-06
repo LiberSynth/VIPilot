@@ -677,6 +677,18 @@ def _m014_drop_batches_unique_constraint(cur):
     """)
 
 
+def _m015_fix_cancelled_status(cur):
+    """
+    Приводит статус отмены батча к английскому виду.
+    Заменяет 'отменён' → 'cancelled' и удаляет несуществующий статус 'устарел'.
+    """
+    cur.execute("""
+        UPDATE batches
+        SET status = 'cancelled'
+        WHERE status IN ('отменён', 'устарел')
+    """)
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -692,6 +704,7 @@ MIGRATIONS = [
     (12, _m012_gemma_no_system_role),
     (13, _m013_sync_video_models),
     (14, _m014_drop_batches_unique_constraint),
+    (15, _m015_fix_cancelled_status),
 ]
 
 

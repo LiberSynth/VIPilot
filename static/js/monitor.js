@@ -28,7 +28,7 @@
     publish_error:    'публикация: ошибка',
     probe:            'пробный',
     story_probe:      'пробный (сюжет)',
-    'отменён':        'отменён',
+    cancelled:        'отменён',
   };
 
   function esc(s) {
@@ -177,7 +177,7 @@
     const waitStatuses  = ['story_ready', 'video_pending', 'video_ready', 'transcode_ready'];
     const errorStatuses = ['error', 'video_error', 'transcode_error', 'publish_error'];
     const md = isActive ? 'md-active'
-             : bs === 'отменён'                   ? 'md-skip'
+             : bs === 'cancelled'                  ? 'md-skip'
              : doneStatuses.indexOf(bs)  >= 0     ? 'md-ok'
              : errorStatuses.indexOf(bs) >= 0     ? 'md-error'
              : waitStatuses.indexOf(bs)  >= 0     ? 'md-wait'

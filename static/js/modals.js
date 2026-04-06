@@ -215,7 +215,7 @@
   };
 
   function _doBatchLogPoll(batchId, body, onDone) {
-    var _TERMINAL = ['probe', 'story_probe', 'video_error', 'transcode_error', 'publish_error', 'отменён'];
+    var _TERMINAL = ['probe', 'story_probe', 'video_error', 'transcode_error', 'publish_error', 'cancelled'];
 
     var videoSection = document.createElement('div');
     videoSection.className    = 'probe-modal-video-section';

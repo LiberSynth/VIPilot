@@ -183,7 +183,7 @@ def db_ensure_batch(scheduled_at, target_id):
                     SELECT id FROM batches
                     WHERE scheduled_at = %s
                       AND target_id    = %s
-                      AND status      != 'отменён'
+                      AND status      != 'cancelled'
                     LIMIT 1
                     """,
                     (scheduled_at, target_id),
@@ -419,8 +419,8 @@ def db_is_batch_scheduled(scheduled_at, target_id):
 
 
 def db_set_batch_obsolete(batch_id):
-    """Переводит батч в status='отменён'."""
-    return db_set_batch_status(batch_id, 'отменён')
+    """Переводит батч в status='cancelled'."""
+    return db_set_batch_status(batch_id, 'cancelled')
 
 
 def db_cancel_obsolete_waiting_batches():
@@ -431,7 +431,7 @@ def db_cancel_obsolete_waiting_batches():
             with conn.cursor() as cur:
                 cur.execute("""
                     UPDATE batches
-                    SET status = 'отменён'
+                    SET status = 'cancelled'
                     WHERE status IN ('transcode_ready', 'story_posted')
                       AND scheduled_at IS NOT NULL
                       AND (
@@ -734,7 +734,7 @@ def db_steal_video_from_cancelled(batch_id) -> str | None:
                     FROM batches
                     WHERE (video_data_transcoded IS NOT NULL OR video_data_original IS NOT NULL)
                       AND (
-                        status = 'отменён'
+                        status = 'cancelled'
                         OR (status = 'probe' AND target_id IS NULL)
                       )
                     ORDER BY created_at ASC
@@ -791,7 +791,7 @@ def db_get_donor_count() -> int:
                     FROM batches
                     WHERE (video_data_transcoded IS NOT NULL OR video_data_original IS NOT NULL)
                       AND (
-                        status = 'отменён'
+                        status = 'cancelled'
                         OR (status = 'probe' AND target_id IS NULL)
                       )
                 """)
@@ -1182,7 +1182,7 @@ def db_cleanup_video_data(file_lifetime_days: int) -> int:
             with conn.cursor() as cur:
                 cur.execute("""
                     UPDATE batches SET video_data_transcoded = NULL
-                    WHERE status IN ('published', 'отменён')
+                    WHERE status IN ('published', 'cancelled')
                       AND completed_at < now() - make_interval(days => %s)
                       AND video_data_transcoded IS NOT NULL
                 """, (file_lifetime_days,))
@@ -1281,7 +1281,7 @@ KNOWN_BATCH_STATUSES = frozenset({
     # publish pipeline
     'transcode_ready', 'story_posted',
     # terminal
-    'отменён', 'error', 'probe', 'story_probe', 'story_error',
+    'cancelled', 'error', 'probe', 'story_probe', 'story_error',
     'video_error', 'transcode_error', 'publish_error', 'published',
     'fatal_error',
 })
@@ -1398,7 +1398,7 @@ def db_cleanup_batches(batch_lifetime_days: int) -> int:
             with conn.cursor() as cur:
                 cur.execute("""
                     SELECT id FROM batches
-                    WHERE status IN ('published', 'отменён')
+                    WHERE status IN ('published', 'cancelled')
                       AND completed_at < now() - make_interval(days => %s)
                 """, (batch_lifetime_days,))
                 rows = cur.fetchall()
