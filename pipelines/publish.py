@@ -44,7 +44,7 @@ def _get_vk_video(batch_id, log_id):
     return video_data
 
 
-def _publish_vk(batch_id, log_id):
+def _publish_vk(batch_id, log_id, target_config):
     """Публикует батч на ВКонтакте (история + стена). Возвращает True если хоть один канал успешен."""
     if not vk.is_configured():
         if log_id:
@@ -55,7 +55,7 @@ def _publish_vk(batch_id, log_id):
     if video_data is None:
         return False
 
-    group_id = int(db_get('vk_group_id', '236929597'))
+    group_id = int((target_config or {}).get('group_id', 236929597))
     do_story = db_get('vk_publish_story', '1') == '1'
     do_wall  = db_get('vk_publish_wall',  '1') == '1'
 
@@ -76,7 +76,7 @@ def _publish_vk(batch_id, log_id):
     return story_ok or wall_ok
 
 
-def _publish_vk_wall(batch_id, log_id):
+def _publish_vk_wall(batch_id, log_id, target_config):
     """Публикует только на стену (возобновление — история уже опубликована)."""
     if not vk.is_configured():
         if log_id:
@@ -91,7 +91,7 @@ def _publish_vk_wall(batch_id, log_id):
     if video_data is None:
         return
 
-    group_id = int(db_get('vk_group_id', '236929597'))
+    group_id = int((target_config or {}).get('group_id', 236929597))
     if log_id:
         db_log_entry(log_id, 'Публикую на стену… (возобновление)')
     vk.publish_wall(video_data, group_id, log_id)
@@ -117,7 +117,7 @@ def run(batch_id):
                 status='running', batch_id=batch_id,
             )
             if target == 'VKontakte':
-                _publish_vk_wall(batch_id, log_id)
+                _publish_vk_wall(batch_id, log_id, batch.get('target_config'))
             db_set_batch_published(batch_id)
             db_log_update(log_id, f'Опубликовано ({target})', 'ok')
             print(f"[publish] Батч {batch_id[:8]}… опубликован (возобновление)")
@@ -154,7 +154,7 @@ def run(batch_id):
         )
 
         if target == 'VKontakte':
-            ok = _publish_vk(batch_id, log_id)
+            ok = _publish_vk(batch_id, log_id, batch.get('target_config'))
         else:
             msg = f'Платформа «{target}» не поддерживается'
             db_log_update(log_id, msg, 'error')

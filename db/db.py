@@ -1223,7 +1223,8 @@ def db_get_batch_by_id(batch_id):
                            t.name            AS target_name,
                            t.aspect_ratio_x,
                            t.aspect_ratio_y,
-                           t.transcode       AS target_transcode
+                           t.transcode       AS target_transcode,
+                           t.config          AS target_config
                     FROM batches b
                     LEFT JOIN targets t ON t.id = b.target_id
                     WHERE b.id = %s

@@ -689,6 +689,20 @@ def _m015_fix_cancelled_status(cur):
     """)
 
 
+def _m016_targets_config(cur):
+    """
+    Добавляет колонку config (JSONB) в таблицу targets для хранения
+    платформо-специфичных параметров. Для VKontakte сохраняет group_id сообщества.
+    """
+    cur.execute("""
+        ALTER TABLE targets
+            ADD COLUMN IF NOT EXISTS config JSONB NOT NULL DEFAULT '{}'
+    """)
+    cur.execute("""
+        UPDATE targets SET config = '{"group_id": 236929597}' WHERE name = 'VKontakte'
+    """)
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -705,6 +719,7 @@ MIGRATIONS = [
     (13, _m013_sync_video_models),
     (14, _m014_drop_batches_unique_constraint),
     (15, _m015_fix_cancelled_status),
+    (16, _m016_targets_config),
 ]
 
 
