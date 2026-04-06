@@ -9,8 +9,6 @@ Pipeline 6 — Сборщик мусора.
 Запускается каждые loop_interval секунд; делает всё за один проход.
 """
 
-import time
-
 from db import (
     db_get,
     db_cleanup_log_entries,
@@ -20,9 +18,6 @@ from db import (
 )
 from log import db_log_pipeline
 from utils.utils import parse_entries_lifetime, parse_log_lifetime, parse_batch_lifetime, parse_file_lifetime
-
-_last_idle_log: float = 0
-_IDLE_LOG_INTERVAL = 3600
 
 
 def run():
@@ -54,13 +49,8 @@ def run():
             summary.append(f"video_data_transcoded: -{n}")
             print(f"[cleanup] Обнулено video_data_transcoded: {n}")
 
-        global _last_idle_log
         if summary:
             db_log_pipeline("cleanup", "Очистка: " + ", ".join(summary), status="ok")
-            _last_idle_log = time.time()
-        elif time.time() - _last_idle_log >= _IDLE_LOG_INTERVAL:
-            db_log_pipeline("cleanup", "Данные в норме", status="ok")
-            _last_idle_log = time.time()
 
     except Exception as e:
         db_log_pipeline("cleanup", f"Сбой пайплайна: {e}", status="error")
