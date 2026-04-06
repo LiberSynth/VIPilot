@@ -806,3 +806,22 @@
     color: #555; font-style: italic; font-size: 13px;
     padding: 24px; text-align: center;
   }
+
+  /* ── Тултип долгого нажатия (мобильный) ── */
+  #touch-tooltip {
+    position: fixed;
+    z-index: 9999;
+    background: rgba(30,30,46,0.97);
+    color: #d0d0e8;
+    font-size: 12px;
+    line-height: 1.4;
+    padding: 6px 10px;
+    border-radius: 7px;
+    border: 1px solid rgba(255,255,255,0.12);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+    pointer-events: none;
+    max-width: 220px;
+    text-align: center;
+    transition: opacity 0.15s;
+  }
+  #touch-tooltip.hidden { opacity: 0; }
