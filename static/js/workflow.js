@@ -29,13 +29,8 @@ function wfUpdateUI(state, activeThreads) {
   }
   if (threadsText) {
     var n = (typeof activeThreads === 'number') ? activeThreads : 0;
-    if (n > 0) {
-      threadsText.textContent = '(выполняется ' + n + ' ' + _pluralThread(n) + ')';
-      threadsText.style.color = '#7878c8';
-    } else {
-      threadsText.textContent = '(потоков: 0)';
-      threadsText.style.color = '#44445a';
-    }
+    threadsText.textContent = '(выполняется потоков: ' + n + ')';
+    threadsText.style.color = n > 0 ? '#7878c8' : '#44445a';
   }
 }
 
