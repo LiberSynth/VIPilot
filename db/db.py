@@ -173,11 +173,20 @@ def db_update_target_aspect_ratio(target_id, x, y):
 
 def db_ensure_batch(scheduled_at, target_id):
     """Создаёт батч если не существует.
-    Отменённые батчи не восстанавливаются — остаются отменёнными.
-    Возвращает UUID нового батча или None если батч уже существует."""
+    Отменённые батчи не считаются существующими — удаляются и пересоздаются.
+    Возвращает UUID нового батча или None если батч уже существует (не отменён)."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    DELETE FROM batches
+                    WHERE scheduled_at = %s
+                      AND target_id = %s
+                      AND status = 'отменён'
+                    """,
+                    (scheduled_at, target_id),
+                )
                 cur.execute(
                     """
                     INSERT INTO batches (scheduled_at, target_id)
