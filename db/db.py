@@ -273,73 +273,6 @@ def db_set_batch_story_probe(batch_id, story_id):
         print(f"[DB] Ошибка db_set_batch_story_probe: {e}")
 
 
-def db_get_pending_batch():
-    """Атомарно захватывает первый pending-батч: переводит его в 'story_generating'
-    и возвращает данные. Гарантирует, что два потока не возьмут один и тот же батч.
-    Adhoc-батчи (scheduled_at IS NULL) имеют приоритет."""
-    try:
-        with get_db() as conn:
-            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-                cur.execute("""
-                    WITH claimed AS (
-                        UPDATE batches SET status = 'story_generating'
-                        WHERE id = (
-                            SELECT id FROM batches
-                            WHERE status = 'pending' AND story_id IS NULL
-                            ORDER BY scheduled_at NULLS FIRST
-                            LIMIT 1
-                            FOR UPDATE SKIP LOCKED
-                        )
-                        RETURNING *
-                    )
-                    SELECT c.id, c.scheduled_at, c.target_id, c.adhoc, c.data,
-                           c.text_model_id,
-                           t.name AS target_name,
-                           t.aspect_ratio_x, t.aspect_ratio_y
-                    FROM claimed c
-                    LEFT JOIN targets t ON t.id = c.target_id
-                """)
-                row = cur.fetchone()
-            conn.commit()
-        return dict(row) if row else None
-    except Exception as e:
-        print(f"[DB] Ошибка db_get_pending_batch: {e}")
-        return None
-
-
-def db_get_story_ready_batch_atomic():
-    """Атомарно захватывает первый story_ready-батч: переводит его в 'video_generating'
-    и возвращает данные. Гарантирует, что два потока не возьмут один и тот же батч."""
-    try:
-        with get_db() as conn:
-            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-                cur.execute("""
-                    WITH claimed AS (
-                        UPDATE batches SET status = 'video_generating'
-                        WHERE id = (
-                            SELECT id FROM batches
-                            WHERE status = 'story_ready'
-                            ORDER BY scheduled_at
-                            LIMIT 1
-                            FOR UPDATE SKIP LOCKED
-                        )
-                        RETURNING *
-                    )
-                    SELECT c.id, c.scheduled_at, c.target_id, c.story_id,
-                           c.video_model_id,
-                           t.name AS target_name,
-                           t.aspect_ratio_x, t.aspect_ratio_y
-                    FROM claimed c
-                    LEFT JOIN targets t ON t.id = c.target_id
-                """)
-                row = cur.fetchone()
-            conn.commit()
-        return dict(row) if row else None
-    except Exception as e:
-        print(f"[DB] Ошибка db_get_story_ready_batch_atomic: {e}")
-        return None
-
-
 def db_recover_story_generating():
     """Сбрасывает застрявшие story_generating-батчи в pending при старте."""
     try:
@@ -496,52 +429,6 @@ def db_get_active_text_model():
 # ---------------------------------------------------------------------------
 # Pipeline 3 — видео
 # ---------------------------------------------------------------------------
-
-def db_get_story_ready_batch():
-    """Возвращает первый батч со status='story_ready', или None."""
-    try:
-        with get_db() as conn:
-            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-                cur.execute("""
-                    SELECT b.id, b.scheduled_at, b.target_id, b.story_id,
-                           t.name AS target_name,
-                           t.aspect_ratio_x, t.aspect_ratio_y
-                    FROM batches b
-                    JOIN targets t ON t.id = b.target_id
-                    WHERE b.status = 'story_ready'
-                    ORDER BY b.scheduled_at
-                    LIMIT 1
-                """)
-                row = cur.fetchone()
-        return dict(row) if row else None
-    except Exception as e:
-        print(f"[DB] Ошибка db_get_story_ready_batch: {e}")
-        return None
-
-
-def db_get_video_pending_batch():
-    """Возвращает первый батч со status='video_pending' и заполненным data, или None."""
-    try:
-        with get_db() as conn:
-            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-                cur.execute("""
-                    SELECT b.id, b.scheduled_at, b.target_id, b.story_id, b.data,
-                           b.video_model_id,
-                           t.name AS target_name,
-                           t.aspect_ratio_x, t.aspect_ratio_y
-                    FROM batches b
-                    LEFT JOIN targets t ON t.id = b.target_id
-                    WHERE b.status = 'video_pending'
-                      AND b.data IS NOT NULL
-                    ORDER BY b.scheduled_at
-                    LIMIT 1
-                """)
-                row = cur.fetchone()
-        return dict(row) if row else None
-    except Exception as e:
-        print(f"[DB] Ошибка db_get_video_pending_batch: {e}")
-        return None
-
 
 def db_is_batch_scheduled(scheduled_at, target_id):
     """Проверяет актуальность батча: слот расписания существует И таргет активен.
@@ -753,62 +640,6 @@ def db_set_batch_video_ready(batch_id, video_url):
     except Exception as e:
         print(f"[DB] Ошибка db_set_batch_video_ready: {e}")
         return False
-
-
-def db_get_video_ready_batch():
-    """Возвращает первый батч со status='video_ready', или None."""
-    try:
-        with get_db() as conn:
-            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-                cur.execute("""
-                    SELECT b.id, b.scheduled_at, b.target_id, b.story_id, b.video_url,
-                           t.name AS target_name,
-                           t.aspect_ratio_x, t.aspect_ratio_y,
-                           t.transcode AS target_transcode
-                    FROM batches b
-                    LEFT JOIN targets t ON t.id = b.target_id
-                    WHERE b.status = 'video_ready'
-                    ORDER BY b.scheduled_at
-                    LIMIT 1
-                """)
-                row = cur.fetchone()
-        return dict(row) if row else None
-    except Exception as e:
-        print(f"[DB] Ошибка db_get_video_ready_batch: {e}")
-        return None
-
-
-def db_get_video_ready_batch_atomic():
-    """Атомарно захватывает первый video_ready-батч: переводит его в 'transcoding'
-    и возвращает данные. Гарантирует, что два потока не возьмут один и тот же батч."""
-    try:
-        with get_db() as conn:
-            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-                cur.execute("""
-                    WITH claimed AS (
-                        UPDATE batches SET status = 'transcoding'
-                        WHERE id = (
-                            SELECT id FROM batches
-                            WHERE status = 'video_ready'
-                            ORDER BY scheduled_at
-                            LIMIT 1
-                            FOR UPDATE SKIP LOCKED
-                        )
-                        RETURNING *
-                    )
-                    SELECT c.id, c.scheduled_at, c.target_id, c.story_id, c.video_url,
-                           t.name AS target_name,
-                           t.aspect_ratio_x, t.aspect_ratio_y,
-                           t.transcode AS target_transcode
-                    FROM claimed c
-                    LEFT JOIN targets t ON t.id = c.target_id
-                """)
-                row = cur.fetchone()
-            conn.commit()
-        return dict(row) if row else None
-    except Exception as e:
-        print(f"[DB] Ошибка db_get_video_ready_batch_atomic: {e}")
-        return None
 
 
 def db_recover_transcoding():
@@ -1032,30 +863,6 @@ def db_set_batch_transcode_error(batch_id):
     except Exception as e:
         print(f"[DB] Ошибка db_set_batch_transcode_error: {e}")
         return False
-
-
-def db_get_transcode_ready_batch():
-    """Возвращает первый батч со status='transcode_ready', или None.
-    Adhoc-батчи (scheduled_at IS NULL) имеют приоритет."""
-    try:
-        with get_db() as conn:
-            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-                cur.execute("""
-                    SELECT b.id, b.scheduled_at, b.target_id, b.story_id,
-                           b.video_url, b.video_file, b.adhoc,
-                           t.name AS target_name,
-                           t.aspect_ratio_x, t.aspect_ratio_y
-                    FROM batches b
-                    LEFT JOIN targets t ON t.id = b.target_id
-                    WHERE b.status = 'transcode_ready'
-                    ORDER BY b.scheduled_at NULLS FIRST
-                    LIMIT 1
-                """)
-                row = cur.fetchone()
-        return dict(row) if row else None
-    except Exception as e:
-        print(f"[DB] Ошибка db_get_transcode_ready_batch: {e}")
-        return None
 
 
 def db_get_batch_logs(batch_id):

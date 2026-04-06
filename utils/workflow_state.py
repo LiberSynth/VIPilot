@@ -36,19 +36,6 @@ def get_active_threads() -> int:
         return _active_threads
 
 
-def inc_active_threads():
-    global _active_threads
-    with _threads_lock:
-        _active_threads += 1
-
-
-def dec_active_threads():
-    global _active_threads
-    with _threads_lock:
-        if _active_threads > 0:
-            _active_threads -= 1
-
-
 def reset_active_threads():
     global _active_threads
     with _threads_lock:
