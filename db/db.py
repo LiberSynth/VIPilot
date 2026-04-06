@@ -797,6 +797,58 @@ def db_get_video_ready_batch():
         return None
 
 
+def db_get_video_ready_batch_atomic():
+    """Атомарно захватывает первый video_ready-батч: переводит его в 'transcoding'
+    и возвращает данные. Гарантирует, что два потока не возьмут один и тот же батч."""
+    try:
+        with get_db() as conn:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute("""
+                    WITH claimed AS (
+                        UPDATE batches SET status = 'transcoding'
+                        WHERE id = (
+                            SELECT id FROM batches
+                            WHERE status = 'video_ready'
+                            ORDER BY scheduled_at
+                            LIMIT 1
+                            FOR UPDATE SKIP LOCKED
+                        )
+                        RETURNING *
+                    )
+                    SELECT c.id, c.scheduled_at, c.target_id, c.story_id, c.video_url,
+                           t.name AS target_name,
+                           t.aspect_ratio_x, t.aspect_ratio_y,
+                           t.transcode AS target_transcode
+                    FROM claimed c
+                    LEFT JOIN targets t ON t.id = c.target_id
+                """)
+                row = cur.fetchone()
+            conn.commit()
+        return dict(row) if row else None
+    except Exception as e:
+        print(f"[DB] Ошибка db_get_video_ready_batch_atomic: {e}")
+        return None
+
+
+def db_recover_transcoding():
+    """Сбрасывает застрявшие transcoding-батчи в video_ready при старте."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE batches SET status = 'video_ready'
+                    WHERE status = 'transcoding'
+                """)
+                n = cur.rowcount
+            conn.commit()
+        if n:
+            print(f"[DB] Восстановлено transcoding → video_ready: {n}")
+        return n
+    except Exception as e:
+        print(f"[DB] Ошибка db_recover_transcoding: {e}")
+        return 0
+
+
 def db_set_batch_original_video(batch_id, video_data: bytes):
     """Сохраняет оригинальное видео (до транскодирования) в поле video_data_original."""
     try:

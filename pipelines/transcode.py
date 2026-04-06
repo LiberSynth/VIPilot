@@ -21,7 +21,7 @@ import tempfile
 from utils.notify import notify_failure
 from db import (
     db_get,
-    db_get_video_ready_batch,
+    db_get_video_ready_batch_atomic,
     db_is_batch_scheduled,
     db_set_batch_obsolete,
     db_get_batch_original_video,
@@ -110,7 +110,7 @@ def run():
     try:
         db_log_interrupt_running('transcode')
 
-        batch = db_get_video_ready_batch()
+        batch = db_get_video_ready_batch_atomic()
         if not batch:
             return
 
