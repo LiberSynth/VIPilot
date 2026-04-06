@@ -135,6 +135,21 @@ function schedulePublishSave() {
   _publishSaveTimer = setTimeout(savePublishSettings, 600);
 }
 
+var _dzenCsrfSaveTimer = null;
+function saveDzenCsrf() {
+  const targetId = document.getElementById('dzen_target_id');
+  const csrfInput = document.getElementById('dzen_csrf_token');
+  if (!targetId || !csrfInput) return;
+  const fd = new FormData();
+  fd.append('dzen_target_id', targetId.value);
+  fd.append('dzen_csrf_token', csrfInput.value.trim());
+  fetch('/save-dzen', { method: 'POST', body: fd }).catch(() => {});
+}
+function scheduleDzenCsrfSave() {
+  clearTimeout(_dzenCsrfSaveTimer);
+  _dzenCsrfSaveTimer = setTimeout(saveDzenCsrf, 800);
+}
+
 var _serviceSaveTimer = null;
 function saveServiceSettings() {
   fetch('/save', { method: 'POST', body: collectAllSettings('service') }).catch(() => {});

@@ -270,16 +270,15 @@ def save():
 
 @bp.route("/save-dzen", methods=["POST"])
 def save_dzen():
+    from flask import jsonify
     if not is_authenticated():
-        return redirect(url_for("admin.login"))
+        return jsonify({"ok": False}), 401
 
-    target_id    = request.form.get("dzen_target_id", "").strip()
-    publisher_id = request.form.get("dzen_publisher_id", "").strip()
-    csrf_token   = request.form.get("dzen_csrf_token", "").strip()
+    target_id  = request.form.get("dzen_target_id", "").strip()
+    csrf_token = request.form.get("dzen_csrf_token", "").strip()
 
-    if not target_id:
-        flash("Таргет Дзен не найден в базе данных", "error")
-        return redirect(url_for("admin.admin_page") + "?tab=publish")
+    if not target_id or not csrf_token:
+        return jsonify({"ok": False}), 400
 
     existing_target = db_get_target_by_name("Дзен")
     existing_config = {}
@@ -287,17 +286,10 @@ def save_dzen():
         existing_config = existing_target.get("config") or {}
 
     new_config = dict(existing_config)
-    if publisher_id:
-        new_config["publisher_id"] = publisher_id
-    if csrf_token:
-        new_config["csrf_token"] = csrf_token
+    new_config["csrf_token"] = csrf_token
 
-    if db_update_target_config(target_id, new_config):
-        flash("Настройки Дзен сохранены", "success")
-    else:
-        flash("Ошибка сохранения настроек Дзен", "error")
-
-    return redirect(url_for("admin.admin_page") + "?tab=publish")
+    ok = db_update_target_config(target_id, new_config)
+    return jsonify({"ok": ok})
 
 
 @bp.route("/logout")

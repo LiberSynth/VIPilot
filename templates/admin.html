@@ -235,54 +235,40 @@
     </form>
 
     <!-- Дзен -->
-    <form id="dzen-form" action="/save-dzen" method="POST" style="margin-top:0">
-      <input type="hidden" name="dzen_target_id" value="{{ dzen_target_id or '' }}">
-      <div class="card" style="margin-top:12px">
-        <div class="card-title">Публикация в Дзен</div>
+    <div class="card" style="margin-top:12px">
+      <input type="hidden" id="dzen_target_id" value="{{ dzen_target_id or '' }}">
+      <div class="card-title">Публикация в Дзен</div>
 
-        {% if dzen_csrf_age is not none %}
-          {% if dzen_csrf_age > 1440 %}
-            <div class="hint" style="margin-bottom:10px;color:#ff6b6b">
-              ⚠ CSRF-токен устарел ({{ dzen_csrf_age // 60 }} ч {{ dzen_csrf_age % 60 }} мин). Обновите его ниже.
-            </div>
-          {% elif dzen_csrf_age > 480 %}
-            <div class="hint" style="margin-bottom:10px;color:#ffa94d">
-              CSRF-токен: {{ dzen_csrf_age // 60 }} ч {{ dzen_csrf_age % 60 }} мин. Рекомендуется обновить.
-            </div>
-          {% else %}
-            <div class="hint" style="margin-bottom:10px;color:#69db7c">
-              CSRF-токен актуален ({{ dzen_csrf_age }} мин назад).
-            </div>
-          {% endif %}
+      {% if dzen_csrf_age is not none %}
+        {% if dzen_csrf_age > 1440 %}
+          <div class="hint" style="margin-bottom:10px;color:#ff6b6b">
+            ⚠ CSRF-токен устарел ({{ dzen_csrf_age // 60 }} ч {{ dzen_csrf_age % 60 }} мин). Обновите его ниже.
+          </div>
+        {% elif dzen_csrf_age > 480 %}
+          <div class="hint" style="margin-bottom:10px;color:#ffa94d">
+            CSRF-токен: {{ dzen_csrf_age // 60 }} ч {{ dzen_csrf_age % 60 }} мин. Рекомендуется обновить.
+          </div>
         {% else %}
-          <div class="hint" style="margin-bottom:10px;color:#aaa">CSRF-токен не задан.</div>
+          <div class="hint" style="margin-bottom:10px;color:#69db7c">
+            CSRF-токен актуален ({{ dzen_csrf_age }} мин назад).
+          </div>
         {% endif %}
+      {% else %}
+        <div class="hint" style="margin-bottom:10px;color:#aaa">CSRF-токен не задан.</div>
+      {% endif %}
 
-        <div class="hint" style="margin-bottom:10px">
-          Как обновить CSRF-токен: откройте <b>dzen.ru/profile/editor</b> в браузере →
-          DevTools (F12) → вкладка Network → выполните любое действие →
-          найдите запрос к <code>editor-api</code> → скопируйте заголовок <code>X-Csrf-Token</code>.
-        </div>
-
-        <div style="margin-bottom:12px">
-          <div class="toggle-label" style="margin-bottom:4px">Publisher ID</div>
-          <input type="text" name="dzen_publisher_id"
-                 value="{{ dzen_publisher_id }}"
-                 placeholder="69d3ec6ae9ff6e1b8d5c6326"
-                 style="width:100%;box-sizing:border-box;background:var(--input-bg,#1a1a2e);border:1px solid var(--border,rgba(255,255,255,.1));border-radius:6px;padding:8px 10px;color:inherit;font-size:13px">
-        </div>
-
-        <div style="margin-bottom:12px">
-          <div class="toggle-label" style="margin-bottom:4px">CSRF-токен</div>
-          <input type="text" name="dzen_csrf_token"
-                 value="{{ dzen_csrf_token }}"
-                 placeholder="abcdef…:1234567890000"
-                 style="width:100%;box-sizing:border-box;background:var(--input-bg,#1a1a2e);border:1px solid var(--border,rgba(255,255,255,.1));border-radius:6px;padding:8px 10px;color:inherit;font-size:13px;font-family:monospace">
-        </div>
-
-        <button type="submit" class="btn-save" style="margin-top:4px">Сохранить</button>
+      <div class="hint" style="margin-bottom:10px">
+        Как обновить: <b>dzen.ru/profile/editor</b> → DevTools (F12) → Network → любое действие →
+        запрос к <code>editor-api</code> → заголовок <code>X-Csrf-Token</code>.
       </div>
-    </form>
+
+      <div class="toggle-label" style="margin-bottom:4px">CSRF-токен</div>
+      <input type="text" id="dzen_csrf_token"
+             value="{{ dzen_csrf_token }}"
+             placeholder="abcdef…:1234567890000"
+             oninput="scheduleDzenCsrfSave()"
+             style="width:100%;box-sizing:border-box;background:var(--input-bg,#1a1a2e);border:1px solid var(--border,rgba(255,255,255,.1));border-radius:6px;padding:8px 10px;color:inherit;font-size:13px;font-family:monospace">
+    </div>
   </div>
 
   <!-- ══ СЛУЖЕБНЫЕ ══ -->
