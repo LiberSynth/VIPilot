@@ -1,6 +1,4 @@
 import os
-import sys
-import signal
 import time
 import atexit
 import threading
@@ -202,16 +200,10 @@ def _on_exit():
     print("[main] Приложение остановлено")
 
 
-def _handle_sigterm(signum, frame):
-    print("[main] Получен SIGTERM, завершаю работу")
-    sys.exit(0)
-
-
 def start_main_loop():
     global _main_loop_started
     if not _main_loop_started:
         _main_loop_started = True
-        signal.signal(signal.SIGTERM, _handle_sigterm)
         init_db()
         run_upgrades()
         db_recover_story_generating()

@@ -19,8 +19,7 @@ def set_paused():
 
 
 def wait_if_paused():
-    while not _resume_event.wait(timeout=1):
-        pass
+    _resume_event.wait()
 
 
 def wakeup_loop():
