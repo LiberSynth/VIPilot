@@ -81,7 +81,9 @@ def api_log():
 def api_monitor():
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
-    return jsonify(db_get_monitor())
+    data = db_get_monitor()
+    data['active_batch_ids'] = list(wf_state.get_active_batch_ids())
+    return jsonify(data)
 
 
 @bp.route("/schedule", methods=["GET"])

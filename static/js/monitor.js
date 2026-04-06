@@ -159,9 +159,10 @@
       .filter(Boolean).join(' · ');
 
     if (logs.length === 0) {
+      const noLogDot = _activeBatchIds.indexOf(batch.batch_id) >= 0 ? 'md-active' : 'md-warn';
       return '<div class="monitor-batch bs-' + esc(bs) + '" data-bid="' + esc(batch.batch_id) + '">' +
         '<div class="monitor-batch-header" style="cursor:default">' +
-          '<span class="monitor-dot md-warn"></span>' +
+          '<span class="monitor-dot ' + noLogDot + '"></span>' +
           '<div class="monitor-batch-meta">' +
             '<div class="monitor-batch-title">' + fmtMskShort(headTime) + '</div>' +
             '<div class="monitor-batch-sub">'   + esc(sub) + '</div>' +
@@ -170,7 +171,8 @@
       '</div>';
     }
 
-    const isActive      = logs.some(function(l) { return l.status === 'running'; });
+    const isActive      = logs.some(function(l) { return l.status === 'running'; })
+                       || _activeBatchIds.indexOf(batch.batch_id) >= 0;
     const doneStatuses  = ['published', 'probe', 'story_probe'];
     const waitStatuses  = ['story_ready', 'video_pending', 'video_ready', 'transcode_ready'];
     const errorStatuses = ['error', 'video_error', 'transcode_error', 'publish_error'];
@@ -280,6 +282,7 @@
   var _collapsedBids    = {};
   var _collapsedSgKeys  = {};
   var _collapsedLids    = {};
+  var _activeBatchIds   = [];
   var _seenLids      = {};
   var _seenBids      = {};
   var _firstRender   = true;
@@ -335,6 +338,7 @@
   function renderTimeline(data) {
     var el = document.getElementById('monitor-timeline');
     if (!el) return;
+    _activeBatchIds = Array.isArray(data.active_batch_ids) ? data.active_batch_ids : [];
     var prev   = getOpenState();
     var groups = buildTimeline(data.batches, data.system);
     if (groups.length === 0) {

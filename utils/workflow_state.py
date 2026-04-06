@@ -66,3 +66,8 @@ def release_batch(batch_id: str):
 def is_batch_active(batch_id: str) -> bool:
     with _threads_lock:
         return batch_id in _active_batch_ids
+
+
+def get_active_batch_ids() -> set:
+    with _threads_lock:
+        return set(_active_batch_ids)

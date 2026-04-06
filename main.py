@@ -181,6 +181,13 @@ def main_loop():
                     pipeline_module = _STATUS_TO_PIPELINE.get(status)
                     if pipeline_module is None:
                         continue
+                    # Публикация: не запускаем поток пока не наступило время
+                    if pipeline_module is publish:
+                        sched = b.get('scheduled_at')
+                        if sched is not None and sched.tzinfo is None:
+                            sched = sched.replace(tzinfo=timezone.utc)
+                        if sched is not None and datetime.now(timezone.utc) < sched:
+                            continue
                     if not wf_state.claim_batch(bid):
                         continue
 

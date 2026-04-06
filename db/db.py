@@ -1197,7 +1197,7 @@ def db_get_actionable_batches():
         with get_db() as conn:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
                 cur.execute("""
-                    SELECT id, status, created_at
+                    SELECT id, status, created_at, scheduled_at
                     FROM batches
                     WHERE status IN (
                         'pending', 'story_generating',
