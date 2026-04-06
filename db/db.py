@@ -261,6 +261,7 @@ def db_create_story_probe_batch(text_model_id):
 
 def db_set_batch_story_probe(batch_id, story_id):
     """Переводит батч в status='story_probe', сохраняет story_id и проставляет completed_at."""
+    _assert_known_status('story_probe')
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
@@ -331,6 +332,7 @@ def db_reset_video_generating(batch_id):
 
 def db_set_batch_story(batch_id, story_id):
     """Привязывает story к батчу и переводит статус в 'story_ready'."""
+    _assert_known_status('story_ready')
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
@@ -463,18 +465,7 @@ def db_is_batch_scheduled(scheduled_at, target_id):
 
 def db_set_batch_obsolete(batch_id):
     """Переводит батч в status='отменён'."""
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "UPDATE batches SET status = 'отменён' WHERE id = %s",
-                    (batch_id,),
-                )
-            conn.commit()
-        return True
-    except Exception as e:
-        print(f"[DB] Ошибка db_set_batch_obsolete: {e}")
-        return False
+    return db_set_batch_status(batch_id, 'отменён')
 
 
 def db_get_story_text(story_id):
@@ -609,6 +600,7 @@ def db_get_active_video_models():
 
 def db_set_batch_video_pending(batch_id, job_data):
     """Сохраняет данные задания и переводит батч в status='video_pending'."""
+    _assert_known_status('video_pending')
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
@@ -628,6 +620,7 @@ def db_set_batch_video_pending(batch_id, job_data):
 
 def db_set_batch_video_ready(batch_id, video_url):
     """Сохраняет video_url и переводит батч в status='video_ready'."""
+    _assert_known_status('video_ready')
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
@@ -695,22 +688,12 @@ def db_get_batch_original_video(batch_id) -> bytes | None:
 def db_set_batch_transcode_skip(batch_id):
     """Переводит батч в status='transcode_ready' без изменения video_data_transcoded.
     Используется когда транскодирование отключено или завершилось некритичной ошибкой."""
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "UPDATE batches SET status = 'transcode_ready' WHERE id = %s",
-                    (batch_id,),
-                )
-            conn.commit()
-        return True
-    except Exception as e:
-        print(f"[DB] Ошибка db_set_batch_transcode_skip: {e}")
-        return False
+    return db_set_batch_status(batch_id, 'transcode_ready')
 
 
 def db_set_batch_transcode_ready(batch_id, video_data: bytes):
     """Сохраняет транскодированный файл в БД и переводит батч в status='transcode_ready'."""
+    _assert_known_status('transcode_ready')
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
@@ -851,18 +834,7 @@ def db_get_donor_count() -> int:
 
 def db_set_batch_transcode_error(batch_id):
     """Переводит батч в status='transcode_error'."""
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "UPDATE batches SET status = 'transcode_error' WHERE id = %s",
-                    (batch_id,),
-                )
-            conn.commit()
-        return True
-    except Exception as e:
-        print(f"[DB] Ошибка db_set_batch_transcode_error: {e}")
-        return False
+    return db_set_batch_status(batch_id, 'transcode_error')
 
 
 def db_get_batch_logs(batch_id):
@@ -948,6 +920,7 @@ def db_get_batch_logs(batch_id):
 
 def db_set_batch_probe(batch_id):
     """Переводит батч в status='probe' и ставит completed_at."""
+    _assert_known_status('probe')
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
@@ -964,6 +937,7 @@ def db_set_batch_probe(batch_id):
 
 def db_set_batch_published(batch_id):
     """Переводит батч в status='published' и ставит completed_at."""
+    _assert_known_status('published')
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
@@ -980,55 +954,23 @@ def db_set_batch_published(batch_id):
 
 def db_set_batch_publish_error(batch_id):
     """Переводит батч в status='publish_error'."""
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "UPDATE batches SET status = 'publish_error' WHERE id = %s",
-                    (batch_id,),
-                )
-            conn.commit()
-        return True
-    except Exception as e:
-        print(f"[DB] Ошибка db_set_batch_publish_error: {e}")
-        return False
+    return db_set_batch_status(batch_id, 'publish_error')
 
 
 def db_set_batch_video_error(batch_id):
     """Переводит батч в status='video_error'."""
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "UPDATE batches SET status = 'video_error' WHERE id = %s",
-                    (batch_id,),
-                )
-            conn.commit()
-        return True
-    except Exception as e:
-        print(f"[DB] Ошибка db_set_batch_video_error: {e}")
-        return False
+    return db_set_batch_status(batch_id, 'video_error')
 
 
 def db_set_batch_story_error(batch_id):
     """Переводит батч в status='story_error'."""
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "UPDATE batches SET status = 'story_error' WHERE id = %s",
-                    (batch_id,),
-                )
-            conn.commit()
-        return True
-    except Exception as e:
-        print(f"[DB] Ошибка db_set_batch_story_error: {e}")
-        return False
+    return db_set_batch_status(batch_id, 'story_error')
 
 
 def db_set_batch_story_ready_from_error(batch_id):
     """Откатывает батч в story_ready после сбоя видео, сохраняя story_id.
     Очищает data (request_id/url), но НЕ трогает story_id — сюжет не регенерируется."""
+    _assert_known_status('story_ready')
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
@@ -1046,6 +988,7 @@ def db_set_batch_story_ready_from_error(batch_id):
 def db_set_batch_pending(batch_id):
     """Сбрасывает батч в статус 'pending', очищая story_id, video_url и data.
     Используется для перезапуска цикла генерации после фатального сбоя видео."""
+    _assert_known_status('pending')
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
@@ -1363,14 +1306,21 @@ KNOWN_BATCH_STATUSES = frozenset({
 })
 
 
+def _assert_known_status(status: str) -> None:
+    """Бросает ValueError если статус не зарегистрирован в KNOWN_BATCH_STATUSES.
+    Вызывай в начале каждого сеттера, чтобы поймать рассинхронизацию с константой."""
+    if status not in KNOWN_BATCH_STATUSES:
+        raise ValueError(
+            f"[DB] Неизвестный статус '{status}' — добавь его в KNOWN_BATCH_STATUSES"
+        )
+
+
 def db_set_batch_status(batch_id: str, status: str) -> bool:
     """Универсальный сеттер статуса батча с валидацией.
     Используй вместо специфичных сеттеров, когда статус задаётся динамически.
-    При передаче незарегистрированного статуса выводит предупреждение в лог.
+    При передаче незарегистрированного статуса бросает ValueError, запись не производится.
     """
-    if status not in KNOWN_BATCH_STATUSES:
-        print(f"[DB] ВНИМАНИЕ: попытка установить неизвестный статус '{status}' "
-              f"для батча {batch_id[:8]}... — добавь его в KNOWN_BATCH_STATUSES")
+    _assert_known_status(status)
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
@@ -1387,6 +1337,7 @@ def db_set_batch_status(batch_id: str, status: str) -> bool:
 
 def db_set_batch_story_generating_by_id(batch_id):
     """Переводит конкретный батч pending → story_generating (атомарно)."""
+    _assert_known_status('story_generating')
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
@@ -1404,6 +1355,7 @@ def db_set_batch_story_generating_by_id(batch_id):
 
 def db_set_batch_video_generating_by_id(batch_id):
     """Переводит конкретный батч story_ready → video_generating (атомарно)."""
+    _assert_known_status('video_generating')
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
@@ -1421,6 +1373,7 @@ def db_set_batch_video_generating_by_id(batch_id):
 
 def db_set_batch_transcoding_by_id(batch_id):
     """Переводит конкретный батч video_ready → transcoding (атомарно)."""
+    _assert_known_status('transcoding')
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
