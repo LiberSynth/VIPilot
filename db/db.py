@@ -173,28 +173,42 @@ def db_update_target_aspect_ratio(target_id, x, y):
 
 def db_ensure_batch(scheduled_at, target_id):
     """Создаёт батч если не существует.
-    Отменённые батчи не считаются существующими — удаляются и пересоздаются.
-    Возвращает UUID нового батча или None если батч уже существует (не отменён)."""
+    Отменённые батчи сбрасываются до pending (без удаления — FK на log).
+    Возвращает UUID нового/сброшенного батча или None если батч уже активен."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    DELETE FROM batches
-                    WHERE scheduled_at = %s
-                      AND target_id = %s
-                      AND status = 'отменён'
+                    WITH reset AS (
+                        UPDATE batches
+                        SET status               = 'pending',
+                            story_id             = NULL,
+                            video_url            = NULL,
+                            video_file           = NULL,
+                            video_data_transcoded = NULL,
+                            video_data_original  = NULL,
+                            data                 = NULL,
+                            completed_at         = NULL,
+                            text_model_id        = NULL,
+                            video_model_id       = NULL
+                        WHERE scheduled_at = %s
+                          AND target_id    = %s
+                          AND status       = 'отменён'
+                        RETURNING id
+                    ),
+                    inserted AS (
+                        INSERT INTO batches (scheduled_at, target_id)
+                        SELECT %s, %s
+                        WHERE NOT EXISTS (SELECT 1 FROM reset)
+                        ON CONFLICT (scheduled_at, target_id) DO NOTHING
+                        RETURNING id
+                    )
+                    SELECT id FROM reset
+                    UNION ALL
+                    SELECT id FROM inserted
                     """,
-                    (scheduled_at, target_id),
-                )
-                cur.execute(
-                    """
-                    INSERT INTO batches (scheduled_at, target_id)
-                    VALUES (%s, %s)
-                    ON CONFLICT (scheduled_at, target_id) DO NOTHING
-                    RETURNING id
-                    """,
-                    (scheduled_at, target_id),
+                    (scheduled_at, target_id, scheduled_at, target_id),
                 )
                 row = cur.fetchone()
             conn.commit()
