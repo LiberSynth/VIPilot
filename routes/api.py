@@ -272,7 +272,7 @@ def api_workflow_state():
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
     state = env_get("workflow_state", "running")
-    return jsonify({"state": state})
+    return jsonify({"state": state, "active_threads": wf_state.get_active_threads()})
 
 
 @bp.route("/workflow/start", methods=["POST"])
