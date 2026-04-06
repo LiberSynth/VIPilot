@@ -664,6 +664,19 @@ def _m012_gemma_no_system_role(cur):
     """)
 
 
+def _m014_drop_batches_unique_constraint(cur):
+    """
+    Снимает уникальное ограничение batches_scheduled_at_target_id_key.
+    Дубли предотвращает программная логика планировщика, а не БД.
+    Ограничение блокировало создание новых батчей для слотов, у которых
+    уже есть отменённый батч с тем же (scheduled_at, target_id).
+    """
+    cur.execute("""
+        ALTER TABLE batches
+            DROP CONSTRAINT IF EXISTS batches_scheduled_at_target_id_key
+    """)
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -678,6 +691,7 @@ MIGRATIONS = [
     (11, _m011_fix_fal_platform_url),
     (12, _m012_gemma_no_system_role),
     (13, _m013_sync_video_models),
+    (14, _m014_drop_batches_unique_constraint),
 ]
 
 

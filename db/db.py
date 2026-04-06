@@ -172,17 +172,28 @@ def db_update_target_aspect_ratio(target_id, x, y):
 # ---------------------------------------------------------------------------
 
 def db_ensure_batch(scheduled_at, target_id):
-    """Создаёт батч если не существует.
-    Отменённые батчи не восстанавливаются — остаются отменёнными.
-    Возвращает UUID нового батча или None если батч уже существует."""
+    """Создаёт батч если нет активного (не отменённого) батча для этого слота.
+    Отменённые батчи игнорируются — они остаются в БД как есть.
+    Возвращает UUID нового батча или None если активный батч уже существует."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
+                    SELECT id FROM batches
+                    WHERE scheduled_at = %s
+                      AND target_id    = %s
+                      AND status      != 'отменён'
+                    LIMIT 1
+                    """,
+                    (scheduled_at, target_id),
+                )
+                if cur.fetchone():
+                    return None
+                cur.execute(
+                    """
                     INSERT INTO batches (scheduled_at, target_id)
                     VALUES (%s, %s)
-                    ON CONFLICT (scheduled_at, target_id) DO NOTHING
                     RETURNING id
                     """,
                     (scheduled_at, target_id),
