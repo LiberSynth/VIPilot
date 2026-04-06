@@ -20,6 +20,8 @@ from db import (
     db_get_active_targets,
     db_update_target_transcode,
     db_update_target_aspect_ratio,
+    db_get_target_by_name,
+    db_update_target_config,
 )
 from utils.consts import ADMIN_PASSWORD
 from utils.auth import is_authenticated, password_fingerprint
@@ -93,6 +95,20 @@ def admin_page():
 
     workflow_state = env_get("workflow_state", "running")
 
+    dzen_target     = db_get_target_by_name("Дзен")
+    dzen_config     = dzen_target.get("config") or {} if dzen_target else {}
+    dzen_publisher_id = dzen_config.get("publisher_id", "")
+    dzen_csrf_token   = dzen_config.get("csrf_token", "")
+    dzen_csrf_age     = None
+    if dzen_csrf_token and ":" in dzen_csrf_token:
+        import time
+        try:
+            ts_ms = int(dzen_csrf_token.split(":")[-1])
+            dzen_csrf_age = int((time.time() * 1000 - ts_ms) / 60000)
+        except (ValueError, IndexError):
+            pass
+    dzen_target_id = dzen_target["id"] if dzen_target else None
+
     active_targets  = db_get_active_targets()
     target          = active_targets[0] if active_targets else None
     target_id       = target["id"] if target else None
@@ -126,6 +142,10 @@ def admin_page():
         target_id=target_id,
         aspect_ratio_x=aspect_ratio_x,
         aspect_ratio_y=aspect_ratio_y,
+        dzen_target_id=dzen_target_id,
+        dzen_publisher_id=dzen_publisher_id,
+        dzen_csrf_token=dzen_csrf_token,
+        dzen_csrf_age=dzen_csrf_age,
         app_version=APP_VERSION,
     ))
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
@@ -246,6 +266,38 @@ def save():
             pass
 
     return redirect(url_for("admin.admin_page") + f"?tab={active_tab}")
+
+
+@bp.route("/save-dzen", methods=["POST"])
+def save_dzen():
+    if not is_authenticated():
+        return redirect(url_for("admin.login"))
+
+    target_id    = request.form.get("dzen_target_id", "").strip()
+    publisher_id = request.form.get("dzen_publisher_id", "").strip()
+    csrf_token   = request.form.get("dzen_csrf_token", "").strip()
+
+    if not target_id:
+        flash("Таргет Дзен не найден в базе данных", "error")
+        return redirect(url_for("admin.admin_page") + "?tab=publish")
+
+    existing_target = db_get_target_by_name("Дзен")
+    existing_config = {}
+    if existing_target:
+        existing_config = existing_target.get("config") or {}
+
+    new_config = dict(existing_config)
+    if publisher_id:
+        new_config["publisher_id"] = publisher_id
+    if csrf_token:
+        new_config["csrf_token"] = csrf_token
+
+    if db_update_target_config(target_id, new_config):
+        flash("Настройки Дзен сохранены", "success")
+    else:
+        flash("Ошибка сохранения настроек Дзен", "error")
+
+    return redirect(url_for("admin.admin_page") + "?tab=publish")
 
 
 @bp.route("/logout")

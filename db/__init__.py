@@ -12,6 +12,8 @@ from .db import (
     db_get_active_targets,
     db_update_target_transcode,
     db_update_target_aspect_ratio,
+    db_get_target_by_name,
+    db_update_target_config,
     db_ensure_batch,
     db_create_adhoc_batch,
     db_create_probe_batch,

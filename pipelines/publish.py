@@ -1,7 +1,7 @@
 """
 Pipeline 5 — Публикация.
 Принимает batch_id, публикует видео на платформу таргета.
-Поддерживается: VKontakte (история + стена, настраивается через settings).
+Поддерживается: VKontakte (история + стена), Дзен (короткое видео).
 Видео берётся из БД (video_data_transcoded).
 Статусы: transcode_ready → story_posted → published / publish_error.
   Возобновление после краша: story_posted → published.
@@ -15,6 +15,7 @@ from db import (
     db_get_batch_by_id,
     db_get_batch_video_data,
     db_get_batch_original_video,
+    db_get_story_text,
     db_is_batch_scheduled,
     db_set_batch_obsolete,
     db_set_batch_probe,
@@ -25,6 +26,8 @@ from db import (
 )
 from log import db_log_pipeline, db_log_entry, db_log_update, db_get_log_entries
 from clients import vk
+from clients import dzen as dzen_client
+from clients.dzen import DzenCsrfExpired
 
 
 def _get_vk_video(batch_id, log_id):
@@ -74,6 +77,44 @@ def _publish_vk(batch_id, log_id, target_config):
         wall_ok = vk.publish_wall(video_data, group_id, log_id) is not None
 
     return story_ok or wall_ok
+
+
+def _publish_dzen(batch_id, log_id, target_config):
+    """Публикует батч на Дзен. Возвращает True при успехе."""
+    cfg = target_config or {}
+
+    if not dzen_client.is_configured(cfg):
+        if log_id:
+            db_log_entry(log_id, 'Дзен не настроен: проверьте publisher_id и CSRF-токен в настройках', level='error')
+        return False
+
+    video_data = db_get_batch_video_data(batch_id)
+    if video_data is None:
+        video_data = db_get_batch_original_video(batch_id)
+    if video_data is None:
+        if log_id:
+            db_log_entry(log_id, 'Видео не найдено в БД (ни transcoded, ни original)', level='error')
+        return False
+
+    batch = db_get_batch_by_id(batch_id)
+    story_id = batch.get('story_id') if batch else None
+    title = ''
+    if story_id:
+        try:
+            text = db_get_story_text(story_id)
+            if text:
+                title = text.split('\n')[0].strip()[:100]
+        except Exception:
+            pass
+    if not title:
+        title = 'Видео'
+
+    try:
+        return dzen_client.publish(video_data, cfg, title, log_id)
+    except DzenCsrfExpired as e:
+        if log_id:
+            db_log_entry(log_id, f'Дзен: CSRF-токен истёк — обновите его в настройках → вкладка «Публикация»', level='error')
+        raise
 
 
 def _publish_vk_wall(batch_id, log_id, target_config):
@@ -155,6 +196,8 @@ def run(batch_id):
 
         if target == 'VKontakte':
             ok = _publish_vk(batch_id, log_id, batch.get('target_config'))
+        elif target == 'Дзен':
+            ok = _publish_dzen(batch_id, log_id, batch.get('target_config'))
         else:
             msg = f'Платформа «{target}» не поддерживается'
             db_log_update(log_id, msg, 'error')

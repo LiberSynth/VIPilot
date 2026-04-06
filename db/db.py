@@ -167,6 +167,39 @@ def db_update_target_aspect_ratio(target_id, x, y):
         return False
 
 
+def db_get_target_by_name(name: str) -> dict | None:
+    """Возвращает таргет по имени (id, name, config, active, ...)."""
+    try:
+        with get_db() as conn:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(
+                    "SELECT id::text, name, active, aspect_ratio_x, aspect_ratio_y, transcode, config "
+                    "FROM targets WHERE name = %s LIMIT 1",
+                    (name,),
+                )
+                row = cur.fetchone()
+        return dict(row) if row else None
+    except Exception as e:
+        print(f"[DB] Ошибка db_get_target_by_name: {e}")
+        return None
+
+
+def db_update_target_config(target_id: str, config: dict) -> bool:
+    """Обновляет JSONB-поле config для указанного target."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE targets SET config = %s::jsonb WHERE id = %s::uuid",
+                    (json.dumps(config), target_id),
+                )
+            conn.commit()
+        return True
+    except Exception as e:
+        print(f"[DB] Ошибка db_update_target_config: {e}")
+        return False
+
+
 # ---------------------------------------------------------------------------
 # Батчи
 # ---------------------------------------------------------------------------
