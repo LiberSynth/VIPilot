@@ -121,7 +121,7 @@ function _buildRestartOverlay() {
       '<div class="confirm-box-title">Перезапустить движок?</div>' +
       '<div class="confirm-box-text">' +
         'Приложение будет остановлено и автоматически перезапущено.<br><br>' +
-        'Текущие задачи будут прерваны. Состояние движка (работает / приостановлен) сохранится.' +
+        'Текущие задачи будут прерваны. Состояние движка (работает/приостановлен) сохранится.' +
       '</div>' +
       '<div class="confirm-box-btns">' +
         '<button class="confirm-cancel" onclick="closeRestartDialog()">Отмена</button>' +
