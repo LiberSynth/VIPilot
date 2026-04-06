@@ -129,24 +129,21 @@ def _run_planning(loop_interval: int):
                         is_catchup = (created_at is not None and created_at <= dt)
 
                 if in_future_window or is_catchup:
-                    for target in targets:
-                        batch_id = db_ensure_batch(dt, target['id'])
-                        if batch_id:
-                            log_id = db_log_pipeline(
-                                'planning',
-                                'Батч запланирован',
-                                status='ok',
-                                batch_id=batch_id,
-                            )
-                            if log_id:
-                                dt_msk = dt.astimezone(MSK)
-                                db_log_entry(log_id, f"Запланирована публикация: {dt_msk.strftime('%d.%m.%Y %H:%M')} МСК")
-                                db_log_entry(log_id, f"Таргет: {target['name']}  ({target['aspect_ratio_x']}:{target['aspect_ratio_y']})")
-                                db_log_entry(log_id, f"Горизонт планирования: {buffer_hours} ч")
-                            print(
-                                f"[planning] Создан батч: {dt.strftime('%d.%m %H:%M')} UTC"
-                                f" / {target['name']}"
-                            )
+                    batch_id = db_ensure_batch(dt, targets[0]['id'])
+                    if batch_id:
+                        log_id = db_log_pipeline(
+                            'planning',
+                            'Батч запланирован',
+                            status='ok',
+                            batch_id=batch_id,
+                        )
+                        if log_id:
+                            dt_msk = dt.astimezone(MSK)
+                            db_log_entry(log_id, f"Запланирована публикация: {dt_msk.strftime('%d.%m.%Y %H:%M')} МСК")
+                            target_names = ', '.join(t['name'] for t in targets)
+                            db_log_entry(log_id, f"Таргеты: {target_names}")
+                            db_log_entry(log_id, f"Горизонт планирования: {buffer_hours} ч")
+                        print(f"[planning] Создан батч: {dt.strftime('%d.%m %H:%M')} UTC")
 
     except Exception as e:
         db_log_pipeline('planning', f"Сбой планирования: {e}", status='error')

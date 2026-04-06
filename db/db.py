@@ -123,11 +123,11 @@ def db_get_active_targets():
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT id, name, aspect_ratio_x, aspect_ratio_y, transcode FROM targets WHERE active = TRUE"
+                    "SELECT id, name, aspect_ratio_x, aspect_ratio_y, transcode, config FROM targets WHERE active = TRUE"
                 )
                 rows = cur.fetchall()
         return [
-            {"id": str(row[0]), "name": row[1], "aspect_ratio_x": row[2], "aspect_ratio_y": row[3], "transcode": bool(row[4])}
+            {"id": str(row[0]), "name": row[1], "aspect_ratio_x": row[2], "aspect_ratio_y": row[3], "transcode": bool(row[4]), "config": row[5] or {}}
             for row in rows
         ]
     except Exception as e:

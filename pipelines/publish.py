@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from utils.notify import notify_failure
 from db import (
     db_get,
+    db_get_active_targets,
     db_get_batch_by_id,
     db_get_batch_video_data,
     db_get_batch_original_video,
@@ -149,18 +150,17 @@ def run(batch_id):
         if status not in ('transcode_ready', 'story_posted'):
             return
 
-        target = batch['target_name'] or 'пробный'
-
         # --- Возобновление после краша: история уже опубликована, только стена ---
         if status == 'story_posted':
             log_id = db_log_pipeline(
-                'publish', f'Публикация ({target}) — возобновление (стена)…',
+                'publish', 'Публикация — возобновление (стена)…',
                 status='running', batch_id=batch_id,
             )
-            if target == 'VKontakte':
-                _publish_vk_wall(batch_id, log_id, batch.get('target_config'))
+            for t in db_get_active_targets():
+                if t['name'] == 'VKontakte':
+                    _publish_vk_wall(batch_id, log_id, t.get('config'))
             db_set_batch_published(batch_id)
-            db_log_update(log_id, f'Опубликовано ({target})', 'ok')
+            db_log_update(log_id, 'Опубликовано (возобновление)', 'ok')
             print(f"[publish] Батч {batch_id[:8]}… опубликован (возобновление)")
             return
 
@@ -187,30 +187,41 @@ def run(batch_id):
             print(f"[publish] Батч {batch_id[:8]}… ещё не время ({remaining} мин до публикации)")
             return
 
-        print(f"[publish] Батч {batch_id[:8]}… ({target}) — начало публикации")
-
-        log_id = db_log_pipeline(
-            'publish', f'Публикация ({target})…',
-            status='running', batch_id=batch_id,
-        )
-
-        if target == 'VKontakte':
-            ok = _publish_vk(batch_id, log_id, batch.get('target_config'))
-        elif target == 'Дзен':
-            ok = _publish_dzen(batch_id, log_id, batch.get('target_config'))
-        else:
-            msg = f'Платформа «{target}» не поддерживается'
-            db_log_update(log_id, msg, 'error')
-            if log_id:
-                db_log_entry(log_id, msg, level='error')
+        active_targets = db_get_active_targets()
+        if not active_targets:
+            msg = 'Нет активных таргетов — публикация невозможна'
+            log_id = db_log_pipeline('publish', msg, status='error', batch_id=batch_id)
             db_set_batch_publish_error(batch_id)
             print(f"[publish] {msg}")
             notify_failure(f"publish: {msg} (батч {batch_id[:8]})")
             return
 
+        target_names = ', '.join(t['name'] for t in active_targets)
+        print(f"[publish] Батч {batch_id[:8]}… ({target_names}) — начало публикации")
+
+        log_id = db_log_pipeline(
+            'publish', f'Публикация ({target_names})…',
+            status='running', batch_id=batch_id,
+        )
+
+        results = []
+        for t in active_targets:
+            name = t['name']
+            cfg  = t.get('config') or {}
+            if name == 'VKontakte':
+                t_ok = _publish_vk(batch_id, log_id, cfg)
+            elif name == 'Дзен':
+                t_ok = _publish_dzen(batch_id, log_id, cfg)
+            else:
+                db_log_entry(log_id, f'Платформа «{name}» не поддерживается', level='warn')
+                t_ok = False
+            results.append(t_ok)
+
+        ok = any(results)
+
         if ok:
             db_set_batch_published(batch_id)
-            db_log_update(log_id, f'Опубликовано ({target})', 'ok')
+            db_log_update(log_id, f'Опубликовано ({target_names})', 'ok')
             print(f"[publish] Батч {batch_id[:8]}… опубликован")
             if log_id:
                 entries = db_get_log_entries(log_id)
@@ -225,7 +236,7 @@ def run(batch_id):
             db_set_batch_publish_error(batch_id)
             db_log_update(log_id, 'Ошибка публикации', 'error')
             print(f"[publish] Батч {batch_id[:8]}… ошибка публикации")
-            notify_failure(f"publish: ошибка публикации батча {batch_id[:8]} ({target})")
+            notify_failure(f"publish: ошибка публикации батча {batch_id[:8]} ({target_names})")
 
     except Exception as e:
         msg = f"Критическая ошибка приложения: {e}"
