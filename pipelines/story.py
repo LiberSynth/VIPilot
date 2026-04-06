@@ -23,6 +23,7 @@ from db import (
     db_is_batch_scheduled,
     db_set_batch_obsolete,
     db_steal_video_from_cancelled,
+    db_set_batch_fatal_error,
     env_get,
 )
 from log import db_log_pipeline, db_log_entry, db_log_update
@@ -256,7 +257,8 @@ def run(batch_id):
             print(f"[story] Готово: story_id={story_id[:8]}…, batch → story_ready")
 
     except Exception as e:
-        msg = f"Сбой пайплайна: {e}"
+        msg = f"Критическая ошибка приложения: {e}"
+        db_set_batch_fatal_error(batch_id)
         if log_id:
             db_log_update(log_id, msg, 'error')
             db_log_entry(log_id, msg, level='error')
@@ -265,5 +267,5 @@ def run(batch_id):
             if new_log_id:
                 db_log_entry(new_log_id, msg, level='error')
         print(f"[story] Ошибка: {e}")
-        notify_failure(f"сбой story-пайплайна: {e}")
+        notify_failure(f"story: критическая ошибка — {e}")
 

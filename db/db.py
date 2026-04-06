@@ -1239,6 +1239,7 @@ KNOWN_BATCH_STATUSES = frozenset({
     # terminal
     'отменён', 'error', 'probe', 'story_probe', 'story_error',
     'video_error', 'transcode_error', 'publish_error', 'published',
+    'fatal_error',
 })
 
 
@@ -1268,6 +1269,25 @@ def db_set_batch_status(batch_id: str, status: str) -> bool:
         return True
     except Exception as e:
         print(f"[DB] Ошибка db_set_batch_status: {e}")
+        return False
+
+
+def db_set_batch_fatal_error(batch_id: str) -> bool:
+    """Переводит батч в статус fatal_error.
+    Вызывается при обнаружении ошибки логики приложения (программного бага),
+    чтобы остановить бесконечный retry. Логирование — ответственность вызывающей стороны.
+    """
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE batches SET status = 'fatal_error' WHERE id = %s",
+                    (batch_id,),
+                )
+            conn.commit()
+        return True
+    except Exception as e:
+        print(f"[DB] Ошибка db_set_batch_fatal_error: {e}")
         return False
 
 

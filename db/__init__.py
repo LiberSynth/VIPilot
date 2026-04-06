@@ -66,6 +66,7 @@ from .db import (
     db_get_distinct_batch_statuses,
     KNOWN_BATCH_STATUSES,
     db_set_batch_status,
+    db_set_batch_fatal_error,
     db_set_batch_story_generating_by_id,
     db_set_batch_video_generating_by_id,
     db_set_batch_transcoding_by_id,

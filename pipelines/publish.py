@@ -21,21 +21,26 @@ from db import (
     db_set_batch_published,
     db_set_batch_publish_error,
     db_set_batch_story_posted,
+    db_set_batch_fatal_error,
 )
 from log import db_log_pipeline, db_log_entry, db_log_update, db_get_log_entries
 from clients import vk
 
 
 def _get_vk_video(batch_id, log_id):
-    """Возвращает видеоданные батча (transcoded или original). Логирует проблемы."""
+    """Возвращает видеоданные батча (transcoded или original).
+    Бросает RuntimeError если оба поля NULL (ошибка логики — батч не должен достигать
+    transcode_ready без видео)."""
     video_data = db_get_batch_video_data(batch_id)
     if video_data is None:
         if log_id:
             db_log_entry(log_id, 'video_data_transcoded отсутствует — использую оригинал (video_data_original)')
         video_data = db_get_batch_original_video(batch_id)
         if video_data is None:
+            msg = 'Ни video_data_transcoded, ни video_data_original не найдены в БД — ошибка логики'
             if log_id:
-                db_log_entry(log_id, 'Ни video_data_transcoded, ни video_data_original не найдены в БД', level='error')
+                db_log_entry(log_id, msg, level='error')
+            raise RuntimeError(msg)
     return video_data
 
 
@@ -93,6 +98,7 @@ def _publish_vk_wall(batch_id, log_id):
 
 
 def run(batch_id):
+    log_id = None
     try:
         batch = db_get_batch_by_id(batch_id)
         if not batch:
@@ -179,7 +185,14 @@ def run(batch_id):
             notify_failure(f"publish: ошибка публикации батча {batch_id[:8]} ({target})")
 
     except Exception as e:
-        db_log_pipeline('publish', f'Сбой пайплайна: {e}', status='error',
-                        batch_id=batch_id)
+        msg = f"Критическая ошибка приложения: {e}"
+        db_set_batch_fatal_error(batch_id)
+        if log_id:
+            db_log_update(log_id, msg, 'error')
+            db_log_entry(log_id, msg, level='error')
+        else:
+            new_log_id = db_log_pipeline('publish', msg, status='error', batch_id=batch_id)
+            if new_log_id:
+                db_log_entry(new_log_id, msg, level='error')
         print(f"[publish] Ошибка: {e}")
-        notify_failure(f"сбой publish-пайплайна: {e}")
+        notify_failure(f"publish: критическая ошибка — {e}")

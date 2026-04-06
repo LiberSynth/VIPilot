@@ -33,6 +33,7 @@ from db import (
     db_set_batch_story_ready_from_error,
     db_set_batch_original_video,
     db_get_random_real_original_video,
+    db_set_batch_fatal_error,
 )
 from log import db_log_pipeline, db_log_entry, db_log_update
 
@@ -179,7 +180,10 @@ def run(batch_id):
         target          = batch['target_name'] or 'пробный'
         ar_x            = batch['aspect_ratio_x'] or 9
         ar_y            = batch['aspect_ratio_y'] or 16
-        story_id        = str(batch['story_id'])
+        story_id        = batch.get('story_id')
+        if story_id is None:
+            raise RuntimeError('story_id отсутствует у батча в статусе story_ready/video_generating — ошибка логики')
+        story_id        = str(story_id)
         is_probe        = batch['target_id'] is None
         pinned_model_id = batch.get('video_model_id')
 
@@ -436,7 +440,14 @@ def run(batch_id):
         print(f"[video] Фатальная ошибка провайдера: {msg}")
         notify_failure(f"video: фатальная ошибка провайдера — {msg}")
     except Exception as e:
-        db_log_pipeline('video', f"Сбой пайплайна: {e}", status='error',
-                        batch_id=batch_id)
+        msg = f"Критическая ошибка приложения: {e}"
+        db_set_batch_fatal_error(batch_id)
+        if log_id:
+            db_log_update(log_id, msg, 'error')
+            db_log_entry(log_id, msg, level='error')
+        else:
+            new_log_id = db_log_pipeline('video', msg, status='error', batch_id=batch_id)
+            if new_log_id:
+                db_log_entry(new_log_id, msg, level='error')
         print(f"[video] Ошибка: {e}")
-        notify_failure(f"сбой video-пайплайна: {e}")
+        notify_failure(f"video: критическая ошибка — {e}")

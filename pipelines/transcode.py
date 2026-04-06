@@ -7,7 +7,7 @@ Pipeline 4 — Транскодирование.
 transcode_ready без единой записи в лог.
 
 Если включено:
-  - Отсутствие оригинала в БД → критичная ошибка (transcode_error).
+  - Отсутствие оригинала в БД → fatal_error (ошибка логики приложения).
   - Любой другой сбой (ffmpeg и т.п.) → некритично: лог-предупреждение,
     батч всё равно переходит в transcode_ready с пустым video_data_transcoded
     (пайплайн публикации возьмёт оригинал как запасной вариант).
@@ -30,6 +30,7 @@ from db import (
     db_set_batch_transcode_skip,
     db_set_batch_transcode_ready,
     db_set_batch_transcode_error,
+    db_set_batch_fatal_error,
 )
 from log import db_log_pipeline, db_log_entry, db_log_update
 
@@ -145,14 +146,10 @@ def run(batch_id):
 
         original_data = db_get_batch_original_video(batch_id)
         if original_data is None:
-            msg = 'Оригинал видео отсутствует в БД (video_data_original = NULL)'
-            db_log_update(log_id, msg, 'error')
+            msg = 'video_data_original = NULL у батча в статусе video_ready — ошибка логики'
             if log_id:
                 db_log_entry(log_id, msg, level='error')
-            db_set_batch_transcode_error(batch_id)
-            print(f"[transcode] {msg}")
-            notify_failure(f"transcode: {msg} (батч {batch_id[:8]})")
-            return
+            raise RuntimeError(msg)
 
         src_mb = round(len(original_data) / 1024 / 1024, 1)
         if log_id:
@@ -204,7 +201,14 @@ def run(batch_id):
         print(f"[transcode] Готово: {out_mb} МБ → БД")
 
     except Exception as e:
-        db_log_pipeline('transcode', f'Сбой пайплайна: {e}', status='error',
-                        batch_id=batch_id)
+        msg = f"Критическая ошибка приложения: {e}"
+        db_set_batch_fatal_error(batch_id)
+        if log_id:
+            db_log_update(log_id, msg, 'error')
+            db_log_entry(log_id, msg, level='error')
+        else:
+            new_log_id = db_log_pipeline('transcode', msg, status='error', batch_id=batch_id)
+            if new_log_id:
+                db_log_entry(new_log_id, msg, level='error')
         print(f"[transcode] Ошибка: {e}")
-        notify_failure(f"сбой transcode-пайплайна: {e}")
+        notify_failure(f"transcode: критическая ошибка — {e}")
