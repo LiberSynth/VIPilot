@@ -32,7 +32,6 @@ from log import db_log_entry
 
 
 _OAUTH_TOKEN = os.environ.get("DZEN_OAUTH_TOKEN", "")
-_CSRF_TOKEN  = os.environ.get("DZEN_CSRF_TOKEN", "")
 
 _EDITOR_BASE = "https://dzen.ru/editor-api/v2"
 _MEDIA_BASE  = "https://dzen.ru/media-api-video"
@@ -289,11 +288,11 @@ def publish(video_data: bytes, target_config: dict, title: str, log_id) -> bool:
     Опционально: "oauth_token" для переопределения env-переменной.
     Возвращает True при успехе.
     """
-    global _OAUTH_TOKEN, _CSRF_TOKEN
+    global _OAUTH_TOKEN
     cfg = target_config or {}
 
     publisher_id = cfg.get("publisher_id", "")
-    csrf         = cfg.get("csrf_token", "") or _CSRF_TOKEN
+    csrf         = cfg.get("csrf_token", "")
     oauth        = cfg.get("oauth_token", "") or _OAUTH_TOKEN
 
     if not publisher_id:
@@ -346,7 +345,7 @@ def publish(video_data: bytes, target_config: dict, title: str, log_id) -> bool:
 def is_configured(target_config: dict | None = None) -> bool:
     cfg = target_config or {}
     has_oauth = bool(cfg.get("oauth_token") or _OAUTH_TOKEN)
-    has_csrf  = bool(cfg.get("csrf_token")  or _CSRF_TOKEN)
+    has_csrf  = bool(cfg.get("csrf_token"))
     has_pub   = bool(cfg.get("publisher_id"))
     return has_oauth and has_csrf and has_pub
 
@@ -354,7 +353,7 @@ def is_configured(target_config: dict | None = None) -> bool:
 def csrf_token_age_minutes(target_config: dict | None = None) -> int | None:
     """Возвращает возраст CSRF-токена в минутах, или None если не определить."""
     cfg = target_config or {}
-    csrf = cfg.get("csrf_token") or _CSRF_TOKEN
+    csrf = cfg.get("csrf_token", "")
     if not csrf or ":" not in csrf:
         return None
     try:
