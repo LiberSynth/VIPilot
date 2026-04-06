@@ -113,6 +113,7 @@ def api_add_schedule_slot():
     new_id = db_add_schedule_slot(time_utc)
     if new_id is None:
         return jsonify({"error": "db error"}), 500
+    wf_state.wakeup_loop()
     return jsonify({"id": new_id, "time_msk": f"{h_msk:02d}:{m_msk:02d}"})
 
 
@@ -121,6 +122,7 @@ def api_delete_schedule_slot(slot_id):
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
     ok = db_delete_schedule_slot(slot_id)
+    wf_state.wakeup_loop()
     return jsonify({"ok": ok})
 
 
