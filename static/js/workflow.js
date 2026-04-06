@@ -30,7 +30,7 @@ function wfUpdateUI(state, activeThreads) {
   if (threadsText) {
     var n = (typeof activeThreads === 'number') ? activeThreads : 0;
     threadsText.textContent = '(выполняется потоков: ' + n + ')';
-    threadsText.style.color = n > 0 ? '#7878c8' : '#44445a';
+    threadsText.style.color = n > 0 ? '#c8ccff' : '#7878c8';
   }
 }
 
