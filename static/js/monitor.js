@@ -82,6 +82,7 @@
     const pip = PIPELINE_LABELS[log.pipeline] || log.pipeline;
     const modelName = (log.pipeline === 'video' && videoModelName) ? videoModelName
       : (log.pipeline === 'story' && textModelName) ? textModelName
+      : (log.pipeline === 'transcode' || log.pipeline === 'transcoding') ? 'H.264'
       : null;
     const modelTag   = modelName ? '<span class="monitor-log-model">' + esc(modelName) + '</span>' : '';
     const hasEntries = log.entries && log.entries.length > 0;

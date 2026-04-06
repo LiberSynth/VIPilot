@@ -139,9 +139,6 @@ def run(batch_id):
                     'story', msg,
                     status='ok', batch_id=batch_id,
                 )
-                if log_id:
-                    db_log_entry(log_id, f"Батч-донор: {donor_id}")
-                    db_log_entry(log_id, "Видео перенесено — генерация и транскодирование пропущены или сокращены")
                 print(f"[story] Батч {batch_id[:8]}… — {msg}")
                 batch_done = True
                 return

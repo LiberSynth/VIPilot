@@ -211,9 +211,6 @@ def run(batch_id):
                 print(f"[video] {msg}")
                 return
             db_set_batch_original_video(batch_id, sample)
-            if log_id:
-                db_log_entry(log_id, '[эмуляция] Оригинал скопирован из случайного донора')
-                db_log_entry(log_id, '[эмуляция] Батч переведён в video_ready')
             db_set_batch_video_ready(batch_id, 'emulation://skipped')
             db_log_update(log_id, 'Видео [эмуляция]', 'ok')
             return
