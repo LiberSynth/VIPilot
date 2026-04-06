@@ -135,12 +135,37 @@ def run(batch_id):
         if not is_probe and env_get('emulation_mode', '0') != '1' and env_get('use_donor', '1') == '1':
             donor_id = db_steal_video_from_cancelled(batch_id)
             if donor_id:
-                msg = f"Видео взято из отменённого батча {donor_id[:8]}… — генерация пропущена"
+                updated = db_get_batch_by_id(batch_id)
+                new_status = updated['status'] if updated else None
+                donor_short = donor_id[:8]
+                detail = (
+                    f"Включён режим «Использовать донора». "
+                    f"Видео позаимствовано из отменённого батча {donor_short}…"
+                )
+
                 log_id = db_log_pipeline(
-                    'story', msg,
+                    'story', 'Найден донор, генерация не требуется',
                     status='ok', batch_id=batch_id,
                 )
-                print(f"[story] Батч {batch_id[:8]}… — {msg}")
+                if log_id:
+                    db_log_entry(log_id, detail)
+
+                video_log_id = db_log_pipeline(
+                    'video', 'Видео получено от донора',
+                    status='ok', batch_id=batch_id,
+                )
+                if video_log_id:
+                    db_log_entry(video_log_id, detail)
+
+                if new_status == 'transcode_ready':
+                    tr_log_id = db_log_pipeline(
+                        'transcode', 'Транскодирование пропущено — видео получено от донора',
+                        status='ok', batch_id=batch_id,
+                    )
+                    if tr_log_id:
+                        db_log_entry(tr_log_id, detail)
+
+                print(f"[story] Батч {batch_id[:8]}… — найден донор {donor_short}, новый статус: {new_status}")
                 batch_done = True
                 return
 
