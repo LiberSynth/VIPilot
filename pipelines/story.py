@@ -19,6 +19,7 @@ from db import (
     db_create_story,
     db_set_batch_story,
     db_set_batch_story_probe,
+    db_set_batch_story_error,
     db_set_batch_pending,
     db_is_batch_scheduled,
     db_set_batch_obsolete,
@@ -225,6 +226,7 @@ def run(batch_id):
                     if log_id:
                         db_log_entry(log_id, msg, level='error')
                     print(f"[story] {msg}")
+                    db_set_batch_story_error(batch_id)
                     batch_done = True
                     return
                 msg = 'Все активные модели не дали результата — повтор с первой модели'
