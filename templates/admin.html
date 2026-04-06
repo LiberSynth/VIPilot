@@ -258,9 +258,15 @@
       </div>
 
       <div class="hint" style="margin-bottom:10px">
-        Как обновить: <b>dzen.ru/profile/editor</b> → DevTools (F12) → вкладка <b>Network</b> →
-        в поле фильтра введи <code>log-studio-event</code> → кликни на любой запрос из списка →
-        справа вкладка <b>Headers</b> → раздел <b>Request Headers</b> → строка <code>x-csrf-token</code>.
+        Как обновить токен:
+        <ol style="margin:6px 0 0 16px;padding:0;line-height:1.7">
+          <li>Открой <b>dzen.ru/profile/editor</b></li>
+          <li>Нажми <b>F12</b> → вкладка <b>Network</b></li>
+          <li>В поле фильтра введи <code>log-studio-event</code></li>
+          <li>Кликни на любой запрос из списка</li>
+          <li>Справа выбери вкладку <b>Headers</b></li>
+          <li>В разделе <b>Request Headers</b> найди строку <code>x-csrf-token</code> и скопируй значение</li>
+        </ol>
       </div>
 
       <div class="toggle-label" style="margin-bottom:4px">CSRF-токен</div>
