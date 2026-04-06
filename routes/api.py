@@ -307,6 +307,14 @@ def api_workflow_use_donor():
     return jsonify({"ok": True, "use_donor": val})
 
 
+@bp.route("/donors/count", methods=["GET"])
+def api_donors_count():
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    from db import db_get_donor_count
+    return jsonify({"count": db_get_donor_count()})
+
+
 @bp.route("/workflow/emulation", methods=["POST"])
 def api_workflow_emulation():
     if not is_authenticated():

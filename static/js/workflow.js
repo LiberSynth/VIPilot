@@ -128,6 +128,21 @@ function confirmRestart() {
     .catch(function() { closeRestartDialog(); showToast('Ошибка соединения', 'error'); });
 }
 
+function refreshDonorCount() {
+  fetch('/api/donors/count')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var el = document.getElementById('donor-count');
+      if (el) el.textContent = d.count;
+    })
+    .catch(function() {});
+}
+
+(function() {
+  refreshDonorCount();
+  setInterval(refreshDonorCount, 10000);
+})();
+
 function _buildClearHistoryOverlay() {
   var el = document.createElement('div');
   el.className = 'confirm-overlay open';

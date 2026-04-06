@@ -965,6 +965,26 @@ def db_steal_video_from_cancelled(batch_id) -> str | None:
         return None
 
 
+def db_get_donor_count() -> int:
+    """Возвращает количество батчей-доноров (отменённые или пробные без target с видео)."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT COUNT(*)
+                    FROM batches
+                    WHERE (video_data_transcoded IS NOT NULL OR video_data_original IS NOT NULL)
+                      AND (
+                        status = 'отменён'
+                        OR (status = 'probe' AND target_id IS NULL)
+                      )
+                """)
+                return cur.fetchone()[0]
+    except Exception as e:
+        print(f"[DB] Ошибка db_get_donor_count: {e}")
+        return 0
+
+
 def db_set_batch_transcode_error(batch_id):
     """Переводит батч в status='transcode_error'."""
     try:
