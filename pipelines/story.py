@@ -20,7 +20,6 @@ from db import (
     db_set_batch_story,
     db_set_batch_story_probe,
     db_set_batch_story_error,
-    db_set_batch_pending,
     db_is_batch_scheduled,
     db_set_batch_obsolete,
     db_steal_video_from_cancelled,
@@ -114,11 +113,12 @@ def run(batch_id):
         if not batch:
             return
 
-        if batch['status'] != 'pending':
+        if batch['status'] not in ('pending', 'story_generating'):
             return
 
-        if not db_set_batch_story_generating_by_id(batch_id):
-            return
+        if batch['status'] == 'pending':
+            if not db_set_batch_story_generating_by_id(batch_id):
+                return
 
         target   = batch['target_name'] or 'пробный'
         is_probe = batch['target_id'] is None
@@ -270,7 +270,3 @@ def run(batch_id):
         print(f"[story] Ошибка: {e}")
         notify_failure(f"сбой story-пайплайна: {e}")
 
-    finally:
-        if not batch_done:
-            db_set_batch_pending(batch_id)
-            print(f"[story] Батч {batch_id[:8]}… сброшен в pending (повторная попытка)")

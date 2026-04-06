@@ -31,7 +31,6 @@ from db import (
     db_set_batch_video_ready,
     db_set_batch_video_error,
     db_set_batch_story_ready_from_error,
-    db_reset_video_generating,
     db_set_batch_original_video,
     db_get_random_real_original_video,
 )
@@ -169,10 +168,11 @@ def run(batch_id):
 
         if status == 'video_pending':
             resumed = True
-        elif status == 'story_ready':
+        elif status in ('story_ready', 'video_generating'):
             resumed = False
-            if not db_set_batch_video_generating_by_id(batch_id):
-                return
+            if status == 'story_ready':
+                if not db_set_batch_video_generating_by_id(batch_id):
+                    return
         else:
             return
 
@@ -443,6 +443,3 @@ def run(batch_id):
                         batch_id=batch_id)
         print(f"[video] Ошибка: {e}")
         notify_failure(f"сбой video-пайплайна: {e}")
-    finally:
-        if batch_id:
-            db_reset_video_generating(batch_id)

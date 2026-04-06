@@ -113,11 +113,12 @@ def run(batch_id):
         if not batch:
             return
 
-        if batch['status'] != 'video_ready':
+        if batch['status'] not in ('video_ready', 'transcoding'):
             return
 
-        if not db_set_batch_transcoding_by_id(batch_id):
-            return
+        if batch['status'] == 'video_ready':
+            if not db_set_batch_transcoding_by_id(batch_id):
+                return
 
         is_probe        = batch['target_id'] is None
         target          = batch['target_name'] or 'пробный'

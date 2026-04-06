@@ -274,62 +274,6 @@ def db_set_batch_story_probe(batch_id, story_id):
         print(f"[DB] Ошибка db_set_batch_story_probe: {e}")
 
 
-def db_recover_story_generating():
-    """Сбрасывает застрявшие story_generating-батчи в pending при старте."""
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    UPDATE batches SET status = 'pending', story_id = NULL
-                    WHERE status = 'story_generating'
-                """)
-                n = cur.rowcount
-            conn.commit()
-        if n:
-            print(f"[DB] Восстановлено story_generating → pending: {n}")
-        return n
-    except Exception as e:
-        print(f"[DB] Ошибка db_recover_story_generating: {e}")
-        return 0
-
-
-def db_recover_video_generating():
-    """Сбрасывает застрявшие video_generating-батчи в story_ready при старте."""
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    UPDATE batches SET status = 'story_ready'
-                    WHERE status = 'video_generating'
-                """)
-                n = cur.rowcount
-            conn.commit()
-        if n:
-            print(f"[DB] Восстановлено video_generating → story_ready: {n}")
-        return n
-    except Exception as e:
-        print(f"[DB] Ошибка db_recover_video_generating: {e}")
-        return 0
-
-
-def db_reset_video_generating(batch_id):
-    """Сбрасывает video_generating → story_ready для конкретного батча
-    (только если батч ещё в этом статусе — безопасно вызывать в finally)."""
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    UPDATE batches SET status = 'story_ready'
-                    WHERE id = %s AND status = 'video_generating'
-                """, (batch_id,))
-                n = cur.rowcount
-            conn.commit()
-        if n:
-            print(f"[DB] Восстановлено video_generating → story_ready: {batch_id[:8]}…")
-    except Exception as e:
-        print(f"[DB] Ошибка db_reset_video_generating: {e}")
-
-
 def db_set_batch_story(batch_id, story_id):
     """Привязывает story к батчу и переводит статус в 'story_ready'."""
     _assert_known_status('story_ready')
@@ -633,25 +577,6 @@ def db_set_batch_video_ready(batch_id, video_url):
     except Exception as e:
         print(f"[DB] Ошибка db_set_batch_video_ready: {e}")
         return False
-
-
-def db_recover_transcoding():
-    """Сбрасывает застрявшие transcoding-батчи в video_ready при старте."""
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    UPDATE batches SET status = 'video_ready'
-                    WHERE status = 'transcoding'
-                """)
-                n = cur.rowcount
-            conn.commit()
-        if n:
-            print(f"[DB] Восстановлено transcoding → video_ready: {n}")
-        return n
-    except Exception as e:
-        print(f"[DB] Ошибка db_recover_transcoding: {e}")
-        return 0
 
 
 def db_set_batch_original_video(batch_id, video_data: bytes):
@@ -967,6 +892,11 @@ def db_set_batch_story_error(batch_id):
     return db_set_batch_status(batch_id, 'story_error')
 
 
+def db_set_batch_story_posted(batch_id):
+    """Переводит батч в status='story_posted' (история опубликована, стена ожидает)."""
+    return db_set_batch_status(batch_id, 'story_posted')
+
+
 def db_set_batch_story_ready_from_error(batch_id):
     """Откатывает батч в story_ready после сбоя видео, сохраняя story_id.
     Очищает data (request_id/url), но НЕ трогает story_id — сюжет не регенерируется."""
@@ -1270,8 +1200,10 @@ def db_get_actionable_batches():
                     SELECT id, status, created_at
                     FROM batches
                     WHERE status IN (
-                        'pending', 'story_ready', 'video_pending',
-                        'video_ready', 'transcode_ready'
+                        'pending', 'story_generating',
+                        'story_ready', 'video_generating', 'video_pending',
+                        'video_ready', 'transcoding',
+                        'transcode_ready', 'story_posted'
                     )
                     ORDER BY created_at ASC
                 """)
@@ -1296,10 +1228,14 @@ def db_get_distinct_batch_statuses():
 
 
 KNOWN_BATCH_STATUSES = frozenset({
-    # actionable
-    'pending', 'story_ready', 'video_pending', 'video_ready', 'transcode_ready',
-    # in-flight (recovery statuses)
-    'story_generating', 'video_generating', 'transcoding',
+    # story pipeline
+    'pending', 'story_generating',
+    # video pipeline
+    'story_ready', 'video_generating', 'video_pending',
+    # transcode pipeline
+    'video_ready', 'transcoding',
+    # publish pipeline
+    'transcode_ready', 'story_posted',
     # terminal
     'отменён', 'error', 'probe', 'story_probe', 'story_error',
     'video_error', 'transcode_error', 'publish_error', 'published',

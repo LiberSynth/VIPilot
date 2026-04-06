@@ -7,7 +7,6 @@ from flask import Flask, request
 
 from db import (
     init_db, run_upgrades, db_get,
-    db_recover_story_generating, db_recover_video_generating, db_recover_transcoding,
     db_get_schedule, db_get_active_targets, db_ensure_batch, db_get_last_pipeline_run,
     db_get_actionable_batches, db_get_distinct_batch_statuses,
     KNOWN_BATCH_STATUSES,
@@ -65,11 +64,15 @@ def _keepalive_loop():
 
 
 _STATUS_TO_PIPELINE = {
-    'pending':        story,
-    'story_ready':    video,
-    'video_pending':  video,
-    'video_ready':    transcode,
-    'transcode_ready': publish,
+    'pending':          story,
+    'story_generating': story,
+    'story_ready':      video,
+    'video_generating': video,
+    'video_pending':    video,
+    'video_ready':      transcode,
+    'transcoding':      transcode,
+    'transcode_ready':  publish,
+    'story_posted':     publish,
 }
 
 def _validate_batch_statuses():
@@ -218,9 +221,6 @@ def start_main_loop():
         _main_loop_started = True
         init_db()
         run_upgrades()
-        db_recover_story_generating()
-        db_recover_video_generating()
-        db_recover_transcoding()
         _validate_batch_statuses()
         wf_state.reset_active_threads()
         if env_get('workflow_state', 'running') == 'pause':

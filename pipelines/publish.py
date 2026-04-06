@@ -2,7 +2,9 @@
 Pipeline 5 — Публикация.
 Принимает batch_id, публикует видео на платформу таргета.
 Поддерживается: VKontakte (история + стена, настраивается через settings).
-Видео берётся из БД (video_data_transcoded). Статус: transcode_ready → published / publish_error.
+Видео берётся из БД (video_data_transcoded).
+Статусы: transcode_ready → story_posted → published / publish_error.
+  Возобновление после краша: story_posted → published.
 """
 
 from datetime import datetime, timezone
@@ -18,18 +20,14 @@ from db import (
     db_set_batch_probe,
     db_set_batch_published,
     db_set_batch_publish_error,
+    db_set_batch_story_posted,
 )
 from log import db_log_pipeline, db_log_entry, db_log_update, db_get_log_entries
 from clients import vk
 
 
-def _publish_vk(batch_id, log_id):
-    """Публикует батч на ВКонтакте. Возвращает True если хоть один канал успешен."""
-    if not vk.is_configured():
-        if log_id:
-            db_log_entry(log_id, 'VK_USER_TOKEN не задан', level='error')
-        return False
-
+def _get_vk_video(batch_id, log_id):
+    """Возвращает видеоданные батча (transcoded или original). Логирует проблемы."""
     video_data = db_get_batch_video_data(batch_id)
     if video_data is None:
         if log_id:
@@ -38,11 +36,23 @@ def _publish_vk(batch_id, log_id):
         if video_data is None:
             if log_id:
                 db_log_entry(log_id, 'Ни video_data_transcoded, ни video_data_original не найдены в БД', level='error')
-            return False
+    return video_data
 
-    group_id  = int(db_get('vk_group_id', '236929597'))
-    do_story  = db_get('vk_publish_story', '1') == '1'
-    do_wall   = db_get('vk_publish_wall',  '1') == '1'
+
+def _publish_vk(batch_id, log_id):
+    """Публикует батч на ВКонтакте (история + стена). Возвращает True если хоть один канал успешен."""
+    if not vk.is_configured():
+        if log_id:
+            db_log_entry(log_id, 'VK_USER_TOKEN не задан', level='error')
+        return False
+
+    video_data = _get_vk_video(batch_id, log_id)
+    if video_data is None:
+        return False
+
+    group_id = int(db_get('vk_group_id', '236929597'))
+    do_story = db_get('vk_publish_story', '1') == '1'
+    do_wall  = db_get('vk_publish_wall',  '1') == '1'
 
     story_ok = wall_ok = False
 
@@ -50,6 +60,8 @@ def _publish_vk(batch_id, log_id):
         if log_id:
             db_log_entry(log_id, 'Публикую историю…')
         story_ok = vk.publish_story(video_data, group_id, log_id) is not None
+        if story_ok:
+            db_set_batch_story_posted(batch_id)
 
     if do_wall:
         if log_id:
@@ -59,17 +71,53 @@ def _publish_vk(batch_id, log_id):
     return story_ok or wall_ok
 
 
+def _publish_vk_wall(batch_id, log_id):
+    """Публикует только на стену (возобновление — история уже опубликована)."""
+    if not vk.is_configured():
+        if log_id:
+            db_log_entry(log_id, 'VK_USER_TOKEN не задан — стена пропущена', level='warn')
+        return
+
+    do_wall = db_get('vk_publish_wall', '1') == '1'
+    if not do_wall:
+        return
+
+    video_data = _get_vk_video(batch_id, log_id)
+    if video_data is None:
+        return
+
+    group_id = int(db_get('vk_group_id', '236929597'))
+    if log_id:
+        db_log_entry(log_id, 'Публикую на стену… (возобновление)')
+    vk.publish_wall(video_data, group_id, log_id)
+
+
 def run(batch_id):
     try:
         batch = db_get_batch_by_id(batch_id)
         if not batch:
             return
 
-        if batch['status'] != 'transcode_ready':
+        status = batch['status']
+        if status not in ('transcode_ready', 'story_posted'):
             return
 
         target = batch['target_name'] or 'пробный'
 
+        # --- Возобновление после краша: история уже опубликована, только стена ---
+        if status == 'story_posted':
+            log_id = db_log_pipeline(
+                'publish', f'Публикация ({target}) — возобновление (стена)…',
+                status='running', batch_id=batch_id,
+            )
+            if target == 'VKontakte':
+                _publish_vk_wall(batch_id, log_id)
+            db_set_batch_published(batch_id)
+            db_log_update(log_id, f'Опубликовано ({target})', 'ok')
+            print(f"[publish] Батч {batch_id[:8]}… опубликован (возобновление)")
+            return
+
+        # --- Стандартный путь: transcode_ready ---
         if batch['target_id'] is None:
             log_id = db_log_pipeline('publish', 'Публикация (пробный)…',
                                      status='running', batch_id=batch_id)
