@@ -61,8 +61,9 @@ function collectAllSettings(activeTab) {
   data.set('log_lifetime',     v('log_lifetime'));
   data.set('batch_lifetime',   v('batch_lifetime'));
   data.set('file_lifetime',    v('file_lifetime'));
-  data.set('buffer_hours',     v('buffer_hours'));
-  data.set('loop_interval',    v('loop_interval'));
+  data.set('buffer_hours',      v('buffer_hours'));
+  data.set('loop_interval',     v('loop_interval'));
+  data.set('max_batch_threads', v('max_batch_threads'));
   return data;
 }
 
@@ -187,6 +188,7 @@ function validateLifetimes() {
     document.getElementById('file_lifetime'),
     document.getElementById('buffer_hours'),
     document.getElementById('loop_interval'),
+    document.getElementById('max_batch_threads'),
   ].filter(Boolean);
   serviceFields.forEach(f => {
     f.addEventListener('input',  scheduleServiceSave);
