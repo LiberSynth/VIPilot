@@ -86,7 +86,8 @@ def admin_page():
     video_duration     = max(1, min(60, int(db_get("video_duration", "6"))))
     video_post_prompt  = db_get("video_post_prompt", "")
     buffer_hours       = max(1, min(720, int(db_get("buffer_hours", "24"))))
-    loop_interval      = max(1, min(3600, int(db_get("loop_interval", "5"))))
+    loop_interval       = max(1, min(3600, int(db_get("loop_interval", "5"))))
+    max_batch_threads   = max(1, min(32, int(db_get("max_batch_threads", "2"))))
     story_fails_to_next = max(1, int(db_get("story_fails_to_next", "3")))
     video_fails_to_next = max(1, int(db_get("video_fails_to_next", "3")))
 
