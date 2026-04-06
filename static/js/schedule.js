@@ -31,6 +31,13 @@
       });
   }
 
+  function loadScheduleSilent() {
+    return fetch('/api/schedule')
+      .then(function(r) { return r.json(); })
+      .then(renderSchedule)
+      .catch(function() {});
+  }
+
   function updateSaveBtn() {
     const input = document.getElementById('new-schedule-time');
     const btn   = document.getElementById('pt-save-btn');
@@ -80,10 +87,11 @@
   window.addScheduleSlot = addScheduleSlot;
 
   window.deleteScheduleSlot = function(btn, id) {
-    btn.disabled = true;
+    var row = btn.closest('.pt-item-row');
+    if (row) row.remove();
     fetch('/api/schedule/' + id, {method: 'DELETE'})
       .then(function(r) { return r.json(); })
-      .then(function() { return loadSchedule(); })
+      .then(function() { return loadScheduleSilent(); })
       .catch(function() {});
   };
 
