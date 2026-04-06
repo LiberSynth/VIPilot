@@ -8,7 +8,8 @@ from flask import Flask, request
 from db import (
     init_db, run_upgrades, db_get,
     db_get_schedule, db_get_active_targets, db_ensure_batch, db_get_last_pipeline_run,
-    db_get_actionable_batches, db_get_distinct_batch_statuses,
+    db_get_actionable_batches,
+    db_get_batches_with_unknown_status,
     db_cancel_obsolete_waiting_batches,
     KNOWN_BATCH_STATUSES,
     env_get, env_set,
@@ -78,12 +79,12 @@ _STATUS_TO_PIPELINE = {
 
 def _validate_batch_statuses():
     """Проверяет, нет ли батчей с неизвестным статусом. Вызывается при старте."""
-    found = db_get_distinct_batch_statuses()
-    unknown = found - KNOWN_BATCH_STATUSES
-    if unknown:
-        msg = f"[validate] ВНИМАНИЕ: батчи с неизвестным статусом: {', '.join(sorted(unknown))}"
-        db_log_root(msg, status='error')
-        print(msg)
+    unknown_batches = db_get_batches_with_unknown_status(KNOWN_BATCH_STATUSES)
+    if unknown_batches:
+        for batch_id, status in unknown_batches.items():
+            msg = f"[validate] ВНИМАНИЕ: батч имеет неизвестный статус: {status!r}"
+            db_log_pipeline('validate', msg, status='error', batch_id=batch_id)
+            print(f"[validate] batch_id={batch_id}: неизвестный статус {status!r}")
     else:
         print("[validate] Все статусы батчей известны.")
 

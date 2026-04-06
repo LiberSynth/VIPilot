@@ -1271,6 +1271,19 @@ def db_get_distinct_batch_statuses():
         return set()
 
 
+def db_get_batches_with_unknown_status(known_statuses):
+    """Возвращает словарь {batch_id: status} для батчей с неизвестным статусом."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT id, status FROM batches")
+                rows = cur.fetchall()
+        return {row[0]: row[1] for row in rows if row[1] not in known_statuses}
+    except Exception as e:
+        print(f"[DB] Ошибка db_get_batches_with_unknown_status: {e}")
+        return {}
+
+
 KNOWN_BATCH_STATUSES = frozenset({
     # story pipeline
     'pending', 'story_generating',
