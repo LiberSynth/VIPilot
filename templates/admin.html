@@ -243,6 +243,7 @@
       <div class="wf-row">
         <span class="wf-dot {{ 'running' if workflow_state == 'running' else 'pause' }}" id="wf-dot"></span>
         <span class="wf-state-text" id="wf-state-text">{{ 'Работает' if workflow_state == 'running' else 'Приостановлен' }}</span>
+        <span id="wf-threads-text" style="font-size:12px;color:#6060a0;margin-left:6px"></span>
         <div class="wf-btns">
           <button class="wf-btn wf-start" id="wf-btn-start" onclick="wfStart()" {{ 'disabled' if workflow_state == 'running' else '' }}>Запустить</button>
           <button class="wf-btn" id="wf-btn-pause" onclick="wfPause()" {{ '' if workflow_state == 'running' else 'disabled' }}>Приостановить</button>
@@ -308,6 +309,14 @@
             <span class="lead-unit">с</span>
           </div>
           <div class="hint" style="margin-top:5px">Пауза между итерациями главного цикла. По умолчанию: 5 с.</div>
+        </div>
+        <div style="margin-top:14px">
+          <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block">Максимальное количество потоков обработки</label>
+          <div class="lead-row">
+            <input type="number" name="max_batch_threads" id="max_batch_threads" value="{{ max_batch_threads }}" min="1" max="32" step="1">
+            <span class="lead-unit">шт</span>
+          </div>
+          <div class="hint" style="margin-top:5px">Сколько батчей обрабатывается одновременно. По умолчанию: 2.</div>
         </div>
       </div>
 

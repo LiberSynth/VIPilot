@@ -1,6 +1,6 @@
 """
 Pipeline 5 — Публикация.
-Берёт первый transcode_ready-батч и публикует видео на платформу таргета.
+Принимает batch_id, публикует видео на платформу таргета.
 Поддерживается: VKontakte (история + стена, настраивается через settings).
 Видео берётся из БД (video_data_transcoded). Статус: transcode_ready → published / publish_error.
 """
@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from utils.notify import notify_failure
 from db import (
     db_get,
-    db_get_transcode_ready_batch,
+    db_get_batch_by_id,
     db_get_batch_video_data,
     db_get_batch_original_video,
     db_is_batch_scheduled,
@@ -19,7 +19,7 @@ from db import (
     db_set_batch_published,
     db_set_batch_publish_error,
 )
-from log import db_log_pipeline, db_log_entry, db_log_update, db_log_interrupt_running, db_get_log_entries
+from log import db_log_pipeline, db_log_entry, db_log_update, db_get_log_entries
 from clients import vk
 
 
@@ -40,7 +40,7 @@ def _publish_vk(batch_id, log_id):
                 db_log_entry(log_id, 'Ни video_data_transcoded, ни video_data_original не найдены в БД', level='error')
             return False
 
-    group_id = int(db_get('vk_group_id', '236929597'))
+    group_id  = int(db_get('vk_group_id', '236929597'))
     do_story  = db_get('vk_publish_story', '1') == '1'
     do_wall   = db_get('vk_publish_wall',  '1') == '1'
 
@@ -59,19 +59,17 @@ def _publish_vk(batch_id, log_id):
     return story_ok or wall_ok
 
 
-def run():
-    batch_id = None
+def run(batch_id):
     try:
-        db_log_interrupt_running('publish')
-
-        batch = db_get_transcode_ready_batch()
+        batch = db_get_batch_by_id(batch_id)
         if not batch:
             return
 
-        batch_id = str(batch['id'])
-        target   = batch['target_name'] or 'пробный'
+        if batch['status'] != 'transcode_ready':
+            return
 
-        # Пробный батч без таргета — публикация не нужна, переводим в probe
+        target = batch['target_name'] or 'пробный'
+
         if batch['target_id'] is None:
             log_id = db_log_pipeline('publish', 'Публикация (пробный)…',
                                      status='running', batch_id=batch_id)

@@ -70,4 +70,10 @@ from .db import (
     db_clear_all_history,
     db_reset_batch_pipeline,
     db_get_last_pipeline_run,
+    db_get_batch_by_id,
+    db_get_actionable_batches,
+    db_set_batch_story_generating_by_id,
+    db_set_batch_video_generating_by_id,
+    db_set_batch_transcoding_by_id,
 )
+

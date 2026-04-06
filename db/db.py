@@ -307,25 +307,6 @@ def db_get_pending_batch():
         return None
 
 
-def db_recover_story_generating():
-    """Сбрасывает застрявшие story_generating-батчи в pending при старте."""
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    UPDATE batches SET status = 'pending'
-                    WHERE status = 'story_generating'
-                """)
-                n = cur.rowcount
-            conn.commit()
-        if n:
-            print(f"[DB] Восстановлено story_generating → pending: {n}")
-        return n
-    except Exception as e:
-        print(f"[DB] Ошибка db_recover_story_generating: {e}")
-        return 0
-
-
 def db_get_story_ready_batch_atomic():
     """Атомарно захватывает первый story_ready-батч: переводит его в 'video_generating'
     и возвращает данные. Гарантирует, что два потока не возьмут один и тот же батч."""
@@ -1488,6 +1469,102 @@ def db_get_last_pipeline_run(pipeline):
     except Exception as e:
         print(f"[DB] Ошибка db_get_last_pipeline_run: {e}")
         return None
+
+
+def db_get_batch_by_id(batch_id):
+    """Возвращает батч по ID со всеми полями, нужными пайплайнам."""
+    try:
+        with get_db() as conn:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute("""
+                    SELECT b.id, b.scheduled_at, b.target_id, b.story_id,
+                           b.video_url, b.status, b.adhoc, b.data,
+                           b.text_model_id, b.video_model_id,
+                           t.name            AS target_name,
+                           t.aspect_ratio_x,
+                           t.aspect_ratio_y,
+                           t.transcode       AS target_transcode
+                    FROM batches b
+                    LEFT JOIN targets t ON t.id = b.target_id
+                    WHERE b.id = %s
+                """, (batch_id,))
+                row = cur.fetchone()
+        return dict(row) if row else None
+    except Exception as e:
+        print(f"[DB] Ошибка db_get_batch_by_id: {e}")
+        return None
+
+
+def db_get_actionable_batches():
+    """Возвращает список батчей, готовых к обработке (FIFO по created_at)."""
+    try:
+        with get_db() as conn:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute("""
+                    SELECT id, status, created_at
+                    FROM batches
+                    WHERE status IN (
+                        'pending', 'story_ready', 'video_pending',
+                        'video_ready', 'transcode_ready'
+                    )
+                    ORDER BY created_at ASC
+                """)
+                rows = cur.fetchall()
+        return [dict(r) for r in rows]
+    except Exception as e:
+        print(f"[DB] Ошибка db_get_actionable_batches: {e}")
+        return []
+
+
+def db_set_batch_story_generating_by_id(batch_id):
+    """Переводит конкретный батч pending → story_generating (атомарно)."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE batches SET status = 'story_generating'
+                    WHERE id = %s AND status = 'pending'
+                """, (batch_id,))
+                n = cur.rowcount
+            conn.commit()
+        return n > 0
+    except Exception as e:
+        print(f"[DB] Ошибка db_set_batch_story_generating_by_id: {e}")
+        return False
+
+
+def db_set_batch_video_generating_by_id(batch_id):
+    """Переводит конкретный батч story_ready → video_generating (атомарно)."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE batches SET status = 'video_generating'
+                    WHERE id = %s AND status = 'story_ready'
+                """, (batch_id,))
+                n = cur.rowcount
+            conn.commit()
+        return n > 0
+    except Exception as e:
+        print(f"[DB] Ошибка db_set_batch_video_generating_by_id: {e}")
+        return False
+
+
+def db_set_batch_transcoding_by_id(batch_id):
+    """Переводит конкретный батч video_ready → transcoding (атомарно)."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE batches SET status = 'transcoding'
+                    WHERE id = %s AND status = 'video_ready'
+                """, (batch_id,))
+                n = cur.rowcount
+            conn.commit()
+        return n > 0
+    except Exception as e:
+        print(f"[DB] Ошибка db_set_batch_transcoding_by_id: {e}")
+        return False
 
 
 def db_cleanup_batches(batch_lifetime_days: int) -> int:

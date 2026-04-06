@@ -1,9 +1,8 @@
 """
 Pipeline 2 — Генерация сюжета.
-Берёт первый pending-батч, атомарно захватывает его (story_generating),
+Принимает batch_id, атомарно переводит батч в story_generating,
 перебирает активные text-модели по порядку (с retry на каждую),
 генерирует текст через OpenRouter и сохраняет результат.
-Если все модели не ответили — цикл начинается заново с первой модели.
 """
 
 import os
@@ -13,7 +12,8 @@ from utils.notify import notify_failure
 from db import (
     db_set_batch_text_model,
     db_get,
-    db_get_pending_batch,
+    db_get_batch_by_id,
+    db_set_batch_story_generating_by_id,
     db_get_active_text_models,
     db_get_text_model_by_id,
     db_create_story,
@@ -25,7 +25,7 @@ from db import (
     db_steal_video_from_cancelled,
     env_get,
 )
-from log import db_log_pipeline, db_log_entry, db_log_update, db_log_interrupt_running
+from log import db_log_pipeline, db_log_entry, db_log_update
 
 _API_KEY = os.environ.get('OPENROUTER_API_KEY', '')
 
@@ -50,7 +50,6 @@ def _build_body(body_tpl, model_url, system_prompt, user_prompt):
                 if has_system:
                     m['content'] = str(m['content']).format(user_prompt)
                 else:
-                    # Модель не поддерживает system-роль — склеиваем оба промпта в user
                     merged = (system_prompt.strip() + '\n\n' + user_prompt.strip()).strip() \
                              if system_prompt else user_prompt
                     m['content'] = str(m['content']).format(merged)
@@ -105,22 +104,23 @@ def _try_model(log_id, m, system_prompt, user_prompt):
     return result
 
 
-def run():
-    batch_id   = None
+def run(batch_id):
     batch_done = False
     log_id     = None
 
     try:
-        db_log_interrupt_running('story')
-
-        batch = db_get_pending_batch()
+        batch = db_get_batch_by_id(batch_id)
         if not batch:
-            batch_done = True
             return
 
-        batch_id  = str(batch['id'])
-        target    = batch['target_name'] or 'пробный'
-        is_probe  = batch['target_id'] is None
+        if batch['status'] != 'pending':
+            return
+
+        if not db_set_batch_story_generating_by_id(batch_id):
+            return
+
+        target   = batch['target_name'] or 'пробный'
+        is_probe = batch['target_id'] is None
 
         if not is_probe and not db_is_batch_scheduled(batch['scheduled_at'], batch['target_id']):
             db_set_batch_obsolete(batch_id)
@@ -269,6 +269,6 @@ def run():
         notify_failure(f"сбой story-пайплайна: {e}")
 
     finally:
-        if batch_id and not batch_done:
+        if not batch_done:
             db_set_batch_pending(batch_id)
             print(f"[story] Батч {batch_id[:8]}… сброшен в pending (повторная попытка)")

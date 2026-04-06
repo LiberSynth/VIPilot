@@ -1,12 +1,13 @@
 """
 Pipeline 3 — Генерация видео.
 
-Берёт первый батч story_ready (или video_pending при рестарте),
-отправляет промпт в fal.ai, поллит статус и сохраняет video_url в batches.
+Принимает batch_id, определяет нужно ли возобновление (video_pending)
+или новая генерация (story_ready), отправляет промпт в fal.ai,
+поллит статус и сохраняет video_url в batches.
 
 Статусы батча:
-  story_ready → video_pending → video_ready
-                             → video_error
+  story_ready → video_generating → video_pending → video_ready
+                                                  → video_error
 """
 
 import os
@@ -19,8 +20,8 @@ from db import (
     db_set_batch_video_model,
     db_get,
     env_get,
-    db_get_story_ready_batch_atomic,
-    db_get_video_pending_batch,
+    db_get_batch_by_id,
+    db_set_batch_video_generating_by_id,
     db_is_batch_scheduled,
     db_set_batch_obsolete,
     db_get_story_text,
@@ -34,21 +35,14 @@ from db import (
     db_set_batch_original_video,
     db_get_random_real_original_video,
 )
-from log import db_log_pipeline, db_log_entry, db_log_update, db_log_interrupt_running
+from log import db_log_pipeline, db_log_entry, db_log_update
 
-_FAL_KEY      = os.environ.get('FAL_API_KEY', '')
+_FAL_KEY = os.environ.get('FAL_API_KEY', '')
 
 
 class ProviderFatalError(Exception):
     """Raised when a provider returns a permanent, non-retryable billing/account error."""
 
-
-# ---------------------------------------------------------------------------
-# Per-provider fatal-error detectors
-# Each function receives (status_code: int, response_body: dict | str) and
-# returns True if the response represents a fatal billing/account error.
-# Add a new function here to support additional providers.
-# ---------------------------------------------------------------------------
 
 def _is_fatal_fal(status_code: int, body) -> bool:
     """Detect fal.ai balance-exhausted / account-locked errors (HTTP 403)."""
@@ -58,19 +52,15 @@ def _is_fatal_fal(status_code: int, body) -> bool:
     return 'exhausted balance' in text or 'locked' in text
 
 
-# Registry: list of detector functions to try in order.
-_FATAL_DETECTORS = [
-    _is_fatal_fal,
-]
+_FATAL_DETECTORS = [_is_fatal_fal]
 
 
 def _is_provider_fatal(status_code: int, body) -> bool:
-    """Return True if any registered detector considers the error fatal."""
     return any(fn(status_code, body) for fn in _FATAL_DETECTORS)
 
 
-_POLL_INTERVAL = 30   # секунд между опросами
-_POLL_MAX      = 240  # максимум попыток (~2 часа)
+_POLL_INTERVAL = 30
+_POLL_MAX      = 240
 
 
 def _headers():
@@ -81,19 +71,16 @@ def _headers():
 
 
 def _build_body(body_tpl, prompt, ar_x, ar_y, video_duration):
-    """Заполняет шаблон тела запроса значениями из батча/настроек."""
     body = dict(body_tpl)
     if 'prompt' in body:
         body['prompt'] = str(body['prompt']).format(prompt)
-    # Вычисляем width/height из aspect ratio (нужны для {:int} в этих полях)
-    if ar_x <= ar_y:   # портрет или квадрат
+    if ar_x <= ar_y:
         calc_h = 1024
         calc_w = round(1024 * ar_x / ar_y / 32) * 32
-    else:              # альбомная
+    else:
         calc_w = 1024
         calc_h = round(1024 * ar_y / ar_x / 32) * 32
 
-    # Маппинг имени поля → целое значение для {:int}
     _INT_VALUES = {
         'duration':   video_duration,
         'width':      calc_w,
@@ -108,7 +95,7 @@ def _build_body(body_tpl, prompt, ar_x, ar_y, video_duration):
             if field == 'aspect_ratio':
                 body[field] = val.format(ar_x, ar_y)
             elif field == 'prompt':
-                pass  # уже заменён выше
+                pass
             else:
                 try:
                     body[field] = val.format(video_duration)
@@ -120,8 +107,7 @@ def _build_body(body_tpl, prompt, ar_x, ar_y, video_duration):
 
 def _poll(log_id, status_url, response_url):
     """Поллит fal.ai до завершения.
-    Возвращает (video_url, None) при успехе или (None, error_msg) при сбое.
-    Не меняет статус батча — это обязанность вызывающего кода."""
+    Возвращает (video_url, None) при успехе или (None, error_msg) при сбое."""
     for attempt in range(_POLL_MAX):
         time.sleep(_POLL_INTERVAL)
         try:
@@ -172,28 +158,29 @@ def _poll(log_id, status_url, response_url):
     return None, msg
 
 
-def run():
-    batch_id = None
+def run(batch_id):
     log_id = None
     try:
-        db_log_interrupt_running('video')
-
-        # Приоритет: возобновить прерванную генерацию (video_pending с request_id)
-        batch   = db_get_video_pending_batch()
-        resumed = batch is not None
-        if not batch:
-            # Атомарный захват: batch сразу переводится в video_generating,
-            # поэтому следующий поток его не возьмёт.
-            batch = db_get_story_ready_batch_atomic()
+        batch = db_get_batch_by_id(batch_id)
         if not batch:
             return
 
-        batch_id  = str(batch['id'])
-        target    = batch['target_name'] or 'пробный'
-        ar_x      = batch['aspect_ratio_x'] or 9
-        ar_y      = batch['aspect_ratio_y'] or 16
-        story_id  = str(batch['story_id'])
-        is_probe  = batch['target_id'] is None
+        status = batch['status']
+
+        if status == 'video_pending':
+            resumed = True
+        elif status == 'story_ready':
+            resumed = False
+            if not db_set_batch_video_generating_by_id(batch_id):
+                return
+        else:
+            return
+
+        target          = batch['target_name'] or 'пробный'
+        ar_x            = batch['aspect_ratio_x'] or 9
+        ar_y            = batch['aspect_ratio_y'] or 16
+        story_id        = str(batch['story_id'])
+        is_probe        = batch['target_id'] is None
         pinned_model_id = batch.get('video_model_id')
 
         try:
@@ -208,7 +195,6 @@ def run():
             print(f"[video] Батч {batch_id[:8]}… отменён, пропускаю")
             return
 
-        # ── Режим эмуляции ──────────────────────────────────────────────────
         if env_get("emulation_mode", "0") == "1":
             print(f"[video] Батч {batch_id[:8]}… — эмуляция генерации видео")
             log_id = db_log_pipeline(
@@ -238,12 +224,12 @@ def run():
         used_model    = None
         used_model_id = None
 
-        # --- Возобновление ---
         if resumed:
-            request_id   = batch['data']['request_id']
-            status_url   = batch['data']['status_url']
-            response_url = batch['data']['response_url']
-            used_model   = batch['data'].get('model_name')
+            batch_data   = batch['data'] or {}
+            request_id   = batch_data['request_id']
+            status_url   = batch_data['status_url']
+            response_url = batch_data['response_url']
+            used_model   = batch_data.get('model_name')
             log_id = db_log_pipeline(
                 'video', 'Генерация видео… (возобновление)',
                 status='running', batch_id=batch_id,
@@ -251,7 +237,6 @@ def run():
             if log_id:
                 db_log_entry(log_id, f"Возобновление: request_id={request_id}")
 
-        # --- Новая генерация ---
         else:
             if not _FAL_KEY:
                 msg = 'FAL_API_KEY не задан — генерация невозможна'
@@ -260,9 +245,7 @@ def run():
                 notify_failure(f"video: {msg}")
                 return
 
-            # --- Выбор модели(ей) ---
             if pinned_model_id:
-                # Probe-режим: используем только зафиксированную модель, одна попытка
                 pinned_m = db_get_video_model_by_id(pinned_model_id)
                 if not pinned_m:
                     msg = f'Пробная модель {str(pinned_model_id)[:8]}… не найдена'
@@ -403,7 +386,6 @@ def run():
                 db_log_entry(log_id, f"Запрос принят ({used_model}): {request_id}")
             print(f"[video] Генерация запущена: request_id={request_id}")
 
-        # --- Поллинг ---
         video_url, poll_err = _poll(log_id, status_url, response_url)
         if not video_url:
             if poll_err:
@@ -411,15 +393,11 @@ def run():
                     db_log_update(log_id, poll_err, 'error')
                 notify_failure(f"video: {poll_err} (батч {batch_id[:8]})")
             if is_probe:
-                # Проба: фиксируем ошибку, сюжет сохраняется
                 db_set_batch_video_error(batch_id)
             else:
-                # Обычный батч: откатываем в story_ready, сохраняя story_id
-                # (сюжет НЕ регенерируется, видео попробуем снова на следующем цикле)
                 db_set_batch_story_ready_from_error(batch_id)
             return
 
-        # --- Скачиваем и сохраняем оригинал ---
         if log_id:
             db_log_entry(log_id, f"Скачиваю оригинал: {video_url}")
         print(f"[video] Скачиваю оригинал с fal.ai…")
@@ -466,8 +444,5 @@ def run():
         print(f"[video] Ошибка: {e}")
         notify_failure(f"сбой video-пайплайна: {e}")
     finally:
-        # Если батч был захвачен (video_generating) но не переведён в
-        # video_pending/video_ready/отменён/pending — возвращаем в story_ready.
-        # Безопасно: UPDATE сработает только если статус всё ещё video_generating.
         if batch_id:
             db_reset_video_generating(batch_id)

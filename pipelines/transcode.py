@@ -1,6 +1,7 @@
 """
 Pipeline 4 — Транскодирование.
-Берёт первый video_ready-батч и транскодирует его в H.264 / AAC / MP4.
+Принимает batch_id, переводит батч video_ready → transcoding (для восстановления
+после краша), транскодирует видео в H.264 / AAC / MP4.
 
 Если транскодирование выключено для таргета — батч тихо переводится в
 transcode_ready без единой записи в лог.
@@ -11,7 +12,7 @@ transcode_ready без единой записи в лог.
     батч всё равно переходит в transcode_ready с пустым video_data_transcoded
     (пайплайн публикации возьмёт оригинал как запасной вариант).
 
-Статус: video_ready → transcode_ready / transcode_error.
+Статус: video_ready → transcoding → transcode_ready / transcode_error.
 """
 
 import os
@@ -21,7 +22,8 @@ import tempfile
 from utils.notify import notify_failure
 from db import (
     db_get,
-    db_get_video_ready_batch_atomic,
+    db_get_batch_by_id,
+    db_set_batch_transcoding_by_id,
     db_is_batch_scheduled,
     db_set_batch_obsolete,
     db_get_batch_original_video,
@@ -29,7 +31,7 @@ from db import (
     db_set_batch_transcode_ready,
     db_set_batch_transcode_error,
 )
-from log import db_log_pipeline, db_log_entry, db_log_update, db_log_interrupt_running
+from log import db_log_pipeline, db_log_entry, db_log_update
 
 
 def _probe_duration(src):
@@ -104,22 +106,23 @@ def _ffmpeg(src, dst, log_id):
     return True
 
 
-def run():
-    batch_id = None
-    log_id   = None
+def run(batch_id):
+    log_id = None
     try:
-        db_log_interrupt_running('transcode')
-
-        batch = db_get_video_ready_batch_atomic()
+        batch = db_get_batch_by_id(batch_id)
         if not batch:
             return
 
-        batch_id        = str(batch['id'])
+        if batch['status'] != 'video_ready':
+            return
+
+        if not db_set_batch_transcoding_by_id(batch_id):
+            return
+
         is_probe        = batch['target_id'] is None
         target          = batch['target_name'] or 'пробный'
         do_transcode    = (db_get('vk_transcode', '1') == '1') if is_probe else bool(batch.get('target_transcode', True))
 
-        # ── Транскодирование выключено для таргета ───────────────────────────
         if not do_transcode:
             db_set_batch_transcode_skip(batch_id)
             print(f"[transcode] Батч {batch_id[:8]}… ({target}) — транскод отключён, пропускаю")
@@ -139,7 +142,6 @@ def run():
             status='running', batch_id=batch_id,
         )
 
-        # ── Получаем оригинал из БД ─────────────────────────────────────────
         original_data = db_get_batch_original_video(batch_id)
         if original_data is None:
             msg = 'Оригинал видео отсутствует в БД (video_data_original = NULL)'

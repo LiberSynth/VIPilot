@@ -2,16 +2,23 @@ import os
 import time
 import atexit
 import threading
-from datetime import timedelta
+from datetime import datetime, timezone, timedelta
 from flask import Flask, request
 
-from db import init_db, run_upgrades, db_get, db_recover_story_generating, db_recover_video_generating, db_recover_transcoding, env_get, env_set
-from log import db_log_root
-from pipelines import planning, story, video, transcode, publish, cleanup
+from db import (
+    init_db, run_upgrades, db_get,
+    db_recover_story_generating, db_recover_video_generating, db_recover_transcoding,
+    db_get_schedule, db_get_active_targets, db_ensure_batch, db_get_last_pipeline_run,
+    db_get_actionable_batches,
+    env_get, env_set,
+)
+from log import db_log_root, db_log_pipeline, db_log_entry
+from pipelines import story, video, transcode, publish, cleanup
 from routes.admin import bp as admin_bp
 from routes.api import bp as api_bp
-from utils.consts import FLASK_SECRET
+from utils.consts import FLASK_SECRET, MSK
 from utils.limiter import limiter
+from utils.utils import parse_hhmm
 import utils.workflow_state as wf_state
 
 flask_app = Flask(__name__, static_folder="static", static_url_path="/static")
@@ -56,41 +63,127 @@ def _keepalive_loop():
             print(f"[keepalive] Ошибка: {e}")
 
 
-def _wrap(module):
-    def _runner():
-        module.run()
-        wf_state.wakeup_loop()
-    return _runner
+_STATUS_TO_PIPELINE = {
+    'pending':        story,
+    'story_ready':    video,
+    'video_pending':  video,
+    'video_ready':    transcode,
+    'transcode_ready': publish,
+}
+
+
+def _run_planning(loop_interval: int):
+    """Планирование: проверяет расписание и создаёт недостающие батчи."""
+    try:
+        schedule = db_get_schedule()
+        targets  = db_get_active_targets()
+
+        if not schedule or not targets:
+            return
+
+        try:
+            buffer_hours = int(db_get('buffer_hours', '24'))
+        except (ValueError, TypeError):
+            buffer_hours = 24
+
+        now           = datetime.now(timezone.utc)
+        effective_now = now + timedelta(seconds=loop_interval)
+        window_end    = effective_now + timedelta(hours=buffer_hours)
+        A             = db_get_last_pipeline_run('planning')
+
+        for day_offset in range(-1, 2):
+            day = (now + timedelta(days=day_offset)).date()
+            for slot in schedule:
+                h, m = parse_hhmm(slot['time_utc'])
+                dt = datetime(day.year, day.month, day.day, h, m, tzinfo=timezone.utc)
+
+                in_future_window = effective_now <= dt < window_end
+
+                is_catchup = False
+                if dt < now:
+                    if A is None:
+                        is_catchup = False
+                    elif dt < A:
+                        is_catchup = False
+                    elif dt < A + timedelta(hours=buffer_hours):
+                        is_catchup = True
+                    else:
+                        created_at = slot.get('created_at')
+                        is_catchup = (created_at is not None and created_at <= dt)
+
+                if in_future_window or is_catchup:
+                    for target in targets:
+                        batch_id = db_ensure_batch(dt, target['id'])
+                        if batch_id:
+                            log_id = db_log_pipeline(
+                                'planning',
+                                'Батч запланирован',
+                                status='ok',
+                                batch_id=batch_id,
+                            )
+                            if log_id:
+                                dt_msk = dt.astimezone(MSK)
+                                db_log_entry(log_id, f"Запланирована публикация: {dt_msk.strftime('%d.%m.%Y %H:%M')} МСК")
+                                db_log_entry(log_id, f"Таргет: {target['name']}  ({target['aspect_ratio_x']}:{target['aspect_ratio_y']})")
+                                db_log_entry(log_id, f"Горизонт планирования: {buffer_hours} ч")
+                            print(
+                                f"[planning] Создан батч: {dt.strftime('%d.%m %H:%M')} UTC"
+                                f" / {target['name']}"
+                            )
+
+    except Exception as e:
+        db_log_pipeline('planning', f"Сбой планирования: {e}", status='error')
+        print(f"[planning] Ошибка: {e}")
 
 
 def main_loop():
-    _threads = {
-        'planning':  None,
-        'story':     None,
-        'video':     None,
-        'transcode': None,
-        'publish':   None,
-        'cleanup':   None,
-    }
+    _cleanup_thread = None
 
     while True:
         interval = 5
         try:
             wf_state.wait_if_paused()
 
-            interval = int(db_get('loop_interval', '5'))
+            try:
+                interval = int(db_get('loop_interval', '5'))
+            except (ValueError, TypeError):
+                interval = 5
 
-            for name, module in [
-                ('planning',  planning),
-                ('story',     story),
-                ('video',     video),
-                ('transcode', transcode),
-                ('publish',   publish),
-                ('cleanup',   cleanup),
-            ]:
-                if _threads[name] is None or not _threads[name].is_alive():
-                    _threads[name] = threading.Thread(target=_wrap(module), daemon=True)
-                    _threads[name].start()
+            try:
+                max_threads = max(1, min(32, int(db_get('max_batch_threads', '2'))))
+            except (ValueError, TypeError):
+                max_threads = 2
+
+            _run_planning(interval)
+
+            if wf_state.get_active_threads() < max_threads:
+                batches = db_get_actionable_batches()
+                for b in batches:
+                    if wf_state.get_active_threads() >= max_threads:
+                        break
+                    bid    = str(b['id'])
+                    status = b['status']
+                    pipeline_module = _STATUS_TO_PIPELINE.get(status)
+                    if pipeline_module is None:
+                        continue
+                    if not wf_state.claim_batch(bid):
+                        continue
+
+                    def _batch_thread(batch_id=bid, pipeline=pipeline_module):
+                        try:
+                            pipeline.run(batch_id)
+                        except Exception as e:
+                            print(f"[main_loop] Необработанная ошибка потока {batch_id[:8]}…: {e}")
+                        finally:
+                            wf_state.release_batch(batch_id)
+                            wf_state.wakeup_loop()
+
+                    t = threading.Thread(target=_batch_thread, daemon=True)
+                    t.start()
+
+            if _cleanup_thread is None or not _cleanup_thread.is_alive():
+                _cleanup_thread = threading.Thread(target=cleanup.run, daemon=True)
+                _cleanup_thread.start()
 
         except Exception as e:
             db_log_root(f"Ошибка главного цикла: {e}", status='error')
@@ -116,6 +209,7 @@ def start_main_loop():
         db_recover_story_generating()
         db_recover_video_generating()
         db_recover_transcoding()
+        wf_state.reset_active_threads()
         if env_get('workflow_state', 'running') == 'pause':
             wf_state.set_paused()
         else:

@@ -10,23 +10,50 @@ function showToast(msg, type) {
   }, 3500);
 }
 
-function wfUpdateUI(state) {
-  var dot      = document.getElementById('wf-dot');
-  var text     = document.getElementById('wf-state-text');
-  var btnStart = document.getElementById('wf-btn-start');
-  var btnPause = document.getElementById('wf-btn-pause');
+function wfUpdateUI(state, activeThreads) {
+  var dot         = document.getElementById('wf-dot');
+  var text        = document.getElementById('wf-state-text');
+  var threadsText = document.getElementById('wf-threads-text');
+  var btnStart    = document.getElementById('wf-btn-start');
+  var btnPause    = document.getElementById('wf-btn-pause');
   if (state === 'running') {
-    dot.className    = 'wf-dot running';
-    text.textContent = 'Работает';
+    dot.className     = 'wf-dot running';
+    text.textContent  = 'Работает';
     btnStart.disabled = true;
     btnPause.disabled = false;
   } else {
-    dot.className    = 'wf-dot pause';
-    text.textContent = 'Приостановлен';
+    dot.className     = 'wf-dot pause';
+    text.textContent  = 'Приостановлен';
     btnStart.disabled = false;
     btnPause.disabled = true;
   }
+  if (threadsText) {
+    var n = (typeof activeThreads === 'number') ? activeThreads : 0;
+    threadsText.textContent = n > 0 ? ('(выполняется ' + n + ' ' + _pluralThread(n) + ')') : '';
+  }
 }
+
+function _pluralThread(n) {
+  var mod10  = n % 10;
+  var mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return 'поток';
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return 'потока';
+  return 'потоков';
+}
+
+function refreshWorkflowState() {
+  fetch('/api/workflow/state')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.state) wfUpdateUI(d.state, d.active_threads || 0);
+    })
+    .catch(function() {});
+}
+
+(function() {
+  refreshWorkflowState();
+  setInterval(refreshWorkflowState, 5000);
+})();
 
 function wfStart() {
   var btn = document.getElementById('wf-btn-start');
