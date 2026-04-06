@@ -416,6 +416,22 @@
     });
   };
 
+  window.monitorExpandAllBatches = function() {
+    document.querySelectorAll('.monitor-batch').forEach(function(batch) {
+      var bid = batch.dataset.bid;
+      batch.classList.add('open');
+      if (bid) delete _collapsedBids[bid];
+    });
+  };
+
+  window.monitorCollapseAllBatches = function() {
+    document.querySelectorAll('.monitor-batch').forEach(function(batch) {
+      var bid = batch.dataset.bid;
+      batch.classList.remove('open');
+      if (bid) _collapsedBids[bid] = true;
+    });
+  };
+
   window.monitorSysCopy = function(btn) {
     const sg = btn.closest('.monitor-sysgroup');
     if (!sg) return;

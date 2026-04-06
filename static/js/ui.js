@@ -56,13 +56,16 @@ function monitorClockTick() {
   const serverNow = Date.now() + _monitorClockOffset;
   const msk = new Date(serverNow + 3 * 60 * 60 * 1000);
   const pad = n => String(n).padStart(2, '0');
-  el.textContent =
+  const timeEl = el.querySelector('#monitor-clock-time');
+  const timeStr =
     pad(msk.getUTCDate()) + '.' +
     pad(msk.getUTCMonth() + 1) + '.' +
     msk.getUTCFullYear() + ' ' +
     pad(msk.getUTCHours()) + ':' +
     pad(msk.getUTCMinutes()) + ':' +
     pad(msk.getUTCSeconds());
+  if (timeEl) timeEl.textContent = timeStr;
+  else el.textContent = timeStr;
 }
 
 function monitorClockStart() {
@@ -74,11 +77,11 @@ function monitorClockStart() {
     const serverMs = d.utc_ms;
     _monitorClockOffset = serverMs - Math.round((t0 + t1) / 2);
     monitorClockTick();
-    el.style.display = 'block';
+    el.style.display = 'flex';
     if (!_monitorClockTimer) _monitorClockTimer = setInterval(monitorClockTick, 1000);
   }).catch(() => {
     monitorClockTick();
-    el.style.display = 'block';
+    el.style.display = 'flex';
     if (!_monitorClockTimer) _monitorClockTimer = setInterval(monitorClockTick, 1000);
   });
 }

@@ -38,7 +38,8 @@
   h1 { font-size: 16px; font-weight: 700; color: #fff; }
   #monitor-clock {
     display: none;
-    text-align: right;
+    align-items: center;
+    justify-content: space-between;
     font-size: 12px; font-weight: 500; color: #555;
     font-variant-numeric: tabular-nums;
     letter-spacing: 0.04em;
