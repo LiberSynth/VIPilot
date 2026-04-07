@@ -265,6 +265,22 @@
       <!-- Статус браузера -->
       <div id="dzen-browser-status-text" class="hint" style="margin-bottom:8px;display:none"></div>
 
+      <!-- Адресная строка + быстрые кнопки -->
+      <div id="dzen-browser-navbar" style="display:none;margin-bottom:8px">
+        <div style="display:flex;gap:6px;margin-bottom:6px">
+          <input id="dzen-nav-url" type="text" placeholder="https://dzen.ru/..."
+                 style="flex:1;background:#1a1a2e;border:1px solid rgba(255,255,255,.15);border-radius:6px;color:#e0e0e0;font-size:13px;padding:6px 10px;outline:none"
+                 onkeydown="if(event.key==='Enter') dzenBrowserNavigate()">
+          <button class="wf-btn" onclick="dzenBrowserNavigate()" style="padding:6px 12px;font-size:13px">→</button>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="wf-btn" onclick="dzenBrowserGoto('https://dzen.ru')" style="font-size:12px;padding:4px 10px">Главная</button>
+          <button class="wf-btn" onclick="dzenBrowserGoto('https://dzen.ru/profile/editor')" style="font-size:12px;padding:4px 10px">Студия</button>
+          <button class="wf-btn" onclick="dzenBrowserGoto('https://dzen.ru/profile/channel')" style="font-size:12px;padding:4px 10px">Канал</button>
+          <button class="wf-btn" onclick="dzenBrowserGoto('https://passport.yandex.ru/auth')" style="font-size:12px;padding:4px 10px">Войти (Яндекс)</button>
+        </div>
+      </div>
+
       <!-- Canvas с браузером -->
       <div id="dzen-browser-wrap" style="display:none;position:relative;border-radius:6px;overflow:hidden;border:1px solid var(--border,rgba(255,255,255,.12))">
         <canvas id="dzen-browser-canvas"
@@ -277,7 +293,7 @@
       </div>
 
       <div id="dzen-browser-hint" class="hint" style="margin-top:8px;display:none">
-        Авторизуйтесь на Дзен. После входа нажмите <b>Сохранить сессию</b>.
+        Нажмите <b>Войти (Яндекс)</b> для авторизации, затем <b>Студия</b> — чтобы перейти в редактор. После входа нажмите <b>Сохранить сессию</b>.
       </div>
     </div>
   </div>

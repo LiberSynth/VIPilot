@@ -12,6 +12,7 @@
   var btnSave  = document.getElementById('dzen-btn-save');
   var btnClose = document.getElementById('dzen-btn-close');
   var sessionStatus = document.getElementById('dzen-session-status');
+  var navbar = document.getElementById('dzen-browser-navbar');
 
   if (!canvas) return;
 
@@ -145,6 +146,7 @@
     hint.style.display = 'none';
     btnSave.style.display = 'none';
     btnClose.style.display = 'none';
+    if (navbar) navbar.style.display = 'none';
   }
 
   /* ── Public actions ── */
@@ -175,6 +177,7 @@
           hint.style.display = '';
           btnSave.style.display = '';
           btnClose.style.display = '';
+          if (navbar) navbar.style.display = '';
           setStatusText('Браузер запускается…', '#aaa');
           connectStream();
         } else {
@@ -221,6 +224,23 @@
   window.dzenBrowserClose = function () {
     fetch('/api/dzen-browser/stop', { method: 'POST' }).catch(function () {});
     handleStopped();
+  };
+
+  /* ── Навигация по URL ── */
+  window.dzenBrowserGoto = function (url) {
+    if (!active) return;
+    var input = document.getElementById('dzen-nav-url');
+    if (input) input.value = url;
+    sendEvent({ type: 'navigate', url: url });
+  };
+
+  window.dzenBrowserNavigate = function () {
+    if (!active) return;
+    var input = document.getElementById('dzen-nav-url');
+    var url = input ? input.value.trim() : '';
+    if (!url) return;
+    if (!url.startsWith('http')) url = 'https://' + url;
+    sendEvent({ type: 'navigate', url: url });
   };
 
   /* ── Авто-открытие при переходе на вкладку Публикация ── */
