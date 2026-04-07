@@ -89,18 +89,23 @@ def _ffmpeg(src, dst, log_id):
         if proc:
             proc.kill()
             proc.communicate()
+        msg = f'Таймаут ffmpeg ({timeout_sec // 60} мин)'
         if log_id:
-            db_log_entry(log_id, f'Таймаут ffmpeg ({timeout_sec // 60} мин)', level='warn')
+            db_log_entry(log_id, msg, level='warn')
+        print(f"[transcode] {msg}")
         return False
     except Exception as e:
+        msg = f'ffmpeg исключение: {e}'
         if log_id:
-            db_log_entry(log_id, f'ffmpeg исключение: {e}', level='warn')
+            db_log_entry(log_id, msg, level='warn')
+        print(f"[transcode] {msg}")
         return False
 
     if returncode != 0:
         err = stderr_bytes.decode(errors='replace')[-600:]
         if log_id:
             db_log_entry(log_id, f'ffmpeg код {returncode}: {err}', level='warn')
+        print(f"[transcode] ffmpeg завершился с кодом {returncode}. Хвост stderr:\n{err}")
         return False
     return True
 

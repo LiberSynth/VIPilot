@@ -1,4 +1,5 @@
 import os
+import subprocess
 import time
 import atexit
 import threading
@@ -231,12 +232,33 @@ def _on_exit():
     print("[main] Приложение остановлено")
 
 
+def _check_ffmpeg():
+    """Проверяет наличие ffmpeg и выводит версию в консоль при старте."""
+    try:
+        result = subprocess.run(
+            ['ffmpeg', '-version'],
+            capture_output=True,
+            timeout=10,
+        )
+        if result.returncode == 0:
+            first_line = result.stdout.decode(errors='replace').splitlines()[0]
+            print(f"[startup] ffmpeg доступен: {first_line}")
+        else:
+            err = result.stderr.decode(errors='replace')[:200]
+            print(f"[startup] ВНИМАНИЕ: ffmpeg вернул код {result.returncode}: {err}")
+    except FileNotFoundError:
+        print("[startup] ВНИМАНИЕ: ffmpeg не найден в PATH — транскодирование недоступно")
+    except Exception as e:
+        print(f"[startup] ВНИМАНИЕ: ffmpeg проверка не удалась: {e}")
+
+
 def start_main_loop():
     global _main_loop_started
     if not _main_loop_started:
         _main_loop_started = True
         init_db()
         run_upgrades()
+        _check_ffmpeg()
         _validate_batch_statuses()
         wf_state.reset_active_threads()
         if env_get('workflow_state', 'running') == 'pause':
