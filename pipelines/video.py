@@ -22,8 +22,6 @@ from db import (
     env_get,
     db_get_batch_by_id,
     db_set_batch_video_generating_by_id,
-    db_is_batch_scheduled,
-    db_set_batch_obsolete,
     db_get_story_text,
     db_get_active_video_models,
     db_get_video_model_by_id,
@@ -33,9 +31,9 @@ from db import (
     db_set_batch_story_ready_from_error,
     db_set_batch_original_video,
     db_get_random_real_original_video,
-    db_set_batch_fatal_error,
 )
 from log import db_log_pipeline, db_log_entry, db_log_update
+from pipelines.base import check_obsolete, handle_critical_error
 
 _FAL_KEY = os.environ.get('FAL_API_KEY', '')
 
@@ -192,11 +190,7 @@ def run(batch_id):
         except (ValueError, TypeError):
             video_duration = 6
 
-        if not is_probe and not db_is_batch_scheduled(batch['scheduled_at'], batch['target_id']):
-            db_set_batch_obsolete(batch_id)
-            db_log_pipeline('video', 'Батч отменён — слот удалён из расписания или таргет отключён',
-                            status='прервана', batch_id=batch_id)
-            print(f"[video] Батч {batch_id[:8]}… отменён, пропускаю")
+        if not is_probe and check_obsolete('video', batch_id, batch):
             return
 
         if env_get("emulation_mode", "0") == "1":
@@ -443,14 +437,4 @@ def run(batch_id):
         print(f"[video] Фатальная ошибка провайдера: {msg}")
         notify_failure(f"video: фатальная ошибка провайдера — {msg}")
     except Exception as e:
-        msg = f"Критическая ошибка приложения: {e}"
-        db_set_batch_fatal_error(batch_id)
-        if log_id:
-            db_log_update(log_id, msg, 'error')
-            db_log_entry(log_id, msg, level='error')
-        else:
-            new_log_id = db_log_pipeline('video', msg, status='error', batch_id=batch_id)
-            if new_log_id:
-                db_log_entry(new_log_id, msg, level='error')
-        print(f"[video] Ошибка: {e}")
-        notify_failure(f"video: критическая ошибка — {e}")
+        handle_critical_error('video', batch_id, log_id, e)

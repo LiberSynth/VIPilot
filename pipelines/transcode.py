@@ -24,15 +24,13 @@ from db import (
     db_get,
     db_get_batch_by_id,
     db_set_batch_transcoding_by_id,
-    db_is_batch_scheduled,
-    db_set_batch_obsolete,
     db_get_batch_original_video,
     db_set_batch_transcode_skip,
     db_set_batch_transcode_ready,
     db_set_batch_transcode_error,
-    db_set_batch_fatal_error,
 )
 from log import db_log_pipeline, db_log_entry, db_log_update
+from pipelines.base import check_obsolete, handle_critical_error
 
 
 def _probe_duration(src):
@@ -130,11 +128,7 @@ def run(batch_id):
             print(f"[transcode] Батч {batch_id[:8]}… ({target}) — транскод отключён, пропускаю")
             return
 
-        if not is_probe and not db_is_batch_scheduled(batch['scheduled_at'], batch['target_id']):
-            db_set_batch_obsolete(batch_id)
-            db_log_pipeline('transcode', 'Батч отменён — слот удалён из расписания или таргет отключён',
-                            status='прервана', batch_id=batch_id)
-            print(f"[transcode] Батч {batch_id[:8]}… отменён, пропускаю")
+        if not is_probe and check_obsolete('transcode', batch_id, batch):
             return
 
         print(f"[transcode] Батч {batch_id[:8]}… ({target}) — начало транскодирования")
@@ -201,14 +195,4 @@ def run(batch_id):
         print(f"[transcode] Готово: {out_mb} МБ → БД")
 
     except Exception as e:
-        msg = f"Критическая ошибка приложения: {e}"
-        db_set_batch_fatal_error(batch_id)
-        if log_id:
-            db_log_update(log_id, msg, 'error')
-            db_log_entry(log_id, msg, level='error')
-        else:
-            new_log_id = db_log_pipeline('transcode', msg, status='error', batch_id=batch_id)
-            if new_log_id:
-                db_log_entry(new_log_id, msg, level='error')
-        print(f"[transcode] Ошибка: {e}")
-        notify_failure(f"transcode: критическая ошибка — {e}")
+        handle_critical_error('transcode', batch_id, log_id, e)

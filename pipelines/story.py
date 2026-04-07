@@ -8,7 +8,6 @@ Pipeline 2 — Генерация сюжета.
 import os
 import requests
 
-from utils.notify import notify_failure
 from db import (
     db_set_batch_text_model,
     db_get,
@@ -20,13 +19,11 @@ from db import (
     db_set_batch_story,
     db_set_batch_story_probe,
     db_set_batch_story_error,
-    db_is_batch_scheduled,
-    db_set_batch_obsolete,
     db_steal_video_from_cancelled,
-    db_set_batch_fatal_error,
     env_get,
 )
 from log import db_log_pipeline, db_log_entry, db_log_update
+from pipelines.base import check_obsolete, handle_critical_error
 
 _API_KEY = os.environ.get('OPENROUTER_API_KEY', '')
 
@@ -124,11 +121,7 @@ def run(batch_id):
         target   = batch['target_name'] or 'пробный'
         is_probe = batch['target_id'] is None
 
-        if not is_probe and not db_is_batch_scheduled(batch['scheduled_at'], batch['target_id']):
-            db_set_batch_obsolete(batch_id)
-            db_log_pipeline('story', 'Батч отменён — слот удалён из расписания или таргет отключён',
-                            status='прервана', batch_id=batch_id)
-            print(f"[story] Батч {batch_id[:8]}… отменён, пропускаю")
+        if not is_probe and check_obsolete('story', batch_id, batch):
             batch_done = True
             return
 
@@ -281,15 +274,5 @@ def run(batch_id):
             print(f"[story] Готово: story_id={story_id[:8]}…, batch → story_ready")
 
     except Exception as e:
-        msg = f"Критическая ошибка приложения: {e}"
-        db_set_batch_fatal_error(batch_id)
-        if log_id:
-            db_log_update(log_id, msg, 'error')
-            db_log_entry(log_id, msg, level='error')
-        else:
-            new_log_id = db_log_pipeline('story', msg, status='error', batch_id=batch_id)
-            if new_log_id:
-                db_log_entry(new_log_id, msg, level='error')
-        print(f"[story] Ошибка: {e}")
-        notify_failure(f"story: критическая ошибка — {e}")
+        handle_critical_error('story', batch_id, log_id, e)
 

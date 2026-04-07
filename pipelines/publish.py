@@ -17,15 +17,13 @@ from db import (
     db_get_batch_video_data,
     db_get_batch_original_video,
     db_get_story_text,
-    db_is_batch_scheduled,
-    db_set_batch_obsolete,
     db_set_batch_probe,
     db_set_batch_published,
     db_set_batch_publish_error,
     db_set_batch_story_posted,
-    db_set_batch_fatal_error,
 )
 from log import db_log_pipeline, db_log_entry, db_log_update, db_get_log_entries
+from pipelines.base import check_obsolete, handle_critical_error
 from clients import vk
 from clients import dzen as dzen_client
 from clients.dzen import DzenCsrfExpired
@@ -174,11 +172,7 @@ def run(batch_id):
             print(f"[publish] Батч {batch_id[:8]}… пробный — публикация пропущена")
             return
 
-        if not db_is_batch_scheduled(batch['scheduled_at'], batch['target_id']):
-            db_set_batch_obsolete(batch_id)
-            db_log_pipeline('publish', 'Батч отменён — слот удалён из расписания или таргет отключён',
-                            status='прервана', batch_id=batch_id)
-            print(f"[publish] Батч {batch_id[:8]}… отменён, пропускаю")
+        if check_obsolete('publish', batch_id, batch):
             return
 
         now = datetime.now(timezone.utc)
@@ -239,14 +233,4 @@ def run(batch_id):
             notify_failure(f"publish: ошибка публикации батча {batch_id[:8]} ({target_names})")
 
     except Exception as e:
-        msg = f"Критическая ошибка приложения: {e}"
-        db_set_batch_fatal_error(batch_id)
-        if log_id:
-            db_log_update(log_id, msg, 'error')
-            db_log_entry(log_id, msg, level='error')
-        else:
-            new_log_id = db_log_pipeline('publish', msg, status='error', batch_id=batch_id)
-            if new_log_id:
-                db_log_entry(new_log_id, msg, level='error')
-        print(f"[publish] Ошибка: {e}")
-        notify_failure(f"publish: критическая ошибка — {e}")
+        handle_critical_error('publish', batch_id, log_id, e)
