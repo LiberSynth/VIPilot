@@ -144,44 +144,48 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id):
 
     try:
         btns = page.locator("button, a[role='button'], [role='button']").all()
-        texts = [b.inner_text().strip() for b in btns if b.is_visible()]
-        print(f"[dzen] Видимые кнопки на странице: {texts}")
-        _log(log_id, f"Кнопки на странице: {texts[:10]}")
+        info = []
+        for b in btns:
+            if b.is_visible():
+                txt = b.inner_text().strip()
+                lbl = b.get_attribute("aria-label") or ""
+                title = b.get_attribute("title") or ""
+                cls = (b.get_attribute("class") or "")[:60]
+                info.append(f"text={txt!r} aria={lbl!r} title={title!r} class={cls!r}")
+        print(f"[dzen] Видимые кнопки ({len(info)}):")
+        for i in info:
+            print(f"  {i}")
+        _log(log_id, f"Кнопок на странице: {len(info)}: {info[:5]}")
     except Exception as _e:
         print(f"[dzen] Ошибка диагностики: {_e}")
 
-    # ── Шаг 2: Кнопка создания публикации ────────────────────────────────
-    _log(log_id, "Ищу кнопку создания публикации…")
-    create_btn = page.locator(
-        "button:has-text('Создать'), "
-        "a:has-text('Создать'), "
-        "button:has-text('Новая публикация'), "
-        "button:has-text('Добавить'), "
-        "a:has-text('Добавить'), "
+    # ── Шаг 2: Кнопка «+» (плюсик) в правом верхнем углу ────────────────
+    _log(log_id, "Ищу кнопку «+» для создания публикации…")
+    plus_btn = page.locator(
         "[data-test='create-button'], "
-        "button:has-text('Опубликовать'), "
-        "button:has-text('Новое'), "
-        "a:has-text('Новое')"
+        "button[aria-label*='Создать'], "
+        "button[aria-label*='создать'], "
+        "button[title*='Создать'], "
+        "button[aria-label*='Create'], "
+        "[class*='create-button'], "
+        "[class*='CreateButton']"
     ).first
-    create_btn.wait_for(state="visible", timeout=15_000)
-    create_btn.click()
-    page.wait_for_timeout(1500)
+    plus_btn.wait_for(state="visible", timeout=15_000)
+    plus_btn.click()
+    _log(log_id, "Кнопка «+» нажата, жду меню…")
+    page.wait_for_timeout(1000)
 
-    # ── Шаг 3: Выбор типа — «Короткое видео» ─────────────────────────────
-    _log(log_id, "Выбираю тип «Короткое видео»…")
-    for selector in [
-        "text=Короткое видео",
-        "text=Видео",
-        "[data-type='gif']",
-        "[data-type='short-video']",
-        "[data-type='video']",
-    ]:
-        el = page.locator(selector).first
-        if el.is_visible():
-            el.click()
-            page.wait_for_timeout(1000)
-            _log(log_id, f"Выбрано: {selector}")
-            break
+    # ── Шаг 3: «Загрузить видео» из выпадающего меню ─────────────────────
+    _log(log_id, "Выбираю «Загрузить видео»…")
+    upload_item = page.locator(
+        "text='Загрузить видео', "
+        "a:has-text('Загрузить видео'), "
+        "button:has-text('Загрузить видео')"
+    ).first
+    upload_item.wait_for(state="visible", timeout=5_000)
+    upload_item.click()
+    _log(log_id, "«Загрузить видео» нажато")
+    page.wait_for_timeout(1500)
 
     # ── Шаг 4: Загружаем файл ────────────────────────────────────────────
     _log(log_id, "Ищу поле загрузки файла…")
