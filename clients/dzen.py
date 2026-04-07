@@ -213,31 +213,17 @@ def publish(
 
         page = context.new_page()
 
-        # Перехватываем CSRF и реальный publisherId из браузерных XHR-запросов
-        import re as _re
-        _real_publisher_id = [None]
-
         def on_request(req):
-            url = req.url
-            # Перехват CSRF
             if not csrf_value[0]:
                 token = req.headers.get("x-csrf-token")
                 if token:
                     csrf_value[0] = token
                     _csrf_source[0] = "xhr"
-                    print(f"[dzen] CSRF перехвачен из XHR: {url[:70]}")
+                    print(f"[dzen] CSRF перехвачен из XHR: {req.url[:70]}")
                     csrf_ready.set()
-            # Перехват publisherId из реальных браузерных запросов к editor-api
-            if not _real_publisher_id[0] and "editor-api" in url:
-                m = _re.search(r"[?&]publisherId=([^&]+)", url)
-                if m:
-                    pid = m.group(1)
-                    print(f"[dzen] publisherId из браузера: {pid}")
-                    _real_publisher_id[0] = pid
 
         page.on("request", on_request)
 
-        # Навигация: сначала главная для CSRF, потом профиль редактора для publisherId
         try:
             page.goto(
                 "https://dzen.ru",
@@ -255,7 +241,6 @@ def publish(
                 "Сессия Дзен истекла — авторизуйтесь снова в браузере (вкладка «Публикация»)"
             )
 
-        # Ждём CSRF из XHR
         if not csrf_value[0]:
             csrf_ready.wait(timeout=_CSRF_WAIT_TIMEOUT)
 
@@ -265,35 +250,6 @@ def publish(
                 "Не удалось получить CSRF-токен. Возможно сессия истекла — "
                 "авторизуйтесь снова в браузере (вкладка «Публикация»)"
             )
-
-        # Навигация в студию канала для перехвата реального publisherId из XHR
-        if not _real_publisher_id[0] and publisher_id:
-            try:
-                page.goto(
-                    f"https://dzen.ru/profile/editor/id/{publisher_id}/",
-                    wait_until="domcontentloaded",
-                    timeout=_PLAYWRIGHT_NAV_TIMEOUT,
-                )
-                page.wait_for_timeout(3000)
-            except Exception:
-                pass
-
-        # Логируем все cookies для диагностики
-        try:
-            _all_cookies = context.cookies(["https://dzen.ru", "https://yandex.ru"])
-            cookie_names = [c["name"] for c in _all_cookies]
-            print(f"[dzen] Куки в сессии: {cookie_names}")
-        except Exception:
-            pass
-
-        # Определяем итоговый publisherId
-        actual_publisher_id = _real_publisher_id[0] or publisher_id
-        if _real_publisher_id[0] and _real_publisher_id[0] != publisher_id:
-            print(f"[dzen] publisherId из браузера ({_real_publisher_id[0]}) отличается от конфига ({publisher_id[:12]}…)")
-            if log_id:
-                db_log_entry(log_id, f"Дзен: используем publisher_id из браузера: {actual_publisher_id[:12]}…")
-        else:
-            print(f"[dzen] publisherId: используем из конфига ({publisher_id[:12]}…)")
 
         csrf = csrf_value[0]
         if log_id:
@@ -307,7 +263,7 @@ def publish(
             "Referer":      "https://dzen.ru",
             "Origin":       "https://dzen.ru",
         }
-        _common_params = {"publisherId": actual_publisher_id, "clid": "320"}
+        _common_params = {"publisherId": publisher_id, "clid": "320"}
 
         # ── Шаг 1: validate-video (необязательный — не блокируем при ошибке) ─
         if log_id:
