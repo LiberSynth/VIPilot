@@ -259,4 +259,32 @@
       window.dzenBrowserOpen();
     }
   });
+
+  /* ── Авто-переподключение если pipeline запустился без открытого виджета ── */
+  function _showPipelineWidget() {
+    active = true;
+    firstFrame = false;
+    overlay.style.display = 'flex';
+    overlay.textContent = 'Публикация…';
+    wrap.style.display = '';
+    if (navbar) navbar.style.display = '';
+    connectStream();
+    // Переключаем на вкладку Публикация чтобы пользователь видел браузер
+    if (typeof window.switchPanel === 'function') {
+      try { window.switchPanel('publish'); } catch (e) {}
+    }
+  }
+
+  setInterval(function () {
+    if (active) return;
+    fetch('/api/dzen-browser/status')
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var st = data && data.browser && data.browser.status;
+        if (st === 'running' && !active) {
+          _showPipelineWidget();
+        }
+      })
+      .catch(function () {});
+  }, 2500);
 })();
