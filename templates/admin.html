@@ -275,6 +275,7 @@
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           <button class="wf-btn" onclick="dzenBrowserGoto('https://dzen.ru')" style="font-size:12px;padding:4px 10px">Главная</button>
+          {% if dzen_publisher_id %}<button class="wf-btn" onclick="dzenBrowserGoto('https://dzen.ru/profile/editor/id/{{ dzen_publisher_id }}/')" style="font-size:12px;padding:4px 10px">Студия</button>{% endif %}
           <button class="wf-btn" onclick="dzenBrowserGoto('https://passport.yandex.ru/auth')" style="font-size:12px;padding:4px 10px">Войти (Яндекс)</button>
         </div>
       </div>
