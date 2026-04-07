@@ -52,10 +52,10 @@ externalPort = 80
 [userenv]
 
 [userenv.shared]
-SMTP_HOST = "smtp.gmail.com"
-SMTP_PORT = "587"
-SMTP_FROM = "vi.pilot.admin@gmail.com"
 FLASK_SECRET = "aede62bdddb1832e7d0c43dcd04edcdb34b8a29f348c066bae75224a4dd9b0e8"
+SMTP_HOST = "smtp.gmail.com"
+SMTP_FROM = "vi.pilot.admin@gmail.com"
+SMTP_PORT = "587"
 
 [postMerge]
 path = "scripts/post-merge.sh"
