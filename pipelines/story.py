@@ -264,7 +264,13 @@ def run(batch_id):
                 db_log_entry(log_id, f"Сохранён как story {story_id[:8]}…, батч → story_probe")
             print(f"[story] Пробный сюжет: story_id={story_id[:8]}…, batch → story_probe")
         else:
-            db_set_batch_story(batch_id, story_id)
+            if not db_set_batch_story(batch_id, story_id):
+                msg = 'Ошибка сохранения статуса батча (db_set_batch_story вернул False)'
+                db_log_update(log_id, msg, 'error')
+                if log_id:
+                    db_log_entry(log_id, msg, level='error')
+                print(f"[story] {msg}")
+                return
             db_set_batch_text_model(batch_id, used_model_id)
             batch_done = True
             msg = f'Сюжет сгенерирован ({used_model_name})'
