@@ -159,12 +159,28 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id):
     except Exception as _e:
         print(f"[dzen] Ошибка диагностики: {_e}")
 
+    # ── Закрываем модальный overlay если есть (онбординг и т.п.) ─────────
+    try:
+        overlay = page.locator("[data-testid='modal-overlay']").first
+        if overlay.is_visible():
+            _log(log_id, "Закрываю модальное окно…")
+            overlay.click()
+            page.wait_for_timeout(500)
+    except Exception:
+        pass
+    # На всякий случай — Escape
+    try:
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(300)
+    except Exception:
+        pass
+
     # ── Шаг 2: Кнопка «+» (плюсик) в правом верхнем углу ────────────────
     _log(log_id, "Ищу кнопку «+» для создания публикации…")
     plus_btn = page.locator(
         "[class*='addButton'], "
         "[class*='author-studio-header__addButton'], "
-        "[data-test='create-button'], "
+        "[data-testid='add-publication-button'], "
         "button[aria-label*='Создать'], "
         "button[aria-label*='создать'], "
         "button[title*='Создать'], "
