@@ -162,13 +162,13 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id):
     # ── Шаг 2: Кнопка «+» (плюсик) в правом верхнем углу ────────────────
     _log(log_id, "Ищу кнопку «+» для создания публикации…")
     plus_btn = page.locator(
+        "[class*='addButton'], "
+        "[class*='author-studio-header__addButton'], "
         "[data-test='create-button'], "
         "button[aria-label*='Создать'], "
         "button[aria-label*='создать'], "
         "button[title*='Создать'], "
-        "button[aria-label*='Create'], "
-        "[class*='create-button'], "
-        "[class*='CreateButton']"
+        "button[aria-label*='Create']"
     ).first
     plus_btn.wait_for(state="visible", timeout=15_000)
     plus_btn.click()
