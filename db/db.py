@@ -1304,6 +1304,45 @@ def db_cleanup_video_data(file_lifetime_days: int) -> int:
         return 0
 
 
+def db_reset_stalled_batches() -> list[dict]:
+    """
+    Сбрасывает «зависшие» батчи при рестарте приложения:
+      - story_generating  → pending
+      - video_generating  → story_ready
+
+    Возвращает список dict: [{"id": ..., "old_status": ..., "new_status": ...}, ...]
+    """
+    resets = [
+        ("story_generating", "pending"),
+        ("video_generating", "story_ready"),
+    ]
+    affected = []
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                for old_status, new_status in resets:
+                    cur.execute(
+                        """
+                        UPDATE batches
+                           SET status = %s, updated_at = NOW()
+                         WHERE status = %s
+                        RETURNING id
+                        """,
+                        (new_status, old_status),
+                    )
+                    rows = cur.fetchall()
+                    for row in rows:
+                        affected.append({
+                            "id": str(row[0]),
+                            "old_status": old_status,
+                            "new_status": new_status,
+                        })
+            conn.commit()
+    except Exception as e:
+        print(f"[DB] Ошибка db_reset_stalled_batches: {e}")
+    return affected
+
+
 def db_get_last_pipeline_run(pipeline):
     """Возвращает MAX(created_at) из таблицы log для указанного пайплайна,
     или None если записей нет."""

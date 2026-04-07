@@ -12,6 +12,7 @@ from db import (
     db_get_actionable_batches,
     db_get_batches_with_unknown_status,
     db_cancel_waiting_batches,
+    db_reset_stalled_batches,
     KNOWN_BATCH_STATUSES,
     env_get, env_set,
 )
@@ -80,6 +81,21 @@ _STATUS_TO_PIPELINE = {
     'story_posted':     publish,
     'wall_posting':     publish,
 }
+
+def _reset_stalled_batches():
+    """Сбрасывает незавершённые батчи на старте: story_generating→pending, video_generating→story_ready."""
+    affected = db_reset_stalled_batches()
+    if not affected:
+        print("[startup] Незавершённых батчей не обнаружено.")
+        return
+    for item in affected:
+        bid  = item["id"]
+        old  = item["old_status"]
+        new  = item["new_status"]
+        msg  = f"Батч сброшен при рестарте: {old} → {new}"
+        db_log_pipeline('startup', msg, status='warn', batch_id=bid)
+        print(f"[startup] Батч {bid[:8]}… сброшен: {old} → {new}")
+
 
 def _validate_batch_statuses():
     """Проверяет, нет ли батчей с неизвестным статусом. Вызывается при старте."""
@@ -263,6 +279,7 @@ def start_main_loop():
         run_upgrades()
         _check_ffmpeg()
         _validate_batch_statuses()
+        _reset_stalled_batches()
         wf_state.reset_active_threads()
         if env_get('workflow_state', 'running') == 'pause':
             wf_state.set_paused()

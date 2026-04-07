@@ -67,6 +67,7 @@ from .db import (
     db_cleanup_video_data,
     db_clear_all_history,
     db_reset_batch_pipeline,
+    db_reset_stalled_batches,
     db_get_last_pipeline_run,
     db_get_batch_by_id,
     db_get_actionable_batches,
