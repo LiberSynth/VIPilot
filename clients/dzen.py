@@ -149,9 +149,9 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id):
             if b.is_visible():
                 txt = b.inner_text().strip()
                 lbl = b.get_attribute("aria-label") or ""
-                title = b.get_attribute("title") or ""
+                btn_title = b.get_attribute("title") or ""
                 cls = (b.get_attribute("class") or "")[:60]
-                info.append(f"text={txt!r} aria={lbl!r} title={title!r} class={cls!r}")
+                info.append(f"text={txt!r} aria={lbl!r} title={btn_title!r} class={cls!r}")
         print(f"[dzen] Видимые кнопки ({len(info)}):")
         for i in info:
             print(f"  {i}")
@@ -189,16 +189,28 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id):
     plus_btn.wait_for(state="visible", timeout=15_000)
     plus_btn.click()
     _log(log_id, "Кнопка «+» нажата, жду меню…")
-    page.wait_for_timeout(1000)
+    page.wait_for_timeout(1500)
+
+    # Скриншот после клика «+» для диагностики
+    try:
+        import os as _os
+        ss2_path = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "data", "dzen_after_plus.jpg")
+        page.screenshot(path=ss2_path, type="jpeg", quality=80)
+        print(f"[dzen] Скриншот после «+»: {ss2_path}")
+    except Exception as _e:
+        print(f"[dzen] Скриншот не сохранён: {_e}")
 
     # ── Шаг 3: «Загрузить видео» из выпадающего меню ─────────────────────
     _log(log_id, "Выбираю «Загрузить видео»…")
-    upload_item = page.locator(
-        "text='Загрузить видео', "
-        "a:has-text('Загрузить видео'), "
-        "button:has-text('Загрузить видео')"
-    ).first
-    upload_item.wait_for(state="visible", timeout=5_000)
+    # Ищем пункт меню — используем Playwright text selector (не CSS!)
+    upload_item = page.get_by_text("Загрузить видео", exact=True).first
+    try:
+        upload_item.wait_for(state="visible", timeout=8_000)
+    except Exception:
+        # Fallback — ищем любой элемент с этим текстом
+        _log(log_id, "exact-match не нашёл — пробую contains…")
+        upload_item = page.locator("text=Загрузить видео").first
+        upload_item.wait_for(state="visible", timeout=5_000)
     upload_item.click()
     _log(log_id, "«Загрузить видео» нажато")
     page.wait_for_timeout(1500)
