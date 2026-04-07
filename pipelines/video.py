@@ -205,8 +205,8 @@ def run(batch_id):
                 'video', 'Видео [эмуляция]',
                 status='running', batch_id=batch_id,
             )
-            sample = db_get_random_real_original_video()
-            if sample is None:
+            result = db_get_random_real_original_video()
+            if result is None:
                 msg = '[эмуляция] Нет видео в пуле — невозможно скопировать оригинал'
                 db_log_update(log_id, msg, 'error')
                 if log_id:
@@ -214,6 +214,9 @@ def run(batch_id):
                 db_set_batch_video_error(batch_id)
                 print(f"[video] {msg}")
                 return
+            sample, donor_batch_id = result
+            if log_id:
+                db_log_entry(log_id, f"Видео заимствовано из батча: {donor_batch_id}", level='info')
             db_set_batch_original_video(batch_id, sample)
             db_set_batch_video_ready(batch_id, 'emulation://skipped')
             db_log_update(log_id, 'Видео [эмуляция]', 'ok')
