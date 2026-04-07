@@ -1,7 +1,7 @@
 import subprocess
 import os
 
-_VERSION_BASE = "1.0.1"
+_VERSION_BASE = os.environ.get("APP_VERSION_BASE", "1.0.1")
 _BUILD_FILE = os.path.join(os.path.dirname(__file__), "_build.py")
 
 
