@@ -229,17 +229,49 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id):
 
     # ── Шаг 5: Вводим заголовок ──────────────────────────────────────────
     _log(log_id, "Ввожу заголовок…")
+    _snap(page)
+
+    # Диагностика: все видимые input/textarea
+    try:
+        all_inputs = page.locator("input:not([type='file']):not([type='hidden']), textarea").all()
+        input_info = []
+        for inp in all_inputs:
+            if inp.is_visible():
+                ph = inp.get_attribute("placeholder") or ""
+                nm = inp.get_attribute("name") or ""
+                tp = inp.get_attribute("type") or ""
+                cls = (inp.get_attribute("class") or "")[:50]
+                input_info.append(f"placeholder={ph!r} name={nm!r} type={tp!r}")
+        print(f"[dzen] Видимые поля ({len(input_info)}): {input_info}")
+        _log(log_id, f"Видимые поля: {input_info[:4]}")
+    except Exception as _e:
+        print(f"[dzen] Ошибка диагностики полей: {_e}")
+
+    # Пробуем все варианты поля заголовка (Дзен использует 'Название', а не 'Заголовок')
+    title_filled = False
     for sel in [
+        "input[placeholder*='азвани']",
+        "textarea[placeholder*='азвани']",
         "input[placeholder*='аголов']",
         "textarea[placeholder*='аголов']",
+        "input[placeholder*='itle']",
         "input[name='title']",
+        "input[name='name']",
         "[data-test='title-input']",
+        "[data-testid*='title'] input",
+        "[class*='title'] input",
     ]:
         ti = page.locator(sel).first
-        if ti.is_visible():
-            ti.fill(title)
-            _log(log_id, f"Заголовок введён ({sel})")
-            break
+        try:
+            if ti.is_visible():
+                ti.fill(title)
+                _log(log_id, f"Заголовок введён ({sel})")
+                title_filled = True
+                break
+        except Exception:
+            continue
+    if not title_filled:
+        _log(log_id, "⚠️ Поле заголовка не найдено — публикуем без заголовка")
     _snap(page)
 
     # ── Шаг 6: Публикуем ─────────────────────────────────────────────────
