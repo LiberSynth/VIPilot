@@ -133,14 +133,35 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id):
             "Сессия истекла — авторизуйтесь снова в браузере (вкладка «Публикация»)"
         )
 
+    # ── Диагностика: логируем все видимые кнопки и ссылки ────────────────
+    try:
+        import os as _os
+        screenshot_path = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "data", "dzen_studio_screenshot.jpg")
+        page.screenshot(path=screenshot_path, type="jpeg", quality=80)
+        print(f"[dzen] Скриншот сохранён: {screenshot_path}")
+    except Exception as _e:
+        print(f"[dzen] Скриншот не сохранён: {_e}")
+
+    try:
+        btns = page.locator("button, a[role='button'], [role='button']").all()
+        texts = [b.inner_text().strip() for b in btns if b.is_visible()]
+        print(f"[dzen] Видимые кнопки на странице: {texts}")
+        _log(log_id, f"Кнопки на странице: {texts[:10]}")
+    except Exception as _e:
+        print(f"[dzen] Ошибка диагностики: {_e}")
+
     # ── Шаг 2: Кнопка создания публикации ────────────────────────────────
     _log(log_id, "Ищу кнопку создания публикации…")
     create_btn = page.locator(
         "button:has-text('Создать'), "
         "a:has-text('Создать'), "
         "button:has-text('Новая публикация'), "
+        "button:has-text('Добавить'), "
+        "a:has-text('Добавить'), "
         "[data-test='create-button'], "
-        "button:has-text('Опубликовать')"
+        "button:has-text('Опубликовать'), "
+        "button:has-text('Новое'), "
+        "a:has-text('Новое')"
     ).first
     create_btn.wait_for(state="visible", timeout=15_000)
     create_btn.click()
