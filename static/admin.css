@@ -555,7 +555,7 @@
   }
 
   .monitor-log-ts       { color: #8080a8; flex-shrink: 0; font-variant-numeric: tabular-nums; }
-  .monitor-log-pipeline { color: #d0d0ec; flex-shrink: 0; font-weight: 500; }
+  .monitor-log-pipeline { color: #d0d0ec; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
   .monitor-log-model { color: #888; font-size: 10px; font-weight: 400; margin-left: 5px; }
   .monitor-log-comment  { color: #9090b8; font-size: 12px; padding-left: 39px; word-break: break-word; white-space: pre-wrap; line-height: 1.4; }
   .monitor-log-chevron  { font-size: 10px; color: #7070a0; flex-shrink: 0; transition: transform .15s; }
