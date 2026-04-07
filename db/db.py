@@ -717,7 +717,7 @@ def db_get_random_real_original_video() -> tuple[bytes, str] | None:
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    SELECT video_data_original, batch_id FROM batches
+                    SELECT video_data_original, id FROM batches
                     WHERE video_data_original IS NOT NULL
                       AND (video_url IS NULL OR video_url NOT LIKE 'emulation://%')
                     ORDER BY random() LIMIT 1
