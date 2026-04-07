@@ -155,7 +155,7 @@ def publish(
 
         try:
             page.goto(
-                "https://dzen.ru/profile/editor",
+                "https://dzen.ru",
                 wait_until="domcontentloaded",
                 timeout=_PLAYWRIGHT_NAV_TIMEOUT,
             )
@@ -170,7 +170,28 @@ def publish(
                 "Сессия Дзен истекла — авторизуйтесь снова в браузере (вкладка «Публикация»)"
             )
 
-        csrf_ready.wait(timeout=_CSRF_WAIT_TIMEOUT)
+        # Пробуем извлечь CSRF напрямую из JS-контекста страницы
+        if not csrf_value[0]:
+            try:
+                csrf_from_js = page.evaluate("""() => {
+                    try {
+                        if (window.Ya && window.Ya.csrfToken) return window.Ya.csrfToken;
+                        var meta = document.querySelector('meta[name="csrf-token"]');
+                        if (meta && meta.content) return meta.content;
+                        var m = document.cookie.match(/(?:^|;\\s*)(?:csrftoken2|_csrf|csrftoken)=([^;]+)/);
+                        if (m) return m[1];
+                    } catch(e) {}
+                    return null;
+                }""")
+                if csrf_from_js:
+                    csrf_value[0] = csrf_from_js
+                    csrf_ready.set()
+            except Exception:
+                pass
+
+        # Если из JS не получили — ждём перехвата из сетевых запросов страницы
+        if not csrf_value[0]:
+            csrf_ready.wait(timeout=_CSRF_WAIT_TIMEOUT)
 
         if not csrf_value[0]:
             browser.close()
@@ -188,7 +209,7 @@ def publish(
             "X-Csrf-Token": csrf,
             "Accept":       "application/json",
             "Content-Type": "application/json",
-            "Referer":      "https://dzen.ru/profile/editor",
+            "Referer":      "https://dzen.ru",
             "Origin":       "https://dzen.ru",
         }
 
