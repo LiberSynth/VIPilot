@@ -266,18 +266,6 @@ def publish(
                 "авторизуйтесь снова в браузере (вкладка «Публикация»)"
             )
 
-        # Дополнительная навигация в редактор для получения реального publisherId
-        if not _real_publisher_id[0]:
-            try:
-                page.goto(
-                    "https://dzen.ru/profile/editor",
-                    wait_until="domcontentloaded",
-                    timeout=_PLAYWRIGHT_NAV_TIMEOUT,
-                )
-                page.wait_for_timeout(3000)
-            except Exception:
-                pass
-
         # Логируем все cookies для диагностики
         try:
             _all_cookies = context.cookies(["https://dzen.ru", "https://yandex.ru"])
