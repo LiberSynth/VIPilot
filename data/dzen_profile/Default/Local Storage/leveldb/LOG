@@ -1,3 +1,6 @@
-2026/04/07-19:38:36.049 6366 Reusing MANIFEST /home/runner/workspace/data/dzen_profile/Default/Local Storage/leveldb/MANIFEST-000001
-2026/04/07-19:38:36.055 6366 Recovering log #3
-2026/04/07-19:38:36.055 6366 Reusing old log /home/runner/workspace/data/dzen_profile/Default/Local Storage/leveldb/000003.log 
+2026/04/07-19:45:23.905 6689 Reusing MANIFEST /home/runner/workspace/data/dzen_profile/Default/Local Storage/leveldb/MANIFEST-000001
+2026/04/07-19:45:23.913 6689 Recovering log #3
+2026/04/07-19:45:23.913 6689 Reusing old log /home/runner/workspace/data/dzen_profile/Default/Local Storage/leveldb/000003.log 
+2026/04/07-19:46:23.915 668b Level-0 table #5: started
+2026/04/07-19:46:23.949 668b Level-0 table #5: 14255 bytes OK
+2026/04/07-19:46:23.952 668b Delete type=0 #3

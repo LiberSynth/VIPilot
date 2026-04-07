@@ -306,12 +306,14 @@ def run_pipeline_browser(fn, cookies: list) -> dict:
     """
     global _running, _latest_frame, _frame_counter
 
+    # Если login-браузер запущен — останавливаем его автоматически
     with _lock:
         if _running:
-            return {
-                "ok": False,
-                "error": "Браузер авторизации запущен — остановите его перед публикацией",
-            }
+            _running = False
+    if _thread and _thread.is_alive():
+        _thread.join(timeout=5)
+
+    with _lock:
         _running = True
 
     _set_status("running", "Публикация…")
@@ -415,6 +417,10 @@ def frame_generator():
             b64 = base64.b64encode(frame).decode()
             yield f"data: {b64}\n\n"
         elif status_now == "stopped":
+            # Ждём секунду — pipeline-браузер может тут же подхватить стрим
+            time.sleep(1.0)
+            if get_status()["status"] != "stopped":
+                continue  # Новый браузер запустился — продолжаем стримить
             yield "data: STOPPED\n\n"
             break
         else:
