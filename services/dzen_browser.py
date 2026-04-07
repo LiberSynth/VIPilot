@@ -87,6 +87,7 @@ _save_done_event = threading.Event()
 _save_result: Optional[dict] = None
 
 _current_target_id: Optional[str] = None
+_pipeline_taking_over: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -226,7 +227,8 @@ def _browser_loop(target_id: str):
         print(f"[dzen_browser] Критическая ошибка: {e}")
         return
 
-    _set_status("stopped")
+    if not _pipeline_taking_over:
+        _set_status("stopped")
 
 
 # ---------------------------------------------------------------------------
@@ -304,7 +306,11 @@ def run_pipeline_browser(fn, cookies: list) -> dict:
     БЛОКИРУЕТ вызывающий поток — вызывать из фонового потока пайплайна.
     Возвращает {"ok": bool, "result": ..., "error": str|None}.
     """
-    global _running, _latest_frame, _frame_counter
+    global _running, _latest_frame, _frame_counter, _pipeline_taking_over
+
+    # Сигнализируем ДО остановки login-браузера — frame_generator не пошлёт STOPPED
+    _pipeline_taking_over = True
+    _set_status("running", "Публикация…")
 
     # Если login-браузер запущен — останавливаем его автоматически
     with _lock:
@@ -315,8 +321,6 @@ def run_pipeline_browser(fn, cookies: list) -> dict:
 
     with _lock:
         _running = True
-
-    _set_status("running", "Публикация…")
 
     _stop_ss = threading.Event()
     _page_ref: list = [None]
@@ -387,6 +391,7 @@ def run_pipeline_browser(fn, cookies: list) -> dict:
     _stop_ss.set()
     ss_thread.join(timeout=3)
 
+    _pipeline_taking_over = False
     with _lock:
         _running = False
     _set_status("stopped")
