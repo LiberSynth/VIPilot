@@ -30,6 +30,7 @@ from typing import Optional
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DZEN_PROFILE_DIR = os.path.join(_PROJECT_ROOT, "data", "dzen_profile")
 _METADATA_FILE = os.path.join(DZEN_PROFILE_DIR, "_vipilot_meta.json")
+DZEN_COOKIES_FILE = os.path.join(_PROJECT_ROOT, "data", "dzen_cookies.json")
 
 
 def _read_meta() -> dict:
@@ -55,9 +56,8 @@ def get_session_saved_at() -> str | None:
 
 
 def profile_exists() -> bool:
-    """True если профиль Chrome уже содержит данные (пользователь логинился)."""
-    cookies_path = os.path.join(DZEN_PROFILE_DIR, "Default", "Cookies")
-    return os.path.exists(cookies_path)
+    """True если куки Дзена уже экспортированы (пользователь логинился и сохранил сессию)."""
+    return os.path.exists(DZEN_COOKIES_FILE)
 
 
 # ---------------------------------------------------------------------------
@@ -183,11 +183,16 @@ def _browser_loop(target_id: str):
                 if _save_request_event.is_set():
                     _save_request_event.clear()
                     try:
-                        # Куки уже сохранены на диск Chrome автоматически.
-                        # Просто фиксируем метку времени.
+                        # Экспортируем куки в JSON — пайплайн будет читать их напрямую
+                        # без открытия профильной директории (нет конфликта блокировки).
+                        cookies = context.cookies(["https://dzen.ru", "https://yandex.ru"])
+                        cookies_path = DZEN_COOKIES_FILE
+                        os.makedirs(os.path.dirname(cookies_path), exist_ok=True)
+                        with open(cookies_path, "w", encoding="utf-8") as _f:
+                            json.dump(cookies, _f, ensure_ascii=False)
                         _write_meta({"saved_at": datetime.now(timezone.utc).isoformat()})
                         _save_result = {"ok": True, "error": None}
-                        print(f"[dzen_browser] Сессия зафиксирована: {DZEN_PROFILE_DIR}")
+                        print(f"[dzen_browser] Сессия сохранена: {len(cookies)} куков → {cookies_path}")
                     except Exception as e:
                         _save_result = {"ok": False, "error": str(e)}
                     _save_done_event.set()

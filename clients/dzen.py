@@ -153,10 +153,9 @@ def publish(
 
     Возвращает True при успехе.
     """
-    import os as _os
     import threading
     from playwright.sync_api import sync_playwright
-    from services.dzen_browser import DZEN_PROFILE_DIR, profile_exists
+    from services.dzen_browser import DZEN_COOKIES_FILE, profile_exists
 
     cfg = target_config or {}
     publisher_id = cfg.get("publisher_id", "")
@@ -169,6 +168,13 @@ def publish(
             "Браузерная сессия Дзен не сохранена — "
             "авторизуйтесь в браузере (вкладка «Публикация»)"
         )
+
+    # Читаем сохранённые куки из JSON (экспортированы при нажатии «Сохранить сессию»)
+    try:
+        with open(DZEN_COOKIES_FILE, "r", encoding="utf-8") as _f:
+            _saved_cookies = json.load(_f)
+    except Exception as e:
+        raise DzenSessionMissing(f"Не удалось прочитать куки сессии: {e}")
 
     if log_id:
         db_log_entry(
@@ -183,11 +189,11 @@ def publish(
         db_log_entry(log_id, "Дзен: запускаю headless-браузер для авторизации…")
 
     with sync_playwright() as pw:
-        _os.makedirs(DZEN_PROFILE_DIR, exist_ok=True)
-        context = pw.chromium.launch_persistent_context(
-            user_data_dir=DZEN_PROFILE_DIR,
+        browser = pw.chromium.launch(
             headless=True,
             args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
+        )
+        context = browser.new_context(
             user_agent=(
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -196,20 +202,22 @@ def publish(
             locale="ru-RU",
         )
 
-        # ── Шаг 0: CSRF из куки (нативный профиль Chrome — HttpOnly доступны) ─
+        # Загружаем куки из JSON — без конфликта блокировки профиля
         _CSRF_COOKIE_NAMES = ("csrftoken2", "_csrf", "csrftoken", "XSRF-TOKEN")
         _csrf_source = ["unknown"]
         try:
-            _cookies = context.cookies(["https://dzen.ru", "https://yandex.ru"])
-            for _c in _cookies:
-                if _c["name"] in _CSRF_COOKIE_NAMES and _c.get("value"):
+            context.add_cookies(_saved_cookies)
+            print(f"[dzen] Загружено {len(_saved_cookies)} куков из файла")
+            # Ищем CSRF прямо в загруженных куках
+            for _c in _saved_cookies:
+                if _c.get("name") in _CSRF_COOKIE_NAMES and _c.get("value"):
                     csrf_value[0] = _c["value"]
                     csrf_ready.set()
                     _csrf_source[0] = f"cookie:{_c['name']}"
                     print(f"[dzen] CSRF найден в куке: {_c['name']}")
                     break
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[dzen] Ошибка загрузки куков: {e}")
 
         page = context.new_page()
 
@@ -231,12 +239,12 @@ def publish(
                 timeout=_PLAYWRIGHT_NAV_TIMEOUT,
             )
         except Exception as e:
-            context.close()
+            browser.close()
             raise DzenApiError(f"Навигация не удалась: {e}")
 
         current_url = page.url
         if "passport.yandex" in current_url or "/auth" in current_url:
-            context.close()
+            browser.close()
             raise DzenCsrfExpired(
                 "Сессия Дзен истекла — авторизуйтесь снова в браузере (вкладка «Публикация»)"
             )
@@ -245,7 +253,7 @@ def publish(
             csrf_ready.wait(timeout=_CSRF_WAIT_TIMEOUT)
 
         if not csrf_value[0]:
-            context.close()
+            browser.close()
             raise DzenApiError(
                 "Не удалось получить CSRF-токен. Возможно сессия истекла — "
                 "авторизуйтесь снова в браузере (вкладка «Публикация»)"
@@ -365,7 +373,7 @@ def publish(
 
         _publish_final(page, publisher_id, pub_id, gif, title, _api_headers)
 
-        context.close()
+        browser.close()
 
     if log_id:
         db_log_entry(log_id, "Дзен: видео опубликовано успешно")
