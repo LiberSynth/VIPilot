@@ -171,7 +171,7 @@
     <form id="publish-form" style="margin-top:0">
       <input type="hidden" id="target_id" name="target_id" value="{{ target_id or '' }}">
 
-      <div class="card">
+      <div class="card{% if not vk_active %} target-disabled{% endif %}">
         <div class="card-title">Публикация в ВКонтакте</div>
         <div class="card-title" style="font-size:13px;font-weight:500;margin-top:0;margin-bottom:6px;color:var(--text-muted,#888)">Соотношение сторон</div>
         <div class="ar-wrap">
@@ -235,7 +235,7 @@
     </form>
 
     <!-- Дзен -->
-    <div class="card" style="margin-top:12px">
+    <div class="card{% if not dzen_active %} target-disabled{% endif %}" style="margin-top:12px">
       <input type="hidden" id="dzen_target_id" value="{{ dzen_target_id or '' }}">
       <div class="card-title">Публикация в Дзен</div>
 

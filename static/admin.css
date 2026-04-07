@@ -239,6 +239,22 @@
   .toggle-wrap input:checked + .toggle-track::after { transform: translateX(20px); }
 
   .card.emulation-active { border-color: rgba(245,166,35,.35); }
+  .card.target-disabled { opacity: .4; pointer-events: none; user-select: none; }
+  .card.target-disabled .card-title::after {
+    content: 'Отключён';
+    display: inline-block;
+    margin-left: 8px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: #888;
+    background: rgba(255,255,255,.08);
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 4px;
+    padding: 1px 6px;
+    vertical-align: middle;
+  }
   .service-section-label {
     font-size: 11px; color: #555; font-weight: 600;
     text-transform: uppercase; letter-spacing: .07em;

@@ -108,6 +108,10 @@ def admin_page():
         except (ValueError, IndexError):
             pass
     dzen_target_id = dzen_target["id"] if dzen_target else None
+    dzen_active    = bool(dzen_target.get("active")) if dzen_target else False
+
+    vk_target  = db_get_target_by_name("VKontakte")
+    vk_active  = bool(vk_target.get("active")) if vk_target else False
 
     active_targets  = db_get_active_targets()
     target          = active_targets[0] if active_targets else None
@@ -146,6 +150,8 @@ def admin_page():
         dzen_publisher_id=dzen_publisher_id,
         dzen_csrf_token=dzen_csrf_token,
         dzen_csrf_age=dzen_csrf_age,
+        vk_active=vk_active,
+        dzen_active=dzen_active,
         app_version=APP_VERSION,
     ))
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
