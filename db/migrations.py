@@ -703,6 +703,20 @@ def _m016_targets_config(cur):
     """)
 
 
+def _m017_dzen_publisher_id(cur):
+    """
+    Устанавливает publisher_id для таргета Дзен в поле config.
+    Запускается после _m016_targets_config (которая добавила колонку config).
+    Идемпотентно: обновляет только если publisher_id ещё не задан.
+    """
+    cur.execute("""
+        UPDATE targets
+        SET config = config || '{"publisher_id": "69d3ec6ae9ff6e1b8d5c6326"}'::jsonb
+        WHERE name = 'Дзен'
+          AND (config->>'publisher_id') IS NULL
+    """)
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -720,6 +734,7 @@ MIGRATIONS = [
     (14, _m014_drop_batches_unique_constraint),
     (15, _m015_fix_cancelled_status),
     (16, _m016_targets_config),
+    (17, _m017_dzen_publisher_id),
 ]
 
 
