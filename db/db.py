@@ -457,7 +457,7 @@ def db_set_batch_cancelled(batch_id):
 
 
 def db_cancel_waiting_batches():
-    """Отменяет batches в статусе transcode_ready/story_posted, у которых слот расписания
+    """Отменяет batches в статусе transcode_ready/story_posted/wall_posting, у которых слот расписания
     больше не существует или таргет деактивирован. Возвращает список отменённых batch_id."""
     try:
         with get_db() as conn:
@@ -465,7 +465,7 @@ def db_cancel_waiting_batches():
                 cur.execute("""
                     UPDATE batches
                     SET status = 'cancelled'
-                    WHERE status IN ('transcode_ready', 'story_posted')
+                    WHERE status IN ('transcode_ready', 'story_posted', 'wall_posting')
                       AND scheduled_at IS NOT NULL
                       AND (
                           NOT EXISTS (
@@ -974,6 +974,30 @@ def db_set_batch_story_posted(batch_id):
     return db_set_batch_status(batch_id, 'story_posted')
 
 
+def db_claim_batch_wall_posting(batch_id: str) -> bool:
+    """Атомарно переводит батч из story_posted → wall_posting.
+    Возвращает True если именно этот процесс захватил батч,
+    False если строка не найдена (другой процесс уже взял батч)."""
+    _assert_known_status('wall_posting')
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE batches SET status = 'wall_posting'
+                    WHERE id = %s AND status = 'story_posted'
+                    RETURNING id
+                    """,
+                    (batch_id,),
+                )
+                row = cur.fetchone()
+            conn.commit()
+        return row is not None
+    except Exception as e:
+        print(f"[DB] Ошибка db_claim_batch_wall_posting: {e}")
+        return False
+
+
 def db_set_batch_story_ready_from_error(batch_id):
     """Откатывает батч в story_ready после сбоя видео, сохраняя story_id.
     Очищает data (request_id/url), но НЕ трогает story_id — сюжет не регенерируется."""
@@ -1270,7 +1294,10 @@ def db_get_batch_by_id(batch_id):
 
 
 def db_get_actionable_batches():
-    """Возвращает список батчей, готовых к обработке (FIFO по created_at)."""
+    """Возвращает список батчей, готовых к обработке (FIFO по created_at).
+    wall_posting не включён: этот статус выставляется атомарно claim-ом
+    и существует только в рамках активного выполнения одного воркера.
+    story_posted включён для resume после краша до wall-публикации."""
     try:
         with get_db() as conn:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
@@ -1326,7 +1353,7 @@ KNOWN_BATCH_STATUSES = frozenset({
     # transcode pipeline
     'video_ready', 'transcoding',
     # publish pipeline
-    'transcode_ready', 'story_posted',
+    'transcode_ready', 'story_posted', 'wall_posting',
     # terminal
     'cancelled', 'error', 'probe', 'story_probe', 'story_error',
     'video_error', 'transcode_error', 'publish_error', 'published',

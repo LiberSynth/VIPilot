@@ -3,8 +3,10 @@ Pipeline 5 — Публикация.
 Принимает batch_id, публикует видео на платформу таргета.
 Поддерживается: VKontakte (история + стена), Дзен (короткое видео).
 Видео берётся из БД (video_data_transcoded).
-Статусы: transcode_ready → story_posted → published / publish_error.
-  Возобновление после краша: story_posted → published.
+Статусы: transcode_ready → story_posted → wall_posting → published / publish_error.
+  wall_posting — промежуточный статус: атомарный захват из story_posted исключает двойной resume.
+  story_posted включён в actionable (resume после краша до wall-публикации).
+  wall_posting НЕ в actionable: активный статус выполнения, краш в нём требует ручного сброса.
 """
 
 from datetime import datetime, timezone
@@ -21,6 +23,7 @@ from db import (
     db_set_batch_published,
     db_set_batch_publish_error,
     db_set_batch_story_posted,
+    db_claim_batch_wall_posting,
 )
 from log import db_log_pipeline, db_log_entry, db_log_update, db_get_log_entries
 from pipelines.base import check_cancelled, handle_critical_error
@@ -71,6 +74,11 @@ def _publish_vk(batch_id, log_id, target_config):
             db_set_batch_story_posted(batch_id)
 
     if do_wall:
+        if story_ok:
+            if not db_claim_batch_wall_posting(batch_id):
+                if log_id:
+                    db_log_entry(log_id, 'Батч уже захвачен другим процессом для публикации стены — этот воркер не устанавливает финальный статус', level='warn')
+                return None
         if log_id:
             db_log_entry(log_id, 'Публикую на стену…')
         wall_ok = vk.publish_wall(video_data, group_id, log_id) is not None
@@ -117,24 +125,27 @@ def _publish_dzen(batch_id, log_id, target_config):
 
 
 def _publish_vk_wall(batch_id, log_id, target_config):
-    """Публикует только на стену (возобновление — история уже опубликована)."""
+    """Публикует только на стену (возобновление — история уже опубликована).
+    Возвращает True при успехе, False при любой ошибке."""
     if not vk.is_configured():
         if log_id:
             db_log_entry(log_id, 'VK_USER_TOKEN не задан — стена пропущена', level='warn')
-        return
+        return False
 
     do_wall = db_get('vk_publish_wall', '1') == '1'
     if not do_wall:
-        return
+        if log_id:
+            db_log_entry(log_id, 'Публикация на стену отключена в настройках — возобновление завершено без стены')
+        return True
 
     video_data = _get_vk_video(batch_id, log_id)
     if video_data is None:
-        return
+        return False
 
     group_id = int((target_config or {}).get('group_id', 236929597))
     if log_id:
         db_log_entry(log_id, 'Публикую на стену… (возобновление)')
-    vk.publish_wall(video_data, group_id, log_id)
+    return vk.publish_wall(video_data, group_id, log_id) is not None
 
 
 def run(batch_id):
@@ -145,21 +156,42 @@ def run(batch_id):
             return
 
         status = batch['status']
-        if status not in ('transcode_ready', 'story_posted'):
+        if status not in ('transcode_ready', 'story_posted', 'wall_posting'):
             return
 
         # --- Возобновление после краша: история уже опубликована, только стена ---
-        if status == 'story_posted':
+        if status in ('story_posted', 'wall_posting'):
+            if status == 'story_posted':
+                if not db_claim_batch_wall_posting(batch_id):
+                    print(f"[publish] Батч {batch_id[:8]}… уже захвачен другим процессом (wall_posting) — пропуск")
+                    return
+            # wall_posting: батч уже захвачен предыдущим claim-ом или стандартным прогоном,
+            # обрабатываем напрямую — краш между claim и завершением стены.
+
             log_id = db_log_pipeline(
                 'publish', 'Публикация — возобновление (стена)…',
                 status='running', batch_id=batch_id,
             )
+            wall_ok = False
             for t in db_get_active_targets():
                 if t['name'] == 'VKontakte':
-                    _publish_vk_wall(batch_id, log_id, t.get('config'))
-            db_set_batch_published(batch_id)
-            db_log_update(log_id, 'Опубликовано (возобновление)', 'ok')
-            print(f"[publish] Батч {batch_id[:8]}… опубликован (возобновление)")
+                    wall_ok = _publish_vk_wall(batch_id, log_id, t.get('config'))
+
+            if wall_ok:
+                saved = db_set_batch_published(batch_id)
+                if saved:
+                    db_log_update(log_id, 'Опубликовано (возобновление)', 'ok')
+                    print(f"[publish] Батч {batch_id[:8]}… опубликован (возобновление)")
+                else:
+                    db_set_batch_publish_error(batch_id)
+                    db_log_update(log_id, 'Стена опубликована, но ошибка записи статуса в БД (возобновление)', 'error')
+                    print(f"[publish] Батч {batch_id[:8]}… ошибка записи published в БД (возобновление)")
+                    notify_failure(f"publish: стена опубликована, но статус не сохранён в БД — батч {batch_id[:8]} (возобновление)")
+            else:
+                db_set_batch_publish_error(batch_id)
+                db_log_update(log_id, 'Ошибка публикации на стену (возобновление)', 'error')
+                print(f"[publish] Батч {batch_id[:8]}… ошибка публикации на стену (возобновление)")
+                notify_failure(f"publish: ошибка публикации на стену батча {batch_id[:8]} (возобновление)")
             return
 
         # --- Стандартный путь: transcode_ready ---
@@ -199,11 +231,15 @@ def run(batch_id):
         )
 
         results = []
+        handed_off = False
         for t in active_targets:
             name = t['name']
             cfg  = t.get('config') or {}
             if name == 'VKontakte':
                 t_ok = _publish_vk(batch_id, log_id, cfg)
+                if t_ok is None:
+                    handed_off = True
+                    t_ok = False
             elif name == 'Дзен':
                 t_ok = _publish_dzen(batch_id, log_id, cfg)
             else:
@@ -211,21 +247,32 @@ def run(batch_id):
                 t_ok = False
             results.append(t_ok)
 
+        if handed_off:
+            db_log_update(log_id, 'Стена VK передана другому воркеру — финальный статус установит он', 'ok')
+            print(f"[publish] Батч {batch_id[:8]}… стена VK передана другому воркеру")
+            return
+
         ok = any(results)
 
         if ok:
-            db_set_batch_published(batch_id)
-            db_log_update(log_id, f'Опубликовано ({target_names})', 'ok')
-            print(f"[publish] Батч {batch_id[:8]}… опубликован")
-            if log_id:
-                entries = db_get_log_entries(log_id)
-                warn_entries = [e for e in entries if e['level'] in ('warn', 'error')]
-                if warn_entries:
-                    notify_failure(
-                        f"publish: батч {batch_id[:8]} опубликован, но в процессе были некритичные ошибки",
-                        log_entries=warn_entries,
-                        partial=True,
-                    )
+            saved = db_set_batch_published(batch_id)
+            if saved:
+                db_log_update(log_id, f'Опубликовано ({target_names})', 'ok')
+                print(f"[publish] Батч {batch_id[:8]}… опубликован")
+                if log_id:
+                    entries = db_get_log_entries(log_id)
+                    warn_entries = [e for e in entries if e['level'] in ('warn', 'error')]
+                    if warn_entries:
+                        notify_failure(
+                            f"publish: батч {batch_id[:8]} опубликован, но в процессе были некритичные ошибки",
+                            log_entries=warn_entries,
+                            partial=True,
+                        )
+            else:
+                db_set_batch_publish_error(batch_id)
+                db_log_update(log_id, f'Опубликовано, но ошибка записи статуса в БД ({target_names})', 'error')
+                print(f"[publish] Батч {batch_id[:8]}… ошибка записи published в БД")
+                notify_failure(f"publish: опубликовано, но статус не сохранён в БД — батч {batch_id[:8]} ({target_names})")
         else:
             db_set_batch_publish_error(batch_id)
             db_log_update(log_id, 'Ошибка публикации', 'error')

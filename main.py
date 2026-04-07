@@ -76,6 +76,7 @@ _STATUS_TO_PIPELINE = {
     'transcoding':      transcode,
     'transcode_ready':  publish,
     'story_posted':     publish,
+    'wall_posting':     publish,
 }
 
 def _validate_batch_statuses():
