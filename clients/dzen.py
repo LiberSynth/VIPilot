@@ -245,12 +245,12 @@ def publish(
                 timeout=_PLAYWRIGHT_NAV_TIMEOUT,
             )
         except Exception as e:
-            browser.close()
+            context.close()
             raise DzenApiError(f"Навигация не удалась: {e}")
 
         current_url = page.url
         if "passport.yandex" in current_url or "/auth" in current_url:
-            browser.close()
+            context.close()
             raise DzenCsrfExpired(
                 "Сессия Дзен истекла — авторизуйтесь снова в браузере (вкладка «Публикация»)"
             )
@@ -260,7 +260,7 @@ def publish(
             csrf_ready.wait(timeout=_CSRF_WAIT_TIMEOUT)
 
         if not csrf_value[0]:
-            browser.close()
+            context.close()
             raise DzenApiError(
                 "Не удалось получить CSRF-токен. Возможно сессия истекла — "
                 "авторизуйтесь снова в браузере (вкладка «Публикация»)"
