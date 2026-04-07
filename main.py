@@ -11,7 +11,7 @@ from db import (
     db_get_schedule, db_get_active_targets, db_ensure_batch, db_get_last_pipeline_run,
     db_get_actionable_batches,
     db_get_batches_with_unknown_status,
-    db_cancel_obsolete_waiting_batches,
+    db_cancel_waiting_batches,
     KNOWN_BATCH_STATUSES,
     env_get, env_set,
 )
@@ -171,7 +171,7 @@ def main_loop():
 
             _run_planning(interval)
 
-            cancelled = db_cancel_obsolete_waiting_batches()
+            cancelled = db_cancel_waiting_batches()
             for bid in cancelled:
                 db_log_pipeline(
                     'publish',

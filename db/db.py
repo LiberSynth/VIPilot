@@ -451,12 +451,12 @@ def db_is_batch_scheduled(scheduled_at, target_id):
         return True  # безопасный fallback: не блокируем работу
 
 
-def db_set_batch_obsolete(batch_id):
+def db_set_batch_cancelled(batch_id):
     """Переводит батч в status='cancelled'."""
     return db_set_batch_status(batch_id, 'cancelled')
 
 
-def db_cancel_obsolete_waiting_batches():
+def db_cancel_waiting_batches():
     """Отменяет batches в статусе transcode_ready/story_posted, у которых слот расписания
     больше не существует или таргет деактивирован. Возвращает список отменённых batch_id."""
     try:
@@ -485,7 +485,7 @@ def db_cancel_obsolete_waiting_batches():
             conn.commit()
         return [str(r[0]) for r in rows]
     except Exception as e:
-        print(f"[DB] Ошибка db_cancel_obsolete_waiting_batches: {e}")
+        print(f"[DB] Ошибка db_cancel_waiting_batches: {e}")
         return []
 
 

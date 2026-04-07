@@ -23,7 +23,7 @@ from db import (
     env_get,
 )
 from log import db_log_pipeline, db_log_entry, db_log_update
-from pipelines.base import check_obsolete, handle_critical_error
+from pipelines.base import check_cancelled, handle_critical_error
 
 _API_KEY = os.environ.get('OPENROUTER_API_KEY', '')
 
@@ -121,7 +121,7 @@ def run(batch_id):
         target   = batch['target_name'] or 'пробный'
         is_probe = batch['target_id'] is None
 
-        if not is_probe and check_obsolete('story', batch_id, batch):
+        if not is_probe and check_cancelled('story', batch_id, batch):
             batch_done = True
             return
 

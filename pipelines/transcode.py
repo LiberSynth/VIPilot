@@ -30,7 +30,7 @@ from db import (
     db_set_batch_transcode_error,
 )
 from log import db_log_pipeline, db_log_entry, db_log_update
-from pipelines.base import check_obsolete, handle_critical_error
+from pipelines.base import check_cancelled, handle_critical_error
 
 
 def _probe_duration(src):
@@ -133,7 +133,7 @@ def run(batch_id):
             print(f"[transcode] Батч {batch_id[:8]}… ({target}) — транскод отключён, пропускаю")
             return
 
-        if not is_probe and check_obsolete('transcode', batch_id, batch):
+        if not is_probe and check_cancelled('transcode', batch_id, batch):
             return
 
         print(f"[transcode] Батч {batch_id[:8]}… ({target}) — начало транскодирования")

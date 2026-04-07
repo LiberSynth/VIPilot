@@ -23,7 +23,7 @@ from db import (
     db_set_batch_story_posted,
 )
 from log import db_log_pipeline, db_log_entry, db_log_update, db_get_log_entries
-from pipelines.base import check_obsolete, handle_critical_error
+from pipelines.base import check_cancelled, handle_critical_error
 from clients import vk
 from clients import dzen as dzen_client
 from clients.dzen import DzenCsrfExpired
@@ -172,7 +172,7 @@ def run(batch_id):
             print(f"[publish] Батч {batch_id[:8]}… пробный — публикация пропущена")
             return
 
-        if check_obsolete('publish', batch_id, batch):
+        if check_cancelled('publish', batch_id, batch):
             return
 
         now = datetime.now(timezone.utc)

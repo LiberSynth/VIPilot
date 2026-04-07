@@ -33,7 +33,7 @@ from db import (
     db_get_random_real_original_video,
 )
 from log import db_log_pipeline, db_log_entry, db_log_update
-from pipelines.base import check_obsolete, handle_critical_error
+from pipelines.base import check_cancelled, handle_critical_error
 
 _FAL_KEY = os.environ.get('FAL_API_KEY', '')
 
@@ -190,7 +190,7 @@ def run(batch_id):
         except (ValueError, TypeError):
             video_duration = 6
 
-        if not is_probe and check_obsolete('video', batch_id, batch):
+        if not is_probe and check_cancelled('video', batch_id, batch):
             return
 
         if env_get("emulation_mode", "0") == "1":
