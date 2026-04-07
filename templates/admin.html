@@ -33,6 +33,9 @@
     <button class="sidebar-item" data-panel="service" onclick="switchPanel('service')">
       <span class="sidebar-item-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="2" y1="4" x2="14" y2="4"/><circle cx="6" cy="4" r="2" fill="currentColor" stroke="none"/><line x1="2" y1="9" x2="14" y2="9"/><circle cx="10" cy="9" r="2" fill="currentColor" stroke="none"/><line x1="2" y1="13" x2="14" y2="13"/><circle cx="5" cy="13" r="2" fill="currentColor" stroke="none"/></svg></span>Служебные
     </button>
+    <button class="sidebar-item" data-panel="info" onclick="switchPanel('info')">
+      <span class="sidebar-item-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.5"/><line x1="8" y1="7.5" x2="8" y2="11.5"/><circle cx="8" cy="5" r="0.5" fill="currentColor" stroke="none"/></svg></span>Информация
+    </button>
   </nav>
 </div>
 
@@ -411,10 +414,16 @@
 
     </form>
 
-    <div style="margin-top:24px;padding:20px 16px;text-align:center;border-top:1px solid #1a1a28">
-      <div style="display:inline-flex;align-items:center;gap:10px;margin-bottom:10px">
-        <div style="width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,#5062f7,#8040f0);display:flex;align-items:center;justify-content:center;flex-shrink:0">
-          <svg width="20" height="20" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+  </div>
+
+  <!-- ══ ИНФОРМАЦИЯ ══ -->
+  <div id="panel-info" class="tab-panel">
+
+    <div class="card" style="margin-top:12px">
+      <div class="card-title">О программе</div>
+      <div style="display:flex;align-items:center;gap:14px;margin-top:14px">
+        <div style="width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,#5062f7,#8040f0);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <svg width="32" height="32" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
             <circle cx="10" cy="34" r="4" fill="#00E8FF" opacity="0.9"/>
             <circle cx="22" cy="26" r="3.5" fill="#00E8FF" opacity="0.75"/>
             <circle cx="10" cy="22" r="3" fill="#00E8FF" opacity="0.7"/>
@@ -427,12 +436,50 @@
             <path d="M18 27 C19.5 24 20.5 22 22 19" stroke="white" stroke-width="1.4" fill="none" opacity="0.35" stroke-linecap="round" stroke-dasharray="2.5 2"/>
           </svg>
         </div>
-        <div style="text-align:left">
-          <div style="font-size:14px;font-weight:700;color:#e0e0f0;letter-spacing:.01em">VisionForge</div>
-          <div style="font-size:11px;color:#555570;margin-top:1px">ROOT Module</div>
+        <div>
+          <div style="font-size:18px;font-weight:700;color:#e0e0f0;letter-spacing:.01em">VisionForge</div>
+          <div style="font-size:12px;font-weight:600;color:#7070a0;margin-top:3px;letter-spacing:.04em">ROOT</div>
+          <div style="font-size:12px;color:#666680;margin-top:5px;line-height:1.5">Модуль управления пайплайном автоматической генерации и публикации видеоконтента</div>
+          <div style="font-size:12px;color:#444460;margin-top:8px">Версия {{ app_version }}</div>
         </div>
       </div>
-      <div style="font-size:12px;color:#444460;margin-top:2px">Версия {{ app_version }}</div>
+    </div>
+
+    <div class="cp-card" style="margin-top:12px" id="dev-info-card">
+      <div class="cp-header" onclick="this.closest('.cp-card').classList.toggle('open')">
+        <div class="cp-header-left">
+          <span class="cp-title">Разработчику</span>
+        </div>
+        <span class="cp-arrow">▾</span>
+      </div>
+      <div class="cp-body">
+        <div style="font-size:13px;color:#c0c0d8;line-height:1.7">
+
+          <p style="margin:0 0 12px"><strong style="color:#e0e0f0">Инициализация при старте</strong><br>
+          При запуске однократно выполняется <code>start_main_loop</code>: инициализируется и мигрирует БД, сбрасывается счётчик активных потоков, все батчи проверяются на наличие неизвестных статусов. Из БД читается сохранённое состояние воркфлоу — если оно было поставлено на паузу до перезапуска, состояние восстанавливается. Затем запускаются два фоновых демон-потока: главный цикл (<code>main_loop</code>) и keepalive-пинг.</p>
+
+          <p style="margin:0 0 12px"><strong style="color:#e0e0f0">Keepalive</strong><br>
+          Отдельный поток каждые 4 минуты делает HTTP GET на <code>/healthz</code> своего же домена — чтобы удержать процесс живым в Replit-окружении, которое засыпает при отсутствии трафика.</p>
+
+          <p style="margin:0 0 8px"><strong style="color:#e0e0f0">Главный цикл (<code>main_loop</code>)</strong><br>
+          Работает в бесконечном цикле. Каждая итерация:</p>
+          <ol style="margin:0 0 12px 18px;padding:0;line-height:1.8">
+            <li><strong>Пауза-контроль.</strong> В начале итерации проверяется флаг паузы. Если поставлен — поток блокируется до снятия.</li>
+            <li><strong>Чтение конфигурации из БД.</strong> Берутся актуальные значения <code>loop_interval</code> (по умолчанию 5 с) и <code>max_batch_threads</code> (по умолчанию 2).</li>
+            <li><strong>Планирование батчей.</strong> Вызывается <code>_run_planning</code>: читается расписание и список активных таргетов. Для окна «от текущего момента до <code>buffer_hours</code> часов вперёд» проверяются слоты расписания за вчера/сегодня/завтра. Если батч для слота ещё не создан — создаётся. Также обрабатывается «догон»: слоты прошлого, попавшие в горизонт предыдущего запуска.</li>
+            <li><strong>Отмена устаревших батчей.</strong> Батчи в статусе ожидания, чьи слоты расписания удалены или таргет отключён, помечаются отменёнными.</li>
+            <li><strong>Диспетчеризация пайплайнов.</strong> Если активных потоков меньше лимита — из БД забираются actionable-батчи. Пайплайн определяется по статусу батча через словарь: <code>pending</code> / <code>story_generating</code> → story; <code>story_ready</code> / <code>video_generating</code> / <code>video_pending</code> → video; <code>video_ready</code> / <code>transcoding</code> → transcode; <code>transcode_ready</code> / <code>story_posted</code> → publish. Для publish дополнительно проверяется, наступило ли время публикации. Каждый батч захватывается атомарно и запускается в отдельном демон-потоке; по завершении цикл немедленно пробуждается.</li>
+            <li><strong>Cleanup.</strong> Если поток очистки не запущен или завершился — стартует новый поток <code>cleanup.run</code>.</li>
+            <li><strong>Ожидание.</strong> Цикл засыпает на <code>loop_interval</code> секунд, но может быть разбужен досрочно при освобождении потока батча.</li>
+          </ol>
+
+          <p style="margin:0 0 12px"><strong style="color:#e0e0f0">Логирование HTTP-запросов</strong><br>
+          Flask-хук <code>before_request</code> логирует каждый входящий запрос: метод, путь, IP, заголовки и тело (при наличии).</p>
+
+          <p style="margin:0;color:#888899;font-style:italic">Суть архитектуры: однопоточный планировщик с мультипоточным исполнением пайплайнов, управляемый через состояние в БД, с явным контролем параллелизма и возможностью паузы без перезапуска процесса.</p>
+
+        </div>
+      </div>
     </div>
 
   </div>

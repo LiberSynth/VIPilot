@@ -5,6 +5,7 @@ const PANEL_TITLES = {
   publish:  'Публикация',
   service:  'Служебные',
   log:      'Монитор',
+  info:     'Информация',
 };
 
 function openSidebar() {
