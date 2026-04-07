@@ -140,19 +140,37 @@ def publish(
             ),
             locale="ru-RU",
         )
+        # ── Шаг 0: CSRF из куки (Playwright читает HttpOnly напрямую) ─────────
+        _CSRF_COOKIE_NAMES = ("csrftoken2", "_csrf", "csrftoken", "XSRF-TOKEN")
+        _csrf_source = "unknown"
+        try:
+            _cookies = context.cookies(["https://dzen.ru", "https://yandex.ru"])
+            for _c in _cookies:
+                if _c["name"] in _CSRF_COOKIE_NAMES and _c.get("value"):
+                    csrf_value[0] = _c["value"]
+                    csrf_ready.set()
+                    _csrf_source = f"cookie:{_c['name']}"
+                    print(f"[dzen] CSRF найден в куке: {_c['name']}")
+                    break
+        except Exception:
+            pass
+
         page = context.new_page()
 
-        # Перехватываем CSRF из заголовков запросов страницы
+        # Дополнительно перехватываем CSRF из заголовков XHR-запросов страницы
         def on_request(req):
             if csrf_value[0]:
                 return
             token = req.headers.get("x-csrf-token")
             if token:
                 csrf_value[0] = token
+                _csrf_source = "xhr"
+                print(f"[dzen] CSRF перехвачен из XHR: {req.url[:60]}")
                 csrf_ready.set()
 
         page.on("request", on_request)
 
+        # Навигация нужна для проверки актуальности сессии
         try:
             page.goto(
                 "https://dzen.ru",
@@ -170,26 +188,7 @@ def publish(
                 "Сессия Дзен истекла — авторизуйтесь снова в браузере (вкладка «Публикация»)"
             )
 
-        # Пробуем извлечь CSRF напрямую из JS-контекста страницы
-        if not csrf_value[0]:
-            try:
-                csrf_from_js = page.evaluate("""() => {
-                    try {
-                        if (window.Ya && window.Ya.csrfToken) return window.Ya.csrfToken;
-                        var meta = document.querySelector('meta[name="csrf-token"]');
-                        if (meta && meta.content) return meta.content;
-                        var m = document.cookie.match(/(?:^|;\\s*)(?:csrftoken2|_csrf|csrftoken)=([^;]+)/);
-                        if (m) return m[1];
-                    } catch(e) {}
-                    return null;
-                }""")
-                if csrf_from_js:
-                    csrf_value[0] = csrf_from_js
-                    csrf_ready.set()
-            except Exception:
-                pass
-
-        # Если из JS не получили — ждём перехвата из сетевых запросов страницы
+        # Если куки не дали CSRF — ждём XHR-перехвата из страницы
         if not csrf_value[0]:
             csrf_ready.wait(timeout=_CSRF_WAIT_TIMEOUT)
 
@@ -202,7 +201,7 @@ def publish(
 
         csrf = csrf_value[0]
         if log_id:
-            db_log_entry(log_id, "Дзен: авторизация получена, начинаю публикацию…")
+            db_log_entry(log_id, f"Дзен: авторизация получена (csrf: {_csrf_source}), начинаю публикацию…")
 
         # Базовые заголовки для всех API-запросов через browser context
         _api_headers = {
