@@ -29,7 +29,8 @@ from log import db_log_pipeline, db_log_entry, db_log_update, db_get_log_entries
 from pipelines.base import check_cancelled, handle_critical_error
 from clients import vk
 from clients import dzen as dzen_client
-from clients.dzen import DzenCsrfExpired
+from clients.dzen import DzenCsrfExpired, DzenSessionMissing
+from db import db_get_target_browser_session
 
 
 def _get_vk_video(batch_id, log_id):
@@ -86,13 +87,21 @@ def _publish_vk(batch_id, log_id, target_config):
     return story_ok or wall_ok
 
 
-def _publish_dzen(batch_id, log_id, target_config):
+def _publish_dzen(batch_id, log_id, target):
     """Публикует батч на Дзен. Возвращает True при успехе."""
-    cfg = target_config or {}
+    cfg = target.get('config') or {} if isinstance(target, dict) else (target or {})
+    target_id = target.get('id') if isinstance(target, dict) else None
 
-    if not dzen_client.is_configured(cfg):
+    browser_session = None
+    if target_id:
+        browser_session = db_get_target_browser_session(target_id)
+
+    if not dzen_client.is_configured(cfg, browser_session):
         if log_id:
-            db_log_entry(log_id, 'Дзен не настроен: проверьте publisher_id и CSRF-токен в настройках', level='error')
+            if not cfg.get('publisher_id'):
+                db_log_entry(log_id, 'Дзен не настроен: publisher_id отсутствует', level='error')
+            else:
+                db_log_entry(log_id, 'Дзен: браузерная сессия не сохранена — авторизуйтесь на вкладке «Публикация»', level='error')
         return False
 
     video_data = db_get_batch_video_data(batch_id)
@@ -117,10 +126,14 @@ def _publish_dzen(batch_id, log_id, target_config):
         title = 'Видео'
 
     try:
-        return dzen_client.publish(video_data, cfg, title, log_id)
+        return dzen_client.publish(video_data, cfg, title, log_id, browser_session=browser_session)
+    except DzenSessionMissing as e:
+        if log_id:
+            db_log_entry(log_id, f'Дзен: {e}', level='error')
+        raise
     except DzenCsrfExpired as e:
         if log_id:
-            db_log_entry(log_id, f'Дзен: CSRF-токен истёк — обновите его в настройках → вкладка «Публикация»', level='error')
+            db_log_entry(log_id, f'Дзен: {e}', level='error')
         raise
 
 
@@ -241,7 +254,7 @@ def run(batch_id):
                     handed_off = True
                     t_ok = False
             elif name == 'Дзен':
-                t_ok = _publish_dzen(batch_id, log_id, cfg)
+                t_ok = _publish_dzen(batch_id, log_id, t)
             else:
                 db_log_entry(log_id, f'Платформа «{name}» не поддерживается', level='warn')
                 t_ok = False

@@ -717,6 +717,17 @@ def _m017_dzen_publisher_id(cur):
     """)
 
 
+def _m018_targets_browser_session(cur):
+    """
+    Добавляет колонку browser_session (JSONB) в таблицу targets.
+    Хранит Playwright storage state (cookies + localStorage) для авторизованной сессии Дзен.
+    """
+    cur.execute("""
+        ALTER TABLE targets
+            ADD COLUMN IF NOT EXISTS browser_session JSONB DEFAULT NULL
+    """)
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -735,6 +746,7 @@ MIGRATIONS = [
     (15, _m015_fix_cancelled_status),
     (16, _m016_targets_config),
     (17, _m017_dzen_publisher_id),
+    (18, _m018_targets_browser_session),
 ]
 
 

@@ -242,42 +242,46 @@
       <input type="hidden" id="dzen_target_id" value="{{ dzen_target_id or '' }}">
       <div class="card-title">Публикация в Дзен</div>
 
-      <div id="dzen_csrf_status" class="hint" style="margin-bottom:10px;color:
-        {%- if dzen_csrf_age is not none -%}
-          {%- if dzen_csrf_age > 1440 -%}#ff6b6b{%- elif dzen_csrf_age > 480 -%}#ffa94d{%- else -%}#69db7c{%- endif -%}
-        {%- else -%}#aaa{%- endif -%}
-      ">
-        {%- if dzen_csrf_age is not none -%}
-          {%- if dzen_csrf_age > 1440 -%}
-            ⚠ CSRF-токен устарел ({{ dzen_csrf_age // 60 }} ч {{ dzen_csrf_age % 60 }} мин). Обновите его ниже.
-          {%- elif dzen_csrf_age > 480 -%}
-            CSRF-токен: {{ dzen_csrf_age // 60 }} ч {{ dzen_csrf_age % 60 }} мин. Рекомендуется обновить.
-          {%- else -%}
-            CSRF-токен актуален ({{ dzen_csrf_age }} мин назад).
-          {%- endif -%}
+      <!-- Статус сессии -->
+      <div id="dzen-session-status" class="hint" style="margin-bottom:12px;color:
+        {%- if dzen_session_saved_at -%}#69db7c{%- else -%}#aaa{%- endif -%}">
+        {%- if dzen_session_saved_at -%}
+          Сессия сохранена: {{ dzen_session_saved_at[:16]|replace('T',' ') }} UTC
         {%- else -%}
-          CSRF-токен не задан.
+          Сессия не сохранена — авторизуйтесь в браузере ниже
         {%- endif -%}
       </div>
 
-      <div class="hint" style="margin-bottom:10px">
-        Как обновить токен:
-        <ol style="margin:6px 0 0 16px;padding:0;line-height:1.7">
-          <li>Открой <b>dzen.ru/profile/editor</b></li>
-          <li>Нажми <b>F12</b> → вкладка <b>Network</b></li>
-          <li>В поле фильтра введи <code>log-studio-event</code></li>
-          <li>Кликни на любой запрос из списка</li>
-          <li>Справа выбери вкладку <b>Headers</b></li>
-          <li>В разделе <b>Request Headers</b> найди строку <code>x-csrf-token</code> и скопируй значение</li>
-        </ol>
+      <!-- Кнопки управления браузером -->
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+        <button class="btn-run-now" id="dzen-btn-open"
+                onclick="dzenBrowserOpen()"
+                style="font-size:13px;padding:7px 14px">Открыть браузер</button>
+        <button class="btn-run-now" id="dzen-btn-save"
+                onclick="dzenBrowserSaveSession()"
+                style="font-size:13px;padding:7px 14px;display:none">Сохранить сессию</button>
+        <button class="wf-btn" id="dzen-btn-close"
+                onclick="dzenBrowserClose()"
+                style="display:none">Закрыть</button>
       </div>
 
-      <div class="toggle-label" style="margin-bottom:4px">CSRF-токен</div>
-      <input type="text" id="dzen_csrf_token"
-             value="{{ dzen_csrf_token }}"
-             placeholder="abcdef…:1234567890000"
-             oninput="scheduleDzenCsrfSave()"
-             style="width:100%;box-sizing:border-box;background:var(--input-bg,#1a1a2e);border:1px solid var(--border,rgba(255,255,255,.1));border-radius:6px;padding:8px 10px;color:inherit;font-size:13px;font-family:monospace">
+      <!-- Статус браузера -->
+      <div id="dzen-browser-status-text" class="hint" style="margin-bottom:8px;display:none"></div>
+
+      <!-- Canvas с браузером -->
+      <div id="dzen-browser-wrap" style="display:none;position:relative;border-radius:6px;overflow:hidden;border:1px solid var(--border,rgba(255,255,255,.12))">
+        <canvas id="dzen-browser-canvas"
+                style="display:block;width:100%;cursor:text"
+                tabindex="0"></canvas>
+        <div id="dzen-browser-overlay"
+             style="position:absolute;inset:0;background:rgba(10,10,20,.7);display:flex;align-items:center;justify-content:center;color:#ccc;font-size:14px">
+          Загрузка…
+        </div>
+      </div>
+
+      <div id="dzen-browser-hint" class="hint" style="margin-top:8px;display:none">
+        Авторизуйтесь на Дзен. После входа нажмите <b>Сохранить сессию</b>.
+      </div>
     </div>
   </div>
 
@@ -552,6 +556,7 @@
 <script src="/static/js/models.js"></script>
 <script src="/static/js/schedule.js"></script>
 <script src="/static/js/modals.js"></script>
+<script src="/static/js/dzen_browser.js"></script>
 
 </body>
 </html>

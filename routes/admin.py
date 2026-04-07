@@ -22,6 +22,7 @@ from db import (
     db_update_target_aspect_ratio,
     db_get_target_by_name,
     db_update_target_config,
+    db_get_target_browser_session_saved_at,
 )
 from utils.consts import ADMIN_PASSWORD
 from utils.auth import is_authenticated, password_fingerprint
@@ -98,17 +99,11 @@ def admin_page():
     dzen_target     = db_get_target_by_name("Дзен")
     dzen_config     = dzen_target.get("config") or {} if dzen_target else {}
     dzen_publisher_id = dzen_config.get("publisher_id", "")
-    dzen_csrf_token   = dzen_config.get("csrf_token", "")
-    dzen_csrf_age     = None
-    if dzen_csrf_token and ":" in dzen_csrf_token:
-        import time
-        try:
-            ts_ms = int(dzen_csrf_token.split(":")[-1])
-            dzen_csrf_age = int((time.time() * 1000 - ts_ms) / 60000)
-        except (ValueError, IndexError):
-            pass
     dzen_target_id = dzen_target["id"] if dzen_target else None
     dzen_active    = bool(dzen_target.get("active")) if dzen_target else False
+    dzen_session_saved_at = None
+    if dzen_target_id:
+        dzen_session_saved_at = db_get_target_browser_session_saved_at(dzen_target_id)
 
     vk_target  = db_get_target_by_name("VKontakte")
     vk_active  = bool(vk_target.get("active")) if vk_target else False
@@ -148,8 +143,7 @@ def admin_page():
         aspect_ratio_y=aspect_ratio_y,
         dzen_target_id=dzen_target_id,
         dzen_publisher_id=dzen_publisher_id,
-        dzen_csrf_token=dzen_csrf_token,
-        dzen_csrf_age=dzen_csrf_age,
+        dzen_session_saved_at=dzen_session_saved_at,
         vk_active=vk_active,
         dzen_active=dzen_active,
         app_version=APP_VERSION,
@@ -274,28 +268,6 @@ def save():
     return redirect(url_for("admin.admin_page") + f"?tab={active_tab}")
 
 
-@bp.route("/save-dzen", methods=["POST"])
-def save_dzen():
-    from flask import jsonify
-    if not is_authenticated():
-        return jsonify({"ok": False}), 401
-
-    target_id  = request.form.get("dzen_target_id", "").strip()
-    csrf_token = request.form.get("dzen_csrf_token", "").strip()
-
-    if not target_id or not csrf_token:
-        return jsonify({"ok": False}), 400
-
-    existing_target = db_get_target_by_name("Дзен")
-    existing_config = {}
-    if existing_target:
-        existing_config = existing_target.get("config") or {}
-
-    new_config = dict(existing_config)
-    new_config["csrf_token"] = csrf_token
-
-    ok = db_update_target_config(target_id, new_config)
-    return jsonify({"ok": ok})
 
 
 @bp.route("/logout")
