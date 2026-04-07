@@ -37,10 +37,11 @@ def handle_critical_error(pipeline_name: str, batch_id: str, log_id, e: Exceptio
     """Обрабатывает непойманное исключение в пайплайне:
     переводит батч в fatal_error, записывает в лог и отправляет уведомление.
     """
-    msg = f"Критическая ошибка приложения: {e}"
+    title = "Критическая ошибка приложения"
+    msg = f"{title}: {e}"
     db_set_batch_fatal_error(batch_id)
     if log_id:
-        db_log_update(log_id, msg, 'error')
+        db_log_update(log_id, title, 'error')
         db_log_entry(log_id, msg, level='error')
     else:
         new_log_id = db_log_pipeline(pipeline_name, msg, status='error', batch_id=batch_id)
