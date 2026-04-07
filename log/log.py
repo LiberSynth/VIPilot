@@ -75,6 +75,54 @@ def db_log_root(message, status='info'):
     return db_log_pipeline('root', message, status=status, batch_id=None)
 
 
+FINAL_BATCH_STATUSES = (
+    'published', 'probe', 'story_probe',
+    'cancelled', 'fatal_error',
+    'video_error', 'transcode_error', 'publish_error',
+)
+
+
+def db_log_fix_orphaned_running(fix=True):
+    """Находит записи лога со статусом 'running', чей батч уже в финальном статусе.
+    Логирует предупреждение для каждой такой записи.
+    Если fix=True — переводит их в статус 'прервана'."""
+    try:
+        placeholders = ', '.join(['%s'] * len(FINAL_BATCH_STATUSES))
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"""
+                    SELECT l.id, l.pipeline, l.batch_id, b.status
+                    FROM log l
+                    JOIN batches b ON b.id = l.batch_id
+                    WHERE l.status = 'running'
+                      AND b.status IN ({placeholders})
+                    """,
+                    FINAL_BATCH_STATUSES,
+                )
+                rows = cur.fetchall()
+                if rows:
+                    for row in rows:
+                        log_id, pipeline, batch_id, batch_status = row
+                        print(
+                            f"[log] WARN: лог #{log_id} (pipeline={pipeline}, "
+                            f"batch={str(batch_id)[:8]}…) завис в 'running', "
+                            f"батч уже в статусе '{batch_status}'"
+                        )
+                    if fix:
+                        ids = [r[0] for r in rows]
+                        cur.execute(
+                            "UPDATE log SET status = 'прервана' WHERE id = ANY(%s)",
+                            (ids,),
+                        )
+                        conn.commit()
+                        print(f"[log] {len(ids)} зависших 'running' записей → прервана")
+        return len(rows) if rows else 0
+    except Exception as e:
+        print(f"[DB] Ошибка db_log_fix_orphaned_running: {e}")
+        return 0
+
+
 def db_get_log_entries(log_id):
     """Возвращает список субзаписей для указанного log_id."""
     try:

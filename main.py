@@ -15,7 +15,7 @@ from db import (
     KNOWN_BATCH_STATUSES,
     env_get, env_set,
 )
-from log import db_log_root, db_log_pipeline, db_log_entry, db_log_interrupt_running
+from log import db_log_root, db_log_pipeline, db_log_entry, db_log_interrupt_running, db_log_fix_orphaned_running
 from pipelines import story, video, transcode, publish, cleanup
 from routes.admin import bp as admin_bp
 from routes.api import bp as api_bp
@@ -268,6 +268,7 @@ def start_main_loop():
             wf_state.set_running()
         for _pipeline in ('story', 'video', 'transcode', 'publish'):
             db_log_interrupt_running(_pipeline)
+        db_log_fix_orphaned_running(fix=True)
         db_log_root("Приложение запущено", status='info')
         atexit.register(_on_exit)
         t = threading.Thread(target=main_loop, daemon=True)

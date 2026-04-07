@@ -171,11 +171,15 @@
       '</div>';
     }
 
-    const isActive      = logs.some(function(l) { return l.status === 'running'; })
-                       || _activeBatchIds.indexOf(batch.batch_id) >= 0;
     const doneStatuses  = ['published', 'probe', 'story_probe'];
     const waitStatuses  = ['story_ready', 'video_pending', 'video_ready', 'transcode_ready'];
     const errorStatuses = ['error', 'video_error', 'transcode_error', 'publish_error', 'fatal_error'];
+    const finalStatuses = doneStatuses.concat(errorStatuses).concat(['cancelled']);
+    const isFinal       = finalStatuses.indexOf(bs) >= 0;
+    const isActive      = !isFinal && (
+                            logs.some(function(l) { return l.status === 'running'; })
+                         || _activeBatchIds.indexOf(batch.batch_id) >= 0
+                         );
     const md = isActive ? 'md-active'
              : bs === 'cancelled'                  ? 'md-skip'
              : doneStatuses.indexOf(bs)  >= 0     ? 'md-ok'

@@ -7,4 +7,5 @@ from .log import (
     db_get_log,
     db_get_log_entries,
     db_get_monitor,
+    db_log_fix_orphaned_running,
 )
