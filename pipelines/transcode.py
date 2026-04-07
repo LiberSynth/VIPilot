@@ -184,7 +184,7 @@ def run(batch_id):
                 db_log_entry(log_id, msg, level='warn')
             db_set_batch_transcode_skip(batch_id)
             print(f"[transcode] {msg}")
-            notify_failure(f"transcode: ffmpeg сбой (некритично) — батч {batch_id[:8]}")
+            notify_failure(f"transcode: ffmpeg сбой (некритично) — батч {batch_id[:8]}", partial=True)
             return
 
         out_mb = round(os.path.getsize(tmp_out_path) / 1024 / 1024, 1)
