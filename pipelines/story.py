@@ -203,7 +203,6 @@ def run(batch_id):
         user_prompt   = db_get('metaprompt', '')
 
         if log_id:
-            db_log_entry(log_id, f"Промпт:\n{user_prompt}")
             db_log_entry(log_id, f"Моделей: {len(models)}, попыток на модель: {fails_to_next}")
 
         story_id        = None

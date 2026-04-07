@@ -284,7 +284,6 @@ def run(batch_id):
             )
             if log_id:
                 db_log_entry(log_id, f"Соотношение сторон: {ar_x}:{ar_y}")
-                db_log_entry(log_id, f"Промпт:\n{story_text}")
                 if pinned_model_id:
                     db_log_entry(log_id, f"Пробная модель: {models[0]['name']}, попыток: {fails_to_next}")
                 else:
