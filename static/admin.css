@@ -628,6 +628,20 @@
     text-transform: uppercase; letter-spacing: .07em; margin-bottom: 10px;
   }
 
+  /* ── Dev sub-sections (inside "Разработчику") ── */
+  .dev-sub { border-top: 1px solid #1e1e2e; }
+  .dev-sub:first-child { border-top: none; }
+  .dev-sub-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 11px 0; cursor: pointer; user-select: none; -webkit-user-select: none;
+  }
+  .dev-sub-header:active { opacity: .75; }
+  .dev-sub-title { font-size: 13px; font-weight: 600; color: #a0a0c0; }
+  .dev-sub-arrow { font-size: 13px; color: #555; transition: transform .2s; flex-shrink: 0; }
+  .dev-sub.open .dev-sub-arrow { transform: rotate(180deg); }
+  .dev-sub-body { display: none; padding-bottom: 12px; }
+  .dev-sub.open .dev-sub-body { display: block; }
+
   /* ── Model list ── */
   .model-list { display: flex; flex-direction: column; gap: 6px; }
   .model-loading { font-size: 13px; color: #555; padding: 8px 0; }
