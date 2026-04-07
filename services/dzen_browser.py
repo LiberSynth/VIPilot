@@ -299,6 +299,18 @@ def request_save(target_id: str) -> dict:
     return _save_result or {"ok": False, "error": "Неизвестная ошибка"}
 
 
+def push_frame(img: bytes):
+    """
+    Помещает JPEG-кадр в буфер трансляции (потокобезопасно).
+    Вызывается из потока Playwright — без лишних потоков.
+    """
+    global _latest_frame, _frame_counter
+    with _frame_lock:
+        _latest_frame = img
+        _frame_counter += 1
+    _new_frame_event.set()
+
+
 def run_pipeline_browser(fn, cookies: list) -> dict:
     """
     Запускает fn(page, context) в новом браузере с куками из cookies.
@@ -306,7 +318,7 @@ def run_pipeline_browser(fn, cookies: list) -> dict:
     БЛОКИРУЕТ вызывающий поток — вызывать из фонового потока пайплайна.
     Возвращает {"ok": bool, "result": ..., "error": str|None}.
     """
-    global _running, _latest_frame, _frame_counter, _pipeline_taking_over
+    global _running, _pipeline_taking_over
 
     # Сигнализируем ДО остановки login-браузера — frame_generator не пошлёт STOPPED
     _pipeline_taking_over = True
@@ -321,27 +333,6 @@ def run_pipeline_browser(fn, cookies: list) -> dict:
 
     with _lock:
         _running = True
-
-    _stop_ss = threading.Event()
-    _page_ref: list = [None]
-
-    def _ss_loop():
-        global _latest_frame, _frame_counter
-        while not _stop_ss.is_set():
-            pg = _page_ref[0]
-            if pg is not None:
-                try:
-                    img = pg.screenshot(type="jpeg", quality=65)
-                    with _frame_lock:
-                        _latest_frame = img
-                        _frame_counter += 1
-                    _new_frame_event.set()
-                except Exception:
-                    pass
-            _stop_ss.wait(timeout=0.3)
-
-    ss_thread = threading.Thread(target=_ss_loop, daemon=True, name="dzen-pipeline-ss")
-    ss_thread.start()
 
     result: dict = {"ok": False, "error": "Неизвестная ошибка"}
 
@@ -369,7 +360,6 @@ def run_pipeline_browser(fn, cookies: list) -> dict:
                     print(f"[dzen_pipeline] Ошибка куков: {e}")
 
             page = ctx.new_page()
-            _page_ref[0] = page
 
             try:
                 fn_result = fn(page, ctx)
@@ -379,7 +369,6 @@ def run_pipeline_browser(fn, cookies: list) -> dict:
                 traceback.print_exc()
                 result = {"ok": False, "error": str(e)}
             finally:
-                _page_ref[0] = None
                 try:
                     browser.close()
                 except Exception:
@@ -387,9 +376,6 @@ def run_pipeline_browser(fn, cookies: list) -> dict:
 
     except Exception as e:
         result = {"ok": False, "error": f"Playwright: {e}"}
-
-    _stop_ss.set()
-    ss_thread.join(timeout=3)
 
     _pipeline_taking_over = False
     with _lock:

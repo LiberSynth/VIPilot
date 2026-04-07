@@ -116,6 +116,16 @@ def _log(log_id, msg: str):
         db_log_entry(log_id, f"Дзен: {msg}")
 
 
+def _snap(page) -> None:
+    """Снимает скриншот и передаёт кадр в SSE-трансляцию (thread-safe)."""
+    try:
+        from services.dzen_browser import push_frame
+        img = page.screenshot(type="jpeg", quality=65)
+        push_frame(img)
+    except Exception as _e:
+        print(f"[dzen] _snap: {_e}")
+
+
 def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id):
     """Управляет браузером для публикации видео через UI Дзена."""
 
@@ -125,6 +135,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id):
     _log(log_id, f"Переход в студию: {studio_url}")
     page.goto(studio_url, wait_until="domcontentloaded", timeout=_NAV_TIMEOUT)
     page.wait_for_timeout(2000)
+    _snap(page)
 
     cur = page.url
     print(f"[dzen] URL после перехода: {cur}")
@@ -133,39 +144,27 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id):
             "Сессия истекла — авторизуйтесь снова в браузере (вкладка «Публикация»)"
         )
 
-    # ── Диагностика: логируем все видимые кнопки и ссылки ────────────────
-    try:
-        import os as _os
-        screenshot_path = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "data", "dzen_studio_screenshot.jpg")
-        page.screenshot(path=screenshot_path, type="jpeg", quality=80)
-        print(f"[dzen] Скриншот сохранён: {screenshot_path}")
-    except Exception as _e:
-        print(f"[dzen] Скриншот не сохранён: {_e}")
-
-    try:
-        btns = page.locator("button, a[role='button'], [role='button']").all()
-        info = []
-        for b in btns:
-            if b.is_visible():
-                txt = b.inner_text().strip()
-                lbl = b.get_attribute("aria-label") or ""
-                btn_title = b.get_attribute("title") or ""
-                cls = (b.get_attribute("class") or "")[:60]
-                info.append(f"text={txt!r} aria={lbl!r} title={btn_title!r} class={cls!r}")
-        print(f"[dzen] Видимые кнопки ({len(info)}):")
-        for i in info:
-            print(f"  {i}")
-        _log(log_id, f"Кнопок на странице: {len(info)}: {info[:5]}")
-    except Exception as _e:
-        print(f"[dzen] Ошибка диагностики: {_e}")
-
-    # ── Закрываем модальный overlay если есть (онбординг и т.п.) ─────────
+    # ── Закрываем модальный overlay если есть (онбординг, донаты и т.п.) ─
     try:
         overlay = page.locator("[data-testid='modal-overlay']").first
         if overlay.is_visible():
             _log(log_id, "Закрываю модальное окно…")
-            overlay.click()
+            # Сначала пробуем кнопку ×, затем клик по оверлею
+            close_x = page.locator(
+                "[data-testid='modal-overlay'] ~ * button, "
+                "dialog button[aria-label*='lose'], "
+                "dialog button[aria-label*='закр'], "
+                "[class*='close'], [class*='Close']"
+            ).first
+            try:
+                if close_x.is_visible():
+                    close_x.click()
+                else:
+                    overlay.click()
+            except Exception:
+                overlay.click()
             page.wait_for_timeout(500)
+            _snap(page)
     except Exception:
         pass
     # На всякий случай — Escape
@@ -190,37 +189,30 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id):
     plus_btn.click()
     _log(log_id, "Кнопка «+» нажата, жду меню…")
     page.wait_for_timeout(1500)
-
-    # Скриншот после клика «+» для диагностики
-    try:
-        import os as _os
-        ss2_path = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "data", "dzen_after_plus.jpg")
-        page.screenshot(path=ss2_path, type="jpeg", quality=80)
-        print(f"[dzen] Скриншот после «+»: {ss2_path}")
-    except Exception as _e:
-        print(f"[dzen] Скриншот не сохранён: {_e}")
+    _snap(page)
 
     # ── Шаг 3: «Загрузить видео» из выпадающего меню ─────────────────────
     _log(log_id, "Выбираю «Загрузить видео»…")
-    # Ищем пункт меню — используем Playwright text selector (не CSS!)
     upload_item = page.get_by_text("Загрузить видео", exact=True).first
     try:
         upload_item.wait_for(state="visible", timeout=8_000)
     except Exception:
-        # Fallback — ищем любой элемент с этим текстом
         _log(log_id, "exact-match не нашёл — пробую contains…")
         upload_item = page.locator("text=Загрузить видео").first
         upload_item.wait_for(state="visible", timeout=5_000)
     upload_item.click()
     _log(log_id, "«Загрузить видео» нажато")
     page.wait_for_timeout(1500)
+    _snap(page)
 
     # ── Шаг 4: Загружаем файл ────────────────────────────────────────────
     _log(log_id, "Ищу поле загрузки файла…")
+    # file input скрыт намеренно — ждём только "attached", не "visible"
     file_input = page.locator('input[type="file"]').first
-    file_input.wait_for(timeout=_UPLOAD_WAIT)
+    file_input.wait_for(state="attached", timeout=15_000)
     file_input.set_input_files(video_path)
     _log(log_id, "Файл передан браузеру, жду загрузки…")
+    _snap(page)
 
     # Ждём пока прогресс-бар исчезнет или появится кнопка следующего шага
     try:
@@ -233,6 +225,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id):
     except Exception:
         _log(log_id, "Не дождался явного сигнала — продолжаю…")
         page.wait_for_timeout(5000)
+    _snap(page)
 
     # ── Шаг 5: Вводим заголовок ──────────────────────────────────────────
     _log(log_id, "Ввожу заголовок…")
@@ -247,6 +240,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id):
             ti.fill(title)
             _log(log_id, f"Заголовок введён ({sel})")
             break
+    _snap(page)
 
     # ── Шаг 6: Публикуем ─────────────────────────────────────────────────
     _log(log_id, "Нажимаю «Опубликовать»…")
@@ -254,6 +248,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id):
     pub_btn.wait_for(state="visible", timeout=15_000)
     pub_btn.click()
     page.wait_for_timeout(4000)
+    _snap(page)
 
     final_url = page.url
     print(f"[dzen] URL после публикации: {final_url}")
