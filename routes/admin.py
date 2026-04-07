@@ -22,7 +22,6 @@ from db import (
     db_update_target_aspect_ratio,
     db_get_target_by_name,
     db_update_target_config,
-    db_get_target_browser_session_saved_at,
 )
 from utils.consts import ADMIN_PASSWORD
 from utils.auth import is_authenticated, password_fingerprint
@@ -101,9 +100,8 @@ def admin_page():
     dzen_publisher_id = dzen_config.get("publisher_id", "")
     dzen_target_id = dzen_target["id"] if dzen_target else None
     dzen_active    = bool(dzen_target.get("active")) if dzen_target else False
-    dzen_session_saved_at = None
-    if dzen_target_id:
-        dzen_session_saved_at = db_get_target_browser_session_saved_at(dzen_target_id)
+    from services.dzen_browser import get_session_saved_at as _dzen_saved_at
+    dzen_session_saved_at = _dzen_saved_at()
 
     vk_target  = db_get_target_by_name("VKontakte")
     vk_active  = bool(vk_target.get("active")) if vk_target else False

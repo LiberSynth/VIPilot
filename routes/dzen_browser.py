@@ -13,7 +13,6 @@ Endpoints:
 from flask import Blueprint, Response, jsonify, request, stream_with_context
 
 from utils.auth import is_authenticated
-from db import db_get_target_browser_session_saved_at
 import services.dzen_browser as browser_svc
 
 bp = Blueprint("dzen_browser", __name__, url_prefix="/api/dzen-browser")
@@ -105,9 +104,8 @@ def status():
     target_id = request.args.get("target_id", "")
     info = browser_svc.get_status()
 
-    saved_at = None
-    if target_id:
-        saved_at = db_get_target_browser_session_saved_at(target_id)
+    from services.dzen_browser import get_session_saved_at as _dzen_saved_at
+    saved_at = _dzen_saved_at()
 
     return jsonify({
         "browser": info,

@@ -2,25 +2,63 @@
 Менеджер Playwright-браузера для авторизации на Дзен.
 
 Запускает headless Chromium в фоновом потоке, транслирует скриншоты через SSE.
-Пользователь авторизуется, затем нажимает «Сохранить сессию» — Playwright storage state
-(cookies + localStorage) сохраняется в БД.
+Пользователь авторизуется — куки сохраняются автоматически в профиль Chrome на диске.
+Кнопка «Сохранить сессию» фиксирует временную метку без дополнительных действий.
 
 Публичный API (потокобезопасен):
     start(target_id)         — запустить браузер
     stop()                   — остановить браузер
     send_event(ev)           — передать событие мыши/клавиатуры
-    request_save(target_id)  — сохранить сессию в БД
+    request_save(target_id)  — зафиксировать метку сохранения
     get_status()             — текущий статус
     frame_generator()        — SSE-генератор кадров (JPEG, base64)
 """
 
 import base64
 import json
+import os
 import queue
 import threading
 import time
 from datetime import datetime, timezone
 from typing import Optional
+
+# ---------------------------------------------------------------------------
+# Путь к персистентному профилю Chrome
+# ---------------------------------------------------------------------------
+
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DZEN_PROFILE_DIR = os.path.join(_PROJECT_ROOT, "data", "dzen_profile")
+_METADATA_FILE = os.path.join(DZEN_PROFILE_DIR, "_vipilot_meta.json")
+
+
+def _read_meta() -> dict:
+    try:
+        with open(_METADATA_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _write_meta(data: dict):
+    os.makedirs(DZEN_PROFILE_DIR, exist_ok=True)
+    try:
+        with open(_METADATA_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+    except Exception as e:
+        print(f"[dzen_browser] Ошибка записи метаданных: {e}")
+
+
+def get_session_saved_at() -> str | None:
+    """Возвращает ISO-метку последнего сохранения или None."""
+    return _read_meta().get("saved_at")
+
+
+def profile_exists() -> bool:
+    """True если профиль Chrome уже содержит данные (пользователь логинился)."""
+    cookies_path = os.path.join(DZEN_PROFILE_DIR, "Default", "Cookies")
+    return os.path.exists(cookies_path)
+
 
 # ---------------------------------------------------------------------------
 # Состояние модуля
@@ -33,8 +71,8 @@ _lock = threading.Lock()
 _running = False
 _thread: Optional[threading.Thread] = None
 
-_status = "stopped"          # stopped | starting | running | error
-_status_msg = ""             # детальная причина ошибки
+_status = "stopped"
+_status_msg = ""
 _status_lock = threading.Lock()
 
 _latest_frame: Optional[bytes] = None
@@ -106,21 +144,19 @@ def _browser_loop(target_id: str):
     from playwright.sync_api import sync_playwright
 
     _set_status("starting")
+    os.makedirs(DZEN_PROFILE_DIR, exist_ok=True)
+    print(f"[dzen_browser] Профиль Chrome: {DZEN_PROFILE_DIR}")
+
     try:
         with sync_playwright() as pw:
-            browser = pw.chromium.launch(
+            context = pw.chromium.launch_persistent_context(
+                user_data_dir=DZEN_PROFILE_DIR,
                 headless=True,
                 args=[
                     "--no-sandbox",
                     "--disable-dev-shm-usage",
                     "--disable-gpu",
                 ],
-            )
-            from db import db_get_target_browser_session
-            saved_session = db_get_target_browser_session(target_id)
-            if saved_session:
-                print(f"[dzen_browser] Загружаю сохранённую сессию для {target_id[:8]}…")
-            context = browser.new_context(
                 viewport={"width": _VIEWPORT_W, "height": _VIEWPORT_H},
                 user_agent=(
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -128,7 +164,6 @@ def _browser_loop(target_id: str):
                     "Chrome/124.0.0.0 Safari/537.36"
                 ),
                 locale="ru-RU",
-                storage_state=saved_session if saved_session else None,
             )
             page = context.new_page()
 
@@ -148,11 +183,11 @@ def _browser_loop(target_id: str):
                 if _save_request_event.is_set():
                     _save_request_event.clear()
                     try:
-                        state = context.storage_state()
-                        state["saved_at"] = datetime.now(timezone.utc).isoformat()
-                        from db import db_set_target_browser_session
-                        ok = db_set_target_browser_session(target_id, state)
-                        _save_result = {"ok": ok, "error": None if ok else "Ошибка записи в БД"}
+                        # Куки уже сохранены на диск Chrome автоматически.
+                        # Просто фиксируем метку времени.
+                        _write_meta({"saved_at": datetime.now(timezone.utc).isoformat()})
+                        _save_result = {"ok": True, "error": None}
+                        print(f"[dzen_browser] Сессия зафиксирована: {DZEN_PROFILE_DIR}")
                     except Exception as e:
                         _save_result = {"ok": False, "error": str(e)}
                     _save_done_event.set()
@@ -179,7 +214,7 @@ def _browser_loop(target_id: str):
 
                 time.sleep(0.2)
 
-            browser.close()
+            context.close()
 
     except Exception as e:
         _set_status("error", str(e))

@@ -142,21 +142,21 @@ def publish(
     target_config: dict,
     title: str,
     log_id,
-    browser_session: dict | None = None,
 ) -> bool:
     """
     Публикует видео на Дзен.
 
     target_config ожидается: {"publisher_id": "..."}
-    browser_session: Playwright storage state из targets.browser_session.
 
-    Все JSON-шаги выполняются через page.evaluate(fetch(...)) в контексте браузера,
-    TUS-загрузка — через context.request (CDN presigned URL).
+    Браузер запускается с персистентным профилем Chrome из data/dzen_profile/ —
+    куки читаются нативно без сериализации.
 
     Возвращает True при успехе.
     """
+    import os as _os
     import threading
     from playwright.sync_api import sync_playwright
+    from services.dzen_browser import DZEN_PROFILE_DIR, profile_exists
 
     cfg = target_config or {}
     publisher_id = cfg.get("publisher_id", "")
@@ -164,7 +164,7 @@ def publish(
     if not publisher_id:
         raise DzenApiError("publisher_id не задан в настройках Дзен")
 
-    if not browser_session:
+    if not profile_exists():
         raise DzenSessionMissing(
             "Браузерная сессия Дзен не сохранена — "
             "авторизуйтесь в браузере (вкладка «Публикация»)"
@@ -183,12 +183,11 @@ def publish(
         db_log_entry(log_id, "Дзен: запускаю headless-браузер для авторизации…")
 
     with sync_playwright() as pw:
-        browser = pw.chromium.launch(
+        _os.makedirs(DZEN_PROFILE_DIR, exist_ok=True)
+        context = pw.chromium.launch_persistent_context(
+            user_data_dir=DZEN_PROFILE_DIR,
             headless=True,
             args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
-        )
-        context = browser.new_context(
-            storage_state=browser_session,
             user_agent=(
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -197,7 +196,7 @@ def publish(
             locale="ru-RU",
         )
 
-        # ── Шаг 0: CSRF из куки (Playwright читает HttpOnly напрямую) ─────────
+        # ── Шаг 0: CSRF из куки (нативный профиль Chrome — HttpOnly доступны) ─
         _CSRF_COOKIE_NAMES = ("csrftoken2", "_csrf", "csrftoken", "XSRF-TOKEN")
         _csrf_source = ["unknown"]
         try:
@@ -410,7 +409,7 @@ def publish(
 
         _publish_final(page, publisher_id, pub_id, gif, title, _api_headers)
 
-        browser.close()
+        context.close()
 
     if log_id:
         db_log_entry(log_id, "Дзен: видео опубликовано успешно")
@@ -549,9 +548,9 @@ def _publish_final(page, publisher_id: str, pub_id: str, gif: dict, title: str, 
 # Публичный API: is_configured
 # ---------------------------------------------------------------------------
 
-def is_configured(target_config: dict | None = None, browser_session: dict | None = None) -> bool:
+def is_configured(target_config: dict | None = None, **_) -> bool:
     """Возвращает True если Дзен полностью настроен для публикации."""
+    from services.dzen_browser import profile_exists
     cfg = target_config or {}
     has_pub = bool(cfg.get("publisher_id"))
-    has_session = bool(browser_session)
-    return has_pub and has_session
+    return has_pub and profile_exists()

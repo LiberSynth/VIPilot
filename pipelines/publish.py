@@ -30,7 +30,6 @@ from pipelines.base import check_cancelled, handle_critical_error
 from clients import vk
 from clients import dzen as dzen_client
 from clients.dzen import DzenCsrfExpired, DzenSessionMissing
-from db import db_get_target_browser_session
 
 
 def _get_vk_video(batch_id, log_id):
@@ -92,11 +91,7 @@ def _publish_dzen(batch_id, log_id, target):
     cfg = target.get('config') or {} if isinstance(target, dict) else (target or {})
     target_id = target.get('id') if isinstance(target, dict) else None
 
-    browser_session = None
-    if target_id:
-        browser_session = db_get_target_browser_session(target_id)
-
-    if not dzen_client.is_configured(cfg, browser_session):
+    if not dzen_client.is_configured(cfg):
         if log_id:
             if not cfg.get('publisher_id'):
                 db_log_entry(log_id, 'Дзен не настроен: publisher_id отсутствует', level='error')
@@ -126,7 +121,7 @@ def _publish_dzen(batch_id, log_id, target):
         title = 'Видео'
 
     try:
-        return dzen_client.publish(video_data, cfg, title, log_id, browser_session=browser_session)
+        return dzen_client.publish(video_data, cfg, title, log_id)
     except DzenSessionMissing as e:
         if log_id:
             db_log_entry(log_id, f'Дзен: {e}', level='error')
