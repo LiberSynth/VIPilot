@@ -142,14 +142,14 @@ def publish(
         )
         # ── Шаг 0: CSRF из куки (Playwright читает HttpOnly напрямую) ─────────
         _CSRF_COOKIE_NAMES = ("csrftoken2", "_csrf", "csrftoken", "XSRF-TOKEN")
-        _csrf_source = "unknown"
+        _csrf_source = ["unknown"]
         try:
             _cookies = context.cookies(["https://dzen.ru", "https://yandex.ru"])
             for _c in _cookies:
                 if _c["name"] in _CSRF_COOKIE_NAMES and _c.get("value"):
                     csrf_value[0] = _c["value"]
                     csrf_ready.set()
-                    _csrf_source = f"cookie:{_c['name']}"
+                    _csrf_source[0] = f"cookie:{_c['name']}"
                     print(f"[dzen] CSRF найден в куке: {_c['name']}")
                     break
         except Exception:
@@ -164,7 +164,7 @@ def publish(
             token = req.headers.get("x-csrf-token")
             if token:
                 csrf_value[0] = token
-                _csrf_source = "xhr"
+                _csrf_source[0] = "xhr"
                 print(f"[dzen] CSRF перехвачен из XHR: {req.url[:60]}")
                 csrf_ready.set()
 
@@ -201,7 +201,7 @@ def publish(
 
         csrf = csrf_value[0]
         if log_id:
-            db_log_entry(log_id, f"Дзен: авторизация получена (csrf: {_csrf_source}), начинаю публикацию…")
+            db_log_entry(log_id, f"Дзен: авторизация получена (csrf: {_csrf_source[0]}), начинаю публикацию…")
 
         # Базовые заголовки для всех API-запросов через browser context
         _api_headers = {
