@@ -129,7 +129,7 @@ def _browser_loop(target_id: str):
 
             try:
                 page.goto(
-                    "https://dzen.ru/profile/editor",
+                    "https://dzen.ru",
                     wait_until="domcontentloaded",
                     timeout=30_000,
                 )

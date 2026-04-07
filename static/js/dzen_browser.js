@@ -9,7 +9,6 @@
   var overlay = document.getElementById('dzen-browser-overlay');
   var hint   = document.getElementById('dzen-browser-hint');
   var statusText = document.getElementById('dzen-browser-status-text');
-  var btnOpen  = document.getElementById('dzen-btn-open');
   var btnSave  = document.getElementById('dzen-btn-save');
   var btnClose = document.getElementById('dzen-btn-close');
   var sessionStatus = document.getElementById('dzen-session-status');
@@ -144,20 +143,19 @@
     if (sse) { sse.close(); sse = null; }
     wrap.style.display = 'none';
     hint.style.display = 'none';
-    btnOpen.style.display = '';
     btnSave.style.display = 'none';
     btnClose.style.display = 'none';
   }
 
   /* ── Public actions ── */
   window.dzenBrowserOpen = function () {
+    if (active) return;
     var tid = getTargetId();
     if (!tid) {
       setStatusText('Таргет Дзен не найден.', '#ff6b6b');
       statusText.style.display = '';
       return;
     }
-    btnOpen.disabled = true;
     setStatusText('Запускаю браузер…', '#aaa');
     statusText.style.display = '';
 
@@ -175,19 +173,16 @@
           overlay.textContent = 'Загрузка…';
           wrap.style.display = '';
           hint.style.display = '';
-          btnOpen.style.display = 'none';
           btnSave.style.display = '';
           btnClose.style.display = '';
           setStatusText('Браузер запускается…', '#aaa');
           connectStream();
         } else {
           setStatusText('Ошибка запуска браузера: ' + (data.error || ''), '#ff6b6b');
-          btnOpen.disabled = false;
         }
       })
       .catch(function () {
         setStatusText('Сетевая ошибка.', '#ff6b6b');
-        btnOpen.disabled = false;
       });
   };
 
@@ -225,6 +220,22 @@
   window.dzenBrowserClose = function () {
     fetch('/api/dzen-browser/stop', { method: 'POST' }).catch(function () {});
     handleStopped();
-    btnOpen.disabled = false;
   };
+
+  /* ── Авто-открытие при переходе на вкладку Публикация ── */
+  var _origSwitchPanel = window.switchPanel;
+  window.switchPanel = function (name) {
+    if (_origSwitchPanel) _origSwitchPanel(name);
+    if (name === 'publish' && !active) {
+      window.dzenBrowserOpen();
+    }
+  };
+
+  /* Открыть сразу, если страница загружена уже на вкладке publish */
+  document.addEventListener('DOMContentLoaded', function () {
+    var panel = document.getElementById('panel-publish');
+    if (panel && panel.classList.contains('active') && !active) {
+      window.dzenBrowserOpen();
+    }
+  });
 })();
