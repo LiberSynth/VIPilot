@@ -1,38 +1,19 @@
 """
-Дзен-клиент: публикует короткое видео (gif-формат Дзен) через внутренний editor API.
+Дзен-клиент: публикует короткое видео через веб-интерфейс Дзена (UI-driven).
 
-Все JSON API-вызовы выполняются через page.evaluate(fetch(...)) — в контексте браузера,
-что обеспечивает корректную передачу ВСЕХ cookies (включая SameSite=Strict и кук
-yandex.ru, которые context.request не передаёт корректно).
-
-TUS-загрузка (шаг 4) выполняется через context.request — CDN-URL presigned, Дзен-сессия
-там не нужна.
-
-Полный цикл (7 шагов):
-  1. validate-video   — проверка формата/размера (необязательный)
-  2. add-publication  — создание черновика
-  3. start-upload-video — инициализация TUS
-  4. TUS upload (HEAD + PATCH) через context.request
-  5. finish-upload-video
-  6. poll publication  — ожидание конвертации
-  7. update-publication-content-and-publish — финальная публикация
+Playwright управляет браузером, скриншоты стримятся в виджет «Публикация».
+Видео загружается через set_input_files() — как обычный пользователь.
 """
 
-import base64
 import json
-import time
-from urllib.parse import urlencode, urlparse
+import os
+import tempfile
 
 from log import db_log_entry
 
 
-_EDITOR_BASE = "https://dzen.ru/editor-api/v2"
-_MEDIA_BASE  = "https://dzen.ru/media-api-video"
-_POLL_TIMEOUT   = 300
-_POLL_INTERVAL  = 5
-
-_PLAYWRIGHT_NAV_TIMEOUT = 30_000
-_CSRF_WAIT_TIMEOUT = 15
+_NAV_TIMEOUT = 30_000   # ms — таймаут навигации
+_UPLOAD_WAIT  = 60_000  # ms — ожидание завершения загрузки видео
 
 
 class DzenSessionMissing(RuntimeError):
@@ -40,97 +21,11 @@ class DzenSessionMissing(RuntimeError):
 
 
 class DzenCsrfExpired(RuntimeError):
-    """CSRF-токен истёк или недействителен."""
+    """Сессия истекла — необходима повторная авторизация."""
 
 
 class DzenApiError(RuntimeError):
-    """Общая ошибка API Дзен."""
-
-
-# ---------------------------------------------------------------------------
-# page.evaluate() fetch-хелпер — вызывает fetch() прямо в JS-контексте браузера
-# ---------------------------------------------------------------------------
-
-def _build_url(base: str, params: dict) -> str:
-    """Добавляет query-параметры к URL."""
-    return f"{base}?{urlencode(params)}" if params else base
-
-
-def _page_fetch(page, url: str, *,
-                method: str = "GET",
-                headers: dict | None = None,
-                json_body=None,
-                binary_body: bytes | None = None) -> dict:
-    """
-    Выполняет fetch() в JS-контексте страницы (page.evaluate).
-    Возвращает {"status": int, "body": str}.
-    Все cookies браузера передаются автоматически — в т.ч. SameSite=Strict.
-    """
-    h = json.dumps(headers or {})
-
-    if binary_body is not None:
-        b64 = base64.b64encode(binary_body).decode()
-        js = f"""async () => {{
-            const b64 = {json.dumps(b64)};
-            const bin = atob(b64);
-            const bytes = new Uint8Array(bin.length);
-            for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-            const resp = await fetch({json.dumps(url)}, {{
-                method: {json.dumps(method)},
-                headers: {h},
-                body: bytes,
-                credentials: 'include'
-            }});
-            const body = await resp.text();
-            return {{status: resp.status, body}};
-        }}"""
-    elif json_body is not None:
-        body_str = json.dumps(json_body) if not isinstance(json_body, str) else json_body
-        js = f"""async () => {{
-            const resp = await fetch({json.dumps(url)}, {{
-                method: {json.dumps(method)},
-                headers: {h},
-                body: {json.dumps(body_str)},
-                credentials: 'include'
-            }});
-            const body = await resp.text();
-            return {{status: resp.status, body}};
-        }}"""
-    else:
-        js = f"""async () => {{
-            const resp = await fetch({json.dumps(url)}, {{
-                method: {json.dumps(method)},
-                headers: {h},
-                credentials: 'include'
-            }});
-            const body = await resp.text();
-            return {{status: resp.status, body}};
-        }}"""
-
-    return page.evaluate(js)
-
-
-def _check_page_response(result: dict, step: str) -> dict:
-    """Проверяет ответ из _page_fetch и возвращает распарсенный JSON."""
-    status = result.get("status", 0)
-    raw = result.get("body", "")
-    print(f"[dzen] {step} HTTP {status}: {raw[:300]}")
-
-    try:
-        body = json.loads(raw)
-    except Exception:
-        raise DzenApiError(f"{step}: нечитаемый ответ ({status}): {raw[:200]}")
-
-    errors = body.get("errors", [])
-    if errors:
-        err_type = errors[0].get("type", "")
-        if err_type in ("auth-error", "forbidden"):
-            raise DzenCsrfExpired(
-                f"{step}: авторизация отклонена — авторизуйтесь снова в браузере"
-            )
-        raise DzenApiError(f"{step}: {errors}")
-
-    return body
+    """Ошибка публикации на Дзен."""
 
 
 # ---------------------------------------------------------------------------
@@ -144,18 +39,11 @@ def publish(
     log_id,
 ) -> bool:
     """
-    Публикует видео на Дзен.
-
-    target_config ожидается: {"publisher_id": "..."}
-
-    Браузер запускается с персистентным профилем Chrome из data/dzen_profile/ —
-    куки читаются нативно без сериализации.
-
+    Публикует видео на Дзен через веб-интерфейс.
+    Браузер виден в панели «Публикация» — можно наблюдать весь процесс.
     Возвращает True при успехе.
     """
-    import threading
-    from playwright.sync_api import sync_playwright
-    from services.dzen_browser import DZEN_COOKIES_FILE, profile_exists
+    from services.dzen_browser import DZEN_COOKIES_FILE, profile_exists, run_pipeline_browser
 
     cfg = target_config or {}
     publisher_id = cfg.get("publisher_id", "")
@@ -169,211 +57,39 @@ def publish(
             "авторизуйтесь в браузере (вкладка «Публикация»)"
         )
 
-    # Читаем сохранённые куки из JSON (экспортированы при нажатии «Сохранить сессию»)
     try:
         with open(DZEN_COOKIES_FILE, "r", encoding="utf-8") as _f:
-            _saved_cookies = json.load(_f)
+            saved_cookies = json.load(_f)
     except Exception as e:
         raise DzenSessionMissing(f"Не удалось прочитать куки сессии: {e}")
 
     if log_id:
-        db_log_entry(
-            log_id,
-            f"Дзен: размер видео {len(video_data) // 1024} КБ, publisher={publisher_id[:12]}…",
-        )
+        db_log_entry(log_id, f"Дзен: {len(video_data) // 1024} КБ, publisher={publisher_id[:12]}…")
 
-    csrf_value: list[str | None] = [None]
-    csrf_ready = threading.Event()
+    # Пишем видео во временный файл (set_input_files требует путь)
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
+    try:
+        tmp.write(video_data)
+        tmp.flush()
+        tmp.close()
+        video_path = tmp.name
 
-    if log_id:
-        db_log_entry(log_id, "Дзен: запускаю headless-браузер для авторизации…")
+        def _do_publish(page, ctx):
+            _publish_ui(page, publisher_id, video_path, title, log_id)
 
-    with sync_playwright() as pw:
-        browser = pw.chromium.launch(
-            headless=True,
-            args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
-        )
-        context = browser.new_context(
-            user_agent=(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/124.0.0.0 Safari/537.36"
-            ),
-            locale="ru-RU",
-        )
+        result = run_pipeline_browser(_do_publish, saved_cookies)
 
-        # Загружаем куки из JSON — без конфликта блокировки профиля
-        _CSRF_COOKIE_NAMES = ("csrftoken2", "_csrf", "csrftoken", "XSRF-TOKEN")
-        _csrf_source = ["unknown"]
+        if not result["ok"]:
+            err = result.get("error", "Неизвестная ошибка")
+            if "истекла" in err or "авторизуйтесь" in err:
+                raise DzenCsrfExpired(err)
+            raise DzenApiError(err)
+
+    finally:
         try:
-            context.add_cookies(_saved_cookies)
-            print(f"[dzen] Загружено {len(_saved_cookies)} куков из файла")
-            # Ищем CSRF прямо в загруженных куках
-            for _c in _saved_cookies:
-                if _c.get("name") in _CSRF_COOKIE_NAMES and _c.get("value"):
-                    csrf_value[0] = _c["value"]
-                    csrf_ready.set()
-                    _csrf_source[0] = f"cookie:{_c['name']}"
-                    print(f"[dzen] CSRF найден в куке: {_c['name']}")
-                    break
-        except Exception as e:
-            print(f"[dzen] Ошибка загрузки куков: {e}")
-
-        page = context.new_page()
-
-        def on_request(req):
-            if not csrf_value[0]:
-                token = req.headers.get("x-csrf-token")
-                if token:
-                    csrf_value[0] = token
-                    _csrf_source[0] = "xhr"
-                    print(f"[dzen] CSRF перехвачен из XHR: {req.url[:70]}")
-                    csrf_ready.set()
-
-        page.on("request", on_request)
-
-        try:
-            page.goto(
-                "https://dzen.ru",
-                wait_until="domcontentloaded",
-                timeout=_PLAYWRIGHT_NAV_TIMEOUT,
-            )
-        except Exception as e:
-            browser.close()
-            raise DzenApiError(f"Навигация не удалась: {e}")
-
-        current_url = page.url
-        if "passport.yandex" in current_url or "/auth" in current_url:
-            browser.close()
-            raise DzenCsrfExpired(
-                "Сессия Дзен истекла — авторизуйтесь снова в браузере (вкладка «Публикация»)"
-            )
-
-        if not csrf_value[0]:
-            csrf_ready.wait(timeout=_CSRF_WAIT_TIMEOUT)
-
-        if not csrf_value[0]:
-            browser.close()
-            raise DzenApiError(
-                "Не удалось получить CSRF-токен. Возможно сессия истекла — "
-                "авторизуйтесь снова в браузере (вкладка «Публикация»)"
-            )
-
-        csrf = csrf_value[0]
-        if log_id:
-            db_log_entry(log_id, f"Дзен: авторизация получена (csrf: {_csrf_source[0]}), начинаю публикацию…")
-
-        # Базовые заголовки для API-запросов
-        _api_headers = {
-            "X-Csrf-Token": csrf,
-            "Accept":       "application/json",
-            "Content-Type": "application/json",
-            "Referer":      "https://dzen.ru",
-            "Origin":       "https://dzen.ru",
-        }
-        _common_params = {"publisherId": publisher_id, "clid": "320"}
-
-        # ── Шаг 1: validate-video (необязательный — не блокируем при ошибке) ─
-        if log_id:
-            db_log_entry(log_id, "Дзен: шаг 1/7 — валидация видео…")
-
-        try:
-            r1 = _page_fetch(
-                page,
-                _build_url(f"{_MEDIA_BASE}/validate-video", _common_params),
-                method="POST",
-                headers={**_api_headers, "Content-Type": "video/mp4"},
-                binary_body=video_data,
-            )
-            _check_page_response(r1, "validate-video")
-        except DzenApiError as e:
-            print(f"[dzen] validate-video пропущен: {e}")
-            if log_id:
-                db_log_entry(log_id, f"Дзен: шаг 1 — валидация пропущена ({e}), продолжаю…")
-
-        # ── Шаг 2: add-publication (создание черновика) ────────────────────
-        if log_id:
-            db_log_entry(log_id, "Дзен: шаг 2/7 — создание черновика…")
-
-        draft_body = {
-            "publicationType": "gif",
-            "content": {"gifContent": {}},
-        }
-        r2 = _page_fetch(
-            page,
-            _build_url(f"{_EDITOR_BASE}/add-publication", _common_params),
-            method="POST",
-            headers=_api_headers,
-            json_body=draft_body,
-        )
-        data2 = _check_page_response(r2, "add-publication")
-        pub_id = data2.get("id") or (data2.get("publications") or [{}])[0].get("id")
-        if not pub_id:
-            raise DzenApiError(f"add-publication: не найден id в ответе: {data2}")
-
-        if log_id:
-            db_log_entry(log_id, f"Дзен: черновик создан id={pub_id}")
-
-        # ── Шаг 3: start-upload-video (инициализация TUS) ─────────────────
-        if log_id:
-            db_log_entry(log_id, "Дзен: шаг 3/7 — инициализация загрузки…")
-
-        video_size = len(video_data)
-        upload_init_body = {
-            "publicationId": pub_id,
-            "fileName": "video.mp4",
-            "fileSize": video_size,
-            "mimeType": "video/mp4",
-        }
-        r3 = _page_fetch(
-            page,
-            _build_url(f"{_MEDIA_BASE}/start-upload-video", _common_params),
-            method="POST",
-            headers=_api_headers,
-            json_body=upload_init_body,
-        )
-        data3 = _check_page_response(r3, "start-upload-video")
-        upload_url = data3.get("uploadUrl") or data3.get("upload_url")
-        upload_id  = data3.get("uploadId")  or data3.get("upload_id")
-        if not upload_url:
-            raise DzenApiError(f"start-upload-video: нет uploadUrl в ответе: {data3}")
-
-        # ── Шаг 4: TUS upload через context.request (CDN presigned URL) ────
-        if log_id:
-            db_log_entry(log_id, "Дзен: шаг 4/7 — загрузка видео (TUS)…")
-
-        req_ctx = context.request
-        _tus_upload(req_ctx, upload_url, video_data, log_id)
-
-        # ── Шаг 5: finish-upload-video ─────────────────────────────────────
-        if log_id:
-            db_log_entry(log_id, "Дзен: шаг 5/7 — завершение загрузки…")
-
-        finish_body = {"publicationId": pub_id}
-        if upload_id:
-            finish_body["uploadId"] = upload_id
-        r5 = _page_fetch(
-            page,
-            _build_url(f"{_MEDIA_BASE}/finish-upload-video", _common_params),
-            method="POST",
-            headers=_api_headers,
-            json_body=finish_body,
-        )
-        _check_page_response(r5, "finish-upload-video")
-
-        # ── Шаг 6: poll until converted ────────────────────────────────────
-        if log_id:
-            db_log_entry(log_id, "Дзен: шаг 6/7 — ожидание конвертации…")
-
-        gif = _poll_conversion(page, publisher_id, pub_id, _api_headers, log_id)
-
-        # ── Шаг 7: publish ─────────────────────────────────────────────────
-        if log_id:
-            db_log_entry(log_id, "Дзен: шаг 7/7 — публикация…")
-
-        _publish_final(page, publisher_id, pub_id, gif, title, _api_headers)
-
-        browser.close()
+            os.unlink(tmp.name)
+        except Exception:
+            pass
 
     if log_id:
         db_log_entry(log_id, "Дзен: видео опубликовано успешно")
@@ -381,140 +97,101 @@ def publish(
 
 
 # ---------------------------------------------------------------------------
-# Шаги TUS (context.request — CDN presigned) и poll/publish (page.evaluate)
+# UI-driven публикация
 # ---------------------------------------------------------------------------
 
-def _tus_upload(req_ctx, upload_url: str, video_data: bytes, log_id) -> None:
-    """TUS upload через Playwright APIRequestContext: HEAD для offset, PATCH-чанки."""
-    tus_headers = {"Tus-Resumable": "1.0.0"}
+def _log(log_id, msg: str):
+    print(f"[dzen] {msg}")
+    if log_id:
+        db_log_entry(log_id, f"Дзен: {msg}")
 
-    head_resp = req_ctx.fetch(
-        upload_url,
-        method="HEAD",
-        headers=tus_headers,
-        fail_on_status_code=False,
-    )
-    offset = int(head_resp.headers.get("upload-offset") or "0")
 
-    chunk_size = 4 * 1024 * 1024
-    total = len(video_data)
+def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id):
+    """Управляет браузером для публикации видео через UI Дзена."""
 
-    while offset < total:
-        chunk = video_data[offset: offset + chunk_size]
-        patch_resp = req_ctx.fetch(
-            upload_url,
-            method="PATCH",
-            headers={
-                "Tus-Resumable":  "1.0.0",
-                "Content-Type":   "application/offset+octet-stream",
-                "Upload-Offset":  str(offset),
-                "Content-Length": str(len(chunk)),
-            },
-            data=chunk,
-            fail_on_status_code=False,
+    studio_url = f"https://dzen.ru/profile/editor/id/{publisher_id}/"
+
+    # ── Шаг 1: Переходим в студию ────────────────────────────────────────
+    _log(log_id, f"Переход в студию: {studio_url}")
+    page.goto(studio_url, wait_until="domcontentloaded", timeout=_NAV_TIMEOUT)
+    page.wait_for_timeout(2000)
+
+    cur = page.url
+    print(f"[dzen] URL после перехода: {cur}")
+    if "passport.yandex" in cur or "/auth" in cur:
+        raise DzenCsrfExpired(
+            "Сессия истекла — авторизуйтесь снова в браузере (вкладка «Публикация»)"
         )
 
-        if patch_resp.status not in (200, 204):
-            raise DzenApiError(f"TUS PATCH: неожиданный статус {patch_resp.status}")
+    # ── Шаг 2: Кнопка создания публикации ────────────────────────────────
+    _log(log_id, "Ищу кнопку создания публикации…")
+    create_btn = page.locator(
+        "button:has-text('Создать'), "
+        "a:has-text('Создать'), "
+        "button:has-text('Новая публикация'), "
+        "[data-test='create-button'], "
+        "button:has-text('Опубликовать')"
+    ).first
+    create_btn.wait_for(state="visible", timeout=15_000)
+    create_btn.click()
+    page.wait_for_timeout(1500)
 
-        new_offset = int(patch_resp.headers.get("upload-offset") or str(offset + len(chunk)))
-        if log_id:
-            db_log_entry(
-                log_id,
-                f"TUS: загружено {new_offset}/{total} байт ({new_offset * 100 // total}%)",
-            )
-        offset = new_offset
+    # ── Шаг 3: Выбор типа — «Короткое видео» ─────────────────────────────
+    _log(log_id, "Выбираю тип «Короткое видео»…")
+    for selector in [
+        "text=Короткое видео",
+        "text=Видео",
+        "[data-type='gif']",
+        "[data-type='short-video']",
+        "[data-type='video']",
+    ]:
+        el = page.locator(selector).first
+        if el.is_visible():
+            el.click()
+            page.wait_for_timeout(1000)
+            _log(log_id, f"Выбрано: {selector}")
+            break
 
+    # ── Шаг 4: Загружаем файл ────────────────────────────────────────────
+    _log(log_id, "Ищу поле загрузки файла…")
+    file_input = page.locator('input[type="file"]').first
+    file_input.wait_for(timeout=_UPLOAD_WAIT)
+    file_input.set_input_files(video_path)
+    _log(log_id, "Файл передан браузеру, жду загрузки…")
 
-def _poll_conversion(page, publisher_id: str, pub_id: str, headers: dict, log_id) -> dict:
-    """Ждёт isConverted=True. Возвращает gifContent."""
-    deadline = time.time() + _POLL_TIMEOUT
-    while time.time() < deadline:
-        url = _build_url(
-            f"{_EDITOR_BASE}/publisher/{publisher_id}/publication/{pub_id}",
-            {"clid": "320"},
+    # Ждём пока прогресс-бар исчезнет или появится кнопка следующего шага
+    try:
+        page.wait_for_selector(
+            "button:has-text('Опубликовать'), "
+            "input[placeholder*='аголов'], "
+            "textarea[placeholder*='аголов']",
+            timeout=_UPLOAD_WAIT,
         )
-        r = _page_fetch(page, url, method="GET", headers=headers)
-        data = _check_page_response(r, "poll-publication")
+    except Exception:
+        _log(log_id, "Не дождался явного сигнала — продолжаю…")
+        page.wait_for_timeout(5000)
 
-        publications = data.get("publications") or [data]
-        pub = publications[0] if publications else {}
-        gif = (pub.get("content") or {}).get("gifContent") or {}
+    # ── Шаг 5: Вводим заголовок ──────────────────────────────────────────
+    _log(log_id, "Ввожу заголовок…")
+    for sel in [
+        "input[placeholder*='аголов']",
+        "textarea[placeholder*='аголов']",
+        "input[name='title']",
+        "[data-test='title-input']",
+    ]:
+        ti = page.locator(sel).first
+        if ti.is_visible():
+            ti.fill(title)
+            _log(log_id, f"Заголовок введён ({sel})")
+            break
 
-        if gif.get("isFailed"):
-            raise DzenApiError("Конвертация видео завершилась ошибкой (isFailed=True)")
+    # ── Шаг 6: Публикуем ─────────────────────────────────────────────────
+    _log(log_id, "Нажимаю «Опубликовать»…")
+    pub_btn = page.locator("button:has-text('Опубликовать')").first
+    pub_btn.wait_for(state="visible", timeout=15_000)
+    pub_btn.click()
+    page.wait_for_timeout(4000)
 
-        if gif.get("isConverted"):
-            if log_id:
-                db_log_entry(log_id, "Видео сконвертировано, публикую…")
-            return gif
-
-        if log_id:
-            db_log_entry(log_id, "Ожидаю конвертации…")
-        time.sleep(_POLL_INTERVAL)
-
-    raise DzenApiError(f"Конвертация не завершилась за {_POLL_TIMEOUT} секунд")
-
-
-def _publish_final(page, publisher_id: str, pub_id: str, gif: dict, title: str, headers: dict) -> None:
-    body = {
-        "id": pub_id,
-        "preview": {"title": title, "snippet": ""},
-        "snippetFrozen": False,
-        "hasNativeAds": False,
-        "commentsFlagState": "on",
-        "delayedPublicationFlagState": "off",
-        "visibleComments": "all",
-        "visibilityType": "all",
-        "premiumTariffs": [],
-        "customCommentsTitle": "",
-        "gifContent": {
-            "videoId":          gif.get("videoId"),
-            "isUploaded":       gif.get("isUploaded"),
-            "isConverted":      gif.get("isConverted"),
-            "isFailed":         gif.get("isFailed", False),
-            "autoPublish":      False,
-            "duration":         gif.get("duration"),
-            "hasSound":         gif.get("hasSound"),
-            "size":             gif.get("size"),
-            "uploadOnVideoHosting": False,
-            "streams":          gif.get("streams", []),
-            "thumbnails":       gif.get("thumbnails", []),
-            "isHighRes":        gif.get("isHighRes", False),
-            "videoMetaId":      gif.get("videoMetaId"),
-            "videoFileId":      gif.get("videoFileId"),
-            "migratedFromEfir": False,
-            "uploadFromYoutube": False,
-            "uploadFromCms":    False,
-            "parallelsUploadUrls": [],
-            "isInvisible":      False,
-            "mentions":         [],
-            "episodes":         [],
-            "externalVideoDuplicates":   [],
-            "externalVideoDuplicatesV2": [],
-            "oneVideoInfo":     gif.get("oneVideoInfo"),
-        },
-        "gifMentions": [],
-        "tagsInput": {"tags": [], "detectedTagsShown": False},
-        "darkPost": False,
-    }
-    url = _build_url(
-        f"{_EDITOR_BASE}/update-publication-content-and-publish",
-        {"publisherId": publisher_id, "clid": "320"},
-    )
-    r = _page_fetch(page, url, method="POST", headers=headers, json_body=body)
-    data = _check_page_response(r, "publish")
-    if data.get("result") != "OK":
-        raise DzenApiError(f"publish: неожиданный результат: {data}")
-
-
-# ---------------------------------------------------------------------------
-# Публичный API: is_configured
-# ---------------------------------------------------------------------------
-
-def is_configured(target_config: dict | None = None, **_) -> bool:
-    """Возвращает True если Дзен полностью настроен для публикации."""
-    from services.dzen_browser import profile_exists
-    cfg = target_config or {}
-    has_pub = bool(cfg.get("publisher_id"))
-    return has_pub and profile_exists()
+    final_url = page.url
+    print(f"[dzen] URL после публикации: {final_url}")
+    _log(log_id, "Публикация завершена!")

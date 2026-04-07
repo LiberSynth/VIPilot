@@ -297,6 +297,101 @@ def request_save(target_id: str) -> dict:
     return _save_result or {"ok": False, "error": "Неизвестная ошибка"}
 
 
+def run_pipeline_browser(fn, cookies: list) -> dict:
+    """
+    Запускает fn(page, context) в новом браузере с куками из cookies.
+    Стримит скриншоты в виджет (тот же _latest_frame механизм).
+    БЛОКИРУЕТ вызывающий поток — вызывать из фонового потока пайплайна.
+    Возвращает {"ok": bool, "result": ..., "error": str|None}.
+    """
+    global _running, _latest_frame, _frame_counter
+
+    with _lock:
+        if _running:
+            return {
+                "ok": False,
+                "error": "Браузер авторизации запущен — остановите его перед публикацией",
+            }
+        _running = True
+
+    _set_status("running", "Публикация…")
+
+    _stop_ss = threading.Event()
+    _page_ref: list = [None]
+
+    def _ss_loop():
+        global _latest_frame, _frame_counter
+        while not _stop_ss.is_set():
+            pg = _page_ref[0]
+            if pg is not None:
+                try:
+                    img = pg.screenshot(type="jpeg", quality=65)
+                    with _frame_lock:
+                        _latest_frame = img
+                        _frame_counter += 1
+                    _new_frame_event.set()
+                except Exception:
+                    pass
+            _stop_ss.wait(timeout=0.3)
+
+    ss_thread = threading.Thread(target=_ss_loop, daemon=True, name="dzen-pipeline-ss")
+    ss_thread.start()
+
+    result: dict = {"ok": False, "error": "Неизвестная ошибка"}
+
+    try:
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch(
+                headless=True,
+                args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
+            )
+            ctx = browser.new_context(
+                user_agent=(
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/124.0.0.0 Safari/537.36"
+                ),
+                locale="ru-RU",
+                viewport={"width": _VIEWPORT_W, "height": _VIEWPORT_H},
+            )
+            if cookies:
+                try:
+                    ctx.add_cookies(cookies)
+                    print(f"[dzen_pipeline] Загружено {len(cookies)} куков")
+                except Exception as e:
+                    print(f"[dzen_pipeline] Ошибка куков: {e}")
+
+            page = ctx.new_page()
+            _page_ref[0] = page
+
+            try:
+                fn_result = fn(page, ctx)
+                result = {"ok": True, "result": fn_result}
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                result = {"ok": False, "error": str(e)}
+            finally:
+                _page_ref[0] = None
+                try:
+                    browser.close()
+                except Exception:
+                    pass
+
+    except Exception as e:
+        result = {"ok": False, "error": f"Playwright: {e}"}
+
+    _stop_ss.set()
+    ss_thread.join(timeout=3)
+
+    with _lock:
+        _running = False
+    _set_status("stopped")
+
+    return result
+
+
 def frame_generator():
     """
     SSE-генератор: выдаёт кадры как base64-encoded JPEG.
