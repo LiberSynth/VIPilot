@@ -719,8 +719,8 @@ def db_get_random_real_original_video() -> tuple[bytes, str] | None:
                     """
                     SELECT video_data_original, id FROM batches
                     WHERE video_data_original IS NOT NULL
-                      AND (video_url IS NULL OR video_url NOT LIKE 'emulation://%')
-                    ORDER BY random() LIMIT 1
+                    ORDER BY (video_url NOT LIKE 'emulation://%') DESC, random()
+                    LIMIT 1
                     """
                 )
                 row = cur.fetchone()
