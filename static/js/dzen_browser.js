@@ -201,19 +201,20 @@
       .then(function (data) {
         btnSave.disabled = false;
         if (data.ok) {
-          setStatusText('Сессия сохранена!', '#69db7c');
+          setStatusText('', '');
+          showToast('Сессия сохранена', 'success');
           if (sessionStatus) {
             var now = new Date().toISOString().slice(0, 16).replace('T', ' ');
             sessionStatus.style.color = '#69db7c';
             sessionStatus.textContent = 'Сессия сохранена: ' + now + ' UTC';
           }
         } else {
-          setStatusText('Ошибка: ' + (data.error || 'Не удалось сохранить'), '#ff6b6b');
+          showToast('Ошибка: ' + (data.error || 'Не удалось сохранить'), 'error');
         }
       })
       .catch(function () {
         btnSave.disabled = false;
-        setStatusText('Сетевая ошибка при сохранении.', '#ff6b6b');
+        showToast('Ошибка соединения', 'error');
       });
   };
 
