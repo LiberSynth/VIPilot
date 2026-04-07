@@ -225,6 +225,7 @@ def publish(
             headers={**_api_headers, "Content-Type": "video/mp4"},
             data=video_data,
         )
+        print(f"[dzen] validate-video HTTP {resp1.status}: {resp1.text()[:400]}")
         _check_api_response(resp1, "validate-video")
 
         # ── Шаг 2: add-publication (создание черновика) ────────────────────
