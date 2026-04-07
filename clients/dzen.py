@@ -214,19 +214,24 @@ def publish(
 
         req_ctx = context.request
 
-        # ── Шаг 1: validate-video ──────────────────────────────────────────
+        # ── Шаг 1: validate-video (необязательный — не блокируем при ошибке) ─
         if log_id:
             db_log_entry(log_id, "Дзен: шаг 1/7 — валидация видео…")
 
-        resp1 = req_ctx.fetch(
-            f"{_MEDIA_BASE}/validate-video",
-            method="POST",
-            params={"publisherId": publisher_id, "clid": "320"},
-            headers={**_api_headers, "Content-Type": "video/mp4"},
-            data=video_data,
-        )
-        print(f"[dzen] validate-video HTTP {resp1.status}: {resp1.text()[:400]}")
-        _check_api_response(resp1, "validate-video")
+        try:
+            resp1 = req_ctx.fetch(
+                f"{_MEDIA_BASE}/validate-video",
+                method="POST",
+                params={"publisherId": publisher_id, "clid": "320"},
+                headers={**_api_headers, "Content-Type": "video/mp4"},
+                data=video_data,
+            )
+            print(f"[dzen] validate-video HTTP {resp1.status}: {resp1.text()[:400]}")
+            _check_api_response(resp1, "validate-video")
+        except DzenApiError as e:
+            print(f"[dzen] validate-video пропущен (ошибка): {e}")
+            if log_id:
+                db_log_entry(log_id, f"Дзен: шаг 1 — валидация пропущена ({e}), продолжаю…")
 
         # ── Шаг 2: add-publication (создание черновика) ────────────────────
         if log_id:
@@ -243,6 +248,7 @@ def publish(
             headers=_api_headers,
             data=json.dumps(draft_body).encode(),
         )
+        print(f"[dzen] add-publication HTTP {resp2.status}: {resp2.text()[:400]}")
         data2 = _check_api_response(resp2, "add-publication")
         pub_id = data2.get("id") or (data2.get("publications") or [{}])[0].get("id")
         if not pub_id:
