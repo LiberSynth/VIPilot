@@ -116,6 +116,10 @@ def _browser_loop(target_id: str):
                     "--disable-gpu",
                 ],
             )
+            from db import db_get_target_browser_session
+            saved_session = db_get_target_browser_session(target_id)
+            if saved_session:
+                print(f"[dzen_browser] Загружаю сохранённую сессию для {target_id[:8]}…")
             context = browser.new_context(
                 viewport={"width": _VIEWPORT_W, "height": _VIEWPORT_H},
                 user_agent=(
@@ -124,6 +128,7 @@ def _browser_loop(target_id: str):
                     "Chrome/124.0.0.0 Safari/537.36"
                 ),
                 locale="ru-RU",
+                storage_state=saved_session if saved_session else None,
             )
             page = context.new_page()
 
