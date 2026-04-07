@@ -33,7 +33,7 @@ def send_failure_email(message: str, log_entries=None, partial: bool = False):
             body += f"\n\n--- Подробный лог ---\n{lines}"
 
         msg = MIMEText(body, "plain", "utf-8")
-        msg["Subject"] = f"VisionForge: {subject_prefix.lower()} в пайплайне"
+        msg["Subject"] = f"VIPilot: {subject_prefix.lower()} в пайплайне"
         msg["From"]    = smtp_from
         msg["To"]      = to_addr
 
