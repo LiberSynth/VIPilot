@@ -1319,10 +1319,10 @@ def db_cleanup_video_data(file_lifetime_days: int) -> int:
                     UPDATE batches
                        SET video_data_transcoded = NULL,
                            video_data_original   = NULL
-                    WHERE status IN ('published', 'cancelled')
+                    WHERE status = ANY(%s)
                       AND completed_at < now() - make_interval(days => %s)
-                      AND (video_data_transcoded IS NOT NULL OR video_data_original IS NOT NULL)
-                """, (file_lifetime_days,))
+                      AND COALESCE(video_data_transcoded, video_data_original) IS NOT NULL
+                """, (list(TERMINAL_BATCH_STATUSES), file_lifetime_days))
                 count = cur.rowcount
             conn.commit()
         return count
@@ -1497,6 +1497,12 @@ KNOWN_BATCH_STATUSES = frozenset({
     # publish pipeline entry point
     'transcode_ready',
     # terminal
+    'cancelled', 'error', 'probe', 'story_probe', 'story_error',
+    'video_error', 'transcode_error', 'publish_error', 'published',
+    'published_partially', 'fatal_error',
+})
+
+TERMINAL_BATCH_STATUSES = frozenset({
     'cancelled', 'error', 'probe', 'story_probe', 'story_error',
     'video_error', 'transcode_error', 'publish_error', 'published',
     'published_partially', 'fatal_error',
