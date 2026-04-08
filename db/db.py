@@ -1309,17 +1309,19 @@ def db_clear_all_history():
 
 
 def db_cleanup_video_data(file_lifetime_days: int) -> int:
-    """Обнуляет video_data_transcoded у опубликованных/отменённых батчей старше file_lifetime_days.
-    Сама запись батча сохраняется, удаляется только бинарник.
+    """Обнуляет video_data_transcoded и video_data_original у опубликованных/отменённых батчей
+    старше file_lifetime_days. Сама запись батча сохраняется.
     Возвращает количество обновлённых батчей."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                    UPDATE batches SET video_data_transcoded = NULL
+                    UPDATE batches
+                       SET video_data_transcoded = NULL,
+                           video_data_original   = NULL
                     WHERE status IN ('published', 'cancelled')
                       AND completed_at < now() - make_interval(days => %s)
-                      AND video_data_transcoded IS NOT NULL
+                      AND (video_data_transcoded IS NOT NULL OR video_data_original IS NOT NULL)
                 """, (file_lifetime_days,))
                 count = cur.rowcount
             conn.commit()
