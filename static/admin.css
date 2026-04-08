@@ -476,7 +476,13 @@
   .monitor-dot.md-skip    { background: #9b9b9b; }
   .monitor-dot.md-partial {
     background: #3ecf8e;
-    box-shadow: 2.5px 2px 0 0 #e05050;
+  }
+  .monitor-dot.md-partial::after {
+    content: '!';
+    position: absolute; inset: 0;
+    text-align: center; line-height: 9px;
+    font-size: 7px; font-weight: 900; color: #fff;
+    font-family: system-ui, sans-serif; font-style: normal;
   }
   .monitor-dot.md-active::before {
     content: ''; position: absolute; inset: -2px; border-radius: 50%;
@@ -555,7 +561,13 @@
   .monitor-log-dot.ls-running   { background: #4a7cf7; }
   .monitor-log-dot.ls-partial   {
     background: #3ecf8e;
-    box-shadow: 2px 1.5px 0 0 #e05050;
+  }
+  .monitor-log-dot.ls-partial::after {
+    content: '!';
+    position: absolute; inset: 0;
+    text-align: center; line-height: 7px;
+    font-size: 6px; font-weight: 900; color: #fff;
+    font-family: system-ui, sans-serif; font-style: normal;
   }
   .monitor-log-dot.ls-running::before {
     content: ''; position: absolute; inset: -2px; border-radius: 50%;
