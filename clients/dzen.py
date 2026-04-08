@@ -250,20 +250,32 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
 
     _log(log_id, "Проверяю наличие капчи «Я не робот» (окно 25 сек)…")
     while _time.monotonic() < _captcha_deadline and not captcha_clicked:
-        # Вариант 1: чекбокс внутри iframe (VK ID / Яндекс капча)
+        # Вариант 1: чекбокс внутри iframe (VK ID / Яндекс SmartCaptcha)
         try:
             captcha_frame = page.frame_locator(
                 "iframe[src*='captcha'], "
+                "iframe[src*='smartcaptcha'], "
+                "iframe[src*='yandexcloud.net'], "
+                "iframe[src*='captcha.yandex'], "
                 "iframe[src*='vk.com/recaptcha'], "
                 "iframe[title*='не робот'], "
-                "iframe[title*='robot']"
+                "iframe[title*='robot'], "
+                "iframe[title*='SmartCaptcha']"
             ).first
             captcha_checkbox = captcha_frame.locator(
-                "input[type='checkbox'], [role='checkbox']"
+                "input[type='checkbox'], "
+                "[role='checkbox'], "
+                "[class*='CheckboxCaptcha'], "
+                "[class*='checkbox-captcha'], "
+                "[class*='captcha-checkbox'], "
+                "div[class*='Checkbox']"
             ).first
             captcha_checkbox.wait_for(state="visible", timeout=1_000)
             _log(log_id, "Капча (iframe) обнаружена — кликаю по чекбоксу…")
-            captcha_checkbox.click()
+            try:
+                captcha_checkbox.click(force=True)
+            except Exception:
+                captcha_checkbox.evaluate("el => el.click()")
             page.wait_for_timeout(1500)
             captcha_clicked = True
             _snap(page, batch_id)
@@ -276,13 +288,42 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
             inline_captcha = page.locator(
                 "[class*='captcha'] input[type='checkbox'], "
                 "[class*='captcha'] [role='checkbox'], "
+                "[class*='CheckboxCaptcha'], "
+                "[class*='captcha-checkbox'], "
                 "[id*='captcha'] input[type='checkbox'], "
                 "label:has-text('не робот') input[type='checkbox'], "
+                "label:has-text('не робот'), "
                 "label:has-text('робот') input[type='checkbox']"
             ).first
             if inline_captcha.is_visible():
                 _log(log_id, "Капча (inline) обнаружена — кликаю по чекбоксу…")
-                inline_captcha.click()
+                try:
+                    inline_captcha.click(force=True)
+                except Exception:
+                    inline_captcha.evaluate("el => el.click()")
+                page.wait_for_timeout(1500)
+                captcha_clicked = True
+                _snap(page, batch_id)
+                break
+        except Exception:
+            pass
+
+        # Вариант 3: клик по всему видимому блоку «не робот» через JS
+        try:
+            clicked = page.evaluate("""() => {
+                const texts = ['не робот', 'не являюсь роботом', 'I\\'m not a robot'];
+                for (const text of texts) {
+                    const els = [...document.querySelectorAll('*')].filter(el =>
+                        el.children.length === 0 &&
+                        el.textContent.toLowerCase().includes(text) &&
+                        el.offsetParent !== null
+                    );
+                    if (els.length > 0) { els[0].click(); return true; }
+                }
+                return false;
+            }""")
+            if clicked:
+                _log(log_id, "Капча (JS-поиск текста) обнаружена — кликнул…")
                 page.wait_for_timeout(1500)
                 captcha_clicked = True
                 _snap(page, batch_id)
