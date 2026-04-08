@@ -219,17 +219,31 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
     _log(log_id, "Файл передан браузеру, жду загрузки…")
     _snap(page, batch_id)
 
-    # Ждём пока прогресс-бар исчезнет или появится кнопка следующего шага
+    # Ждём, пока Дзен откроет редактор видео.
+    # Сигнал: URL меняется на ?videoEditorPublicationId=... — именно тогда
+    # кнопка «Опубликовать» принадлежит форме видео, а не фоновым спискам.
+    _log(log_id, "Жду открытия редактора видео (videoEditorPublicationId)…")
+    _editor_opened = False
     try:
-        page.wait_for_selector(
-            "button:has-text('Опубликовать'), "
-            "input[placeholder*='аголов'], "
-            "textarea[placeholder*='аголов']",
-            timeout=_UPLOAD_WAIT,
-        )
+        page.wait_for_url("*videoEditorPublicationId*", timeout=_UPLOAD_WAIT)
+        _editor_opened = True
+        _log(log_id, f"Редактор видео открылся: {page.url}")
     except Exception:
-        _log(log_id, "Не дождался явного сигнала — продолжаю…")
-        page.wait_for_timeout(5000)
+        pass
+
+    if not _editor_opened:
+        # Запасной вариант: ждём поле заголовка или кнопку в диалоге
+        _log(log_id, "URL редактора не появился, жду форму…")
+        try:
+            page.wait_for_selector(
+                "input[placeholder*='аголов'], "
+                "textarea[placeholder*='аголов'], "
+                "button:has-text('Опубликовать после обработки')",
+                timeout=15_000,
+            )
+        except Exception:
+            _log(log_id, "Форма не обнаружена — продолжаю по таймауту…")
+            page.wait_for_timeout(5000)
     _snap(page, batch_id)
 
     # ── Шаг 5: Публикуем ─────────────────────────────────────────────────
