@@ -1023,6 +1023,27 @@ def _m029_user_role_links(cur):
     """)
 
 
+def _m030_user_roles_module_field(cur):
+    """
+    Добавляет колонку module (TEXT NOT NULL DEFAULT '') в таблицу user_roles.
+    Обновляет существующие строки: root→ROOT, producer→PRODUCER, operator→OPERATOR.
+    Deployed: -
+    """
+    cur.execute("""
+        ALTER TABLE user_roles
+            ADD COLUMN IF NOT EXISTS module TEXT NOT NULL DEFAULT ''
+    """)
+    cur.execute("""
+        UPDATE user_roles SET module = 'ROOT'     WHERE slug = 'root'
+    """)
+    cur.execute("""
+        UPDATE user_roles SET module = 'PRODUCER' WHERE slug = 'producer'
+    """)
+    cur.execute("""
+        UPDATE user_roles SET module = 'OPERATOR' WHERE slug = 'operator'
+    """)
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -1054,6 +1075,7 @@ MIGRATIONS = [
     (28, _m028_fill_null_story_ids),
     (29, _m029_targets_order),
     (30, _m029_user_role_links),
+    (31, _m030_user_roles_module_field),
 ]
 
 

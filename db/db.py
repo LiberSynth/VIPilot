@@ -1716,27 +1716,31 @@ def db_get_user_by_login(login):
             with conn.cursor() as cur:
                 cur.execute("""
                     SELECT u.id, u.name, u.login, u.password,
-                           CASE
-                               WHEN bool_or(r.slug = 'root')     THEN 'root'
-                               WHEN bool_or(r.slug = 'producer') THEN 'producer'
-                               WHEN bool_or(r.slug = 'operator') THEN 'operator'
-                               ELSE NULL
-                           END AS role
+                           r.slug, r.name AS role_name, r.module
                     FROM users u
                     LEFT JOIN user_role_links url ON url.user_id = u.id
                     LEFT JOIN user_roles r        ON r.id = url.role_id
                     WHERE u.login = %s
-                    GROUP BY u.id, u.name, u.login, u.password
+                    ORDER BY r.slug
                 """, (login,))
-                row = cur.fetchone()
-                if not row:
+                rows = cur.fetchall()
+                if not rows:
                     return None
+                first = rows[0]
+                roles = []
+                for row in rows:
+                    if row[4] is not None:
+                        roles.append({
+                            "slug": row[4],
+                            "name": row[5],
+                            "module": row[6] or row[4].upper(),
+                        })
                 return {
-                    "id": str(row[0]),
-                    "name": row[1],
-                    "login": row[2],
-                    "password": row[3],
-                    "role": row[4],
+                    "id": str(first[0]),
+                    "name": first[1],
+                    "login": first[2],
+                    "password": first[3],
+                    "roles": roles,
                 }
     except Exception as e:
         print(f"[DB] Ошибка db_get_user_by_login: {e}")

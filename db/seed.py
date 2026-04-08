@@ -54,12 +54,12 @@ def seed_db():
                 """)
 
                 cur.execute("""
-                    INSERT INTO user_roles (name, slug)
-                    SELECT v.name, v.slug FROM (VALUES
-                        ('root',     'root'),
-                        ('producer', 'producer'),
-                        ('operator', 'operator')
-                    ) AS v(name, slug)
+                    INSERT INTO user_roles (name, slug, module)
+                    SELECT v.name, v.slug, v.module FROM (VALUES
+                        ('root',     'root',     'ROOT'),
+                        ('producer', 'producer', 'PRODUCER'),
+                        ('operator', 'operator', 'OPERATOR')
+                    ) AS v(name, slug, module)
                     WHERE NOT EXISTS (
                         SELECT 1 FROM user_roles WHERE slug = v.slug
                     )

@@ -36,6 +36,29 @@ from utils.utils import (
 
 bp = Blueprint("web", __name__)
 
+RESERVED_SLUGS = {"web", "save", "logout", "select-module", "healthz", "favicon.ico", "icon-preview", "root"}
+
+
+def _get_session_roles():
+    return session.get("roles", [])
+
+
+def _has_slug(slug):
+    return any(r["slug"] == slug for r in _get_session_roles())
+
+
+def _redirect_after_login():
+    roles = _get_session_roles()
+    if any(r["slug"] == "root" for r in roles):
+        return redirect(url_for("web.root_page"))
+    non_root = [r for r in roles if r["slug"] != "root"]
+    if len(non_root) == 1:
+        return redirect(f"/{non_root[0]['slug']}")
+    if len(non_root) > 1:
+        return redirect(url_for("web.select_module"))
+    session.clear()
+    return redirect(url_for("web.login"))
+
 
 @bp.route("/favicon.ico")
 def favicon():
@@ -56,10 +79,7 @@ def icon_preview():
 @limiter.limit("10 per minute")
 def login():
     if is_authenticated():
-        role = session.get("role", "root")
-        if role == "producer":
-            return redirect(url_for("web.producer_page"))
-        return redirect(url_for("web.root_page"))
+        return _redirect_after_login()
 
     error = False
     if request.method == "POST":
@@ -69,11 +89,9 @@ def login():
         if user and user["password"] == password_val:
             session["auth"] = True
             session["auth_ts"] = time.time()
-            session["role"] = user["role"] or "root"
+            session["roles"] = user["roles"]
             session.permanent = True
-            if session["role"] == "producer":
-                return redirect(url_for("web.producer_page"))
-            return redirect(url_for("web.root_page"))
+            return _redirect_after_login()
         error = True
     return render_template("login.html", error=error)
 
@@ -81,6 +99,14 @@ def login():
 @bp.route("/web")
 def root_page():
     if not is_authenticated():
+        return redirect(url_for("web.login"))
+    if not _has_slug("root"):
+        roles = _get_session_roles()
+        non_root = [r for r in roles if r["slug"] != "root"]
+        if len(non_root) == 1:
+            return redirect(f"/{non_root[0]['slug']}")
+        if non_root:
+            return redirect(url_for("web.select_module"))
         return redirect(url_for("web.login"))
     metaprompt      = db_get("metaprompt", "")
     system_prompt   = db_get("system_prompt", "")
@@ -281,16 +307,37 @@ def save():
     return redirect(url_for("web.root_page") + f"?tab={active_tab}")
 
 
-
-
-@bp.route("/producer")
-def producer_page():
+@bp.route("/select-module")
+def select_module():
     if not is_authenticated():
         return redirect(url_for("web.login"))
-    if session.get("role") != "producer":
+    roles = _get_session_roles()
+    non_root = [r for r in roles if r["slug"] != "root"]
+    if not non_root:
         return redirect(url_for("web.root_page"))
+    if len(non_root) == 1:
+        return redirect(f"/{non_root[0]['slug']}")
+    return render_template("select_module.html", roles=non_root)
+
+
+@bp.route("/<slug>")
+def module_page(slug):
+    if slug in RESERVED_SLUGS:
+        return redirect(url_for("web.login"))
+    if not is_authenticated():
+        return redirect(url_for("web.login"))
+    if not _has_slug(slug):
+        roles = _get_session_roles()
+        non_root = [r for r in roles if r["slug"] != "root"]
+        if len(non_root) > 1:
+            return redirect(url_for("web.select_module"))
+        return redirect(url_for("web.login"))
+    from jinja2 import TemplateNotFound
     from utils.version import VERSION as APP_VERSION
-    resp = make_response(render_template("producer.html", app_version=APP_VERSION))
+    try:
+        resp = make_response(render_template(f"{slug}.html", app_version=APP_VERSION))
+    except TemplateNotFound:
+        return redirect(url_for("web.select_module"))
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     resp.headers["Pragma"] = "no-cache"
     resp.headers["Expires"] = "0"
