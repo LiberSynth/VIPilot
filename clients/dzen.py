@@ -82,8 +82,7 @@ def publish(
         db_log_entry(log_id, f"Дзен: {len(video_data) // 1024} КБ, publisher={publisher_id[:12]}…")
 
     # Пишем видео во временный файл с именем = заголовок (Дзен автоподставляет имя файла)
-    safe_name = re.sub(r'[^\w\s\-]', '', title, flags=re.UNICODE).strip()
-    safe_name = re.sub(r'\s+', '_', safe_name)[:80] or "video"
+    safe_name = re.sub(r'[^\w\s\-]', '', title, flags=re.UNICODE).strip()[:80] or "video"
     tmp_dir = tempfile.mkdtemp()
     video_path = os.path.join(tmp_dir, f"{safe_name}.mp4")
     try:

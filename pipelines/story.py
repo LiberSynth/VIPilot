@@ -224,7 +224,7 @@ def run(batch_id):
                     if result:
                         first_line = result.split('\n')[0]
                         if '.' not in first_line:
-                            title = first_line.rstrip('.')
+                            title = ' '.join(first_line.split()[:4]).rstrip('.')
                             result = result[len(first_line):].strip()
                         else:
                             title = ' '.join(result.split()[:4]).rstrip('.')

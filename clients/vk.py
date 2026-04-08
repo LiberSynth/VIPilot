@@ -20,8 +20,7 @@ _VK_VER   = '5.131'
 
 def _safe_filename(title: str) -> str:
     """Возвращает безопасное имя файла из title (без спецсимволов, макс 80 символов)."""
-    safe = re.sub(r'[^\w\s\-]', '', title, flags=re.UNICODE).strip()
-    safe = re.sub(r'\s+', '_', safe)[:80]
+    safe = re.sub(r'[^\w\s\-]', '', title, flags=re.UNICODE).strip()[:80]
     return safe or 'video'
 
 
