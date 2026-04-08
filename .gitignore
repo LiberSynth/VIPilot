@@ -2,6 +2,14 @@
 videos/
 attached_assets/
 
+# Browser profile cache and runtime artifacts
+data/dzen_profile/Default/Cache/
+data/dzen_profile/Default/Cache_Data/
+data/**/*Cache*
+data/**/*-wal
+data/**/*-shm
+data/**/*.log
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
