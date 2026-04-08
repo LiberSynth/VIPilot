@@ -281,6 +281,31 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
     _DIALOG_POLL   = 2_000   # ms
     captcha_clicked = False
 
+    # Тексты, которые Дзен показывает в тост-ошибках при неудаче публикации.
+    _DZEN_ERROR_TEXTS = [
+        "временно ограничена",
+        "Публикация материалов",
+        "обратитесь в поддержку",
+        "Ошибка публикации",
+        "не удалось опубликовать",
+        "Видео не опубликовано",
+    ]
+
+    def _check_error_toast():
+        """Проверяет body на наличие известных ошибок Дзена; кидает DzenApiError."""
+        try:
+            body = page.locator("body").inner_text(timeout=1500)
+            for err in _DZEN_ERROR_TEXTS:
+                if err.lower() in body.lower():
+                    raise DzenApiError(
+                        f"Дзен заблокировал публикацию: «{err}». "
+                        "Попробуйте позже или проверьте состояние аккаунта."
+                    )
+        except DzenApiError:
+            raise
+        except Exception:
+            pass
+
     _dialog_deadline = _time.monotonic() + _DIALOG_WINDOW / 1000
 
     while _time.monotonic() < _dialog_deadline:
@@ -295,6 +320,9 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
                 pub_after.click()
                 page.wait_for_timeout(2000)
                 _snap(page, batch_id)
+                _check_error_toast()   # сразу проверяем тост-ошибку после клика
+        except DzenApiError:
+            raise
         except Exception:
             pass
 
@@ -449,6 +477,9 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
                 pass
         if confirmed:
             break
+
+        # 2b. Проверка тост-ошибок Дзена — завершаем сразу, не ждём таймаута
+        _check_error_toast()
 
         # 3. Проверка URL
         url_now = page.url
