@@ -76,13 +76,15 @@ def publish(
     if log_id:
         db_log_entry(log_id, f"Дзен: {len(video_data) // 1024} КБ, publisher={publisher_id[:12]}…")
 
-    # Пишем видео во временный файл (set_input_files требует путь)
-    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
+    # Пишем видео во временный файл с именем = заголовок (Дзен автоподставляет имя файла)
+    import re as _re
+    safe_name = _re.sub(r'[^\w\s\-]', '', title, flags=_re.UNICODE).strip()
+    safe_name = _re.sub(r'\s+', '_', safe_name)[:80] or "video"
+    tmp_dir = tempfile.mkdtemp()
+    video_path = os.path.join(tmp_dir, f"{safe_name}.mp4")
     try:
-        tmp.write(video_data)
-        tmp.flush()
-        tmp.close()
-        video_path = tmp.name
+        with open(video_path, "wb") as _f:
+            _f.write(video_data)
 
         def _do_publish(page, ctx):
             _publish_ui(page, publisher_id, video_path, title, log_id)
@@ -97,7 +99,8 @@ def publish(
 
     finally:
         try:
-            os.unlink(tmp.name)
+            import shutil as _shutil
+            _shutil.rmtree(tmp_dir, ignore_errors=True)
         except Exception:
             pass
 
