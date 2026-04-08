@@ -240,167 +240,131 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
     page.wait_for_timeout(2000)
     _snap(page, batch_id)
 
-    # ── Шаг 6: Обрабатываем капчу «Я не робот» если появилась ───────────
-    # Ищем капчу в течение 25 секунд с интервалами (может появляться с задержкой)
-    _CAPTCHA_WINDOW = 25_000  # ms — окно ожидания капчи
-    _CAPTCHA_POLL   = 2_000   # ms — интервал опроса
+    # ── Шаг 6: Обрабатываем три разных элемента (25 секунд) ─────────────
+    #
+    # A. Кнопка «Опубликовать после обработки» — нажать немедленно при появлении.
+    # B. Капча VK «Я не робот» (iframe id.vk.com/not_robot_captcha) — кликнуть
+    #    ТОЛЬКО чекбокс внутри iframe капчи, не трогать ничего снаружи.
+    # C. Попап «Уже можно публиковать» — закрыть крестиком (×), не кликать ничего
+    #    внутри него.
+    #
+    _DIALOG_WINDOW = 25_000  # ms
+    _DIALOG_POLL   = 2_000   # ms
     captcha_clicked = False
 
-    _captcha_deadline = _time.monotonic() + _CAPTCHA_WINDOW / 1000
+    _dialog_deadline = _time.monotonic() + _DIALOG_WINDOW / 1000
 
-    _CAPTCHA_CHECKBOX_SELECTORS = [
-        "input[type='checkbox']",
-        "div[role='checkbox']",
-        "span[role='checkbox']",
-        "label",                         # VK not_robot_captcha — кликабельный label
-        "[class*='CheckboxCaptcha']",
-        "[class*='checkbox-captcha']",
-        "[class*='captcha-checkbox']",
-        "[class*='Checkbox__box']",
-        "[class*='vkc__Checkbox']",      # VK-специфичные классы
-        "div[class*='Checkbox']",
-        "span[class*='Checkbox']",
-        "div[class*='checkbox']",
-        "span[class*='checkbox']",
-    ]
-    _CAPTCHA_FRAME_KEYWORDS = (
-        "captcha", "smartcaptcha", "yandexcloud", "recaptcha", "robot",
-        "id.vk.com",
-    )
+    while _time.monotonic() < _dialog_deadline:
 
-    _log(log_id, "Проверяю наличие капчи «Я не робот» (окно 25 сек)…")
-    while _time.monotonic() < _captcha_deadline and not captcha_clicked:
-
-        # Дампим все фреймы для диагностики
-        all_frames = page.frames
-        frame_urls = [f.url for f in all_frames]
-        _log(log_id, f"Фреймы на странице: {frame_urls}")
-
-        # Вариант 1: перебираем все реальные фреймы страницы
-        for frame in all_frames:
-            if captcha_clicked:
-                break
-            frame_url = frame.url.lower()
-            is_captcha_frame = any(kw in frame_url for kw in _CAPTCHA_FRAME_KEYWORDS)
-            if not is_captcha_frame and frame_url not in ("", "about:blank"):
-                continue
-            # Пробуем в каждом фрейме — включая главный
-            for sel in _CAPTCHA_CHECKBOX_SELECTORS:
-                try:
-                    el = frame.locator(sel).first
-                    if el.is_visible():
-                        _log(log_id, f"Капча найдена в фрейме {frame.url!r} selector={sel!r} — кликаю…")
-                        try:
-                            el.click(timeout=2000)
-                        except Exception:
-                            try:
-                                el.click(force=True, timeout=2000)
-                            except Exception:
-                                el.evaluate("el => el.click()")
-                        page.wait_for_timeout(1500)
-                        captcha_clicked = True
-                        _snap(page, batch_id)
-                        break
-                except Exception:
-                    pass
-
-        if captcha_clicked:
-            break
-
-        # Вариант 2: frame_locator по src/title (Playwright CSS на главной странице)
+        # ── A. Кнопка «Опубликовать после обработки» ──────────────────────
         try:
-            captcha_frame = page.frame_locator(
-                "iframe[src*='captcha'], "
-                "iframe[src*='smartcaptcha'], "
-                "iframe[src*='yandexcloud.net'], "
-                "iframe[src*='captcha.yandex'], "
-                "iframe[src*='vk.com/recaptcha'], "
-                "iframe[title*='не робот'], "
-                "iframe[title*='robot'], "
-                "iframe[title*='SmartCaptcha']"
+            pub_after = page.locator(
+                "button:has-text('Опубликовать после обработки')"
             ).first
-            captcha_checkbox = captcha_frame.locator(", ".join(_CAPTCHA_CHECKBOX_SELECTORS)).first
-            captcha_checkbox.wait_for(state="visible", timeout=1_000)
-            _log(log_id, "Капча (frame_locator) обнаружена — кликаю…")
-            try:
-                captcha_checkbox.click(force=True)
-            except Exception:
-                captcha_checkbox.evaluate("el => el.click()")
-            page.wait_for_timeout(1500)
-            captcha_clicked = True
-            _snap(page, batch_id)
-            break
-        except Exception:
-            pass
-
-        # Вариант 3: inline-чекбокс прямо на главной странице
-        try:
-            inline_captcha = page.locator(
-                "[class*='captcha'] input[type='checkbox'], "
-                "[class*='captcha'] [role='checkbox'], "
-                "[class*='CheckboxCaptcha'], "
-                "[class*='captcha-checkbox'], "
-                "[id*='captcha'] input[type='checkbox'], "
-                "label:has-text('не робот')"
-            ).first
-            if inline_captcha.is_visible():
-                _log(log_id, "Капча (inline) обнаружена — кликаю…")
-                try:
-                    inline_captcha.click(force=True)
-                except Exception:
-                    inline_captcha.evaluate("el => el.click()")
-                page.wait_for_timeout(1500)
-                captcha_clicked = True
+            if pub_after.is_visible():
+                _log(log_id, "Нажимаю «Опубликовать после обработки»…")
+                pub_after.click()
+                page.wait_for_timeout(2000)
                 _snap(page, batch_id)
-                break
         except Exception:
             pass
 
-        # Проверяем: появился ли попап «Уже можно публиковать» — кликаем кнопку внутри него
+        # ── B. Капча «Я не робот» — кликаем чекбокс внутри iframe ────────
+        if not captcha_clicked:
+            try:
+                all_frames = page.frames
+                _log(log_id, f"Фреймы: {[f.url for f in all_frames]}")
+                for frame in all_frames:
+                    if captcha_clicked:
+                        break
+                    furl = frame.url.lower()
+                    # Только фреймы капчи (id.vk.com/not_robot_captcha, smartcaptcha, и т.п.)
+                    is_captcha = any(kw in furl for kw in (
+                        "not_robot_captcha", "smartcaptcha", "yandexcloud",
+                        "captcha.yandex", "recaptcha", "id.vk.com",
+                    ))
+                    if not is_captcha:
+                        continue
+                    _log(log_id, f"Капча-фрейм найден: {frame.url!r}")
+                    # Ищем чекбокс ВНУТРИ фрейма капчи
+                    for sel in [
+                        "[class*='vkc__Checkbox']",
+                        "input[type='checkbox']",
+                        "[role='checkbox']",
+                        "label",
+                    ]:
+                        try:
+                            el = frame.locator(sel).first
+                            if el.is_visible():
+                                _log(log_id, f"Кликаю чекбокс капчи {sel!r}…")
+                                try:
+                                    el.click(timeout=2000)
+                                except Exception:
+                                    el.click(force=True, timeout=2000)
+                                page.wait_for_timeout(2000)
+                                captcha_clicked = True
+                                _snap(page, batch_id)
+                                break
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+
+        # ── C. Попап «Уже можно публиковать» — закрываем крестиком ───────
         try:
-            ready_hint = page.locator(
-                "text=Уже можно публиковать, "
-                "text=Видео появится на канале"
-            ).first
-            if ready_hint.is_visible():
-                _log(log_id, "Попап «Уже можно публиковать» обнаружен — ищу кнопку публикации…")
-                # Кнопка может называться «Опубликовать» или «Опубликовать после обработки»
-                for btn_text in ["Опубликовать после обработки", "Опубликовать"]:
+            popup_text = page.locator("text=Уже можно публиковать").first
+            if popup_text.is_visible():
+                _log(log_id, "Попап «Уже можно публиковать» виден — закрываю крестиком…")
+                closed = False
+                # Ищем кнопку закрытия (×) рядом с попапом
+                for close_sel in [
+                    "button[aria-label='Закрыть']",
+                    "button[aria-label='Close']",
+                    "button[aria-label='close']",
+                    "[class*='close']:not(button[disabled])",
+                    "[class*='Close']:not(button[disabled])",
+                    "button:has-text('×')",
+                    "button:has-text('✕')",
+                    "button:has-text('✖')",
+                ]:
                     try:
-                        btn = page.locator(f"button:has-text('{btn_text}')").first
-                        if btn.is_visible():
-                            _log(log_id, f"Кликаю «{btn_text}»…")
-                            btn.click()
-                            page.wait_for_timeout(2000)
+                        close_btn = page.locator(close_sel).first
+                        if close_btn.is_visible():
+                            close_btn.click()
+                            page.wait_for_timeout(500)
+                            closed = True
+                            _log(log_id, f"Попап закрыт ({close_sel!r})")
                             _snap(page, batch_id)
-                            captcha_clicked = True
                             break
                     except Exception:
                         pass
-                if captcha_clicked:
-                    break
+                if not closed:
+                    page.keyboard.press("Escape")
+                    page.wait_for_timeout(500)
+                    _log(log_id, "Попап: отправил Escape")
         except Exception:
             pass
 
-        # Проверяем финальное подтверждение публикации
+        # ── Проверяем финальное подтверждение публикации ──────────────────
         try:
-            success_hint = page.locator(
+            success_now = page.locator(
                 "[class*='toast']:has-text('опубликован'), "
                 "[class*='notification']:has-text('опубликован'), "
                 "[data-testid='publish-success']"
             ).first
-            if success_hint.is_visible():
-                _log(log_id, "Подтверждение публикации уже получено — капча не нужна.")
+            if success_now.is_visible():
+                _log(log_id, "Публикация подтверждена ещё в шаге 6.")
+                captcha_clicked = True
                 break
         except Exception:
             pass
 
-        page.wait_for_timeout(_CAPTCHA_POLL)
+        page.wait_for_timeout(_DIALOG_POLL)
 
     if captcha_clicked:
-        _log(log_id, "Капча пройдена, жду подтверждения публикации…")
+        _log(log_id, "Действия в шаге 6 выполнены, жду подтверждения публикации…")
     else:
-        _log(log_id, "Капча не обнаружена, жду подтверждения публикации…")
+        _log(log_id, "Шаг 6 завершён (капча/попап не обнаружены), жду подтверждения…")
 
     # ── Шаг 7: Ожидаем подтверждения публикации ──────────────────────────
     _PUBLISH_CONFIRM_TIMEOUT = 60_000  # ms — полный таймаут ожидания
@@ -430,25 +394,6 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
 
     _confirm_deadline = _time.monotonic() + _PUBLISH_CONFIRM_TIMEOUT / 1000
     while _time.monotonic() < _confirm_deadline and not confirmed:
-        # 0. Если попап «Уже можно публиковать» ещё виден — кликаем кнопку ещё раз
-        #    (может остаться после решения капчи)
-        try:
-            ready_hint = page.locator("text=Уже можно публиковать").first
-            if ready_hint.is_visible():
-                for btn_text in ["Опубликовать после обработки", "Опубликовать"]:
-                    try:
-                        btn = page.locator(f"button:has-text('{btn_text}')").first
-                        if btn.is_visible():
-                            _log(log_id, f"Попап ещё виден — кликаю «{btn_text}»…")
-                            btn.click()
-                            page.wait_for_timeout(2000)
-                            _snap(page, batch_id)
-                            break
-                    except Exception:
-                        pass
-        except Exception:
-            pass
-
         # 1. CSS-проверка
         try:
             el = page.locator(css_success_selector).first
