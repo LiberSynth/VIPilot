@@ -219,17 +219,32 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
     _log(log_id, "Файл передан браузеру, жду загрузки…")
     _snap(page, batch_id)
 
-    # Ждём, пока Дзен откроет редактор видео.
-    # Сигнал: URL меняется на ?videoEditorPublicationId=... — именно тогда
-    # кнопка «Опубликовать» принадлежит форме видео, а не фоновым спискам.
-    _log(log_id, "Жду открытия редактора видео (videoEditorPublicationId)…")
+    # Ждём одно из двух:
+    #   a) ?videoEditorPublicationId=...  — редактор открылся, нужно кликать «Опубликовать»
+    #   b) ?state=published               — Дзен опубликовал сам, ничего больше не нужно
+    _log(log_id, "Жду открытия редактора видео или авто-публикации…")
     _editor_opened = False
+    _auto_published = False
     try:
-        page.wait_for_url("*videoEditorPublicationId*", timeout=_UPLOAD_WAIT)
-        _editor_opened = True
-        _log(log_id, f"Редактор видео открылся: {page.url}")
+        page.wait_for_url(
+            re.compile(r"videoEditorPublicationId|state=published"),
+            timeout=_UPLOAD_WAIT,
+        )
+        _cur = page.url
+        if "state=published" in _cur:
+            _auto_published = True
+            _log(log_id, f"Дзен опубликовал видео автоматически: {_cur}")
+        else:
+            _editor_opened = True
+            _log(log_id, f"Редактор видео открылся: {_cur}")
     except Exception:
         pass
+
+    if _auto_published:
+        # Видео уже опубликовано — пропускаем шаги 5-7
+        _snap(page, batch_id)
+        _log(log_id, "Публикация завершена!")
+        return
 
     if not _editor_opened:
         # Запасной вариант: ждём поле заголовка или кнопку в диалоге
@@ -438,6 +453,11 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
         # 3. Проверка URL
         url_now = page.url
         if url_now != url_before:
+            # state=published — Дзен подтвердил публикацию
+            if "state=published" in url_now:
+                confirmed = True
+                _log(log_id, f"URL → state=published — публикация подтверждена.")
+                break
             video_match = re.search(r"/video/|/shorts/|/watch\?", url_now)
             if video_match or "editor" not in url_now:
                 confirmed = True
@@ -453,13 +473,17 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
         url_after = page.url
         print(f"[dzen] URL до публикации: {url_before}")
         print(f"[dzen] URL после публикации: {url_after}")
-        video_url_pattern = re.search(r"/video/|/shorts/|/watch\?", url_after)
-        if video_url_pattern and url_after != url_before:
+        if "state=published" in url_after:
             confirmed = True
-            _log(log_id, f"URL сменился на страницу видео ({url_after}) — публикация подтверждена.")
-        elif url_after != url_before and "editor" not in url_after:
-            confirmed = True
-            _log(log_id, f"URL сменился ({url_after}) — публикация предположительно подтверждена.")
+            _log(log_id, f"URL → state=published — публикация подтверждена (финал).")
+        else:
+            video_url_pattern = re.search(r"/video/|/shorts/|/watch\?", url_after)
+            if video_url_pattern and url_after != url_before:
+                confirmed = True
+                _log(log_id, f"URL сменился на страницу видео ({url_after}) — публикация подтверждена.")
+            elif url_after != url_before and "editor" not in url_after:
+                confirmed = True
+                _log(log_id, f"URL сменился ({url_after}) — публикация предположительно подтверждена.")
 
     _snap(page, batch_id)
 
