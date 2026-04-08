@@ -286,27 +286,51 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
                     if not is_captcha:
                         continue
                     _log(log_id, f"Капча-фрейм найден: {frame.url!r}")
-                    # Ищем чекбокс ВНУТРИ фрейма капчи
+                    # Вариант 1: JS-клик напрямую по input[type=checkbox] внутри фрейма.
+                    # Это надёжнее чем Playwright-клик — не зависит от видимости и позиции.
+                    _js_clicked = False
+                    for js_sel in [
+                        'input[type="checkbox"]',
+                        '[class*="Checkbox"] input',
+                        '[class*="checkbox"] input',
+                    ]:
+                        try:
+                            done = frame.evaluate(
+                                f'() => {{ const el = document.querySelector({repr(js_sel)}); '
+                                f'if (el) {{ el.click(); return true; }} return false; }}'
+                            )
+                            if done:
+                                _log(log_id, f"Капча: JS-клик по {js_sel!r} — выполнен")
+                                _js_clicked = True
+                                break
+                        except Exception:
+                            pass
+
+                    if _js_clicked:
+                        page.wait_for_timeout(2000)
+                        captcha_clicked = True
+                        _snap(page, batch_id)
+                        break
+
+                    # Вариант 2: Playwright-клик по label (ассоциирован с чекбоксом через for=)
                     for sel in [
-                        "[class*='vkc__Checkbox']",
+                        "label",
                         "input[type='checkbox']",
                         "[role='checkbox']",
-                        "label",
                     ]:
                         try:
                             el = frame.locator(sel).first
                             if el.is_visible():
-                                _log(log_id, f"Кликаю чекбокс капчи {sel!r}…")
-                                try:
-                                    el.click(timeout=2000)
-                                except Exception:
-                                    el.click(force=True, timeout=2000)
+                                _log(log_id, f"Капча: Playwright-клик {sel!r}…")
+                                el.click(force=True, timeout=2000)
                                 page.wait_for_timeout(2000)
                                 captcha_clicked = True
                                 _snap(page, batch_id)
                                 break
                         except Exception:
                             pass
+                    if captcha_clicked:
+                        break
             except Exception:
                 pass
 
