@@ -1449,7 +1449,7 @@ KNOWN_BATCH_STATUSES = frozenset({
     'fatal_error',
 })
 
-_COMPOSITE_STATUS_SUFFIXES = ('.posting', '.published', '.pending')
+_COMPOSITE_STATUS_SUFFIXES = ('.posting', '.published', '.pending', '.failed')
 
 
 def _get_dynamic_publish_statuses() -> set:

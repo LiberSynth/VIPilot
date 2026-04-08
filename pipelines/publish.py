@@ -221,7 +221,7 @@ def run(batch_id):
                     db_log_update(log_id, f'Шаг {cur_slug}.{cur_method} удалён из конфига — батч требует ручной проверки', 'error')
                     notify_failure(f"publish: батч {batch_id[:8]} завис в {cur_slug}.{cur_method}.pending, а шаг удалён из конфига")
                     return
-            elif cur_phase == 'published':
+            elif cur_phase in ('published', 'failed'):
                 found_idx = None
                 for i, (slug, method, _) in enumerate(steps):
                     if slug == cur_slug and method == cur_method:
@@ -234,7 +234,7 @@ def run(batch_id):
                     print(f"[publish] Батч {batch_id[:8]}… шаг {cur_slug}.{cur_method} не найден в текущем конфиге")
                     db_set_batch_publish_error(batch_id)
                     db_log_update(log_id, f'Шаг {cur_slug}.{cur_method} удалён из конфига — батч требует ручной проверки', 'error')
-                    notify_failure(f"publish: батч {batch_id[:8]} завис в {cur_slug}.{cur_method}.published, а шаг удалён из конфига")
+                    notify_failure(f"publish: батч {batch_id[:8]} завис в {cur_slug}.{cur_method}.{cur_phase}, а шаг удалён из конфига")
                     return
                 elif found_idx + 1 < len(steps):
                     ns, nm, _ = steps[found_idx + 1]
@@ -252,6 +252,7 @@ def run(batch_id):
                     return
 
         any_ok = False
+        failed_steps = []
         expected_from = status
         for step_idx, (slug, method, target) in enumerate(steps):
             if resume_from is not None:
@@ -261,6 +262,7 @@ def run(batch_id):
 
             posting_status = f"{slug}.{method}.posting"
             published_status = f"{slug}.{method}.published"
+            failed_status = f"{slug}.{method}.failed"
 
             if not db_claim_batch_status(batch_id, expected_from, posting_status):
                 print(f"[publish] Батч {batch_id[:8]}… уже захвачен другим процессом для {posting_status} — пропуск")
@@ -270,29 +272,32 @@ def run(batch_id):
             if log_id:
                 db_log_entry(log_id, f'Шаг {slug}.{method}: выполняю…')
 
+            step_error = None
             try:
                 ok = _call_client(slug, method, batch_id, log_id, target)
             except (DzenSessionMissing, DzenCsrfExpired) as e:
+                ok = False
+                step_error = str(e)
                 if log_id:
                     db_log_entry(log_id, f'{slug}.{method}: {e}', level='error')
-                db_set_batch_publish_error(batch_id)
-                db_log_update(log_id, f'Ошибка сессии {slug}.{method}', 'error')
-                notify_failure(f"publish: ошибка сессии {slug}.{method} батча {batch_id[:8]}")
-                return
             except Exception as e:
+                ok = False
+                step_error = str(e)
                 if log_id:
                     db_log_entry(log_id, f'{slug}.{method}: неожиданная ошибка: {e}', level='error')
-                db_set_batch_publish_error(batch_id)
-                db_log_update(log_id, f'Ошибка {slug}.{method}', 'error')
-                notify_failure(f"publish: ошибка {slug}.{method} батча {batch_id[:8]}: {e}")
-                return
 
             if not ok:
-                db_set_batch_publish_error(batch_id)
-                db_log_update(log_id, f'Ошибка публикации {slug}.{method}', 'error')
-                print(f"[publish] Батч {batch_id[:8]}… ошибка {slug}.{method}")
-                notify_failure(f"publish: ошибка публикации {slug}.{method} батча {batch_id[:8]}")
-                return
+                failed_steps.append(f"{slug}.{method}")
+                err_msg = step_error or 'ошибка публикации'
+                print(f"[publish] Батч {batch_id[:8]}… ошибка {slug}.{method}: {err_msg}")
+                notify_failure(f"publish: ошибка {slug}.{method} батча {batch_id[:8]}: {err_msg}")
+                step_saved = db_set_batch_status(batch_id, failed_status)
+                if not step_saved:
+                    db_set_batch_publish_error(batch_id)
+                    db_log_update(log_id, f'Шаг {slug}.{method}: ошибка, не удалось сохранить статус — аварийная остановка', 'error')
+                    return
+                expected_from = failed_status
+                continue
 
             any_ok = True
 
@@ -309,17 +314,29 @@ def run(batch_id):
         if any_ok:
             saved = db_set_batch_published(batch_id)
             if saved:
-                db_log_update(log_id, f'Опубликовано ({target_names})', 'ok')
-                print(f"[publish] Батч {batch_id[:8]}… опубликован")
-                if log_id:
-                    entries = db_get_log_entries(log_id)
-                    warn_entries = [e for e in entries if e['level'] in ('warn', 'error')]
-                    if warn_entries:
-                        notify_failure(
-                            f"publish: батч {batch_id[:8]} опубликован, но в процессе были некритичные ошибки",
-                            log_entries=warn_entries,
-                            partial=True,
-                        )
+                if failed_steps:
+                    fail_list = ', '.join(failed_steps)
+                    db_log_update(log_id, f'Частично опубликовано ({target_names}); ошибки: {fail_list}', 'ok')
+                    print(f"[publish] Батч {batch_id[:8]}… частично опубликован (ошибки: {fail_list})")
+                    entries = db_get_log_entries(log_id) if log_id else []
+                    err_entries = [e for e in entries if e['level'] in ('warn', 'error')]
+                    notify_failure(
+                        f"publish: батч {batch_id[:8]} частично опубликован; не удалось: {fail_list}",
+                        log_entries=err_entries,
+                        partial=True,
+                    )
+                else:
+                    db_log_update(log_id, f'Опубликовано ({target_names})', 'ok')
+                    print(f"[publish] Батч {batch_id[:8]}… опубликован")
+                    if log_id:
+                        entries = db_get_log_entries(log_id)
+                        warn_entries = [e for e in entries if e['level'] in ('warn', 'error')]
+                        if warn_entries:
+                            notify_failure(
+                                f"publish: батч {batch_id[:8]} опубликован, но в процессе были некритичные ошибки",
+                                log_entries=warn_entries,
+                                partial=True,
+                            )
             else:
                 db_set_batch_publish_error(batch_id)
                 db_log_update(log_id, f'Опубликовано, но ошибка записи статуса в БД', 'error')
