@@ -2,20 +2,25 @@
 Менеджер Playwright-браузера для авторизации на Дзен.
 
 Запускает headless Chromium в фоновом потоке, транслирует скриншоты через SSE.
-Пользователь авторизуется — куки сохраняются автоматически в профиль Chrome на диске.
-Кнопка «Сохранить сессию» фиксирует временную метку без дополнительных действий.
+Пользователь авторизуется — после входа нажимает «Сохранить сессию», куки
+сохраняются в поле targets.session_context в БД.
 
 Публичный API (потокобезопасен):
-    start(target_id)         — запустить браузер
-    stop()                   — остановить браузер
-    send_event(ev)           — передать событие мыши/клавиатуры
-    request_save(target_id)  — зафиксировать метку сохранения
-    get_status()             — текущий статус
-    frame_generator()        — SSE-генератор кадров (JPEG, base64)
+    start(target_id)              — запустить браузер
+    stop()                        — остановить браузер
+    send_event(ev)                — передать событие мыши/клавиатуры
+    request_save(target_id)       — сохранить куки в БД
+    get_status()                  — текущий статус
+    get_session_saved_at(tid)     — ISO-метка последнего сохранения
+    profile_exists(tid)           — True если сессия есть в БД
+    frame_generator()             — SSE-генератор кадров (JPEG, base64)
+    push_frame(img)               — поместить кадр в буфер трансляции
+    push_frame_for_batch(bid, img)— кадр для конкретного батча
+    get_frame_for_batch(bid)      — последний кадр батча
+    run_pipeline_browser(fn, cookies) — запустить публикацию
 """
 
 import base64
-import json
 import os
 import queue
 import threading

@@ -199,7 +199,9 @@
 
   setInterval(function () {
     if (active) return;
-    fetch('/api/dzen-browser/status')
+    var tid = getTargetId();
+    var url = '/api/dzen-browser/status' + (tid ? '?target_id=' + encodeURIComponent(tid) : '');
+    fetch(url)
       .then(function (r) { return r.json(); })
       .then(function (data) {
         var st = data && data.browser && data.browser.status;
@@ -209,6 +211,12 @@
       })
       .catch(function () {});
   }, 2500);
+
+  window.addEventListener('beforeunload', function () {
+    if (active) {
+      fetch('/api/dzen-browser/stop', { method: 'POST', keepalive: true }).catch(function () {});
+    }
+  });
 
   /* ── Авто-запуск при переходе на вкладку Публикация ── */
   var _origSwitchPanel = window.switchPanel;
