@@ -78,8 +78,10 @@
   const MON_SVG_PLAY     = `<svg viewBox="0 0 16 16"><polygon points="4,2 13,8 4,14"/></svg>`;
   const MON_SVG_INFO     = `<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.2"/><line x1="8" y1="5.5" x2="8" y2="5.5"/><line x1="8" y1="7.5" x2="8" y2="11"/></svg>`;
 
-  function renderLogItem(log, batchId, storyId, hasVideoData, textModelName, videoModelName) {
-    const st  = log.status || 'info';
+  function renderLogItem(log, batchId, storyId, hasVideoData, textModelName, videoModelName, batchStatus) {
+    const isPublish = (log.pipeline === 'publish');
+    const rawSt = log.status || 'info';
+    const st = (isPublish && rawSt === 'ok' && batchStatus === 'published_partially') ? 'partial' : rawSt;
     const pip = PIPELINE_LABELS[log.pipeline] || log.pipeline;
     const modelName = (log.pipeline === 'video' && videoModelName) ? videoModelName
       : (log.pipeline === 'story' && textModelName) ? textModelName
@@ -102,7 +104,6 @@
       '<button class="cycle-float-btn" title="Скопировать инфо" onclick="monitorPipelineCopyInfo(this)">' + MON_SVG_INFO + '</button>' +
     '</div>';
 
-    const isPublish = (log.pipeline === 'publish');
     const frameHtml = (isPublish && batchId)
       ? '<div class="monitor-pub-frame">' +
           '<img data-bid="' + esc(batchId) + '" style="width:100%;height:auto;display:block">' +
@@ -200,7 +201,7 @@
              : 'md-warn';
 
     const logHtml = '<div class="monitor-log-list">' + logs.map(function(log) {
-      return renderLogItem(log, batch.batch_id, batch.story_id, batch.has_video_data, batch.text_model_name, batch.video_model_name);
+      return renderLogItem(log, batch.batch_id, batch.story_id, batch.has_video_data, batch.text_model_name, batch.video_model_name, bs);
     }).join('') + '</div>';
 
     const batchStoryBtn = batch.story_id
@@ -415,36 +416,12 @@
     });
   });
 
-  function updatePublishNavDot(batches, activeBatchIds) {
-    var dot = document.getElementById('publish-nav-dot');
-    if (!dot) return;
-    var cls = '';
-    for (var i = 0; i < batches.length; i++) {
-      var b = batches[i];
-      if (activeBatchIds.indexOf(b.batch_id) >= 0) {
-        var logs = b.logs || [];
-        var hasPublish = logs.some(function(l) { return l.pipeline === 'publish'; });
-        if (hasPublish) { cls = 'navdot-active'; break; }
-      }
-    }
-    if (!cls) {
-      for (var j = 0; j < batches.length; j++) {
-        var bs = batches[j].batch_status || '';
-        if (bs === 'published')           { cls = 'navdot-ok';      break; }
-        if (bs === 'published_partially') { cls = 'navdot-partial'; break; }
-        if (bs === 'publish_error')       { cls = 'navdot-error';   break; }
-      }
-    }
-    dot.className = 'publish-nav-dot' + (cls ? ' ' + cls : '');
-  }
-
   function renderTimeline(data) {
     var el = document.getElementById('monitor-timeline');
     if (!el) return;
     _activeBatchIds = Array.isArray(data.active_batch_ids) ? data.active_batch_ids : [];
     var prev   = getOpenState();
     var groups = buildTimeline(data.batches, data.system);
-    updatePublishNavDot(data.batches || [], _activeBatchIds);
     if (groups.length === 0) {
       el.innerHTML = '<div style="font-size:12px;color:#444;padding:4px 0">Нет данных</div>';
       return;
