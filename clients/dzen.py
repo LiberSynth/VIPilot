@@ -416,15 +416,39 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
         "[data-testid='publish-success'], "
         "[data-testid*='publish']:has-text('опубликован')"
     )
-    # Текстовые паттерны — проверяем отдельно через locator
+    # Текстовые паттерны — проверяем отдельно через locator.
+    # ВАЖНО: «Уже можно публиковать» — это подсказка ДО публикации, не подтверждение.
+    # Сюда включаем только то, что появляется ПОСЛЕ успешной отправки.
     text_success_patterns = [
         "text=Видео опубликовано",
-        "text=Уже можно публиковать",
-        "text=Видео появится на канале",
+        "text=Видео добавлено",
+        "text=Видео будет опубликовано",
+        "text=Видео на модерации",
+        "text=Видео обрабатывается",
+        "text=Ролик опубликован",
     ]
 
     _confirm_deadline = _time.monotonic() + _PUBLISH_CONFIRM_TIMEOUT / 1000
     while _time.monotonic() < _confirm_deadline and not confirmed:
+        # 0. Если попап «Уже можно публиковать» ещё виден — кликаем кнопку ещё раз
+        #    (может остаться после решения капчи)
+        try:
+            ready_hint = page.locator("text=Уже можно публиковать").first
+            if ready_hint.is_visible():
+                for btn_text in ["Опубликовать после обработки", "Опубликовать"]:
+                    try:
+                        btn = page.locator(f"button:has-text('{btn_text}')").first
+                        if btn.is_visible():
+                            _log(log_id, f"Попап ещё виден — кликаю «{btn_text}»…")
+                            btn.click()
+                            page.wait_for_timeout(2000)
+                            _snap(page, batch_id)
+                            break
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
         # 1. CSS-проверка
         try:
             el = page.locator(css_success_selector).first
