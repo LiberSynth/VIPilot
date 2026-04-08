@@ -18,7 +18,7 @@ from db import (
 )
 from log import db_log_root, db_log_pipeline, db_log_entry, db_log_interrupt_running, db_log_fix_orphaned_running
 from pipelines import story, video, transcode, publish, cleanup
-from routes.admin import bp as admin_bp
+from routes.web import bp as web_bp
 from routes.api import bp as api_bp
 from routes.dzen_browser import bp as dzen_browser_bp
 from utils.consts import FLASK_SECRET, MSK
@@ -31,7 +31,7 @@ flask_app.secret_key = FLASK_SECRET
 flask_app.permanent_session_lifetime = timedelta(days=7)
 limiter.init_app(flask_app)
 
-flask_app.register_blueprint(admin_bp)
+flask_app.register_blueprint(web_bp)
 flask_app.register_blueprint(api_bp)
 flask_app.register_blueprint(dzen_browser_bp)
 

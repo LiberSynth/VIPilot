@@ -33,7 +33,7 @@ from utils.utils import (
     parse_file_lifetime,
 )
 
-bp = Blueprint("admin", __name__)
+bp = Blueprint("web", __name__)
 
 
 @bp.route("/favicon.ico")
@@ -57,8 +57,8 @@ def login():
     if is_authenticated():
         role = session.get("role", "root")
         if role == "producer":
-            return redirect(url_for("admin.producer_page"))
-        return redirect(url_for("admin.admin_page"))
+            return redirect(url_for("web.producer_page"))
+        return redirect(url_for("web.admin_page"))
 
     error = False
     if request.method == "POST":
@@ -71,8 +71,8 @@ def login():
             session["role"] = user["role"] or "root"
             session.permanent = True
             if session["role"] == "producer":
-                return redirect(url_for("admin.producer_page"))
-            return redirect(url_for("admin.admin_page"))
+                return redirect(url_for("web.producer_page"))
+            return redirect(url_for("web.admin_page"))
         error = True
     return render_template("login.html", error=error)
 
@@ -80,7 +80,7 @@ def login():
 @bp.route("/admin")
 def admin_page():
     if not is_authenticated():
-        return redirect(url_for("admin.login"))
+        return redirect(url_for("web.login"))
     metaprompt      = db_get("metaprompt", "")
     system_prompt   = db_get("system_prompt", "")
     batch_lifetime     = parse_batch_lifetime(db_get("batch_lifetime", "7"))
@@ -122,7 +122,7 @@ def admin_page():
     vk_transcode    = db_get("vk_transcode", "1") == "1"
 
     resp = make_response(render_template(
-        "admin.html",
+        "root.html",
         metaprompt=metaprompt,
         system_prompt=system_prompt,
         batch_lifetime=batch_lifetime,
@@ -163,7 +163,7 @@ def admin_page():
 @bp.route("/save", methods=["POST"])
 def save():
     if not is_authenticated():
-        return redirect(url_for("admin.login"))
+        return redirect(url_for("web.login"))
 
     system_prompt_val = request.form.get("system_prompt")
     if system_prompt_val is not None:
@@ -175,7 +175,7 @@ def save():
         if active_tab == "story":
             print("[SAVE] Попытка сохранить пустой мета-промпт — отклонено")
             flash("Мета-промпт не может быть пустым", "error")
-            return redirect(url_for("admin.admin_page"))
+            return redirect(url_for("web.admin_page"))
     else:
         db_set("metaprompt", metaprompt)
 
@@ -271,7 +271,7 @@ def save():
         except (ValueError, TypeError):
             pass
 
-    return redirect(url_for("admin.admin_page") + f"?tab={active_tab}")
+    return redirect(url_for("web.admin_page") + f"?tab={active_tab}")
 
 
 
@@ -279,9 +279,9 @@ def save():
 @bp.route("/producer")
 def producer_page():
     if not is_authenticated():
-        return redirect(url_for("admin.login"))
+        return redirect(url_for("web.login"))
     if session.get("role") != "producer":
-        return redirect(url_for("admin.admin_page"))
+        return redirect(url_for("web.admin_page"))
     from utils.version import VERSION as APP_VERSION
     resp = make_response(render_template("producer.html", app_version=APP_VERSION))
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
@@ -293,4 +293,4 @@ def producer_page():
 @bp.route("/logout")
 def logout():
     session.clear()
-    return redirect(url_for("admin.login"))
+    return redirect(url_for("web.login"))
