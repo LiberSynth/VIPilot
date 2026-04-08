@@ -102,12 +102,9 @@
     '</div>';
 
     const isPublish = (log.pipeline === 'publish');
-    const frameTs   = (st === 'running') ? ('?t=' + Date.now()) : '';
     const frameHtml = (isPublish && batchId)
       ? '<div class="monitor-pub-frame">' +
-          '<img src="/api/batch/' + esc(batchId) + '/publish-frame' + frameTs + '" ' +
-               'onload="this.parentNode.style.display=\'block\'" ' +
-               'onerror="this.parentNode.style.display=\'none\'">' +
+          '<img data-bid="' + esc(batchId) + '" style="width:100%;height:auto;display:block">' +
         '</div>'
       : '';
 
@@ -301,6 +298,7 @@
   var _seenLids      = {};
   var _seenBids      = {};
   var _firstRender   = true;
+  var _pubFrameCache = {};  // batchId → blob URL
 
   function getOpenState() {
     var bids = {}, sgkeys = {}, lids = {};
@@ -350,6 +348,42 @@
     });
   }
 
+  function refreshPublishFrames() {
+    document.querySelectorAll('.monitor-pub-frame img[data-bid]').forEach(function(img) {
+      var bid = img.dataset.bid;
+      if (!bid) return;
+
+      // Мгновенно восстанавливаем кадр из кэша (без мигания после перерисовки DOM)
+      if (_pubFrameCache[bid] && !img.src) {
+        img.src = _pubFrameCache[bid];
+        img.parentNode.style.display = 'block';
+      }
+
+      // Новый кадр получаем только для активной публикации
+      var logItem = img.closest('.monitor-log-item');
+      if (!logItem || logItem.dataset.status !== 'running') return;
+
+      // Preload-swap: старый кадр виден до тех пор, пока новый не загружен полностью
+      fetch('/api/batch/' + bid + '/publish-frame?t=' + Date.now())
+        .then(function(r) {
+          if (!r.ok || r.status === 204) return null;
+          return r.blob();
+        })
+        .then(function(blob) {
+          if (!blob) return;
+          if (_pubFrameCache[bid]) URL.revokeObjectURL(_pubFrameCache[bid]);
+          var url = URL.createObjectURL(blob);
+          _pubFrameCache[bid] = url;
+          document.querySelectorAll('.monitor-pub-frame img[data-bid="' + bid + '"]')
+            .forEach(function(el) {
+              el.src = url;
+              el.parentNode.style.display = 'block';
+            });
+        })
+        .catch(function() {});
+    });
+  }
+
   function renderTimeline(data) {
     var el = document.getElementById('monitor-timeline');
     if (!el) return;
@@ -366,6 +400,7 @@
     restoreOpenState(prev);
     if (!_firstRender) autoExpandNewActivity();
     _firstRender = false;
+    refreshPublishFrames();
   }
 
   function refreshMonitor() {
@@ -591,4 +626,5 @@
 
   refreshMonitor();
   setInterval(refreshMonitor, 5000);
+  setInterval(refreshPublishFrames, 3000);
 })();
