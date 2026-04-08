@@ -250,18 +250,22 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
 
     _CAPTCHA_CHECKBOX_SELECTORS = [
         "input[type='checkbox']",
-        "[role='checkbox']",
+        "div[role='checkbox']",
+        "span[role='checkbox']",
+        "label",                         # VK not_robot_captcha — кликабельный label
         "[class*='CheckboxCaptcha']",
         "[class*='checkbox-captcha']",
         "[class*='captcha-checkbox']",
         "[class*='Checkbox__box']",
+        "[class*='vkc__Checkbox']",      # VK-специфичные классы
         "div[class*='Checkbox']",
         "span[class*='Checkbox']",
         "div[class*='checkbox']",
         "span[class*='checkbox']",
     ]
     _CAPTCHA_FRAME_KEYWORDS = (
-        "captcha", "smartcaptcha", "yandexcloud", "recaptcha", "robot"
+        "captcha", "smartcaptcha", "yandexcloud", "recaptcha", "robot",
+        "id.vk.com",
     )
 
     _log(log_id, "Проверяю наличие капчи «Я не робот» (окно 25 сек)…")
@@ -399,34 +403,64 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
         _log(log_id, "Капча не обнаружена, жду подтверждения публикации…")
 
     # ── Шаг 7: Ожидаем подтверждения публикации ──────────────────────────
-    _PUBLISH_CONFIRM_TIMEOUT = 60_000  # ms
-
-    # Специфичные селекторы успеха — toast/notification с упоминанием публикации
-    # и data-testid от Дзена; намеренно не используем широкие class*='success'
-    success_selector = (
-        "[class*='toast']:has-text('опубликован'), "
-        "[class*='notification']:has-text('опубликован'), "
-        "[data-testid='publish-success'], "
-        "[data-testid*='publish']:has-text('опубликован'), "
-        "text=Видео опубликовано, "
-        "text=Уже можно публиковать, "
-        "text=Видео появится на канале"
-    )
+    _PUBLISH_CONFIRM_TIMEOUT = 60_000  # ms — полный таймаут ожидания
+    _CONFIRM_POLL = 2_000              # ms — интервал опроса
 
     url_before = page.url
     confirmed = False
 
-    try:
-        page.wait_for_selector(success_selector, timeout=_PUBLISH_CONFIRM_TIMEOUT)
-        confirmed = True
-        _log(log_id, "Уведомление об успешной публикации получено.")
-    except Exception:
-        pass
+    # CSS-селекторы (только чистый CSS, без text= — они несовместимы с wait_for_selector)
+    css_success_selector = (
+        "[class*='toast']:has-text('опубликован'), "
+        "[class*='notification']:has-text('опубликован'), "
+        "[data-testid='publish-success'], "
+        "[data-testid*='publish']:has-text('опубликован')"
+    )
+    # Текстовые паттерны — проверяем отдельно через locator
+    text_success_patterns = [
+        "text=Видео опубликовано",
+        "text=Уже можно публиковать",
+        "text=Видео появится на канале",
+    ]
+
+    _confirm_deadline = _time.monotonic() + _PUBLISH_CONFIRM_TIMEOUT / 1000
+    while _time.monotonic() < _confirm_deadline and not confirmed:
+        # 1. CSS-проверка
+        try:
+            el = page.locator(css_success_selector).first
+            if el.is_visible():
+                confirmed = True
+                _log(log_id, "Уведомление об успешной публикации получено (CSS).")
+                break
+        except Exception:
+            pass
+
+        # 2. Текстовая проверка
+        for pat in text_success_patterns:
+            try:
+                el = page.locator(pat).first
+                if el.is_visible():
+                    confirmed = True
+                    _log(log_id, f"Успех по тексту: {pat!r}")
+                    break
+            except Exception:
+                pass
+        if confirmed:
+            break
+
+        # 3. Проверка URL
+        url_now = page.url
+        if url_now != url_before:
+            video_match = re.search(r"/video/|/shorts/|/watch\?", url_now)
+            if video_match or "editor" not in url_now:
+                confirmed = True
+                _log(log_id, f"URL сменился ({url_now}) — публикация подтверждена.")
+                break
+
+        page.wait_for_timeout(_CONFIRM_POLL)
 
     if not confirmed:
-        # Проверяем смену URL на страницу опубликованного видео
-        # Дзен обычно редиректит на /video/<id> или /shorts/<id>
-        page.wait_for_timeout(3000)
+        # Финальный URL-снимок
         url_after = page.url
         print(f"[dzen] URL до публикации: {url_before}")
         print(f"[dzen] URL после публикации: {url_after}")
@@ -435,7 +469,6 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
             confirmed = True
             _log(log_id, f"URL сменился на страницу видео ({url_after}) — публикация подтверждена.")
         elif url_after != url_before and "editor" not in url_after:
-            # Запасной вариант: любое изменение URL, не ведущее обратно в редактор
             confirmed = True
             _log(log_id, f"URL сменился ({url_after}) — публикация предположительно подтверждена.")
 
