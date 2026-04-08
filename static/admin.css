@@ -239,9 +239,9 @@
   .toggle-wrap input:checked + .toggle-track::after { transform: translateX(20px); }
 
   .card.emulation-active { border-color: rgba(245,166,35,.35); }
-  .card.target-disabled { opacity: .4; pointer-events: none; user-select: none; }
-  .card.target-disabled .card-title::after {
-    content: 'Отключён';
+  .card.target-disabled { filter: grayscale(1) opacity(0.55); pointer-events: none; user-select: none; }
+  .card.target-disabled > .card-title:first-child::after {
+    content: 'Отключен';
     display: inline-block;
     margin-left: 8px;
     font-size: 10px;
