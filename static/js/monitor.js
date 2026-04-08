@@ -24,8 +24,9 @@
     video_error:      'видео: ошибка',
     transcode_ready:  'транскод готов',
     transcode_error:  'транскод: ошибка',
-    published:        'опубликовано',
-    publish_error:    'публикация: ошибка',
+    published:            'опубликовано',
+    published_partially:  'частично опубликовано',
+    publish_error:        'публикация: ошибка',
     probe:            'пробный',
     story_probe:      'пробный (сюжет)',
     cancelled:        'отменён',
@@ -414,12 +415,36 @@
     });
   });
 
+  function updatePublishNavDot(batches, activeBatchIds) {
+    var dot = document.getElementById('publish-nav-dot');
+    if (!dot) return;
+    var cls = '';
+    for (var i = 0; i < batches.length; i++) {
+      var b = batches[i];
+      if (activeBatchIds.indexOf(b.batch_id) >= 0) {
+        var logs = b.logs || [];
+        var hasPublish = logs.some(function(l) { return l.pipeline === 'publish'; });
+        if (hasPublish) { cls = 'navdot-active'; break; }
+      }
+    }
+    if (!cls) {
+      for (var j = 0; j < batches.length; j++) {
+        var bs = batches[j].batch_status || '';
+        if (bs === 'published')           { cls = 'navdot-ok';      break; }
+        if (bs === 'published_partially') { cls = 'navdot-partial'; break; }
+        if (bs === 'publish_error')       { cls = 'navdot-error';   break; }
+      }
+    }
+    dot.className = 'publish-nav-dot' + (cls ? ' ' + cls : '');
+  }
+
   function renderTimeline(data) {
     var el = document.getElementById('monitor-timeline');
     if (!el) return;
     _activeBatchIds = Array.isArray(data.active_batch_ids) ? data.active_batch_ids : [];
     var prev   = getOpenState();
     var groups = buildTimeline(data.batches, data.system);
+    updatePublishNavDot(data.batches || [], _activeBatchIds);
     if (groups.length === 0) {
       el.innerHTML = '<div style="font-size:12px;color:#444;padding:4px 0">Нет данных</div>';
       return;
