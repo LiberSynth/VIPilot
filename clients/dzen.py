@@ -352,14 +352,38 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
         except Exception:
             pass
 
-        # Проверяем, не появилось ли уже подтверждение — тогда капча не нужна
+        # Проверяем: появился ли попап «Уже можно публиковать» — кликаем кнопку внутри него
+        try:
+            ready_hint = page.locator(
+                "text=Уже можно публиковать, "
+                "text=Видео появится на канале"
+            ).first
+            if ready_hint.is_visible():
+                _log(log_id, "Попап «Уже можно публиковать» обнаружен — ищу кнопку публикации…")
+                # Кнопка может называться «Опубликовать» или «Опубликовать после обработки»
+                for btn_text in ["Опубликовать после обработки", "Опубликовать"]:
+                    try:
+                        btn = page.locator(f"button:has-text('{btn_text}')").first
+                        if btn.is_visible():
+                            _log(log_id, f"Кликаю «{btn_text}»…")
+                            btn.click()
+                            page.wait_for_timeout(2000)
+                            _snap(page, batch_id)
+                            captcha_clicked = True
+                            break
+                    except Exception:
+                        pass
+                if captcha_clicked:
+                    break
+        except Exception:
+            pass
+
+        # Проверяем финальное подтверждение публикации
         try:
             success_hint = page.locator(
                 "[class*='toast']:has-text('опубликован'), "
                 "[class*='notification']:has-text('опубликован'), "
-                "[data-testid='publish-success'], "
-                "text=Уже можно публиковать, "
-                "text=Видео появится на канале"
+                "[data-testid='publish-success']"
             ).first
             if success_hint.is_visible():
                 _log(log_id, "Подтверждение публикации уже получено — капча не нужна.")
