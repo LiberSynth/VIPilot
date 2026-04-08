@@ -57,7 +57,8 @@ def seed_db():
                     INSERT INTO user_roles (name, slug)
                     SELECT v.name, v.slug FROM (VALUES
                         ('root',     'root'),
-                        ('producer', 'producer')
+                        ('producer', 'producer'),
+                        ('operator', 'operator')
                     ) AS v(name, slug)
                     WHERE NOT EXISTS (
                         SELECT 1 FROM user_roles WHERE slug = v.slug
@@ -65,16 +66,32 @@ def seed_db():
                 """)
 
                 cur.execute("""
-                    INSERT INTO users (name, login, password, role_id)
-                    SELECT v.name, v.login, v.password,
-                           (SELECT id FROM user_roles WHERE slug = v.role_slug)
+                    INSERT INTO users (name, login, password)
+                    SELECT v.name, v.login, v.password
                     FROM (VALUES
-                        ('root',     'root',     '0000', 'root'),
-                        ('producer', 'producer', '0000', 'producer')
-                    ) AS v(name, login, password, role_slug)
+                        ('root',     'root',     '0000'),
+                        ('producer', 'producer', '0000'),
+                        ('operator', 'operator', '0000')
+                    ) AS v(name, login, password)
                     WHERE NOT EXISTS (
                         SELECT 1 FROM users WHERE login = v.login
                     )
+                """)
+
+                cur.execute("""
+                    INSERT INTO user_role_links (user_id, role_id)
+                    SELECT u.id, r.id
+                    FROM (VALUES
+                        ('operator', 'operator'),
+                        ('producer', 'producer'),
+                        ('producer', 'operator'),
+                        ('root',     'root'),
+                        ('root',     'producer'),
+                        ('root',     'operator')
+                    ) AS v(user_login, role_slug)
+                    JOIN users      u ON u.login = v.user_login
+                    JOIN user_roles r ON r.slug  = v.role_slug
+                    ON CONFLICT DO NOTHING
                 """)
 
             conn.commit()

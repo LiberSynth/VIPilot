@@ -1715,10 +1715,18 @@ def db_get_user_by_login(login):
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                    SELECT u.id, u.name, u.login, u.password, r.slug AS role
+                    SELECT u.id, u.name, u.login, u.password,
+                           CASE
+                               WHEN bool_or(r.slug = 'root')     THEN 'root'
+                               WHEN bool_or(r.slug = 'producer') THEN 'producer'
+                               WHEN bool_or(r.slug = 'operator') THEN 'operator'
+                               ELSE NULL
+                           END AS role
                     FROM users u
-                    LEFT JOIN user_roles r ON r.id = u.role_id
+                    LEFT JOIN user_role_links url ON url.user_id = u.id
+                    LEFT JOIN user_roles r        ON r.id = url.role_id
                     WHERE u.login = %s
+                    GROUP BY u.id, u.name, u.login, u.password
                 """, (login,))
                 row = cur.fetchone()
                 if not row:

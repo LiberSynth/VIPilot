@@ -993,6 +993,36 @@ def _m028_fill_null_story_ids(cur):
     """)
 
 
+def _m029_user_role_links(cur):
+    """
+    Переход users↔roles к many-to-many.
+    - Создаёт таблицу user_role_links (user_id UUID, role_id UUID, PK составной).
+    - Переносит существующие назначения из users.role_id в user_role_links (только если колонка ещё существует).
+    - Удаляет колонку role_id из users.
+    Deployed: -
+    """
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS user_role_links (
+            user_id UUID NOT NULL,
+            role_id UUID NOT NULL,
+            PRIMARY KEY (user_id, role_id)
+        )
+    """)
+    cur.execute("""
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'users' AND column_name = 'role_id'
+    """)
+    if cur.fetchone():
+        cur.execute("""
+            INSERT INTO user_role_links (user_id, role_id)
+            SELECT id, role_id FROM users WHERE role_id IS NOT NULL
+            ON CONFLICT DO NOTHING
+        """)
+    cur.execute("""
+        ALTER TABLE users DROP COLUMN IF EXISTS role_id
+    """)
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -1023,6 +1053,7 @@ MIGRATIONS = [
     (27, _m027_sync_vk_publish_method_from_settings),
     (28, _m028_fill_null_story_ids),
     (29, _m029_targets_order),
+    (30, _m029_user_role_links),
 ]
 
 
