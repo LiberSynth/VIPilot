@@ -135,7 +135,10 @@
     <form id="publish-form" style="margin-top:0">
       <input type="hidden" id="target_id" name="target_id" value="{{ target_id or '' }}">
 
-      <div class="card{% if not vk_active %} target-disabled{% endif %}">
+      {% for slug in publish_order %}
+
+      {% if slug == 'vk' %}
+      <div class="card{% if not vk_active %} target-disabled{% endif %}"{% if not loop.first %} style="margin-top:12px"{% endif %}>
         <div class="card-title">Публикация в ВКонтакте</div>
         <div class="card-title" style="font-size:13px;font-weight:500;margin-top:0;margin-bottom:6px;color:var(--text-muted,#888)">Соотношение сторон</div>
         <div class="ar-wrap">
@@ -196,38 +199,41 @@
           </label>
         </div>
       </div>
+      {% endif %}
+
+      {% if slug == 'dzen' %}
+      <div class="card{% if not dzen_active %} target-disabled{% endif %}"
+           id="dzen-browser-card"
+           {% if not loop.first %}style="margin-top:12px"{% endif %}
+           data-studio-url="{% if dzen_publisher_id %}https://dzen.ru/profile/editor/id/{{ dzen_publisher_id }}/{% endif %}">
+        <input type="hidden" id="dzen_target_id" value="{{ dzen_target_id or '' }}">
+        <div class="card-title">Публикация в Дзен</div>
+
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
+          <div class="hint" style="flex:1;margin:0">
+            Используется браузерная автоматизация Playwrite.<br>
+            Если браузер не авторизован — войдите в аккаунт Яндекса.
+            После входа нажмите <b>Сохранить сессию</b>.
+          </div>
+          <button class="btn-run-now" id="dzen-btn-save"
+                  onclick="dzenBrowserSaveSession()"
+                  style="font-size:13px;padding:7px 14px;white-space:nowrap">Сохранить сессию</button>
+        </div>
+
+        <div id="dzen-browser-wrap" style="position:relative;border-radius:6px;overflow:hidden;border:1px solid var(--border,rgba(255,255,255,.12))">
+          <canvas id="dzen-browser-canvas"
+                  style="display:block;width:100%;cursor:pointer"
+                  tabindex="0"></canvas>
+          <div id="dzen-browser-overlay"
+               style="position:absolute;inset:0;background:rgba(10,10,20,.85);display:flex;align-items:center;justify-content:center;color:#aaa;font-size:14px">
+            Загрузка…
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      {% endfor %}
     </form>
-
-    <!-- Дзен -->
-    <div class="card{% if not dzen_active %} target-disabled{% endif %}"
-         id="dzen-browser-card"
-         style="margin-top:12px"
-         data-studio-url="{% if dzen_publisher_id %}https://dzen.ru/profile/editor/id/{{ dzen_publisher_id }}/{% endif %}">
-      <input type="hidden" id="dzen_target_id" value="{{ dzen_target_id or '' }}">
-      <div class="card-title">Публикация в Дзен</div>
-
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
-        <div class="hint" style="flex:1;margin:0">
-          Используется браузерная автоматизация Playwrite.<br>
-          Если браузер не авторизован — войдите в аккаунт Яндекса.
-          После входа нажмите <b>Сохранить сессию</b>.
-        </div>
-        <button class="btn-run-now" id="dzen-btn-save"
-                onclick="dzenBrowserSaveSession()"
-                style="font-size:13px;padding:7px 14px;white-space:nowrap">Сохранить сессию</button>
-      </div>
-
-      <!-- Canvas с браузером — всегда виден -->
-      <div id="dzen-browser-wrap" style="position:relative;border-radius:6px;overflow:hidden;border:1px solid var(--border,rgba(255,255,255,.12))">
-        <canvas id="dzen-browser-canvas"
-                style="display:block;width:100%;cursor:pointer"
-                tabindex="0"></canvas>
-        <div id="dzen-browser-overlay"
-             style="position:absolute;inset:0;background:rgba(10,10,20,.85);display:flex;align-items:center;justify-content:center;color:#aaa;font-size:14px">
-          Загрузка…
-        </div>
-      </div>
-    </div>
   </div>
 
   <!-- ══ СЛУЖЕБНЫЕ ══ -->

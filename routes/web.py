@@ -121,6 +121,7 @@ def root_page():
     aspect_ratio_x  = target["aspect_ratio_x"] if target else 9
     aspect_ratio_y  = target["aspect_ratio_y"] if target else 16
     vk_transcode    = db_get("vk_transcode", "1") == "1"
+    publish_order   = [t["slug"] for t in active_targets if t.get("slug") in ("vk", "dzen")]
 
     resp = make_response(render_template(
         "root.html",
@@ -153,6 +154,7 @@ def root_page():
         dzen_session_saved_at=dzen_session_saved_at,
         vk_active=vk_active,
         dzen_active=dzen_active,
+        publish_order=publish_order,
         app_version=APP_VERSION,
     ))
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
