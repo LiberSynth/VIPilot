@@ -53,6 +53,30 @@ def seed_db():
                     )
                 """)
 
+                cur.execute("""
+                    INSERT INTO user_roles (name, slug)
+                    SELECT v.name, v.slug FROM (VALUES
+                        ('root',     'root'),
+                        ('producer', 'producer')
+                    ) AS v(name, slug)
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM user_roles WHERE slug = v.slug
+                    )
+                """)
+
+                cur.execute("""
+                    INSERT INTO users (name, login, password, role_id)
+                    SELECT v.name, v.login, v.password,
+                           (SELECT id FROM user_roles WHERE slug = v.role_slug)
+                    FROM (VALUES
+                        ('root',     'root',     '0000', 'root'),
+                        ('producer', 'producer', '0000', 'producer')
+                    ) AS v(name, login, password, role_slug)
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM users WHERE login = v.login
+                    )
+                """)
+
             conn.commit()
         print("[DB] Данные инициализированы")
     except Exception as e:

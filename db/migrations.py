@@ -927,6 +927,31 @@ def _m025_drop_all_foreign_keys(cur):
         """)
 
 
+def _m026_users(cur):
+    """
+    Создаёт таблицы user_roles и users для системы авторизации.
+    user_roles: id (UUID), name, slug
+    users: id (UUID), name, login, password, role_id
+    Deployed: -
+    """
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS user_roles (
+            id   UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+            name VARCHAR(200) NOT NULL,
+            slug VARCHAR(100) NOT NULL UNIQUE
+        )
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id       UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+            name     VARCHAR(200) NOT NULL,
+            login    VARCHAR(200) NOT NULL UNIQUE,
+            password VARCHAR(500) NOT NULL,
+            role_id  UUID
+        )
+    """)
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -953,6 +978,7 @@ MIGRATIONS = [
     (23, _m023_stories_title),
     (24, _m024_batches_type_replace_adhoc_target_id),
     (25, _m025_drop_all_foreign_keys),
+    (26, _m026_users),
 ]
 
 
