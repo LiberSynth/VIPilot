@@ -481,7 +481,7 @@
     content: '!';
     position: absolute; inset: 0;
     text-align: center; line-height: 9px;
-    font-size: 7px; font-weight: 900; color: #fff;
+    font-size: 7px; font-weight: 900; color: #0d3d22;
     font-family: system-ui, sans-serif; font-style: normal;
   }
   .monitor-dot.md-active::before {
@@ -566,7 +566,7 @@
     content: '!';
     position: absolute; inset: 0;
     text-align: center; line-height: 7px;
-    font-size: 6px; font-weight: 900; color: #fff;
+    font-size: 6px; font-weight: 900; color: #0d3d22;
     font-family: system-ui, sans-serif; font-style: normal;
   }
   .monitor-log-dot.ls-running::before {
