@@ -164,7 +164,7 @@ def _run_planning(loop_interval: int):
                         is_catchup = (created_at is not None and created_at <= dt)
 
                 if in_future_window or is_catchup:
-                    batch_id = db_ensure_batch(dt, targets[0]['id'])
+                    batch_id = db_ensure_batch(dt)
                     if batch_id:
                         log_id = db_log_pipeline(
                             'planning',
@@ -209,7 +209,7 @@ def main_loop():
             for bid in cancelled:
                 db_log_pipeline(
                     'publish',
-                    'Батч отменён — слот удалён из расписания или таргет отключён',
+                    'Батч отменён — слот удалён из расписания',
                     status='прервана',
                     batch_id=bid,
                 )

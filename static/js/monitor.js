@@ -156,14 +156,15 @@
     const logs = groupLogsByPipeline(batch.logs || []);
 
     const headTime = batch.created_at;
-    const schedStr = batch.adhoc
-      ? (batch.target_name ? 'Публикация: сейчас'
-          : bs === 'story_probe' ? 'Пробный сюжет'
-          : bs === 'probe'       ? 'Пробное видео'
-          : 'Пробный')
-      : 'Публикация: ' + fmtMskShort(batch.scheduled_at);
+    const schedStr = batch.type === 'slot'
+      ? 'Публикация: ' + fmtMskShort(batch.scheduled_at)
+      : batch.type === 'probe'
+        ? (bs === 'story_probe' ? 'Пробный сюжет'
+            : bs === 'probe'       ? 'Пробное видео'
+            : 'Пробный')
+        : 'Публикация: сейчас';
     const statusLabel = (bs === 'probe' || bs === 'story_probe') ? 'выполнен' : (STATUS_LABELS[bs] || bs);
-    const sub = [schedStr, batch.target_name, statusLabel]
+    const sub = [schedStr, statusLabel]
       .filter(Boolean).join(' · ');
 
     if (logs.length === 0) {
@@ -219,9 +220,8 @@
       '</div>';
 
     return '<div class="monitor-batch bs-' + esc(bs) + '" data-bid="' + esc(batch.batch_id) +
-      '" data-scheduled="'  + esc(batch.adhoc ? 'сейчас' : fmtMsk(batch.scheduled_at)) +
+      '" data-scheduled="'  + esc(batch.type !== 'slot' ? 'сейчас' : fmtMsk(batch.scheduled_at)) +
       '" data-bstatus="'    + esc(bs) +
-      '" data-target="'     + esc(batch.target_name     || '') +
       '" data-text-model="' + esc(batch.text_model_name || '') +
       '" data-video-model="'+ esc(batch.video_model_name|| '') +
       '" onclick="monitorToggleBatch(event,this)">' +
@@ -458,7 +458,6 @@
       'batch_id: '    + (batchEl.dataset.bid       || ''),
       'scheduled: '   + (batchEl.dataset.scheduled  || ''),
       'status: '      + (batchEl.dataset.bstatus    || ''),
-      'target: '      + (batchEl.dataset.target     || ''),
       'text_model: '  + (batchEl.dataset.textModel  || ''),
       'video_model: ' + (batchEl.dataset.videoModel || ''),
     ];

@@ -21,6 +21,7 @@ from db import (
     db_get,
     env_get,
     db_get_batch_by_id,
+    db_get_active_targets,
     db_set_batch_video_generating_by_id,
     db_get_story_text,
     db_get_active_video_models,
@@ -175,14 +176,21 @@ def run(batch_id):
         else:
             return
 
-        target          = batch['target_name'] or 'пробный'
-        ar_x            = batch['aspect_ratio_x'] or 9
-        ar_y            = batch['aspect_ratio_y'] or 16
+        is_probe        = batch['type'] == 'probe'
+        if is_probe:
+            target = 'пробный'
+            ar_x   = 9
+            ar_y   = 16
+        else:
+            active_targets = db_get_active_targets()
+            tgt    = active_targets[0] if active_targets else {}
+            target = tgt.get('name') or 'adhoc'
+            ar_x   = tgt.get('aspect_ratio_x') or 9
+            ar_y   = tgt.get('aspect_ratio_y') or 16
         story_id        = batch.get('story_id')
         if story_id is None:
             raise RuntimeError('story_id отсутствует у батча в статусе story_ready/video_generating — ошибка логики')
         story_id        = str(story_id)
-        is_probe        = batch['target_id'] is None
         pinned_model_id = batch.get('video_model_id')
 
         try:

@@ -12,6 +12,7 @@ from db import (
     db_set_batch_text_model,
     db_get,
     db_get_batch_by_id,
+    db_get_active_targets,
     db_set_batch_story_generating_by_id,
     db_get_active_text_models,
     db_get_text_model_by_id,
@@ -118,8 +119,13 @@ def run(batch_id):
             if not db_set_batch_story_generating_by_id(batch_id):
                 return
 
-        target   = batch['target_name'] or 'пробный'
-        is_probe = batch['target_id'] is None
+        is_probe = batch['type'] == 'probe'
+        if is_probe:
+            target = 'пробный'
+        else:
+            active_targets = db_get_active_targets()
+            tgt    = active_targets[0] if active_targets else {}
+            target = tgt.get('name') or 'adhoc'
 
         if not is_probe and check_cancelled('story', batch_id, batch):
             batch_done = True

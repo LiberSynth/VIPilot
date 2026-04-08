@@ -202,18 +202,15 @@ def db_get_monitor(batch_limit=50):
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
-                # Батчи — ведущая таблица batches, LEFT JOIN log/targets
+                # Батчи — ведущая таблица batches, LEFT JOIN log
                 cur.execute(
                     """
                     SELECT
                         b.id,
                         b.scheduled_at,
-                        b.adhoc,
+                        b.type,
                         b.status,
                         b.created_at,
-                        t.name,
-                        t.aspect_ratio_x,
-                        t.aspect_ratio_y,
                         MAX(l.created_at) AS last_event_at,
                         b.story_id,
                         (b.video_data_transcoded IS NOT NULL OR b.video_data_original IS NOT NULL) AS has_video_data,
@@ -246,11 +243,10 @@ def db_get_monitor(batch_limit=50):
                         COALESCE(vm.name, b.data->>'model_name') AS video_model_name
                     FROM batches b
                     LEFT JOIN log l ON l.batch_id = b.id
-                    LEFT JOIN targets t ON t.id = b.target_id
                     LEFT JOIN ai_models tm ON tm.id = b.text_model_id
                     LEFT JOIN ai_models vm ON vm.id = b.video_model_id
-                    GROUP BY b.id, b.scheduled_at, b.adhoc, b.status, b.created_at,
-                             t.name, t.aspect_ratio_x, t.aspect_ratio_y, b.story_id, b.video_data_transcoded,
+                    GROUP BY b.id, b.scheduled_at, b.type, b.status, b.created_at,
+                             b.story_id, b.video_data_transcoded,
                              tm.name, vm.name
                     ORDER BY COALESCE(MAX(l.created_at), b.created_at) DESC
                     LIMIT %s
@@ -288,18 +284,15 @@ def db_get_monitor(batch_limit=50):
             {
                 "batch_id":         str(r[0]),
                 "scheduled_at":     r[1].isoformat() if r[1] else None,
-                "adhoc":            r[2],
+                "type":             r[2],
                 "batch_status":     r[3],
                 "created_at":       r[4].isoformat() if r[4] else None,
-                "target_name":      r[5],
-                "aspect_ratio_x":   r[6],
-                "aspect_ratio_y":   r[7],
-                "last_event_at":    r[8].isoformat() if r[8] else None,
-                "story_id":         str(r[9]) if r[9] else None,
-                "has_video_data":   bool(r[10]),
-                "logs":             r[11],
-                "text_model_name":  r[12],
-                "video_model_name": r[13],
+                "last_event_at":    r[5].isoformat() if r[5] else None,
+                "story_id":         str(r[6]) if r[6] else None,
+                "has_video_data":   bool(r[7]),
+                "logs":             r[8],
+                "text_model_name":  r[9],
+                "video_model_name": r[10],
             }
             for r in batch_rows
         ]

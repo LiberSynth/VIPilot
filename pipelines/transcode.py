@@ -23,6 +23,7 @@ from utils.notify import notify_failure
 from db import (
     db_get,
     db_get_batch_by_id,
+    db_get_active_targets,
     db_set_batch_transcoding_by_id,
     db_get_batch_original_video,
     db_set_batch_transcode_skip,
@@ -124,9 +125,15 @@ def run(batch_id):
             if not db_set_batch_transcoding_by_id(batch_id):
                 return
 
-        is_probe        = batch['target_id'] is None
-        target          = batch['target_name'] or 'пробный'
-        do_transcode    = (db_get('vk_transcode', '1') == '1') if is_probe else bool(batch.get('target_transcode', True))
+        is_probe     = batch['type'] == 'probe'
+        if is_probe:
+            target       = 'пробный'
+            do_transcode = db_get('vk_transcode', '1') == '1'
+        else:
+            active_targets = db_get_active_targets()
+            tgt          = active_targets[0] if active_targets else {}
+            target       = tgt.get('name') or 'adhoc'
+            do_transcode = bool(tgt.get('transcode', True))
 
         if not do_transcode:
             db_set_batch_transcode_skip(batch_id)

@@ -15,16 +15,16 @@ from utils.notify import notify_failure
 
 
 def check_cancelled(pipeline_name: str, batch_id: str, batch: dict) -> bool:
-    """Проверяет, не отменён ли батч (слот расписания удалён или таргет отключён).
+    """Проверяет, не отменён ли батч (слот расписания удалён).
 
     Возвращает True, если батч отменён и пайплайн должен прерваться.
     Вызывать только для не-пробных батчей (is_probe проверяет сам вызывающий).
     """
-    if not db_is_batch_scheduled(batch['scheduled_at'], batch['target_id']):
+    if not db_is_batch_scheduled(batch['scheduled_at'], batch.get('type', 'slot')):
         db_set_batch_cancelled(batch_id)
         db_log_pipeline(
             pipeline_name,
-            'Батч отменён — слот удалён из расписания или таргет отключён',
+            'Батч отменён — слот удалён из расписания',
             status='прервана',
             batch_id=batch_id,
         )

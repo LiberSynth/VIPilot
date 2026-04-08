@@ -851,6 +851,53 @@ def _m023_stories_title(cur):
             )
 
 
+def _m024_batches_type_replace_adhoc_target_id(cur):
+    """
+    Заменяет adhoc (BOOLEAN) и target_id (UUID FK) на type (TEXT NOT NULL) в таблице batches.
+
+    Правила переноса данных:
+      adhoc=FALSE                          → type='slot'
+      adhoc=TRUE AND target_id IS NOT NULL → type='adhoc'
+      adhoc=TRUE AND target_id IS NULL     → type='probe'
+
+    Удаляет колонки adhoc и target_id, а также FK-ограничение на targets.
+    Deployed: -
+    """
+    cur.execute("""
+        ALTER TABLE batches
+            ADD COLUMN IF NOT EXISTS type TEXT NOT NULL DEFAULT 'slot'
+    """)
+    cur.execute("""
+        UPDATE batches
+           SET type = CASE
+               WHEN adhoc = FALSE                          THEN 'slot'
+               WHEN adhoc = TRUE AND target_id IS NOT NULL THEN 'adhoc'
+               WHEN adhoc = TRUE AND target_id IS NULL     THEN 'probe'
+               ELSE 'slot'
+           END
+    """)
+    cur.execute("""
+        ALTER TABLE batches
+            ALTER COLUMN type DROP DEFAULT
+    """)
+    cur.execute("""
+        DO $$ BEGIN
+            IF EXISTS (
+                SELECT 1 FROM information_schema.table_constraints
+                WHERE table_name = 'batches'
+                  AND constraint_name = 'batches_target_id_fkey'
+            ) THEN
+                ALTER TABLE batches DROP CONSTRAINT batches_target_id_fkey;
+            END IF;
+        END $$
+    """)
+    cur.execute("""
+        ALTER TABLE batches
+            DROP COLUMN IF EXISTS adhoc,
+            DROP COLUMN IF EXISTS target_id
+    """)
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -875,6 +922,7 @@ MIGRATIONS = [
     (21, _m021_migrate_old_batch_statuses),
     (22, _m022_widen_batches_status),
     (23, _m023_stories_title),
+    (24, _m024_batches_type_replace_adhoc_target_id),
 ]
 
 

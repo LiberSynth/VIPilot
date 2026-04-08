@@ -257,7 +257,7 @@ def db_get_target_session_context_saved_at(target_id: str) -> str | None:
 # Батчи
 # ---------------------------------------------------------------------------
 
-def db_ensure_batch(scheduled_at, target_id):
+def db_ensure_batch(scheduled_at):
     """Создаёт батч если нет активного (не отменённого) батча для этого слота.
     Отменённые батчи игнорируются — они остаются в БД как есть.
     Возвращает UUID нового батча или None если активный батч уже существует."""
@@ -268,21 +268,20 @@ def db_ensure_batch(scheduled_at, target_id):
                     """
                     SELECT id FROM batches
                     WHERE scheduled_at = %s
-                      AND target_id    = %s
                       AND status      != 'cancelled'
                     LIMIT 1
                     """,
-                    (scheduled_at, target_id),
+                    (scheduled_at,),
                 )
                 if cur.fetchone():
                     return None
                 cur.execute(
                     """
-                    INSERT INTO batches (scheduled_at, target_id)
-                    VALUES (%s, %s)
+                    INSERT INTO batches (scheduled_at, type)
+                    VALUES (%s, 'slot')
                     RETURNING id
                     """,
-                    (scheduled_at, target_id),
+                    (scheduled_at,),
                 )
                 row = cur.fetchone()
             conn.commit()
@@ -296,17 +295,17 @@ def db_ensure_batch(scheduled_at, target_id):
 # Батчи — пайплайновые функции
 # ---------------------------------------------------------------------------
 
-def db_create_adhoc_batch(target_id):
-    """Создаёт внеплановый батч с adhoc=True и scheduled_at=NULL.
+def db_create_adhoc_batch():
+    """Создаёт внеплановый батч с type='adhoc' и scheduled_at=NULL.
     Возвращает UUID нового батча или None при ошибке."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                    INSERT INTO batches (scheduled_at, target_id, adhoc)
-                    VALUES (NULL, %s, TRUE)
+                    INSERT INTO batches (scheduled_at, type)
+                    VALUES (NULL, 'adhoc')
                     RETURNING id
-                """, (target_id,))
+                """)
                 row = cur.fetchone()
             conn.commit()
         return str(row[0]) if row else None
@@ -316,15 +315,15 @@ def db_create_adhoc_batch(target_id):
 
 
 def db_create_probe_batch(video_model_id):
-    """Создаёт pending-батч без таргета с зафиксированной video_model_id.
+    """Создаёт pending-батч с type='probe' и зафиксированной video_model_id.
     Возвращает UUID батча или None."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
                     INSERT INTO batches
-                        (target_id, status, adhoc, video_model_id)
-                    VALUES (NULL, 'pending', TRUE, %s)
+                        (status, type, video_model_id)
+                    VALUES ('pending', 'probe', %s)
                     RETURNING id
                 """, (video_model_id,))
                 row = cur.fetchone()
@@ -336,7 +335,7 @@ def db_create_probe_batch(video_model_id):
 
 
 def db_create_story_probe_batch(text_model_id):
-    """Создаёт pending-батч без таргета для пробного запроса сценария.
+    """Создаёт pending-батч с type='probe' для пробного запроса сценария.
     data-флаг story_probe=true сигнализирует пайплайну завершить батч
     в статусе story_probe (без передачи в видео-конвейер)."""
     try:
@@ -344,8 +343,8 @@ def db_create_story_probe_batch(text_model_id):
             with conn.cursor() as cur:
                 cur.execute("""
                     INSERT INTO batches
-                        (target_id, status, adhoc, text_model_id, data)
-                    VALUES (NULL, 'pending', TRUE, %s, '{"story_probe": true}')
+                        (status, type, text_model_id, data)
+                    VALUES ('pending', 'probe', %s, '{"story_probe": true}')
                     RETURNING id
                 """, (text_model_id,))
                 row = cur.fetchone()
@@ -473,32 +472,26 @@ def db_get_active_text_model():
 # Pipeline 3 — видео
 # ---------------------------------------------------------------------------
 
-def db_is_batch_scheduled(scheduled_at, target_id):
-    """Проверяет актуальность батча: слот расписания существует И таргет активен.
-    Возвращает True если оба условия выполнены, False если хотя бы одно нарушено.
-    Adhoc-батчи (scheduled_at=None) всегда считаются актуальными."""
-    if scheduled_at is None:
+def db_is_batch_scheduled(scheduled_at, batch_type='slot'):
+    """Проверяет актуальность батча: слот расписания существует.
+    Не-slot батчи (adhoc/probe) пропускаются без проверки — всегда возвращают True.
+    Возвращает True если слот существует, False если удалён."""
+    if batch_type != 'slot' or scheduled_at is None:
         return True
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    SELECT
-                        EXISTS (
-                            SELECT 1 FROM schedule
-                            WHERE time_utc = to_char(%s::timestamptz AT TIME ZONE 'UTC', 'HH24:MI')
-                        ) AS slot_ok,
-                        EXISTS (
-                            SELECT 1 FROM targets
-                            WHERE id = %s AND active = TRUE
-                        ) AS target_ok
+                    SELECT EXISTS (
+                        SELECT 1 FROM schedule
+                        WHERE time_utc = to_char(%s::timestamptz AT TIME ZONE 'UTC', 'HH24:MI')
+                    )
                     """,
-                    (scheduled_at, target_id),
+                    (scheduled_at,),
                 )
                 row = cur.fetchone()
-                slot_ok, target_ok = row
-                return slot_ok and target_ok
+                return bool(row[0])
     except Exception as e:
         print(f"[DB] Ошибка db_is_batch_scheduled: {e}")
         return True  # безопасный fallback: не блокируем работу
@@ -510,8 +503,8 @@ def db_set_batch_cancelled(batch_id):
 
 
 def db_cancel_waiting_batches():
-    """Отменяет batches в статусе transcode_ready или с промежуточными составными статусами
-    (*.published, *.pending), у которых слот расписания больше не существует или таргет деактивирован.
+    """Отменяет slot-батчи в статусе transcode_ready или с промежуточными составными статусами
+    (*.published, *.pending), у которых слот расписания больше не существует.
     Возвращает список отменённых batch_id."""
     try:
         with get_db() as conn:
@@ -524,17 +517,12 @@ def db_cancel_waiting_batches():
                         OR status LIKE '%.published'
                         OR status LIKE '%.pending'
                     )
+                      AND type = 'slot'
                       AND scheduled_at IS NOT NULL
-                      AND (
-                          NOT EXISTS (
-                              SELECT 1 FROM schedule
-                              WHERE time_utc = to_char(
-                                  batches.scheduled_at AT TIME ZONE 'UTC', 'HH24:MI'
-                              )
-                          )
-                          OR NOT EXISTS (
-                              SELECT 1 FROM targets
-                              WHERE id = batches.target_id AND active = TRUE
+                      AND NOT EXISTS (
+                          SELECT 1 FROM schedule
+                          WHERE time_utc = to_char(
+                              batches.scheduled_at AT TIME ZONE 'UTC', 'HH24:MI'
                           )
                       )
                     RETURNING id
@@ -824,8 +812,8 @@ def db_get_batch_video_data(batch_id) -> bytes | None:
 
 def db_steal_video_from_cancelled(batch_id) -> str | None:
     """Ищет самый старый батч-донор с видео:
-    — отменённые батчи (status = 'отменён')
-    — завершённые пробные батчи (status = 'probe', target_id IS NULL)
+    — отменённые батчи (status = 'cancelled')
+    — завершённые пробные батчи (status = 'probe', type = 'probe')
     Донором считается батч у которого есть video_data_transcoded или video_data_original.
     Если есть транскодированное — переносит его, статус получателя → transcode_ready.
     Если только оригинал — переносит его, статус получателя → video_ready.
@@ -839,7 +827,7 @@ def db_steal_video_from_cancelled(batch_id) -> str | None:
                     WHERE (video_data_transcoded IS NOT NULL OR video_data_original IS NOT NULL)
                       AND (
                         status = 'cancelled'
-                        OR (status = 'probe' AND target_id IS NULL)
+                        OR (status = 'probe' AND type = 'probe')
                       )
                     ORDER BY created_at ASC
                     LIMIT 1
@@ -886,7 +874,7 @@ def db_steal_video_from_cancelled(batch_id) -> str | None:
 
 
 def db_get_donor_count() -> int:
-    """Возвращает количество батчей-доноров (отменённые или пробные без target с видео)."""
+    """Возвращает количество батчей-доноров (отменённые или пробные с видео)."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
@@ -896,7 +884,7 @@ def db_get_donor_count() -> int:
                     WHERE (video_data_transcoded IS NOT NULL OR video_data_original IS NOT NULL)
                       AND (
                         status = 'cancelled'
-                        OR (status = 'probe' AND target_id IS NULL)
+                        OR (status = 'probe' AND type = 'probe')
                       )
                 """)
                 return cur.fetchone()[0]
@@ -923,17 +911,15 @@ def db_get_batch_logs(batch_id):
                     SELECT
                         b.id::text                                              AS batch_id,
                         b.scheduled_at,
-                        b.adhoc,
+                        b.type,
                         b.status                                                AS batch_status,
                         b.created_at,
-                        t.name                                                  AS target_name,
                         b.story_id::text                                        AS story_id,
                         (b.video_data_transcoded IS NOT NULL
                          OR b.video_data_original IS NOT NULL)                  AS has_video_data,
                         tm.name                                                 AS text_model_name,
                         vm.name                                                 AS video_model_name
                     FROM batches b
-                    LEFT JOIN targets   t  ON t.id  = b.target_id
                     LEFT JOIN ai_models tm ON tm.id = b.text_model_id
                     LEFT JOIN ai_models vm ON vm.id = b.video_model_id
                     WHERE b.id = %s
@@ -967,9 +953,8 @@ def db_get_batch_logs(batch_id):
             'batch_id':         row['batch_id'],
             'batch_status':     row['batch_status'],
             'created_at':       row['created_at'].isoformat() if row['created_at'] else None,
-            'adhoc':            row['adhoc'],
+            'type':             row['type'],
             'scheduled_at':     row['scheduled_at'].isoformat() if row['scheduled_at'] else None,
-            'target_name':      row['target_name'],
             'story_id':         row['story_id'],
             'has_video_data':   bool(row['has_video_data']),
             'text_model_name':  row['text_model_name'],
@@ -1381,16 +1366,10 @@ def db_get_batch_by_id(batch_id):
         with get_db() as conn:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
                 cur.execute("""
-                    SELECT b.id, b.scheduled_at, b.target_id, b.story_id,
-                           b.video_url, b.status, b.adhoc, b.data,
-                           b.text_model_id, b.video_model_id,
-                           t.name            AS target_name,
-                           t.aspect_ratio_x,
-                           t.aspect_ratio_y,
-                           t.transcode       AS target_transcode,
-                           t.config          AS target_config
+                    SELECT b.id, b.scheduled_at, b.type, b.story_id,
+                           b.video_url, b.status, b.data,
+                           b.text_model_id, b.video_model_id
                     FROM batches b
-                    LEFT JOIN targets t ON t.id = b.target_id
                     WHERE b.id = %s
                 """, (batch_id,))
                 row = cur.fetchone()
@@ -1629,7 +1608,8 @@ def db_set_batch_transcoding_by_id(batch_id):
 
 
 def db_cleanup_batches(batch_lifetime_days: int) -> int:
-    """Удаляет батчи со статусом 'published'/'отменён' старше batch_lifetime_days.
+    """Удаляет батчи со статусом 'published'/'cancelled', а также пробные батчи
+    (type = 'probe') завершённые (probe/story_probe), старше batch_lifetime_days.
     Удаляет связанные логи и осиротевшие stories.
     Возвращает количество удалённых батчей."""
     try:
@@ -1637,7 +1617,10 @@ def db_cleanup_batches(batch_lifetime_days: int) -> int:
             with conn.cursor() as cur:
                 cur.execute("""
                     SELECT id FROM batches
-                    WHERE status IN ('published', 'cancelled')
+                    WHERE (
+                        status IN ('published', 'cancelled')
+                        OR (type = 'probe' AND status IN ('probe', 'story_probe'))
+                    )
                       AND completed_at < now() - make_interval(days => %s)
                 """, (batch_lifetime_days,))
                 rows = cur.fetchall()

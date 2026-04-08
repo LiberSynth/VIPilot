@@ -21,7 +21,6 @@ from db import (
     env_get,
     env_set,
     db_create_adhoc_batch,
-    db_get_active_targets,
     db_reset_batch_pipeline,
     db_get_story_text,
     db_get_batch_video_data,
@@ -49,12 +48,7 @@ def api_time():
 def api_run_now():
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
-    targets = db_get_active_targets()
-    if not targets:
-        return jsonify({"error": "Нет активных таргетов"}), 400
-    target = targets[0]
-    target_id = str(target['id'])
-    batch_id = db_create_adhoc_batch(target_id)
+    batch_id = db_create_adhoc_batch()
     if not batch_id:
         return jsonify({"error": "Не удалось создать батч"}), 500
     wf_state.wakeup_loop()
@@ -66,7 +60,6 @@ def api_run_now():
     )
     if log_id:
         db_log_entry(log_id, "Запуск по запросу пользователя (внеплановый)")
-        db_log_entry(log_id, f"Таргет: {target['name']}  ({target['aspect_ratio_x']}:{target['aspect_ratio_y']})")
     return jsonify({"ok": True, "batch_id": batch_id})
 
 
