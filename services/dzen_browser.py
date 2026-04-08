@@ -301,7 +301,7 @@ def request_save(target_id: str) -> dict:
 
 def push_frame(img: bytes):
     """
-    Помещает JPEG-кадр в буфер трансляции (потокобезопасно).
+    Помещает JPEG-кадр в глобальный буфер трансляции (потокобезопасно).
     Вызывается из потока Playwright — без лишних потоков.
     """
     global _latest_frame, _frame_counter
@@ -309,6 +309,30 @@ def push_frame(img: bytes):
         _latest_frame = img
         _frame_counter += 1
     _new_frame_event.set()
+
+
+# ---------------------------------------------------------------------------
+# Хранилище кадров по batch_id (для монитора)
+# ---------------------------------------------------------------------------
+
+_batch_frames: dict = {}        # batch_id → JPEG bytes
+_batch_frames_lock = threading.Lock()
+_MAX_BATCH_FRAMES = 30          # держим не более N батчей
+
+
+def push_frame_for_batch(batch_id: str, img: bytes):
+    """Сохраняет последний JPEG-кадр для конкретного батча."""
+    with _batch_frames_lock:
+        _batch_frames[batch_id] = img
+        if len(_batch_frames) > _MAX_BATCH_FRAMES:
+            oldest = next(iter(_batch_frames))
+            del _batch_frames[oldest]
+
+
+def get_frame_for_batch(batch_id: str) -> Optional[bytes]:
+    """Возвращает последний JPEG-кадр батча или None."""
+    with _batch_frames_lock:
+        return _batch_frames.get(batch_id)
 
 
 def run_pipeline_browser(fn, cookies: list) -> dict:

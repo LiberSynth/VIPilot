@@ -561,6 +561,20 @@
   .monitor-log-chevron  { font-size: 10px; color: #7070a0; flex-shrink: 0; transition: transform .15s; }
   .monitor-log-item.open .monitor-log-chevron { transform: rotate(180deg); }
 
+  .monitor-pub-frame {
+    display: none;
+    margin: 0 8px 6px;
+    border-radius: 4px;
+    overflow: hidden;
+    background: #0d0d14;
+    line-height: 0;
+  }
+  .monitor-pub-frame img {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 4px;
+  }
   .monitor-entries {
     display: none;
     background: #07070a;

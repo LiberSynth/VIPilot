@@ -407,3 +407,19 @@ def api_get_story(story_id):
     return jsonify({"text": text})
 
 
+@bp.route("/batch/<batch_id>/publish-frame")
+def api_batch_publish_frame(batch_id):
+    """Возвращает последний JPEG-скриншот браузера публикации для батча."""
+    if not is_authenticated():
+        return Response("Unauthorized", status=401)
+    from services.dzen_browser import get_frame_for_batch
+    img = get_frame_for_batch(batch_id)
+    if img is None:
+        return Response("", status=204)
+    return Response(
+        img,
+        mimetype="image/jpeg",
+        headers={"Cache-Control": "no-store, no-cache"},
+    )
+
+

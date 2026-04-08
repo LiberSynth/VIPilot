@@ -47,6 +47,7 @@ def publish(
     target_config: dict,
     title: str,
     log_id,
+    batch_id=None,
 ) -> bool:
     """
     Публикует видео на Дзен через веб-интерфейс.
@@ -87,7 +88,7 @@ def publish(
             _f.write(video_data)
 
         def _do_publish(page, ctx):
-            _publish_ui(page, publisher_id, video_path, title, log_id)
+            _publish_ui(page, publisher_id, video_path, title, log_id, batch_id=batch_id)
 
         result = run_pipeline_browser(_do_publish, saved_cookies)
 
@@ -119,17 +120,19 @@ def _log(log_id, msg: str):
         db_log_entry(log_id, f"Дзен: {msg}")
 
 
-def _snap(page) -> None:
-    """Снимает скриншот и передаёт кадр в SSE-трансляцию (thread-safe)."""
+def _snap(page, batch_id=None) -> None:
+    """Снимает скриншот и передаёт кадр в SSE-трансляцию и монитор (thread-safe)."""
     try:
-        from services.dzen_browser import push_frame
+        from services.dzen_browser import push_frame, push_frame_for_batch
         img = page.screenshot(type="jpeg", quality=65)
         push_frame(img)
+        if batch_id:
+            push_frame_for_batch(batch_id, img)
     except Exception as _e:
         print(f"[dzen] _snap: {_e}")
 
 
-def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id):
+def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, batch_id=None):
     """Управляет браузером для публикации видео через UI Дзена."""
 
     studio_url = f"https://dzen.ru/profile/editor/id/{publisher_id}/"
@@ -138,7 +141,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id):
     _log(log_id, f"Переход в студию: {studio_url}")
     page.goto(studio_url, wait_until="domcontentloaded", timeout=_NAV_TIMEOUT)
     page.wait_for_timeout(2000)
-    _snap(page)
+    _snap(page, batch_id)
 
     cur = page.url
     print(f"[dzen] URL после перехода: {cur}")
@@ -167,7 +170,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id):
             except Exception:
                 overlay.click()
             page.wait_for_timeout(500)
-            _snap(page)
+            _snap(page, batch_id)
     except Exception:
         pass
     # На всякий случай — Escape
@@ -192,7 +195,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id):
     plus_btn.click()
     _log(log_id, "Кнопка «+» нажата, жду меню…")
     page.wait_for_timeout(1500)
-    _snap(page)
+    _snap(page, batch_id)
 
     # ── Шаг 3: «Загрузить видео» из выпадающего меню ─────────────────────
     _log(log_id, "Выбираю «Загрузить видео»…")
@@ -206,7 +209,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id):
     upload_item.click()
     _log(log_id, "«Загрузить видео» нажато")
     page.wait_for_timeout(1500)
-    _snap(page)
+    _snap(page, batch_id)
 
     # ── Шаг 4: Загружаем файл ────────────────────────────────────────────
     _log(log_id, "Ищу поле загрузки файла…")
@@ -215,7 +218,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id):
     file_input.wait_for(state="attached", timeout=15_000)
     file_input.set_input_files(video_path)
     _log(log_id, "Файл передан браузеру, жду загрузки…")
-    _snap(page)
+    _snap(page, batch_id)
 
     # Ждём пока прогресс-бар исчезнет или появится кнопка следующего шага
     try:
@@ -228,7 +231,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id):
     except Exception:
         _log(log_id, "Не дождался явного сигнала — продолжаю…")
         page.wait_for_timeout(5000)
-    _snap(page)
+    _snap(page, batch_id)
 
     # ── Шаг 5: Публикуем ─────────────────────────────────────────────────
     _log(log_id, "Нажимаю «Опубликовать»…")
@@ -236,7 +239,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id):
     pub_btn.wait_for(state="visible", timeout=15_000)
     pub_btn.click()
     page.wait_for_timeout(4000)
-    _snap(page)
+    _snap(page, batch_id)
 
     final_url = page.url
     print(f"[dzen] URL после публикации: {final_url}")

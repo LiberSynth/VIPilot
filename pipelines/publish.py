@@ -121,7 +121,7 @@ def _publish_dzen(batch_id, log_id, target):
         title = 'Видео'
 
     try:
-        return dzen_client.publish(video_data, cfg, title, log_id)
+        return dzen_client.publish(video_data, cfg, title, log_id, batch_id=batch_id)
     except DzenSessionMissing as e:
         if log_id:
             db_log_entry(log_id, f'Дзен: {e}', level='error')

@@ -101,6 +101,16 @@
       '<button class="cycle-float-btn" title="Скопировать инфо" onclick="monitorPipelineCopyInfo(this)">' + MON_SVG_INFO + '</button>' +
     '</div>';
 
+    const isPublish = (log.pipeline === 'publish');
+    const frameTs   = (st === 'running') ? ('?t=' + Date.now()) : '';
+    const frameHtml = (isPublish && batchId)
+      ? '<div class="monitor-pub-frame">' +
+          '<img src="/api/batch/' + esc(batchId) + '/publish-frame' + frameTs + '" ' +
+               'onload="this.parentNode.style.display=\'block\'" ' +
+               'onerror="this.parentNode.style.display=\'none\'">' +
+        '</div>'
+      : '';
+
     return '<div class="monitor-log-item" data-lid="' + esc(log.id) + '" data-status="' + esc(st) + '" onclick="monitorToggleLog(event,this)">' +
       '<div class="monitor-log-header">' +
         '<div class="monitor-log-header-top">' +
@@ -111,6 +121,7 @@
         '</div>' +
         comment +
       '</div>' +
+      frameHtml +
       renderEntries(log.entries) +
     '</div>';
   }
