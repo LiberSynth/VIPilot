@@ -76,7 +76,6 @@ from .db import (
     db_get_distinct_batch_statuses,
     db_get_batches_with_unknown_status,
     KNOWN_BATCH_STATUSES,
-    TERMINAL_BATCH_STATUSES,
     db_set_batch_status,
     db_claim_batch_status,
     db_set_batch_fatal_error,
