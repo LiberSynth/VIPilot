@@ -245,8 +245,8 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
     # A. Кнопка «Опубликовать после обработки» — нажать немедленно при появлении.
     # B. Капча VK «Я не робот» (iframe id.vk.com/not_robot_captcha) — кликнуть
     #    ТОЛЬКО чекбокс внутри iframe капчи, не трогать ничего снаружи.
-    # C. Попап «Уже можно публиковать» — закрыть крестиком (×), не кликать ничего
-    #    внутри него.
+    # C. «Уже можно публиковать» — это просто текст внизу диалога, НЕ попап.
+    #    Закрывать нечего, игнорируем. Escape не слать — он убьёт капчу.
     #
     _DIALOG_WINDOW = 25_000  # ms
     _DIALOG_POLL   = 2_000   # ms
@@ -310,40 +310,8 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
             except Exception:
                 pass
 
-        # ── C. Попап «Уже можно публиковать» — закрываем крестиком ───────
-        try:
-            popup_text = page.locator("text=Уже можно публиковать").first
-            if popup_text.is_visible():
-                _log(log_id, "Попап «Уже можно публиковать» виден — закрываю крестиком…")
-                closed = False
-                # Ищем кнопку закрытия (×) рядом с попапом
-                for close_sel in [
-                    "button[aria-label='Закрыть']",
-                    "button[aria-label='Close']",
-                    "button[aria-label='close']",
-                    "[class*='close']:not(button[disabled])",
-                    "[class*='Close']:not(button[disabled])",
-                    "button:has-text('×')",
-                    "button:has-text('✕')",
-                    "button:has-text('✖')",
-                ]:
-                    try:
-                        close_btn = page.locator(close_sel).first
-                        if close_btn.is_visible():
-                            close_btn.click()
-                            page.wait_for_timeout(500)
-                            closed = True
-                            _log(log_id, f"Попап закрыт ({close_sel!r})")
-                            _snap(page, batch_id)
-                            break
-                    except Exception:
-                        pass
-                if not closed:
-                    page.keyboard.press("Escape")
-                    page.wait_for_timeout(500)
-                    _log(log_id, "Попап: отправил Escape")
-        except Exception:
-            pass
+        # ── C. «Уже можно публиковать» — это встроенный текст диалога, НЕ попап.
+        #       Закрывать нечего, игнорируем полностью. Escape не отправляем.
 
         # ── Проверяем финальное подтверждение публикации ──────────────────
         try:
