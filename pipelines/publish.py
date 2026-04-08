@@ -24,6 +24,7 @@ from db import (
     db_set_batch_published,
     db_set_batch_published_partially,
     db_set_batch_publish_error,
+    db_set_batch_cancelled,
     db_set_batch_status,
     db_claim_batch_status,
 )
@@ -180,20 +181,32 @@ def run(batch_id):
                 return
 
         if not active_targets:
-            msg = 'Нет активных таргетов — публикация невозможна'
-            log_id = db_log_pipeline('publish', msg, status='error', batch_id=batch_id)
-            db_set_batch_publish_error(batch_id)
-            print(f"[publish] {msg}")
-            notify_failure(f"publish: {msg} (батч {batch_id[:8]})")
+            if parsed is None:
+                msg = 'Батч отменён — нет активных таргетов'
+                db_set_batch_cancelled(batch_id)
+                db_log_pipeline('publish', msg, status='прервана', batch_id=batch_id)
+                print(f"[publish] {msg} (батч {batch_id[:8]}…)")
+            else:
+                msg = 'Нет активных таргетов — публикация невозможна'
+                log_id = db_log_pipeline('publish', msg, status='error', batch_id=batch_id)
+                db_set_batch_publish_error(batch_id)
+                print(f"[publish] {msg}")
+                notify_failure(f"publish: {msg} (батч {batch_id[:8]})")
             return
 
         steps = _build_steps(active_targets)
         if not steps:
-            msg = 'Нет методов публикации в конфиге таргетов'
-            log_id = db_log_pipeline('publish', msg, status='error', batch_id=batch_id)
-            db_set_batch_publish_error(batch_id)
-            print(f"[publish] {msg}")
-            notify_failure(f"publish: {msg} (батч {batch_id[:8]})")
+            if parsed is None:
+                msg = 'Батч отменён — нет методов публикации в конфиге таргетов'
+                db_set_batch_cancelled(batch_id)
+                db_log_pipeline('publish', msg, status='прервана', batch_id=batch_id)
+                print(f"[publish] {msg} (батч {batch_id[:8]}…)")
+            else:
+                msg = 'Нет методов публикации в конфиге таргетов'
+                log_id = db_log_pipeline('publish', msg, status='error', batch_id=batch_id)
+                db_set_batch_publish_error(batch_id)
+                print(f"[publish] {msg}")
+                notify_failure(f"publish: {msg} (батч {batch_id[:8]})")
             return
 
         target_names = ', '.join(t['name'] for t in active_targets)

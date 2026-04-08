@@ -125,7 +125,11 @@ def run(batch_id):
             if not db_set_batch_transcoding_by_id(batch_id):
                 return
 
-        is_probe     = batch['type'] == 'probe'
+        is_probe = batch['type'] == 'probe'
+
+        if not is_probe and check_cancelled('transcode', batch_id, batch):
+            return
+
         if is_probe:
             target       = 'пробный'
             do_transcode = db_get('vk_transcode', '1') == '1'
@@ -138,9 +142,6 @@ def run(batch_id):
         if not do_transcode:
             db_set_batch_transcode_skip(batch_id)
             print(f"[transcode] Батч {batch_id[:8]}… ({target}) — транскод отключён, пропускаю")
-            return
-
-        if not is_probe and check_cancelled('transcode', batch_id, batch):
             return
 
         print(f"[transcode] Батч {batch_id[:8]}… ({target}) — начало транскодирования")
