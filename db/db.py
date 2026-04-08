@@ -200,6 +200,23 @@ def db_update_target_config(target_id: str, config: dict) -> bool:
         return False
 
 
+def db_update_target_publish_method_by_slug(slug: str, methods: dict) -> bool:
+    """Обновляет config.publish_method у таргета по slug (JSONB merge)."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE targets SET config = config || jsonb_build_object('publish_method', %s::jsonb)"
+                    " WHERE slug = %s",
+                    (json.dumps(methods), slug),
+                )
+            conn.commit()
+        return True
+    except Exception as e:
+        print(f"[DB] Ошибка db_update_target_publish_method_by_slug: {e}")
+        return False
+
+
 def db_get_target_session_context(target_id: str) -> dict | None:
     """Возвращает Playwright storage state (cookies) для таргета, или None."""
     try:

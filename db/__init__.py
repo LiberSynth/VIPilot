@@ -14,6 +14,7 @@ from .db import (
     db_update_target_aspect_ratio,
     db_get_target_by_name,
     db_update_target_config,
+    db_update_target_publish_method_by_slug,
     db_get_target_session_context,
     db_set_target_session_context,
     db_get_target_session_context_saved_at,

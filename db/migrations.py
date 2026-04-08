@@ -952,6 +952,26 @@ def _m026_users(cur):
     """)
 
 
+def _m027_sync_vk_publish_method_from_settings(cur):
+    """Синхронизирует publish_method VK-таргета из настроек (vk_publish_story / vk_publish_wall).
+    Исправляет рассинхрон: настройки хранились в db_get/db_set, а _build_steps читает target.config."""
+    cur.execute("SELECT value FROM settings WHERE key = 'vk_publish_story' LIMIT 1")
+    row = cur.fetchone()
+    story_on = (row[0] if row else "1") == "1"
+
+    cur.execute("SELECT value FROM settings WHERE key = 'vk_publish_wall' LIMIT 1")
+    row = cur.fetchone()
+    wall_on = (row[0] if row else "0") == "1"
+
+    import json as _json
+    methods = _json.dumps({"story": 1 if story_on else 0, "wall": 1 if wall_on else 0})
+    cur.execute(
+        "UPDATE targets SET config = config || jsonb_build_object('publish_method', %s::jsonb)"
+        " WHERE slug = 'vk'",
+        (methods,),
+    )
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -979,6 +999,7 @@ MIGRATIONS = [
     (24, _m024_batches_type_replace_adhoc_target_id),
     (25, _m025_drop_all_foreign_keys),
     (26, _m026_users),
+    (27, _m027_sync_vk_publish_method_from_settings),
 ]
 
 

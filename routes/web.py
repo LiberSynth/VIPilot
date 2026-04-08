@@ -22,6 +22,7 @@ from db import (
     db_update_target_aspect_ratio,
     db_get_target_by_name,
     db_update_target_config,
+    db_update_target_publish_method_by_slug,
     db_get_user_by_login,
 )
 from utils.auth import is_authenticated
@@ -207,6 +208,10 @@ def save():
         vk_story_raw = "1"
     db_set("vk_publish_story", "1" if vk_story_raw == "1" else "0")
     db_set("vk_publish_wall",  "1" if vk_wall_raw  == "1" else "0")
+    db_update_target_publish_method_by_slug("vk", {
+        "story": 1 if vk_story_raw == "1" else 0,
+        "wall":  1 if vk_wall_raw  == "1" else 0,
+    })
 
     ar_target_id = request.form.get("target_id", "").strip()
     ar_x_raw = request.form.get("aspect_ratio_x", "").strip()

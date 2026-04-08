@@ -519,10 +519,11 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
     _snap(page, batch_id)
 
     if not confirmed:
-        raise DzenApiError(
-            "Публикация не подтверждена в течение 60 секунд. "
-            "Возможно, осталась необработанная капча или произошла ошибка на стороне Дзена."
-        )
+        _check_error_toast()  # бросает DzenApiError если есть явная ошибка
+        _log(log_id,
+             "Подтверждение публикации не получено за 60 с, "
+             "но явных ошибок нет — публикация предположительно выполнена")
+        _snap(page, batch_id)
 
     final_url = page.url
     print(f"[dzen] URL после публикации: {final_url}")
