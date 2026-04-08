@@ -243,23 +243,6 @@
     sendEvent({ type: 'navigate', url: url });
   };
 
-  /* ── Авто-открытие при переходе на вкладку Публикация ── */
-  var _origSwitchPanel = window.switchPanel;
-  window.switchPanel = function (name) {
-    if (_origSwitchPanel) _origSwitchPanel(name);
-    if (name === 'publish' && !active) {
-      window.dzenBrowserOpen();
-    }
-  };
-
-  /* Открыть сразу, если страница загружена уже на вкладке publish */
-  document.addEventListener('DOMContentLoaded', function () {
-    var panel = document.getElementById('panel-publish');
-    if (panel && panel.classList.contains('active') && !active) {
-      window.dzenBrowserOpen();
-    }
-  });
-
   /* ── Авто-переподключение если pipeline запустился без открытого виджета ── */
   function _showPipelineWidget() {
     active = true;
@@ -269,10 +252,6 @@
     wrap.style.display = '';
     if (navbar) navbar.style.display = '';
     connectStream();
-    // Переключаем на вкладку Публикация чтобы пользователь видел браузер
-    if (typeof window.switchPanel === 'function') {
-      try { window.switchPanel('publish'); } catch (e) {}
-    }
   }
 
   setInterval(function () {
