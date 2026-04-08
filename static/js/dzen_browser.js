@@ -4,15 +4,10 @@
   var VIEWPORT_W = 900;
   var VIEWPORT_H = 680;
 
-  var canvas = document.getElementById('dzen-browser-canvas');
-  var wrap   = document.getElementById('dzen-browser-wrap');
+  var canvas  = document.getElementById('dzen-browser-canvas');
+  var wrap    = document.getElementById('dzen-browser-wrap');
   var overlay = document.getElementById('dzen-browser-overlay');
-  var hint   = document.getElementById('dzen-browser-hint');
-  var statusText = document.getElementById('dzen-browser-status-text');
-  var btnSave  = document.getElementById('dzen-btn-save');
-  var btnClose = document.getElementById('dzen-btn-close');
-  var sessionStatus = document.getElementById('dzen-session-status');
-  var navbar = document.getElementById('dzen-browser-navbar');
+  var btnSave = document.getElementById('dzen-btn-save');
 
   if (!canvas) return;
 
@@ -20,8 +15,8 @@
   canvas.width  = VIEWPORT_W;
   canvas.height = VIEWPORT_H;
 
-  var sse = null;
-  var active = false;
+  var sse        = null;
+  var active     = false;
   var firstFrame = false;
 
   function getTargetId() {
@@ -29,11 +24,9 @@
     return el ? el.value : '';
   }
 
-  function setStatusText(msg, color) {
-    if (!statusText) return;
-    statusText.style.display = msg ? '' : 'none';
-    statusText.style.color = color || '#aaa';
-    statusText.textContent = msg;
+  function getStudioUrl() {
+    var card = document.getElementById('dzen-browser-card');
+    return card ? (card.dataset.studioUrl || '') : '';
   }
 
   function sendEvent(ev) {
@@ -115,7 +108,6 @@
     sse.onmessage = function (e) {
       var data = e.data;
       if (data === 'STOPPED') {
-        setStatusText('Браузер остановлен.', '#aaa');
         handleStopped();
         return;
       }
@@ -127,39 +119,27 @@
         if (!firstFrame) {
           firstFrame = true;
           overlay.style.display = 'none';
-          setStatusText('', '');
         }
       };
       img.src = 'data:image/jpeg;base64,' + data;
     };
 
-    sse.onerror = function () {
-      if (!active) return;
-      setStatusText('Ошибка соединения с браузером.', '#ff6b6b');
-    };
+    sse.onerror = function () {};
   }
 
   function handleStopped() {
     active = false;
     if (sse) { sse.close(); sse = null; }
-    wrap.style.display = 'none';
-    hint.style.display = 'none';
-    btnSave.style.display = 'none';
-    btnClose.style.display = 'none';
-    if (navbar) navbar.style.display = 'none';
   }
 
-  /* ── Public actions ── */
+  /* ── Запуск браузера ── */
   window.dzenBrowserOpen = function () {
     if (active) return;
     var tid = getTargetId();
-    if (!tid) {
-      setStatusText('Таргет Дзен не найден.', '#ff6b6b');
-      statusText.style.display = '';
-      return;
-    }
-    setStatusText('Запускаю браузер…', '#aaa');
-    statusText.style.display = '';
+    if (!tid) return;
+
+    overlay.style.display = 'flex';
+    overlay.textContent = 'Загрузка…';
 
     fetch('/api/dzen-browser/start', {
       method: 'POST',
@@ -168,32 +148,25 @@
     })
       .then(function (r) { return r.json(); })
       .then(function (data) {
-        if (data.ok) {
-          active = true;
-          firstFrame = false;
-          overlay.style.display = 'flex';
-          overlay.textContent = 'Загрузка…';
-          wrap.style.display = '';
-          hint.style.display = '';
-          btnSave.style.display = '';
-          btnClose.style.display = '';
-          if (navbar) navbar.style.display = '';
-          setStatusText('Браузер запускается…', '#aaa');
-          connectStream();
-        } else {
-          setStatusText('Ошибка запуска браузера: ' + (data.error || ''), '#ff6b6b');
+        if (!data.ok) return;
+        active = true;
+        firstFrame = false;
+        connectStream();
+        var url = getStudioUrl();
+        if (url) {
+          setTimeout(function () {
+            sendEvent({ type: 'navigate', url: url });
+          }, 1200);
         }
       })
-      .catch(function () {
-        setStatusText('Сетевая ошибка.', '#ff6b6b');
-      });
+      .catch(function () {});
   };
 
+  /* ── Сохранение сессии ── */
   window.dzenBrowserSaveSession = function () {
     var tid = getTargetId();
     if (!tid) return;
-    btnSave.disabled = true;
-    setStatusText('Сохраняю сессию…', '#aaa');
+    if (btnSave) btnSave.disabled = true;
 
     fetch('/api/dzen-browser/save-session', {
       method: 'POST',
@@ -202,45 +175,17 @@
     })
       .then(function (r) { return r.json(); })
       .then(function (data) {
-        btnSave.disabled = false;
+        if (btnSave) btnSave.disabled = false;
         if (data.ok) {
-          setStatusText('', '');
           showToast('Сессия сохранена', 'success');
-          if (sessionStatus) {
-            var now = new Date().toISOString().slice(0, 16).replace('T', ' ');
-            sessionStatus.style.color = '#69db7c';
-            sessionStatus.textContent = 'Сессия сохранена: ' + now + ' UTC';
-          }
         } else {
           showToast('Ошибка: ' + (data.error || 'Не удалось сохранить'), 'error');
         }
       })
       .catch(function () {
-        btnSave.disabled = false;
+        if (btnSave) btnSave.disabled = false;
         showToast('Ошибка соединения', 'error');
       });
-  };
-
-  window.dzenBrowserClose = function () {
-    fetch('/api/dzen-browser/stop', { method: 'POST' }).catch(function () {});
-    handleStopped();
-  };
-
-  /* ── Навигация по URL ── */
-  window.dzenBrowserGoto = function (url) {
-    if (!active) return;
-    var input = document.getElementById('dzen-nav-url');
-    if (input) input.value = url;
-    sendEvent({ type: 'navigate', url: url });
-  };
-
-  window.dzenBrowserNavigate = function () {
-    if (!active) return;
-    var input = document.getElementById('dzen-nav-url');
-    var url = input ? input.value.trim() : '';
-    if (!url) return;
-    if (!url.startsWith('http')) url = 'https://' + url;
-    sendEvent({ type: 'navigate', url: url });
   };
 
   /* ── Авто-переподключение если pipeline запустился без открытого виджета ── */
@@ -249,8 +194,6 @@
     firstFrame = false;
     overlay.style.display = 'flex';
     overlay.textContent = 'Публикация…';
-    wrap.style.display = '';
-    if (navbar) navbar.style.display = '';
     connectStream();
   }
 
@@ -266,4 +209,20 @@
       })
       .catch(function () {});
   }, 2500);
+
+  /* ── Авто-запуск при переходе на вкладку Публикация ── */
+  var _origSwitchPanel = window.switchPanel;
+  window.switchPanel = function (name) {
+    if (_origSwitchPanel) _origSwitchPanel(name);
+    if (name === 'publish' && !active) {
+      window.dzenBrowserOpen();
+    }
+  };
+
+  document.addEventListener('DOMContentLoaded', function () {
+    var panel = document.getElementById('panel-publish');
+    if (panel && panel.classList.contains('active') && !active) {
+      window.dzenBrowserOpen();
+    }
+  });
 })();

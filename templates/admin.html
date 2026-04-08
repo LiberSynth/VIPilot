@@ -224,61 +224,32 @@
     </form>
 
     <!-- Дзен -->
-    <div class="card{% if not dzen_active %} target-disabled{% endif %}" style="margin-top:12px">
+    <div class="card{% if not dzen_active %} target-disabled{% endif %}"
+         id="dzen-browser-card"
+         style="margin-top:12px"
+         data-studio-url="{% if dzen_publisher_id %}https://dzen.ru/profile/editor/id/{{ dzen_publisher_id }}/{% endif %}">
       <input type="hidden" id="dzen_target_id" value="{{ dzen_target_id or '' }}">
       <div class="card-title">Публикация в Дзен</div>
 
-      <!-- Статус сессии -->
-      <div id="dzen-session-status" class="hint" style="margin-bottom:12px;color:
-        {%- if dzen_session_saved_at -%}#69db7c{%- else -%}#aaa{%- endif -%}">
-        {%- if dzen_session_saved_at -%}
-          Сессия сохранена: {{ dzen_session_saved_at[:16]|replace('T',' ') }} UTC
-        {%- else -%}
-          Сессия не сохранена — авторизуйтесь в браузере ниже
-        {%- endif -%}
-      </div>
-
-      <!-- Кнопки управления браузером -->
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
+        <div class="hint" style="flex:1;margin:0">
+          Если браузер не авторизован — войдите в аккаунт Яндекса.
+          После входа нажмите <b>Сохранить сессию</b>.
+        </div>
         <button class="btn-run-now" id="dzen-btn-save"
                 onclick="dzenBrowserSaveSession()"
-                style="font-size:13px;padding:7px 14px;display:none">Сохранить сессию</button>
-        <button class="wf-btn" id="dzen-btn-close"
-                onclick="dzenBrowserClose()"
-                style="display:none">Закрыть</button>
+                style="font-size:13px;padding:7px 14px;white-space:nowrap">Сохранить сессию</button>
       </div>
 
-      <!-- Статус браузера -->
-      <div id="dzen-browser-status-text" class="hint" style="margin-bottom:8px;display:none"></div>
-
-      <!-- Адресная строка + быстрые кнопки -->
-      <div id="dzen-browser-navbar" style="display:none;margin-bottom:8px">
-        <div style="display:flex;gap:6px;margin-bottom:6px">
-          <input id="dzen-nav-url" type="text" placeholder="https://dzen.ru/..."
-                 style="flex:1;background:#1a1a2e;border:1px solid rgba(255,255,255,.15);border-radius:6px;color:#e0e0e0;font-size:13px;padding:6px 10px;outline:none"
-                 onkeydown="if(event.key==='Enter') dzenBrowserNavigate()">
-          <button class="wf-btn" onclick="dzenBrowserNavigate()" style="padding:6px 12px;font-size:13px">→</button>
-        </div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap">
-          <button class="wf-btn" onclick="dzenBrowserGoto('https://dzen.ru')" style="font-size:12px;padding:4px 10px">Главная</button>
-          {% if dzen_publisher_id %}<button class="wf-btn" onclick="dzenBrowserGoto('https://dzen.ru/profile/editor/id/{{ dzen_publisher_id }}/')" style="font-size:12px;padding:4px 10px">Студия</button>{% endif %}
-          <button class="wf-btn" onclick="dzenBrowserGoto('https://passport.yandex.ru/auth')" style="font-size:12px;padding:4px 10px">Войти (Яндекс)</button>
-        </div>
-      </div>
-
-      <!-- Canvas с браузером -->
-      <div id="dzen-browser-wrap" style="display:none;position:relative;border-radius:6px;overflow:hidden;border:1px solid var(--border,rgba(255,255,255,.12))">
+      <!-- Canvas с браузером — всегда виден -->
+      <div id="dzen-browser-wrap" style="position:relative;border-radius:6px;overflow:hidden;border:1px solid var(--border,rgba(255,255,255,.12))">
         <canvas id="dzen-browser-canvas"
                 style="display:block;width:100%;cursor:pointer"
                 tabindex="0"></canvas>
         <div id="dzen-browser-overlay"
-             style="position:absolute;inset:0;background:rgba(10,10,20,.7);display:flex;align-items:center;justify-content:center;color:#ccc;font-size:14px">
+             style="position:absolute;inset:0;background:rgba(10,10,20,.85);display:flex;align-items:center;justify-content:center;color:#aaa;font-size:14px">
           Загрузка…
         </div>
-      </div>
-
-      <div id="dzen-browser-hint" class="hint" style="margin-top:8px;display:none">
-        Нажмите <b>Войти (Яндекс)</b> для авторизации. После входа перейдите в нужный раздел Дзена и нажмите <b>Сохранить сессию</b>.
       </div>
     </div>
   </div>
