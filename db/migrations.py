@@ -898,6 +898,35 @@ def _m024_batches_type_replace_adhoc_target_id(cur):
     """)
 
 
+def _m025_drop_all_foreign_keys(cur):
+    """
+    Удаляет все оставшиеся FK-ограничения из схемы.
+    Целостность данных обеспечивается на уровне приложения.
+    Deployed: -
+    """
+    constraints = [
+        ("ai_models",   "ai_models_platform_id_fkey"),
+        ("ai_models",   "ai_models_ai_platform_id_fkey"),
+        ("batches",     "batches_story_id_fkey"),
+        ("batches",     "batches_video_model_id_fkey"),
+        ("batches",     "batches_text_model_id_fkey"),
+        ("log",         "log_batch_id_fkey"),
+        ("log_entries", "log_entries_log_id_fkey"),
+        ("stories",     "stories_model_id_fkey"),
+    ]
+    for table, name in constraints:
+        cur.execute(f"""
+            DO $$ BEGIN
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.table_constraints
+                    WHERE table_name = '{table}' AND constraint_name = '{name}'
+                ) THEN
+                    ALTER TABLE {table} DROP CONSTRAINT {name};
+                END IF;
+            END $$
+        """)
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -923,6 +952,7 @@ MIGRATIONS = [
     (22, _m022_widen_batches_status),
     (23, _m023_stories_title),
     (24, _m024_batches_type_replace_adhoc_target_id),
+    (25, _m025_drop_all_foreign_keys),
 ]
 
 
