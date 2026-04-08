@@ -360,12 +360,18 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
         "text=Ролик опубликован",
     ]
 
+    # Снимок на каждой навигации главного фрейма (смена URL, редирект и т.п.)
+    def _on_navigate(frame):
+        if frame == page.main_frame:
+            _snap(page, batch_id)
+    page.on("framenavigated", _on_navigate)
+
     _confirm_deadline = _time.monotonic() + _PUBLISH_CONFIRM_TIMEOUT / 1000
-    _snap_every = 5   # делать снимок каждые N итераций (каждые 10 сек при POLL=2s)
+    _snap_every = 3   # опросный снимок каждые N итераций (каждые 6 сек при POLL=2s)
     _iter = 0
     while _time.monotonic() < _confirm_deadline and not confirmed:
         _iter += 1
-        if _iter % _snap_every == 1:   # первый снимок сразу, потом каждые 10 сек
+        if _iter % _snap_every == 1:   # первый снимок сразу, потом каждые 6 сек
             _snap(page, batch_id)
 
         # 1. CSS-проверка
@@ -401,6 +407,8 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
                 break
 
         page.wait_for_timeout(_CONFIRM_POLL)
+
+    page.remove_listener("framenavigated", _on_navigate)
 
     if not confirmed:
         # Финальный URL-снимок
