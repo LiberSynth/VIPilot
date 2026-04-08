@@ -9,6 +9,7 @@ import os
 import re
 import shutil
 import tempfile
+import time as _time
 
 from log import db_log_entry
 
@@ -236,8 +237,125 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
     pub_btn = page.locator("button:has-text('Опубликовать')").first
     pub_btn.wait_for(state="visible", timeout=15_000)
     pub_btn.click()
-    page.wait_for_timeout(4000)
+    page.wait_for_timeout(2000)
     _snap(page, batch_id)
+
+    # ── Шаг 6: Обрабатываем капчу «Я не робот» если появилась ───────────
+    # Ищем капчу в течение 25 секунд с интервалами (может появляться с задержкой)
+    _CAPTCHA_WINDOW = 25_000  # ms — окно ожидания капчи
+    _CAPTCHA_POLL   = 2_000   # ms — интервал опроса
+    captcha_clicked = False
+
+    _captcha_deadline = _time.monotonic() + _CAPTCHA_WINDOW / 1000
+
+    _log(log_id, "Проверяю наличие капчи «Я не робот» (окно 25 сек)…")
+    while _time.monotonic() < _captcha_deadline and not captcha_clicked:
+        # Вариант 1: чекбокс внутри iframe (VK ID / Яндекс капча)
+        try:
+            captcha_frame = page.frame_locator(
+                "iframe[src*='captcha'], "
+                "iframe[src*='vk.com/recaptcha'], "
+                "iframe[title*='не робот'], "
+                "iframe[title*='robot']"
+            ).first
+            captcha_checkbox = captcha_frame.locator(
+                "input[type='checkbox'], [role='checkbox']"
+            ).first
+            captcha_checkbox.wait_for(state="visible", timeout=1_000)
+            _log(log_id, "Капча (iframe) обнаружена — кликаю по чекбоксу…")
+            captcha_checkbox.click()
+            page.wait_for_timeout(1500)
+            captcha_clicked = True
+            _snap(page, batch_id)
+            break
+        except Exception:
+            pass
+
+        # Вариант 2: inline-чекбокс капчи (без iframe)
+        try:
+            inline_captcha = page.locator(
+                "[class*='captcha'] input[type='checkbox'], "
+                "[class*='captcha'] [role='checkbox'], "
+                "[id*='captcha'] input[type='checkbox'], "
+                "label:has-text('не робот') input[type='checkbox'], "
+                "label:has-text('робот') input[type='checkbox']"
+            ).first
+            if inline_captcha.is_visible():
+                _log(log_id, "Капча (inline) обнаружена — кликаю по чекбоксу…")
+                inline_captcha.click()
+                page.wait_for_timeout(1500)
+                captcha_clicked = True
+                _snap(page, batch_id)
+                break
+        except Exception:
+            pass
+
+        # Проверяем, не появилось ли уже подтверждение — тогда капча не нужна
+        try:
+            success_hint = page.locator(
+                "[class*='toast']:has-text('опубликован'), "
+                "[class*='notification']:has-text('опубликован'), "
+                "[data-testid='publish-success']"
+            ).first
+            if success_hint.is_visible():
+                _log(log_id, "Подтверждение публикации уже получено — капча не нужна.")
+                break
+        except Exception:
+            pass
+
+        page.wait_for_timeout(_CAPTCHA_POLL)
+
+    if captcha_clicked:
+        _log(log_id, "Капча пройдена, жду подтверждения публикации…")
+    else:
+        _log(log_id, "Капча не обнаружена, жду подтверждения публикации…")
+
+    # ── Шаг 7: Ожидаем подтверждения публикации ──────────────────────────
+    _PUBLISH_CONFIRM_TIMEOUT = 60_000  # ms
+
+    # Специфичные селекторы успеха — toast/notification с упоминанием публикации
+    # и data-testid от Дзена; намеренно не используем широкие class*='success'
+    success_selector = (
+        "[class*='toast']:has-text('опубликован'), "
+        "[class*='notification']:has-text('опубликован'), "
+        "[data-testid='publish-success'], "
+        "[data-testid*='publish']:has-text('опубликован'), "
+        "text=Видео опубликовано"
+    )
+
+    url_before = page.url
+    confirmed = False
+
+    try:
+        page.wait_for_selector(success_selector, timeout=_PUBLISH_CONFIRM_TIMEOUT)
+        confirmed = True
+        _log(log_id, "Уведомление об успешной публикации получено.")
+    except Exception:
+        pass
+
+    if not confirmed:
+        # Проверяем смену URL на страницу опубликованного видео
+        # Дзен обычно редиректит на /video/<id> или /shorts/<id>
+        page.wait_for_timeout(3000)
+        url_after = page.url
+        print(f"[dzen] URL до публикации: {url_before}")
+        print(f"[dzen] URL после публикации: {url_after}")
+        video_url_pattern = re.search(r"/video/|/shorts/|/watch\?", url_after)
+        if video_url_pattern and url_after != url_before:
+            confirmed = True
+            _log(log_id, f"URL сменился на страницу видео ({url_after}) — публикация подтверждена.")
+        elif url_after != url_before and "editor" not in url_after:
+            # Запасной вариант: любое изменение URL, не ведущее обратно в редактор
+            confirmed = True
+            _log(log_id, f"URL сменился ({url_after}) — публикация предположительно подтверждена.")
+
+    _snap(page, batch_id)
+
+    if not confirmed:
+        raise DzenApiError(
+            "Публикация не подтверждена в течение 60 секунд. "
+            "Возможно, осталась необработанная капча или произошла ошибка на стороне Дзена."
+        )
 
     final_url = page.url
     print(f"[dzen] URL после публикации: {final_url}")
