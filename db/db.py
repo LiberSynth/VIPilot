@@ -404,6 +404,20 @@ def db_set_batch_story(batch_id, story_id):
         return False
 
 
+def db_set_batch_story_id(batch_id, story_id):
+    """Устанавливает story_id батча без изменения статуса."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE batches SET story_id = %s WHERE id = %s",
+                    (story_id, batch_id),
+                )
+            conn.commit()
+    except Exception as e:
+        print(f"[DB] Ошибка db_set_batch_story_id: {e}")
+
+
 def db_set_batch_text_model(batch_id, model_id):
     """Сохраняет id текстовой модели, сгенерировавшей сюжет."""
     try:
@@ -786,21 +800,22 @@ def db_set_batch_transcode_ready(batch_id, video_data: bytes):
         return False
 
 
-def db_get_random_real_original_video() -> tuple[bytes, str] | None:
-    """Возвращает (video_data_original, batch_id) случайного батча с реальным (не эмулированным) видео."""
+def db_get_random_real_original_video() -> tuple[bytes, str, str | None] | None:
+    """Возвращает (video_data_original, batch_id, story_id) случайного батча с реальным видео.
+    story_id может быть None, если у донора нет привязанного сюжета."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    SELECT video_data_original, id FROM batches
+                    SELECT video_data_original, id, story_id::text FROM batches
                     WHERE video_data_original IS NOT NULL
                     ORDER BY (video_url NOT LIKE 'emulation://%') DESC, random()
                     LIMIT 1
                     """
                 )
                 row = cur.fetchone()
-                return (bytes(row[0]), str(row[1])) if row else None
+                return (bytes(row[0]), str(row[1]), row[2]) if row else None
     except Exception as e:
         print(f"[DB] Ошибка db_get_random_real_original_video: {e}")
         return None
@@ -839,7 +854,7 @@ def db_steal_video_from_cancelled(batch_id) -> str | None:
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                    SELECT id, video_data_transcoded, video_data_original, video_url
+                    SELECT id, video_data_transcoded, video_data_original, video_url, story_id::text
                     FROM batches
                     WHERE (video_data_transcoded IS NOT NULL OR video_data_original IS NOT NULL)
                       AND (
@@ -854,7 +869,7 @@ def db_steal_video_from_cancelled(batch_id) -> str | None:
                 if not donor:
                     return None
 
-                donor_id, video_data_transcoded, video_data_original, video_url = donor
+                donor_id, video_data_transcoded, video_data_original, video_url, donor_story_id = donor
 
                 if video_data_transcoded is not None:
                     # Транскодированное есть — переносим его, получатель сразу в transcode_ready
@@ -862,9 +877,10 @@ def db_steal_video_from_cancelled(batch_id) -> str | None:
                         UPDATE batches
                         SET status                = 'transcode_ready',
                             video_data_transcoded = %s,
-                            video_url             = %s
+                            video_url             = %s,
+                            story_id              = COALESCE(story_id, %s)
                         WHERE id = %s
-                    """, (psycopg2.Binary(bytes(video_data_transcoded)), video_url, batch_id))
+                    """, (psycopg2.Binary(bytes(video_data_transcoded)), video_url, donor_story_id, batch_id))
                     cur.execute(
                         "UPDATE batches SET video_data_transcoded = NULL WHERE id = %s",
                         (donor_id,),
@@ -875,9 +891,10 @@ def db_steal_video_from_cancelled(batch_id) -> str | None:
                         UPDATE batches
                         SET status               = 'video_ready',
                             video_data_original  = %s,
-                            video_url            = %s
+                            video_url            = %s,
+                            story_id             = COALESCE(story_id, %s)
                         WHERE id = %s
-                    """, (psycopg2.Binary(bytes(video_data_original)), video_url, batch_id))
+                    """, (psycopg2.Binary(bytes(video_data_original)), video_url, donor_story_id, batch_id))
                     cur.execute(
                         "UPDATE batches SET video_data_original = NULL WHERE id = %s",
                         (donor_id,),

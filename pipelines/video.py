@@ -32,6 +32,7 @@ from db import (
     db_set_batch_story_ready_from_error,
     db_set_batch_original_video,
     db_get_random_real_original_video,
+    db_set_batch_story_id,
 )
 from log import db_log_pipeline, db_log_entry, db_log_update
 from pipelines.base import check_cancelled, handle_critical_error
@@ -216,10 +217,12 @@ def run(batch_id):
                 db_set_batch_video_error(batch_id)
                 print(f"[video] {msg}")
                 return
-            sample, donor_batch_id = result
+            sample, donor_batch_id, donor_story_id = result
             if log_id:
                 db_log_entry(log_id, f"Видео заимствовано из батча: {donor_batch_id}", level='info')
             db_set_batch_original_video(batch_id, sample)
+            if donor_story_id:
+                db_set_batch_story_id(batch_id, donor_story_id)
             db_set_batch_video_ready(batch_id, 'emulation://skipped')
             db_log_update(log_id, 'Видео [эмуляция]', 'ok')
             return

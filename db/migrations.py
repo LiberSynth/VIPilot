@@ -972,6 +972,20 @@ def _m027_sync_vk_publish_method_from_settings(cur):
     )
 
 
+def _m028_fill_null_story_ids(cur):
+    """Заполняет batches.story_id случайными значениями из stories там, где он NULL.
+    Работает только если в таблице stories есть хотя бы одна запись."""
+    cur.execute("SELECT COUNT(*) FROM stories")
+    count = cur.fetchone()[0]
+    if count == 0:
+        return
+    cur.execute("""
+        UPDATE batches
+        SET story_id = (SELECT id FROM stories ORDER BY random() LIMIT 1)
+        WHERE story_id IS NULL
+    """)
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -1000,6 +1014,7 @@ MIGRATIONS = [
     (25, _m025_drop_all_foreign_keys),
     (26, _m026_users),
     (27, _m027_sync_vk_publish_method_from_settings),
+    (28, _m028_fill_null_story_ids),
 ]
 
 
