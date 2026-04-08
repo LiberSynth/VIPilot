@@ -361,7 +361,13 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
     ]
 
     _confirm_deadline = _time.monotonic() + _PUBLISH_CONFIRM_TIMEOUT / 1000
+    _snap_every = 5   # делать снимок каждые N итераций (каждые 10 сек при POLL=2s)
+    _iter = 0
     while _time.monotonic() < _confirm_deadline and not confirmed:
+        _iter += 1
+        if _iter % _snap_every == 1:   # первый снимок сразу, потом каждые 10 сек
+            _snap(page, batch_id)
+
         # 1. CSS-проверка
         try:
             el = page.locator(css_success_selector).first
