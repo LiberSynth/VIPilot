@@ -424,14 +424,14 @@ def db_set_batch_video_model(batch_id, model_id):
 # Истории (stories)
 # ---------------------------------------------------------------------------
 
-def db_create_story(model_id, result):
+def db_create_story(model_id, title, result):
     """Сохраняет сгенерированный сюжет в таблицу stories. Возвращает UUID или None."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "INSERT INTO stories (model_id, result) VALUES (%s, %s) RETURNING id",
-                    (model_id, result),
+                    "INSERT INTO stories (model_id, title, result) VALUES (%s, %s, %s) RETURNING id",
+                    (model_id, title, result),
                 )
                 row = cur.fetchone()
             conn.commit()
@@ -557,6 +557,19 @@ def db_get_story_text(story_id):
         return row[0] if row else None
     except Exception as e:
         print(f"[DB] Ошибка db_get_story_text: {e}")
+        return None
+
+
+def db_get_story_title(story_id):
+    """Возвращает stories.title по UUID, или None."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT title FROM stories WHERE id = %s", (story_id,))
+                row = cur.fetchone()
+        return row[0] if row else None
+    except Exception as e:
+        print(f"[DB] Ошибка db_get_story_title: {e}")
         return None
 
 

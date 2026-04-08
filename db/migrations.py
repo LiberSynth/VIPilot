@@ -814,6 +814,43 @@ def _m022_widen_batches_status(cur):
     cur.execute("ALTER TABLE batches ALTER COLUMN status TYPE TEXT")
 
 
+def _m023_stories_title(cur):
+    """
+    Добавляет поле title TEXT NOT NULL DEFAULT '' в таблицу stories.
+    Заполняет title и при необходимости result для существующих записей по правилам:
+      - первая строка result не содержит '.' → title = первая_строка.rstrip('.'),
+        result = остаток.strip()
+      - первая строка содержит '.' → title = первые 4 слова.rstrip('.'),
+        result не меняется
+    Deployed: -
+    """
+    cur.execute("""
+        ALTER TABLE stories
+            ADD COLUMN IF NOT EXISTS title TEXT NOT NULL DEFAULT ''
+    """)
+
+    cur.execute("SELECT id, result FROM stories WHERE title = ''")
+    rows = cur.fetchall()
+    for row in rows:
+        story_id, result = row[0], row[1]
+        if not result:
+            continue
+        first_line = result.split('\n')[0]
+        if '.' not in first_line:
+            title = first_line.rstrip('.')
+            new_result = result[len(first_line):].strip()
+            cur.execute(
+                "UPDATE stories SET title = %s, result = %s WHERE id = %s",
+                (title, new_result, story_id),
+            )
+        else:
+            title = ' '.join(result.split()[:4]).rstrip('.')
+            cur.execute(
+                "UPDATE stories SET title = %s WHERE id = %s",
+                (title, story_id),
+            )
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -837,6 +874,7 @@ MIGRATIONS = [
     (20, _m020_targets_slug_and_publish_methods),
     (21, _m021_migrate_old_batch_statuses),
     (22, _m022_widen_batches_status),
+    (23, _m023_stories_title),
 ]
 
 

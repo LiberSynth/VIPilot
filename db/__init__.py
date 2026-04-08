@@ -34,6 +34,7 @@ from .db import (
     db_set_batch_cancelled,
     db_cancel_waiting_batches,
     db_get_story_text,
+    db_get_story_title,
     db_get_active_video_models,
     db_set_batch_video_pending,
     db_set_batch_video_ready,

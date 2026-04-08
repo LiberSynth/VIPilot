@@ -19,7 +19,7 @@ from db import (
     db_get_batch_by_id,
     db_get_batch_video_data,
     db_get_batch_original_video,
-    db_get_story_text,
+    db_get_story_title,
     db_set_batch_probe,
     db_set_batch_published,
     db_set_batch_publish_error,
@@ -61,14 +61,24 @@ def _call_client(slug, method, batch_id, log_id, target):
             return False
         video_data = _get_video(batch_id, log_id)
         group_id = int(cfg.get('group_id', 236929597))
+        batch = db_get_batch_by_id(batch_id)
+        story_id = batch.get('story_id') if batch else None
+        title = ''
+        if story_id:
+            try:
+                title = db_get_story_title(story_id) or ''
+            except Exception:
+                pass
+        if not title:
+            title = 'Видео'
         if method == 'story':
             if log_id:
                 db_log_entry(log_id, 'Публикую историю…')
-            return vk.publish_story(video_data, group_id, log_id) is not None
+            return vk.publish_story(video_data, group_id, log_id, title=title) is not None
         elif method == 'wall':
             if log_id:
                 db_log_entry(log_id, 'Публикую на стену…')
-            return vk.publish_wall(video_data, group_id, log_id) is not None
+            return vk.publish_wall(video_data, group_id, log_id, title=title) is not None
         else:
             if log_id:
                 db_log_entry(log_id, f'VK: неизвестный метод «{method}» — пропуск', level='warn')
@@ -96,13 +106,12 @@ def _call_client(slug, method, batch_id, log_id, target):
         title = ''
         if story_id:
             try:
-                text = db_get_story_text(story_id)
-                if text:
-                    title = text.split('\n')[0].strip()[:100]
+                title = db_get_story_title(story_id) or ''
             except Exception:
                 pass
         if not title:
             title = 'Видео'
+
 
         return dzen_client.publish(video_data, cfg, title, log_id, batch_id=batch_id, target_id=target_id)
 

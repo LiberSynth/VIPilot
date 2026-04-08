@@ -6,6 +6,7 @@ VK API-клиент.
 
 import io
 import os
+import re
 import time
 
 import requests
@@ -17,7 +18,14 @@ _VK_API   = 'https://api.vk.com/method'
 _VK_VER   = '5.131'
 
 
-def publish_story(video_data: bytes, group_id: int, log_id) -> int | None:
+def _safe_filename(title: str) -> str:
+    """Возвращает безопасное имя файла из title (без спецсимволов, макс 80 символов)."""
+    safe = re.sub(r'[^\w\s\-]', '', title, flags=re.UNICODE).strip()
+    safe = re.sub(r'\s+', '_', safe)[:80]
+    return safe or 'video'
+
+
+def publish_story(video_data: bytes, group_id: int, log_id, title: str = '') -> int | None:
     """Публикует видео как историю ВКонтакте. Возвращает story_id или None."""
     r = requests.post(f'{_VK_API}/stories.getVideoUploadServer', data={
         'group_id':    group_id,
@@ -32,12 +40,13 @@ def publish_story(video_data: bytes, group_id: int, log_id) -> int | None:
         return None
 
     upload_url = r['response']['upload_url']
+    filename = f"{_safe_filename(title)}.mp4" if title else 'video.mp4'
 
     for attempt in range(3):
         try:
             up = requests.post(
                 upload_url,
-                files={'video_file': ('video.mp4', io.BytesIO(video_data), 'video/mp4')},
+                files={'video_file': (filename, io.BytesIO(video_data), 'video/mp4')},
                 timeout=300,
             )
             up.raise_for_status()
@@ -79,11 +88,11 @@ def publish_story(video_data: bytes, group_id: int, log_id) -> int | None:
     return None
 
 
-def publish_wall(video_data: bytes, group_id: int, log_id) -> int | None:
+def publish_wall(video_data: bytes, group_id: int, log_id, title: str = '') -> int | None:
     """Публикует видео на стену сообщества ВКонтакте. Возвращает post_id или None."""
     save_resp = requests.post(f'{_VK_API}/video.save', data={
         'group_id':     group_id,
-        'name':         '',
+        'name':         title or '',
         'description':  '',
         'wallpost':     0,
         'access_token': _VK_TOKEN,
@@ -98,10 +107,11 @@ def publish_wall(video_data: bytes, group_id: int, log_id) -> int | None:
     upload_url = save_resp['response']['upload_url']
     video_id   = save_resp['response']['video_id']
     owner_id   = save_resp['response']['owner_id']
+    filename = f"{_safe_filename(title)}.mp4" if title else 'video.mp4'
 
     up = requests.post(
         upload_url,
-        files={'video_file': ('video.mp4', io.BytesIO(video_data), 'video/mp4')},
+        files={'video_file': (filename, io.BytesIO(video_data), 'video/mp4')},
         timeout=300,
     )
     up.raise_for_status()

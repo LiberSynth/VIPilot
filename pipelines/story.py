@@ -219,7 +219,13 @@ def run(batch_id):
                 for attempt in range(fails_to_next):
                     result = _try_model(log_id, m, system_prompt, user_prompt)
                     if result:
-                        story_id = db_create_story(m['id'], result)
+                        first_line = result.split('\n')[0]
+                        if '.' not in first_line:
+                            title = first_line.rstrip('.')
+                            result = result[len(first_line):].strip()
+                        else:
+                            title = ' '.join(result.split()[:4]).rstrip('.')
+                        story_id = db_create_story(m['id'], title, result)
                         if story_id:
                             used_model_name = model_name
                             used_model_id   = m['id']
