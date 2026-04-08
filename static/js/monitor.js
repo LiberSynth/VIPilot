@@ -298,7 +298,8 @@
   var _seenLids      = {};
   var _seenBids      = {};
   var _firstRender   = true;
-  var _pubFrameCache = {};  // batchId → blob URL
+  var _pubFrameCache    = {};  // batchId → blob URL
+  var _pubFrameFetching = {};  // batchId → true (in-flight guard)
 
   function getOpenState() {
     var bids = {}, sgkeys = {}, lids = {};
@@ -348,7 +349,23 @@
     });
   }
 
+  function _evictPubFrameCache() {
+    var inDom = {};
+    document.querySelectorAll('.monitor-pub-frame img[data-bid]').forEach(function(img) {
+      if (img.dataset.bid) inDom[img.dataset.bid] = true;
+    });
+    Object.keys(_pubFrameCache).forEach(function(bid) {
+      if (!inDom[bid]) {
+        URL.revokeObjectURL(_pubFrameCache[bid]);
+        delete _pubFrameCache[bid];
+        delete _pubFrameFetching[bid];
+      }
+    });
+  }
+
   function refreshPublishFrames() {
+    _evictPubFrameCache();
+
     document.querySelectorAll('.monitor-pub-frame img[data-bid]').forEach(function(img) {
       var bid = img.dataset.bid;
       if (!bid) return;
@@ -363,6 +380,10 @@
       var logItem = img.closest('.monitor-log-item');
       if (!logItem || logItem.dataset.status !== 'running') return;
 
+      // Защита от дублирующих запросов при медленной сети
+      if (_pubFrameFetching[bid]) return;
+      _pubFrameFetching[bid] = true;
+
       // Preload-swap: старый кадр виден до тех пор, пока новый не загружен полностью
       fetch('/api/batch/' + bid + '/publish-frame?t=' + Date.now())
         .then(function(r) {
@@ -370,6 +391,7 @@
           return r.blob();
         })
         .then(function(blob) {
+          _pubFrameFetching[bid] = false;
           if (!blob) return;
           if (_pubFrameCache[bid]) URL.revokeObjectURL(_pubFrameCache[bid]);
           var url = URL.createObjectURL(blob);
@@ -380,9 +402,15 @@
               el.parentNode.style.display = 'block';
             });
         })
-        .catch(function() {});
+        .catch(function() { _pubFrameFetching[bid] = false; });
     });
   }
+
+  window.addEventListener('beforeunload', function() {
+    Object.keys(_pubFrameCache).forEach(function(bid) {
+      URL.revokeObjectURL(_pubFrameCache[bid]);
+    });
+  });
 
   function renderTimeline(data) {
     var el = document.getElementById('monitor-timeline');
