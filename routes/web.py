@@ -58,7 +58,7 @@ def login():
         role = session.get("role", "root")
         if role == "producer":
             return redirect(url_for("web.producer_page"))
-        return redirect(url_for("web.admin_page"))
+        return redirect(url_for("web.root_page"))
 
     error = False
     if request.method == "POST":
@@ -72,13 +72,13 @@ def login():
             session.permanent = True
             if session["role"] == "producer":
                 return redirect(url_for("web.producer_page"))
-            return redirect(url_for("web.admin_page"))
+            return redirect(url_for("web.root_page"))
         error = True
     return render_template("login.html", error=error)
 
 
-@bp.route("/admin")
-def admin_page():
+@bp.route("/web")
+def root_page():
     if not is_authenticated():
         return redirect(url_for("web.login"))
     metaprompt      = db_get("metaprompt", "")
@@ -175,7 +175,7 @@ def save():
         if active_tab == "story":
             print("[SAVE] Попытка сохранить пустой мета-промпт — отклонено")
             flash("Мета-промпт не может быть пустым", "error")
-            return redirect(url_for("web.admin_page"))
+            return redirect(url_for("web.root_page"))
     else:
         db_set("metaprompt", metaprompt)
 
@@ -271,7 +271,7 @@ def save():
         except (ValueError, TypeError):
             pass
 
-    return redirect(url_for("web.admin_page") + f"?tab={active_tab}")
+    return redirect(url_for("web.root_page") + f"?tab={active_tab}")
 
 
 
@@ -281,7 +281,7 @@ def producer_page():
     if not is_authenticated():
         return redirect(url_for("web.login"))
     if session.get("role") != "producer":
-        return redirect(url_for("web.admin_page"))
+        return redirect(url_for("web.root_page"))
     from utils.version import VERSION as APP_VERSION
     resp = make_response(render_template("producer.html", app_version=APP_VERSION))
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
