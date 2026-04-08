@@ -1653,3 +1653,32 @@ def db_cleanup_batches(batch_lifetime_days: int) -> int:
     except Exception as e:
         print(f"[DB] Ошибка db_cleanup_batches: {e}")
         return 0
+
+
+# ---------------------------------------------------------------------------
+# Пользователи
+# ---------------------------------------------------------------------------
+
+def db_get_user_by_login(login):
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT u.id, u.name, u.login, u.password, r.slug AS role
+                    FROM users u
+                    LEFT JOIN user_roles r ON r.id = u.role_id
+                    WHERE u.login = %s
+                """, (login,))
+                row = cur.fetchone()
+                if not row:
+                    return None
+                return {
+                    "id": str(row[0]),
+                    "name": row[1],
+                    "login": row[2],
+                    "password": row[3],
+                    "role": row[4],
+                }
+    except Exception as e:
+        print(f"[DB] Ошибка db_get_user_by_login: {e}")
+        return None

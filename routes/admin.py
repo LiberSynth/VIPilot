@@ -22,9 +22,9 @@ from db import (
     db_update_target_aspect_ratio,
     db_get_target_by_name,
     db_update_target_config,
+    db_get_user_by_login,
 )
-from utils.consts import ADMIN_PASSWORD
-from utils.auth import is_authenticated, password_fingerprint
+from utils.auth import is_authenticated
 from utils.limiter import limiter
 from utils.utils import (
     parse_batch_lifetime,
@@ -55,15 +55,23 @@ def icon_preview():
 @limiter.limit("10 per minute")
 def login():
     if is_authenticated():
+        role = session.get("role", "root")
+        if role == "producer":
+            return redirect(url_for("admin.producer_page"))
         return redirect(url_for("admin.admin_page"))
 
     error = False
     if request.method == "POST":
-        if request.form.get("password") == ADMIN_PASSWORD:
+        login_val = request.form.get("login", "").strip()
+        password_val = request.form.get("password", "")
+        user = db_get_user_by_login(login_val)
+        if user and user["password"] == password_val:
             session["auth"] = True
-            session["pw_fp"] = password_fingerprint()
             session["auth_ts"] = time.time()
+            session["role"] = user["role"] or "root"
             session.permanent = True
+            if session["role"] == "producer":
+                return redirect(url_for("admin.producer_page"))
             return redirect(url_for("admin.admin_page"))
         error = True
     return render_template("login.html", error=error)
@@ -266,6 +274,20 @@ def save():
     return redirect(url_for("admin.admin_page") + f"?tab={active_tab}")
 
 
+
+
+@bp.route("/producer")
+def producer_page():
+    if not is_authenticated():
+        return redirect(url_for("admin.login"))
+    if session.get("role") != "producer":
+        return redirect(url_for("admin.admin_page"))
+    from utils.version import VERSION as APP_VERSION
+    resp = make_response(render_template("producer.html", app_version=APP_VERSION))
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
 
 
 @bp.route("/logout")

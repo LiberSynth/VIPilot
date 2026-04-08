@@ -79,5 +79,6 @@ from .db import (
     db_set_batch_story_generating_by_id,
     db_set_batch_video_generating_by_id,
     db_set_batch_transcoding_by_id,
+    db_get_user_by_login,
 )
 

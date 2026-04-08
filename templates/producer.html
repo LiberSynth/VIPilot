@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>VIPilot</title>
+<link rel="stylesheet" href="/static/admin.css">
+</head>
+<body>
+
+<!-- Sidebar -->
+<div class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <span class="sidebar-title">Разделы</span>
+    <button class="sidebar-close" onclick="closeSidebar()">✕</button>
+  </div>
+  <nav class="sidebar-nav">
+    <button class="sidebar-item active" data-panel="info" onclick="switchPanel('info')">
+      <span class="sidebar-item-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.5"/><line x1="8" y1="7.5" x2="8" y2="11.5"/><circle cx="8" cy="5" r="0.5" fill="currentColor" stroke="none"/></svg></span>Информация
+    </button>
+  </nav>
+</div>
+
+{% set page_title = 'Информация' %}
+{% include 'common/header.html' %}
+
+<div class="container">
+
+  <!-- ══ ИНФОРМАЦИЯ ══ -->
+  <div id="panel-info" class="tab-panel active">
+    {% from 'common/info_panel.html' import info_panel %}
+    {{ info_panel('PRODUCER', 'Модуль управления контентом и мониторинга публикаций.', show_developer=False) }}
+  </div>
+
+</div>
+
+<script src="/static/js/ui.js"></script>
+
+</body>
+</html>

@@ -39,10 +39,9 @@
     margin-bottom: 12px;
   }
   h1 { font-size: 20px; font-weight: 600; color: #fff; }
-  .subtitle { font-size: 13px; color: #666; margin-top: 4px; }
   .field { margin-bottom: 16px; }
   label { display: block; font-size: 13px; color: #999; margin-bottom: 6px; font-weight: 500; }
-  input[type=password] {
+  input[type=text], input[type=password] {
     width: 100%;
     background: #0f0f13;
     border: 1px solid #2a2a38;
@@ -53,7 +52,7 @@
     outline: none;
     transition: border-color .2s;
   }
-  input[type=password]:focus { border-color: #4a7cf7; }
+  input[type=text]:focus, input[type=password]:focus { border-color: #4a7cf7; }
   .error {
     background: rgba(255,80,80,.12);
     border: 1px solid rgba(255,80,80,.3);
@@ -95,15 +94,18 @@
       </svg>
     </div>
     <h1>VIPilot</h1>
-    <div class="subtitle">ROOT</div>
   </div>
   {% if error %}
-  <div class="error">Неверный пароль</div>
+  <div class="error">Неверный логин или пароль</div>
   {% endif %}
   <form method="post">
     <div class="field">
+      <label>Логин</label>
+      <input type="text" name="login" autofocus placeholder="Введите логин" autocomplete="username">
+    </div>
+    <div class="field">
       <label>Пароль</label>
-      <input type="password" name="password" autofocus placeholder="Введите пароль">
+      <input type="password" name="password" placeholder="Введите пароль" autocomplete="current-password">
     </div>
     <button type="submit">Войти</button>
   </form>
