@@ -728,6 +728,16 @@ def _m018_targets_browser_session(cur):
     """)
 
 
+def _m019_rename_session_context(cur):
+    """
+    Переименовывает колонку browser_session → session_context в таблице targets.
+    """
+    cur.execute("""
+        ALTER TABLE targets
+            RENAME COLUMN browser_session TO session_context
+    """)
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -747,6 +757,7 @@ MIGRATIONS = [
     (16, _m016_targets_config),
     (17, _m017_dzen_publisher_id),
     (18, _m018_targets_browser_session),
+    (19, _m019_rename_session_context),
 ]
 
 

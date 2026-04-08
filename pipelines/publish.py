@@ -91,7 +91,7 @@ def _publish_dzen(batch_id, log_id, target):
     cfg = target.get('config') or {} if isinstance(target, dict) else (target or {})
     target_id = target.get('id') if isinstance(target, dict) else None
 
-    if not dzen_client.is_configured(cfg):
+    if not dzen_client.is_configured(cfg, target_id):
         if log_id:
             if not cfg.get('publisher_id'):
                 db_log_entry(log_id, 'Дзен не настроен: publisher_id отсутствует', level='error')
@@ -121,7 +121,7 @@ def _publish_dzen(batch_id, log_id, target):
         title = 'Видео'
 
     try:
-        return dzen_client.publish(video_data, cfg, title, log_id, batch_id=batch_id)
+        return dzen_client.publish(video_data, cfg, title, log_id, batch_id=batch_id, target_id=target_id)
     except DzenSessionMissing as e:
         if log_id:
             db_log_entry(log_id, f'Дзен: {e}', level='error')

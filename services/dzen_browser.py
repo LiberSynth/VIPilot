@@ -29,35 +29,22 @@ from typing import Optional
 
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DZEN_PROFILE_DIR = os.path.join(_PROJECT_ROOT, "data", "dzen_profile")
-_METADATA_FILE = os.path.join(DZEN_PROFILE_DIR, "_vipilot_meta.json")
-DZEN_COOKIES_FILE = os.path.join(_PROJECT_ROOT, "data", "dzen_cookies.json")
 
 
-def _read_meta() -> dict:
-    try:
-        with open(_METADATA_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return {}
+def get_session_saved_at(target_id: str | None = None) -> str | None:
+    """Возвращает ISO-метку последнего сохранения из БД, или None."""
+    if not target_id:
+        return None
+    from db import db_get_target_session_context_saved_at
+    return db_get_target_session_context_saved_at(target_id)
 
 
-def _write_meta(data: dict):
-    os.makedirs(DZEN_PROFILE_DIR, exist_ok=True)
-    try:
-        with open(_METADATA_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f)
-    except Exception as e:
-        print(f"[dzen_browser] Ошибка записи метаданных: {e}")
-
-
-def get_session_saved_at() -> str | None:
-    """Возвращает ISO-метку последнего сохранения или None."""
-    return _read_meta().get("saved_at")
-
-
-def profile_exists() -> bool:
-    """True если куки Дзена уже экспортированы (пользователь логинился и сохранил сессию)."""
-    return os.path.exists(DZEN_COOKIES_FILE)
+def profile_exists(target_id: str | None = None) -> bool:
+    """True если куки Дзена уже сохранены в БД для данного таргета."""
+    if not target_id:
+        return False
+    from db import db_get_target_session_context
+    return db_get_target_session_context(target_id) is not None
 
 
 # ---------------------------------------------------------------------------
@@ -184,16 +171,16 @@ def _browser_loop(target_id: str):
                 if _save_request_event.is_set():
                     _save_request_event.clear()
                     try:
-                        # Экспортируем куки в JSON — пайплайн будет читать их напрямую
-                        # без открытия профильной директории (нет конфликта блокировки).
+                        from db import db_set_target_session_context
                         cookies = context.cookies(["https://dzen.ru", "https://yandex.ru"])
-                        cookies_path = DZEN_COOKIES_FILE
-                        os.makedirs(os.path.dirname(cookies_path), exist_ok=True)
-                        with open(cookies_path, "w", encoding="utf-8") as _f:
-                            json.dump(cookies, _f, ensure_ascii=False)
-                        _write_meta({"saved_at": datetime.now(timezone.utc).isoformat()})
-                        _save_result = {"ok": True, "error": None}
-                        print(f"[dzen_browser] Сессия сохранена: {len(cookies)} куков → {cookies_path}")
+                        saved_at = datetime.now(timezone.utc).isoformat()
+                        state = {"cookies": cookies, "saved_at": saved_at}
+                        ok = db_set_target_session_context(_current_target_id, state)
+                        if ok:
+                            _save_result = {"ok": True, "error": None}
+                            print(f"[dzen_browser] Сессия сохранена в БД: {len(cookies)} куков, target={_current_target_id}")
+                        else:
+                            _save_result = {"ok": False, "error": "Ошибка записи в БД"}
                     except Exception as e:
                         _save_result = {"ok": False, "error": str(e)}
                     _save_done_event.set()

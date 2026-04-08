@@ -200,13 +200,13 @@ def db_update_target_config(target_id: str, config: dict) -> bool:
         return False
 
 
-def db_get_target_browser_session(target_id: str) -> dict | None:
-    """Возвращает Playwright storage state (cookies + localStorage) для таргета, или None."""
+def db_get_target_session_context(target_id: str) -> dict | None:
+    """Возвращает Playwright storage state (cookies) для таргета, или None."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT browser_session FROM targets WHERE id = %s::uuid",
+                    "SELECT session_context FROM targets WHERE id = %s::uuid",
                     (target_id,),
                 )
                 row = cur.fetchone()
@@ -214,42 +214,42 @@ def db_get_target_browser_session(target_id: str) -> dict | None:
             return row[0]
         return None
     except Exception as e:
-        print(f"[DB] Ошибка db_get_target_browser_session: {e}")
+        print(f"[DB] Ошибка db_get_target_session_context: {e}")
         return None
 
 
-def db_set_target_browser_session(target_id: str, state: dict) -> bool:
-    """Сохраняет Playwright storage state (cookies + localStorage) для таргета."""
+def db_set_target_session_context(target_id: str, state: dict) -> bool:
+    """Сохраняет Playwright storage state (cookies) для таргета."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "UPDATE targets SET browser_session = %s::jsonb WHERE id = %s::uuid",
+                    "UPDATE targets SET session_context = %s::jsonb WHERE id = %s::uuid",
                     (json.dumps(state), target_id),
                 )
             conn.commit()
         return True
     except Exception as e:
-        print(f"[DB] Ошибка db_set_target_browser_session: {e}")
+        print(f"[DB] Ошибка db_set_target_session_context: {e}")
         return False
 
 
-def db_get_target_browser_session_saved_at(target_id: str) -> str | None:
+def db_get_target_session_context_saved_at(target_id: str) -> str | None:
     """
-    Возвращает timestamp последнего сохранения browser_session из поля
-    browser_session->'saved_at' (ISO-строку), или None.
+    Возвращает timestamp последнего сохранения session_context из поля
+    session_context->'saved_at' (ISO-строку), или None.
     """
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT browser_session->>'saved_at' FROM targets WHERE id = %s::uuid",
+                    "SELECT session_context->>'saved_at' FROM targets WHERE id = %s::uuid",
                     (target_id,),
                 )
                 row = cur.fetchone()
         return row[0] if row else None
     except Exception as e:
-        print(f"[DB] Ошибка db_get_target_browser_session_saved_at: {e}")
+        print(f"[DB] Ошибка db_get_target_session_context_saved_at: {e}")
         return None
 
 
