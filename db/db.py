@@ -123,11 +123,11 @@ def db_get_active_targets():
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT id, name, aspect_ratio_x, aspect_ratio_y, transcode, config FROM targets WHERE active = TRUE"
+                    "SELECT id, name, aspect_ratio_x, aspect_ratio_y, transcode, config, slug FROM targets WHERE active = TRUE ORDER BY id"
                 )
                 rows = cur.fetchall()
         return [
-            {"id": str(row[0]), "name": row[1], "aspect_ratio_x": row[2], "aspect_ratio_y": row[3], "transcode": bool(row[4]), "config": row[5] or {}}
+            {"id": str(row[0]), "name": row[1], "aspect_ratio_x": row[2], "aspect_ratio_y": row[3], "transcode": bool(row[4]), "config": row[5] or {}, "slug": row[6] or ""}
             for row in rows
         ]
     except Exception as e:
@@ -510,15 +510,20 @@ def db_set_batch_cancelled(batch_id):
 
 
 def db_cancel_waiting_batches():
-    """Отменяет batches в статусе transcode_ready/story_posted/wall_posting, у которых слот расписания
-    больше не существует или таргет деактивирован. Возвращает список отменённых batch_id."""
+    """Отменяет batches в статусе transcode_ready или с промежуточными составными статусами
+    (*.published, *.pending), у которых слот расписания больше не существует или таргет деактивирован.
+    Возвращает список отменённых batch_id."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
                     UPDATE batches
                     SET status = 'cancelled'
-                    WHERE status IN ('transcode_ready', 'story_posted', 'wall_posting')
+                    WHERE (
+                        status = 'transcode_ready'
+                        OR status LIKE '%.published'
+                        OR status LIKE '%.pending'
+                    )
                       AND scheduled_at IS NOT NULL
                       AND (
                           NOT EXISTS (
@@ -1022,35 +1027,6 @@ def db_set_batch_story_error(batch_id):
     return db_set_batch_status(batch_id, 'story_error')
 
 
-def db_set_batch_story_posted(batch_id):
-    """Переводит батч в status='story_posted' (история опубликована, стена ожидает)."""
-    return db_set_batch_status(batch_id, 'story_posted')
-
-
-def db_claim_batch_wall_posting(batch_id: str) -> bool:
-    """Атомарно переводит батч из story_posted → wall_posting.
-    Возвращает True если именно этот процесс захватил батч,
-    False если строка не найдена (другой процесс уже взял батч)."""
-    _assert_known_status('wall_posting')
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    UPDATE batches SET status = 'wall_posting'
-                    WHERE id = %s AND status = 'story_posted'
-                    RETURNING id
-                    """,
-                    (batch_id,),
-                )
-                row = cur.fetchone()
-            conn.commit()
-        return row is not None
-    except Exception as e:
-        print(f"[DB] Ошибка db_claim_batch_wall_posting: {e}")
-        return False
-
-
 def db_set_batch_story_ready_from_error(batch_id):
     """Откатывает батч в story_ready после сбоя видео, сохраняя story_id.
     Очищает data (request_id/url), но НЕ трогает story_id — сюжет не регенерируется."""
@@ -1307,12 +1283,13 @@ def db_cleanup_video_data(file_lifetime_days: int) -> int:
 def db_reset_stalled_batches() -> list[dict]:
     """
     Сбрасывает «зависшие» батчи при рестарте приложения:
-      - story_generating  → pending
-      - video_generating  → story_ready
+      - story_generating           → pending
+      - video_generating           → story_ready
+      - {slug}.{method}.posting    → {slug}.{method}.pending  (динамически по таргетам)
 
     Возвращает список dict: [{"id": ..., "old_status": ..., "new_status": ...}, ...]
     """
-    resets = [
+    static_resets = [
         ("story_generating", "pending"),
         ("video_generating", "story_ready"),
     ]
@@ -1320,11 +1297,11 @@ def db_reset_stalled_batches() -> list[dict]:
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
-                for old_status, new_status in resets:
+                for old_status, new_status in static_resets:
                     cur.execute(
                         """
                         UPDATE batches
-                           SET status = %s, updated_at = NOW()
+                           SET status = %s
                          WHERE status = %s
                         RETURNING id
                         """,
@@ -1337,6 +1314,31 @@ def db_reset_stalled_batches() -> list[dict]:
                             "old_status": old_status,
                             "new_status": new_status,
                         })
+
+                cur.execute("""
+                    SELECT DISTINCT status FROM batches
+                    WHERE status LIKE '%.posting'
+                """)
+                posting_rows = cur.fetchall()
+                for (posting_status,) in posting_rows:
+                    pending_status = posting_status[:-len('.posting')] + '.pending'
+                    cur.execute(
+                        """
+                        UPDATE batches
+                           SET status = %s
+                         WHERE status = %s
+                        RETURNING id
+                        """,
+                        (pending_status, posting_status),
+                    )
+                    rows = cur.fetchall()
+                    for row in rows:
+                        affected.append({
+                            "id": str(row[0]),
+                            "old_status": posting_status,
+                            "new_status": pending_status,
+                        })
+
             conn.commit()
     except Exception as e:
         print(f"[DB] Ошибка db_reset_stalled_batches: {e}")
@@ -1387,9 +1389,10 @@ def db_get_batch_by_id(batch_id):
 
 def db_get_actionable_batches():
     """Возвращает список батчей, готовых к обработке (FIFO по created_at).
-    wall_posting не включён: этот статус выставляется атомарно claim-ом
-    и существует только в рамках активного выполнения одного воркера.
-    story_posted включён для resume после краша до wall-публикации."""
+    Включает батчи с фиксированными статусами пайплайнов story/video/transcode,
+    а также батчи со статусами, оканчивающимися на .pending или .published
+    (промежуточные составные статусы publish-пайплайна).
+    Статусы *.posting не включаются — они являются активными и захвачены воркером."""
     try:
         with get_db() as conn:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
@@ -1400,8 +1403,10 @@ def db_get_actionable_batches():
                         'pending', 'story_generating',
                         'story_ready', 'video_generating', 'video_pending',
                         'video_ready', 'transcoding',
-                        'transcode_ready', 'story_posted'
+                        'transcode_ready'
                     )
+                    OR status LIKE '%.pending'
+                    OR status LIKE '%.published'
                     ORDER BY created_at ASC
                 """)
                 rows = cur.fetchall()
@@ -1444,22 +1449,52 @@ KNOWN_BATCH_STATUSES = frozenset({
     'story_ready', 'video_generating', 'video_pending',
     # transcode pipeline
     'video_ready', 'transcoding',
-    # publish pipeline
-    'transcode_ready', 'story_posted', 'wall_posting',
+    # publish pipeline entry point
+    'transcode_ready',
     # terminal
     'cancelled', 'error', 'probe', 'story_probe', 'story_error',
     'video_error', 'transcode_error', 'publish_error', 'published',
     'fatal_error',
 })
 
+_COMPOSITE_STATUS_SUFFIXES = ('.posting', '.published', '.pending')
+
+
+def _get_dynamic_publish_statuses() -> set:
+    """Читает все таргеты (включая неактивные) и возвращает набор допустимых составных статусов вида
+    {slug}.{method}.posting / .published / .pending.
+    Неактивные таргеты включаются для корректной валидации статусов батчей, которые могли
+    находиться в процессе публикации в момент деактивации таргета."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT slug, config FROM targets WHERE slug IS NOT NULL AND slug != ''"
+                )
+                rows = cur.fetchall()
+        statuses = set()
+        for slug, cfg in rows:
+            methods = (cfg or {}).get('publish_method', {})
+            for method in methods:
+                for suffix in _COMPOSITE_STATUS_SUFFIXES:
+                    statuses.add(f"{slug}.{method}{suffix}")
+        return statuses
+    except Exception:
+        return set()
+
 
 def _assert_known_status(status: str) -> None:
-    """Бросает ValueError если статус не зарегистрирован в KNOWN_BATCH_STATUSES.
-    Вызывай в начале каждого сеттера, чтобы поймать рассинхронизацию с константой."""
-    if status not in KNOWN_BATCH_STATUSES:
-        raise ValueError(
-            f"[DB] Неизвестный статус '{status}' — добавь его в KNOWN_BATCH_STATUSES"
-        )
+    """Проверяет, что статус известен. Для составных статусов ({slug}.{method}.posting/published/pending)
+    динамически читает разрешённые значения из таблицы targets."""
+    if status in KNOWN_BATCH_STATUSES:
+        return
+    if any(status.endswith(sfx) for sfx in _COMPOSITE_STATUS_SUFFIXES):
+        dynamic = _get_dynamic_publish_statuses()
+        if status in dynamic:
+            return
+    raise ValueError(
+        f"[DB] Неизвестный статус '{status}' — добавь его в KNOWN_BATCH_STATUSES или проверь конфиг таргета"
+    )
 
 
 def db_set_batch_status(batch_id: str, status: str) -> bool:
@@ -1479,6 +1514,31 @@ def db_set_batch_status(batch_id: str, status: str) -> bool:
         return True
     except Exception as e:
         print(f"[DB] Ошибка db_set_batch_status: {e}")
+        return False
+
+
+def db_claim_batch_status(batch_id: str, from_status: str, to_status: str) -> bool:
+    """Атомарно переводит батч из from_status → to_status только если текущий статус равен from_status.
+    Возвращает True если переход выполнен (этот процесс захватил батч),
+    False если строка не найдена (другой процесс уже изменил статус)."""
+    _assert_known_status(from_status)
+    _assert_known_status(to_status)
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE batches SET status = %s
+                    WHERE id = %s AND status = %s
+                    RETURNING id
+                    """,
+                    (to_status, batch_id, from_status),
+                )
+                row = cur.fetchone()
+            conn.commit()
+        return row is not None
+    except Exception as e:
+        print(f"[DB] Ошибка db_claim_batch_status: {e}")
         return False
 
 

@@ -738,6 +738,82 @@ def _m019_rename_session_context(cur):
     """)
 
 
+def _m020_targets_slug_and_publish_methods(cur):
+    """
+    Добавляет поле slug в targets и обогащает config publish_method.*.
+    VKontakte → slug=vk, publish_method.story и publish_method.wall берутся из
+    глобальных настроек vk_publish_story / vk_publish_wall (по умолчанию 1).
+    Дзен → slug=dzen, publish_method.video=1.
+    Deployed: -
+    """
+    cur.execute("""
+        ALTER TABLE targets
+            ADD COLUMN IF NOT EXISTS slug VARCHAR(50)
+    """)
+    cur.execute("""
+        UPDATE targets
+        SET slug = 'vk'
+        WHERE name = 'VKontakte' AND (slug IS NULL OR slug = '')
+    """)
+    cur.execute("""
+        UPDATE targets
+        SET slug = 'dzen'
+        WHERE name = 'Дзен' AND (slug IS NULL OR slug = '')
+    """)
+    cur.execute("""
+        WITH settings AS (
+            SELECT
+                COALESCE((SELECT value FROM settings WHERE key = 'vk_publish_story'), '1') AS story_val,
+                COALESCE((SELECT value FROM settings WHERE key = 'vk_publish_wall'),  '1') AS wall_val
+        )
+        UPDATE targets
+        SET config = config
+            || jsonb_build_object(
+                'publish_method', jsonb_build_object(
+                    'story', (SELECT CASE WHEN story_val = '1' THEN 1 ELSE 0 END FROM settings),
+                    'wall',  (SELECT CASE WHEN wall_val  = '1' THEN 1 ELSE 0 END FROM settings)
+                )
+            )
+        WHERE name = 'VKontakte'
+          AND (config->'publish_method') IS NULL
+    """)
+    cur.execute("""
+        UPDATE targets
+        SET config = config || '{"publish_method": {"video": 1}}'::jsonb
+        WHERE name = 'Дзен'
+          AND (config->'publish_method') IS NULL
+    """)
+
+
+def _m021_migrate_old_batch_statuses(cur):
+    """
+    Переводит батчи из старых промежуточных статусов в новые составные.
+    story_posted  → vk.story.published
+    wall_posting  → vk.wall.posting
+    Deployed: -
+    """
+    cur.execute("""
+        UPDATE batches
+        SET status = 'vk.story.published'
+        WHERE status = 'story_posted'
+    """)
+    cur.execute("""
+        UPDATE batches
+        SET status = 'vk.wall.posting'
+        WHERE status = 'wall_posting'
+    """)
+
+
+def _m022_widen_batches_status(cur):
+    """
+    Расширяет batches.status с VARCHAR(30) до TEXT.
+    Составные статусы {slug}.{method}.{phase} могут превышать 30 символов
+    при произвольных slug/method именах.
+    Deployed: -
+    """
+    cur.execute("ALTER TABLE batches ALTER COLUMN status TYPE TEXT")
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -758,6 +834,9 @@ MIGRATIONS = [
     (17, _m017_dzen_publisher_id),
     (18, _m018_targets_browser_session),
     (19, _m019_rename_session_context),
+    (20, _m020_targets_slug_and_publish_methods),
+    (21, _m021_migrate_old_batch_statuses),
+    (22, _m022_widen_batches_status),
 ]
 
 

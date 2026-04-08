@@ -78,9 +78,20 @@ _STATUS_TO_PIPELINE = {
     'video_ready':      transcode,
     'transcoding':      transcode,
     'transcode_ready':  publish,
-    'story_posted':     publish,
-    'wall_posting':     publish,
 }
+
+_PUBLISH_STATUS_SUFFIXES = ('.pending', '.published')
+
+
+def _get_pipeline(status: str):
+    """Возвращает модуль пайплайна для данного статуса батча.
+    Составные статусы вида slug.method.pending / slug.method.published → publish."""
+    pipeline = _STATUS_TO_PIPELINE.get(status)
+    if pipeline is not None:
+        return pipeline
+    if any(status.endswith(sfx) for sfx in _PUBLISH_STATUS_SUFFIXES):
+        return publish
+    return None
 
 def _reset_stalled_batches():
     """Сбрасывает незавершённые батчи на старте: story_generating→pending, video_generating→story_ready."""
@@ -98,8 +109,12 @@ def _reset_stalled_batches():
 
 
 def _validate_batch_statuses():
-    """Проверяет, нет ли батчей с неизвестным статусом. Вызывается при старте."""
-    unknown_batches = db_get_batches_with_unknown_status(KNOWN_BATCH_STATUSES)
+    """Проверяет, нет ли батчей с неизвестным статусом. Вызывается при старте.
+    Составные статусы publish-пайплайна (slug.method.posting/published/pending) считаются известными."""
+    from db.db import _get_dynamic_publish_statuses
+    dynamic = _get_dynamic_publish_statuses()
+    all_known = KNOWN_BATCH_STATUSES | dynamic
+    unknown_batches = db_get_batches_with_unknown_status(all_known)
     if unknown_batches:
         for batch_id, status in unknown_batches.items():
             msg = f"[validate] ВНИМАНИЕ: батч имеет неизвестный статус: {status!r}"
@@ -207,7 +222,7 @@ def main_loop():
                         break
                     bid    = str(b['id'])
                     status = b['status']
-                    pipeline_module = _STATUS_TO_PIPELINE.get(status)
+                    pipeline_module = _get_pipeline(status)
                     if pipeline_module is None:
                         continue
                     # Публикация: не запускаем поток пока не наступило время
