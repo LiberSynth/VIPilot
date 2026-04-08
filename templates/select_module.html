@@ -96,7 +96,7 @@
   </div>
   <div class="subtitle">Выберите модуль для работы</div>
   {% for role in roles %}
-  <a href="/{{ role.slug }}" class="module-btn">{{ role.module }}</a>
+  <a href="{{ role.url }}" class="module-btn">{{ role.module }}</a>
   {% endfor %}
   <a href="/logout" class="logout-link">Выйти</a>
 </div>

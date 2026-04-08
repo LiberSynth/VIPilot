@@ -47,14 +47,15 @@ def _has_slug(slug):
     return any(r["slug"] == slug for r in _get_session_roles())
 
 
+def _role_url(role):
+    return url_for("web.root_page") if role["slug"] == "root" else f"/{role['slug']}"
+
+
 def _redirect_after_login():
     roles = _get_session_roles()
-    if any(r["slug"] == "root" for r in roles):
-        return redirect(url_for("web.root_page"))
-    non_root = [r for r in roles if r["slug"] != "root"]
-    if len(non_root) == 1:
-        return redirect(f"/{non_root[0]['slug']}")
-    if len(non_root) > 1:
+    if len(roles) == 1:
+        return redirect(_role_url(roles[0]))
+    if len(roles) > 1:
         return redirect(url_for("web.select_module"))
     session.clear()
     return redirect(url_for("web.login"))
@@ -312,12 +313,12 @@ def select_module():
     if not is_authenticated():
         return redirect(url_for("web.login"))
     roles = _get_session_roles()
-    non_root = [r for r in roles if r["slug"] != "root"]
-    if not non_root:
-        return redirect(url_for("web.root_page"))
-    if len(non_root) == 1:
-        return redirect(f"/{non_root[0]['slug']}")
-    return render_template("select_module.html", roles=non_root)
+    if not roles:
+        return redirect(url_for("web.login"))
+    if len(roles) == 1:
+        return redirect(_role_url(roles[0]))
+    roles_display = [dict(r, url=_role_url(r)) for r in roles]
+    return render_template("select_module.html", roles=roles_display)
 
 
 @bp.route("/<slug>")
