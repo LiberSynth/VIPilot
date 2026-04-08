@@ -477,7 +477,7 @@
                 <li><strong>pending / story_generating</strong> → <code>story.py</code>: генерация текстового сценария через LLM. По завершении — статус <code>story_ready</code>.</li>
                 <li><strong>story_ready / video_generating / video_pending</strong> → <code>video.py</code>: отправка сценария в API генерации видео (fal.ai), опрос статуса задачи, сохранение результата. По завершении — статус <code>video_ready</code>.</li>
                 <li><strong>video_ready / transcoding</strong> → <code>transcode.py</code>: перекодирование видео через ffmpeg — нормализация разрешения, частоты кадров и формата. Если транскодирование отключено в настройках — батч сразу переводится в <code>transcode_ready</code> через <code>skip</code>.</li>
-                <li><strong>transcode_ready / {slug}.{method}.pending / {slug}.{method}.published</strong> → <code>publish.py</code>: публикация в настроенные каналы (ВКонтакте, Дзен). Пайплайн последовательно проходит по активным таргетам и включённым методам из <code>publish_method.*</code>. Дожидается наступления <code>scheduled_at</code> если время ещё не пришло. По завершении всех шагов — статус <code>published</code>.</li>
+                <li><strong>transcode_ready / {slug}.{method}.pending / {slug}.{method}.published</strong> → <code>publish.py</code>: публикация в настроенные каналы (ВКонтакте, Дзен). Пайплайн последовательно проходит по активным таргетам и включенным методам из <code>publish_method.*</code>. Дожидается наступления <code>scheduled_at</code> если время ещё не пришло. По завершении всех шагов — статус <code>published</code>.</li>
               </ol>
 
               <p style="margin:0 0 12px"><strong style="color:#e0e0f0">Захват батча и защита от дублирования</strong><br>

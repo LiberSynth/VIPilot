@@ -299,7 +299,7 @@ def api_workflow_use_donor():
     body = request.get_json(silent=True) or {}
     val = "1" if body.get("enabled") == "1" else "0"
     env_set("use_donor", val)
-    label = "включён" if val == "1" else "выключен"
+    label = "включен" if val == "1" else "выключен"
     db_log_root(f"Использовать донора {label}", status='info')
     return jsonify({"ok": True, "use_donor": val})
 

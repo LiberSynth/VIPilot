@@ -136,10 +136,7 @@ def run(batch_id):
             if donor_id:
                 updated = db_get_batch_by_id(batch_id)
                 new_status = updated['status'] if updated else None
-                detail = (
-                    f"Включён режим «Использовать донора». "
-                    f"Видео позаимствовано из отменённого батча {donor_id}"
-                )
+                detail = "Включен режим «Использовать донора».  Генерация сюжета не требуется."
 
                 log_id = db_log_pipeline(
                     'story', 'Найден донор, генерация не требуется',
