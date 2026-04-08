@@ -4,7 +4,12 @@
 Модели ИИ управляются через db/migrations.py (_m004_seed_ai_models).
 """
 
+import logging
+import traceback
+
 from .connection import get_db
+
+logger = logging.getLogger(__name__)
 
 
 def seed_db():
@@ -97,4 +102,5 @@ def seed_db():
             conn.commit()
         print("[DB] Данные инициализированы")
     except Exception as e:
-        print(f"[DB] Ошибка seed_db: {e}")
+        logger.error("[DB] Ошибка seed_db:\n%s", traceback.format_exc())
+        raise

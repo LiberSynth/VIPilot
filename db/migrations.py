@@ -1044,6 +1044,54 @@ def _m030_user_roles_module_field(cur):
     """)
 
 
+def _m032_seed_default_users(cur):
+    """
+    Гарантирует наличие дефолтных пользователей (root, producer, operator) и
+    их связей с ролями. Idempotent: использует WHERE NOT EXISTS / ON CONFLICT DO NOTHING.
+    Исправляет продакшн-БД, где seed_db() не отработал из-за поглощённой ошибки.
+    """
+    cur.execute("""
+        INSERT INTO user_roles (name, slug, module)
+        SELECT v.name, v.slug, v.module FROM (VALUES
+            ('root',     'root',     'ROOT'),
+            ('producer', 'producer', 'PRODUCER'),
+            ('operator', 'operator', 'OPERATOR')
+        ) AS v(name, slug, module)
+        WHERE NOT EXISTS (
+            SELECT 1 FROM user_roles WHERE slug = v.slug
+        )
+    """)
+
+    cur.execute("""
+        INSERT INTO users (name, login, password)
+        SELECT v.name, v.login, v.password
+        FROM (VALUES
+            ('root',     'root',     '0000'),
+            ('producer', 'producer', '0000'),
+            ('operator', 'operator', '0000')
+        ) AS v(name, login, password)
+        WHERE NOT EXISTS (
+            SELECT 1 FROM users WHERE login = v.login
+        )
+    """)
+
+    cur.execute("""
+        INSERT INTO user_role_links (user_id, role_id)
+        SELECT u.id, r.id
+        FROM (VALUES
+            ('operator', 'operator'),
+            ('producer', 'producer'),
+            ('producer', 'operator'),
+            ('root',     'root'),
+            ('root',     'producer'),
+            ('root',     'operator')
+        ) AS v(user_login, role_slug)
+        JOIN users      u ON u.login = v.user_login
+        JOIN user_roles r ON r.slug  = v.role_slug
+        ON CONFLICT DO NOTHING
+    """)
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -1076,6 +1124,7 @@ MIGRATIONS = [
     (29, _m029_targets_order),
     (30, _m029_user_role_links),
     (31, _m030_user_roles_module_field),
+    (32, _m032_seed_default_users),
 ]
 
 

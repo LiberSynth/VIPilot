@@ -3,9 +3,14 @@
 Последовательность: bootstrap → migrations → seed.
 """
 
+import logging
+import traceback
+
 from .connection import get_db
 from .migrations import run_migrations
 from .seed import seed_db
+
+logger = logging.getLogger(__name__)
 
 
 def _bootstrap():
@@ -36,4 +41,5 @@ def init_db():
         run_migrations()
         seed_db()
     except Exception as e:
-        print(f"[DB] Ошибка инициализации: {e}")
+        logger.error("[DB] Ошибка инициализации:\n%s", traceback.format_exc())
+        raise
