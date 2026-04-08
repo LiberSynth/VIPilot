@@ -295,7 +295,9 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
             success_hint = page.locator(
                 "[class*='toast']:has-text('опубликован'), "
                 "[class*='notification']:has-text('опубликован'), "
-                "[data-testid='publish-success']"
+                "[data-testid='publish-success'], "
+                "text=Уже можно публиковать, "
+                "text=Видео появится на канале"
             ).first
             if success_hint.is_visible():
                 _log(log_id, "Подтверждение публикации уже получено — капча не нужна.")
@@ -320,7 +322,9 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
         "[class*='notification']:has-text('опубликован'), "
         "[data-testid='publish-success'], "
         "[data-testid*='publish']:has-text('опубликован'), "
-        "text=Видео опубликовано"
+        "text=Видео опубликовано, "
+        "text=Уже можно публиковать, "
+        "text=Видео появится на канале"
     )
 
     url_before = page.url
