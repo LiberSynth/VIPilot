@@ -123,7 +123,7 @@ def db_get_active_targets():
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT id, name, aspect_ratio_x, aspect_ratio_y, transcode, config, slug FROM targets WHERE active = TRUE ORDER BY id"
+                    'SELECT id, name, aspect_ratio_x, aspect_ratio_y, transcode, config, slug FROM targets WHERE active = TRUE ORDER BY "order", name'
                 )
                 rows = cur.fetchall()
         return [

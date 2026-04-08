@@ -972,6 +972,13 @@ def _m027_sync_vk_publish_method_from_settings(cur):
     )
 
 
+def _m029_targets_order(cur):
+    """Добавляет столбец order в targets и выставляет vk=1, dzen=2."""
+    cur.execute('ALTER TABLE targets ADD COLUMN IF NOT EXISTS "order" INTEGER')
+    cur.execute('UPDATE targets SET "order" = 1 WHERE slug = \'vk\'')
+    cur.execute('UPDATE targets SET "order" = 2 WHERE slug = \'dzen\'')
+
+
 def _m028_fill_null_story_ids(cur):
     """Заполняет batches.story_id случайными значениями из stories там, где он NULL.
     Работает только если в таблице stories есть хотя бы одна запись."""
@@ -1015,6 +1022,7 @@ MIGRATIONS = [
     (26, _m026_users),
     (27, _m027_sync_vk_publish_method_from_settings),
     (28, _m028_fill_null_story_ids),
+    (29, _m029_targets_order),
 ]
 
 
