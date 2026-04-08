@@ -1010,6 +1010,23 @@ def db_set_batch_published(batch_id):
         return False
 
 
+def db_set_batch_published_partially(batch_id):
+    """Переводит батч в status='published_partially' и ставит completed_at."""
+    _assert_known_status('published_partially')
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE batches SET status = 'published_partially', completed_at = now() WHERE id = %s",
+                    (batch_id,),
+                )
+            conn.commit()
+        return True
+    except Exception as e:
+        print(f"[DB] Ошибка db_set_batch_published_partially: {e}")
+        return False
+
+
 def db_set_batch_publish_error(batch_id):
     """Переводит батч в status='publish_error'."""
     return db_set_batch_status(batch_id, 'publish_error')
@@ -1446,7 +1463,7 @@ KNOWN_BATCH_STATUSES = frozenset({
     # terminal
     'cancelled', 'error', 'probe', 'story_probe', 'story_error',
     'video_error', 'transcode_error', 'publish_error', 'published',
-    'fatal_error',
+    'published_partially', 'fatal_error',
 })
 
 _COMPOSITE_STATUS_SUFFIXES = ('.posting', '.published', '.pending', '.failed')

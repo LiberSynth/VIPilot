@@ -22,6 +22,7 @@ from db import (
     db_get_story_title,
     db_set_batch_probe,
     db_set_batch_published,
+    db_set_batch_published_partially,
     db_set_batch_publish_error,
     db_set_batch_status,
     db_claim_batch_status,
@@ -312,10 +313,10 @@ def run(batch_id):
             expected_from = published_status
 
         if any_ok:
-            saved = db_set_batch_published(batch_id)
-            if saved:
-                if failed_steps:
-                    fail_list = ', '.join(failed_steps)
+            if failed_steps:
+                fail_list = ', '.join(failed_steps)
+                saved = db_set_batch_published_partially(batch_id)
+                if saved:
                     db_log_update(log_id, f'Частично опубликовано ({target_names}); ошибки: {fail_list}', 'ok')
                     print(f"[publish] Батч {batch_id[:8]}… частично опубликован (ошибки: {fail_list})")
                     entries = db_get_log_entries(log_id) if log_id else []
@@ -326,6 +327,13 @@ def run(batch_id):
                         partial=True,
                     )
                 else:
+                    db_set_batch_publish_error(batch_id)
+                    db_log_update(log_id, 'Частично опубликовано, но ошибка записи статуса в БД', 'error')
+                    print(f"[publish] Батч {batch_id[:8]}… ошибка записи published_partially в БД")
+                    notify_failure(f"publish: частично опубликовано, но статус не сохранён в БД — батч {batch_id[:8]}")
+            else:
+                saved = db_set_batch_published(batch_id)
+                if saved:
                     db_log_update(log_id, f'Опубликовано ({target_names})', 'ok')
                     print(f"[publish] Батч {batch_id[:8]}… опубликован")
                     if log_id:
@@ -337,11 +345,11 @@ def run(batch_id):
                                 log_entries=warn_entries,
                                 partial=True,
                             )
-            else:
-                db_set_batch_publish_error(batch_id)
-                db_log_update(log_id, f'Опубликовано, но ошибка записи статуса в БД', 'error')
-                print(f"[publish] Батч {batch_id[:8]}… ошибка записи published в БД")
-                notify_failure(f"publish: опубликовано, но статус не сохранён в БД — батч {batch_id[:8]}")
+                else:
+                    db_set_batch_publish_error(batch_id)
+                    db_log_update(log_id, 'Опубликовано, но ошибка записи статуса в БД', 'error')
+                    print(f"[publish] Батч {batch_id[:8]}… ошибка записи published в БД")
+                    notify_failure(f"publish: опубликовано, но статус не сохранён в БД — батч {batch_id[:8]}")
         else:
             db_set_batch_publish_error(batch_id)
             db_log_update(log_id, 'Ошибка публикации', 'error')

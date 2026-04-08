@@ -54,6 +54,7 @@ from .db import (
     db_get_batch_logs,
     db_set_batch_probe,
     db_set_batch_published,
+    db_set_batch_published_partially,
     db_set_batch_publish_error,
     db_get_models,
     db_activate_model,
