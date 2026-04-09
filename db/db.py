@@ -355,16 +355,17 @@ def db_create_probe_batch(video_model_id):
 def db_create_story_probe_batch(text_model_id):
     """Создаёт pending-батч с type='probe' для пробного запроса сценария.
     data-флаг story_probe=true сигнализирует пайплайну завершить батч
-    в статусе story_probe (без передачи в видео-конвейер)."""
+    в статусе story_probe (без передачи в видео-конвейер).
+    probe_model_id хранится в data, а не в колонке text_model_id."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
                     INSERT INTO batches
-                        (status, type, text_model_id, data)
-                    VALUES ('pending', 'probe', %s, '{"story_probe": true}')
+                        (status, type, data)
+                    VALUES ('pending', 'probe', %s)
                     RETURNING id
-                """, (text_model_id,))
+                """, (json.dumps({"story_probe": True, "probe_model_id": str(text_model_id)}),))
                 row = cur.fetchone()
             conn.commit()
         return str(row[0]) if row else None
@@ -419,19 +420,19 @@ def db_set_batch_story_id(batch_id, story_id):
         print(f"[DB] Ошибка db_set_batch_story_id: {e}")
 
 
-def db_set_batch_text_model(batch_id, model_id):
-    """Сохраняет id текстовой модели, сгенерировавшей сюжет."""
+def db_set_story_model(story_id, model_id):
+    """Сохраняет id текстовой модели, сгенерировавшей сюжет, в таблицу stories."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "UPDATE batches SET text_model_id = %s WHERE id = %s",
-                    (model_id, batch_id),
+                    "UPDATE stories SET model_id = %s WHERE id = %s",
+                    (model_id, story_id),
                 )
             conn.commit()
         return True
     except Exception as e:
-        print(f"[DB] Ошибка db_set_batch_text_model: {e}")
+        print(f"[DB] Ошибка db_set_story_model: {e}")
         return False
 
 
@@ -955,7 +956,8 @@ def db_get_batch_logs(batch_id):
                         tm.name                                                 AS text_model_name,
                         vm.name                                                 AS video_model_name
                     FROM batches b
-                    LEFT JOIN ai_models tm ON tm.id = b.text_model_id
+                    LEFT JOIN stories s ON s.id = b.story_id
+                    LEFT JOIN ai_models tm ON tm.id = s.model_id
                     LEFT JOIN ai_models vm ON vm.id = b.video_model_id
                     WHERE b.id = %s
                 """, (batch_id,))
@@ -1415,7 +1417,7 @@ def db_get_batch_by_id(batch_id):
                 cur.execute("""
                     SELECT b.id, b.scheduled_at, b.type, b.story_id,
                            b.video_url, b.status, b.data,
-                           b.text_model_id, b.video_model_id
+                           b.video_model_id
                     FROM batches b
                     WHERE b.id = %s
                 """, (batch_id,))

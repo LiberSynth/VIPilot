@@ -25,7 +25,7 @@ from .db import (
     db_set_batch_story_probe,
     db_set_batch_story,
     db_set_batch_story_id,
-    db_set_batch_text_model,
+    db_set_story_model,
     db_set_batch_video_model,
     db_create_story,
     db_get_active_text_model,

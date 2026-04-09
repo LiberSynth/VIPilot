@@ -243,7 +243,8 @@ def db_get_monitor(batch_limit=50):
                         COALESCE(vm.name, b.data->>'model_name') AS video_model_name
                     FROM batches b
                     LEFT JOIN log l ON l.batch_id = b.id
-                    LEFT JOIN ai_models tm ON tm.id = b.text_model_id
+                    LEFT JOIN stories s ON s.id = b.story_id
+                    LEFT JOIN ai_models tm ON tm.id = s.model_id
                     LEFT JOIN ai_models vm ON vm.id = b.video_model_id
                     GROUP BY b.id, b.scheduled_at, b.type, b.status, b.created_at,
                              b.story_id, b.video_data_transcoded,

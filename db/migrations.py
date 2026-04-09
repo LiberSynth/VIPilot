@@ -1159,6 +1159,82 @@ def _m034_stories_result_to_content(cur):
     """)
 
 
+def _m035_drop_text_model_id(cur):
+    """
+    Переносит text_model_id из batches в stories.model_id.
+    - Синхронизирует stories.model_id из batches.text_model_id (берём батч с MAX created_at по story_id)
+    - Обновляет триггер check_batch_model_types — убирает проверку text_model_id
+    - Дропает FK-constraint batches_text_model_id_fkey
+    - Дропает колонку batches.text_model_id
+    Deployed: -
+    """
+    cur.execute("""
+        UPDATE stories s
+        SET model_id = b.text_model_id
+        FROM (
+            SELECT DISTINCT ON (story_id) story_id, text_model_id
+            FROM batches
+            WHERE text_model_id IS NOT NULL AND story_id IS NOT NULL
+            ORDER BY story_id, created_at DESC
+        ) b
+        WHERE s.id = b.story_id
+          AND (s.model_id IS NULL OR s.model_id != b.text_model_id)
+    """)
+    cur.execute("""
+        CREATE OR REPLACE FUNCTION trg_fn_batch_model_types()
+        RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN
+            IF NEW.video_model_id IS NOT NULL THEN
+                IF NOT EXISTS (
+                    SELECT 1 FROM ai_models
+                    WHERE id = NEW.video_model_id AND type = 'text-to-video'
+                ) THEN
+                    RAISE EXCEPTION 'video_model_id must reference ai_models with type=text-to-video';
+                END IF;
+            END IF;
+            RETURN NEW;
+        END;
+        $$
+    """)
+    cur.execute("""
+        DO $$ BEGIN
+            IF EXISTS (
+                SELECT 1 FROM pg_trigger
+                WHERE tgname = 'trg_batch_model_types'
+                  AND tgrelid = 'batches'::regclass
+            ) THEN
+                DROP TRIGGER trg_batch_model_types ON batches;
+            END IF;
+        END $$
+    """)
+    cur.execute("""
+        DO $$ BEGIN
+            IF EXISTS (
+                SELECT 1 FROM pg_constraint
+                WHERE conname = 'batches_text_model_id_fkey'
+                  AND conrelid = 'batches'::regclass
+            ) THEN
+                ALTER TABLE batches DROP CONSTRAINT batches_text_model_id_fkey;
+            END IF;
+        END $$
+    """)
+    cur.execute("""
+        DO $$ BEGIN
+            IF EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'batches' AND column_name = 'text_model_id'
+            ) THEN
+                ALTER TABLE batches DROP COLUMN text_model_id;
+            END IF;
+        END $$
+    """)
+    cur.execute("""
+        CREATE TRIGGER trg_batch_model_types
+        BEFORE INSERT OR UPDATE OF video_model_id ON batches
+        FOR EACH ROW EXECUTE FUNCTION trg_fn_batch_model_types()
+    """)
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -1194,6 +1270,7 @@ MIGRATIONS = [
     (32, _m032_seed_default_users),
     (33, _m033_sync_targets_from_dev),
     (34, _m034_stories_result_to_content),
+    (35, _m035_drop_text_model_id),
 ]
 
 

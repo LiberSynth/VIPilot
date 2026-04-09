@@ -9,7 +9,7 @@ import os
 import requests
 
 from db import (
-    db_set_batch_text_model,
+    db_set_story_model,
     db_get,
     db_get_batch_by_id,
     db_get_active_targets,
@@ -181,7 +181,7 @@ def run(batch_id):
 
         batch_data     = batch.get('data') or {}
         is_story_probe = batch_data.get('story_probe', False) if isinstance(batch_data, dict) else False
-        probe_model_id = str(batch['text_model_id']) if batch.get('text_model_id') else None
+        probe_model_id = batch_data.get('probe_model_id') if isinstance(batch_data, dict) else None
 
         if is_story_probe and probe_model_id:
             probe_model = db_get_text_model_by_id(probe_model_id)
@@ -264,7 +264,7 @@ def run(batch_id):
 
         if is_story_probe:
             db_set_batch_story_probe(batch_id, story_id)
-            db_set_batch_text_model(batch_id, used_model_id)
+            db_set_story_model(story_id, used_model_id)
             batch_done = True
             msg = f'Сюжет сгенерирован ({used_model_name})'
             db_log_update(log_id, msg, 'ok')
@@ -279,7 +279,7 @@ def run(batch_id):
                     db_log_entry(log_id, msg, level='error')
                 print(f"[story] {msg}")
                 return
-            db_set_batch_text_model(batch_id, used_model_id)
+            db_set_story_model(story_id, used_model_id)
             batch_done = True
             msg = f'Сюжет сгенерирован ({used_model_name})'
             db_log_update(log_id, msg, 'ok')
