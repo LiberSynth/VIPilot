@@ -876,13 +876,21 @@ def _m024_batches_type_replace_adhoc_target_id(cur):
             ADD COLUMN IF NOT EXISTS type TEXT NOT NULL DEFAULT 'slot'
     """)
     cur.execute("""
-        UPDATE batches
-           SET type = CASE
-               WHEN adhoc = FALSE                          THEN 'slot'
-               WHEN adhoc = TRUE AND target_id IS NOT NULL THEN 'adhoc'
-               WHEN adhoc = TRUE AND target_id IS NULL     THEN 'probe'
-               ELSE 'slot'
-           END
+        DO $$
+        BEGIN
+            IF EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'batches' AND column_name = 'adhoc'
+            ) THEN
+                UPDATE batches
+                   SET type = CASE
+                       WHEN adhoc = FALSE                          THEN 'slot'
+                       WHEN adhoc = TRUE AND target_id IS NOT NULL THEN 'adhoc'
+                       WHEN adhoc = TRUE AND target_id IS NULL     THEN 'probe'
+                       ELSE 'slot'
+                   END;
+            END IF;
+        END $$
     """)
     cur.execute("""
         ALTER TABLE batches
