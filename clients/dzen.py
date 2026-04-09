@@ -130,6 +130,52 @@ def _snap(page, batch_id=None) -> None:
         print(f"[dzen] _snap: {_e}")
 
 
+def _has_captcha_frame(page) -> bool:
+    """Возвращает True если в page есть активный iframe капчи."""
+    try:
+        for frame in page.frames:
+            furl = frame.url.lower()
+            if any(kw in furl for kw in (
+                "not_robot_captcha", "smartcaptcha", "yandexcloud",
+                "captcha.yandex", "recaptcha", "id.vk.com",
+            )):
+                return True
+    except Exception:
+        pass
+    return False
+
+
+def _dismiss_popups(page, log_id=None) -> None:
+    """
+    Закрывает любые видимые диалоги/попапы без разбора.
+    Пропускает закрытие если активна капча-iframe.
+    """
+    if _has_captcha_frame(page):
+        return
+    try:
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(200)
+    except Exception:
+        pass
+    for sel in [
+        "[data-testid='modal-overlay']",
+        "[class*='modal-close']",
+        "[class*='modalClose']",
+        "button[aria-label*='lose']",
+        "button[aria-label*='закр']",
+        "dialog button",
+        "[class*='close'][class*='button']",
+    ]:
+        try:
+            btn = page.locator(sel).first
+            if btn.is_visible(timeout=300):
+                btn.click()
+                page.wait_for_timeout(200)
+                break
+        except Exception:
+            pass
+
+
 def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, batch_id=None):
     """Управляет браузером для публикации видео через UI Дзена."""
 
@@ -178,6 +224,9 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
     except Exception:
         pass
 
+    # Перед шагом 2: сбрасываем любые оставшиеся диалоги
+    _dismiss_popups(page, log_id)
+
     # ── Шаг 2: Кнопка «+» (плюсик) в правом верхнем углу ────────────────
     _log(log_id, "Ищу кнопку «+» для создания публикации…")
     plus_btn = page.locator(
@@ -208,6 +257,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
     _log(log_id, "«Загрузить видео» нажато")
     page.wait_for_timeout(1500)
     _snap(page, batch_id)
+    _dismiss_popups(page, log_id)
 
     # ── Шаг 4: Загружаем файл ────────────────────────────────────────────
     _log(log_id, "Ищу поле загрузки файла…")
@@ -392,6 +442,11 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
 
         # ── C. «Уже можно публиковать» — это встроенный текст диалога, НЕ попап.
         #       Закрывать нечего, игнорируем полностью. Escape не отправляем.
+
+        # ── D. Закрываем любые другие неизвестные попапы/диалоги ──────────
+        #       _dismiss_popups сама пропустит закрытие если активна капча.
+        if not captcha_clicked:
+            _dismiss_popups(page, log_id)
 
         # ── Проверяем финальное подтверждение публикации ──────────────────
         try:
