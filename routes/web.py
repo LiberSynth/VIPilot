@@ -36,7 +36,7 @@ from utils.utils import (
 
 bp = Blueprint("web", __name__)
 
-RESERVED_SLUGS = {"web", "save", "logout", "select-module", "healthz", "favicon.ico", "icon-preview", "root"}
+RESERVED_SLUGS = {"web", "save", "logout", "select-module", "healthz", "favicon.ico", "icon-preview", "root", "producer"}
 
 
 def _get_session_roles():
@@ -190,6 +190,40 @@ def root_page():
     return resp
 
 
+@bp.route("/producer")
+def producer_page():
+    if not is_authenticated():
+        return redirect(url_for("web.login"))
+    if not _has_slug("producer"):
+        roles = _get_session_roles()
+        other = [r for r in roles if r["slug"] != "producer"]
+        if len(other) == 1:
+            return redirect(_role_url(other[0]))
+        if other:
+            return redirect(url_for("web.select_module"))
+        return redirect(url_for("web.login"))
+    system_prompt       = db_get("system_prompt", "")
+    metaprompt          = db_get("metaprompt", "")
+    video_post_prompt   = db_get("video_post_prompt", "")
+    story_fails_to_next = max(1, int(db_get("story_fails_to_next", "3")))
+    video_duration      = max(1, min(60, int(db_get("video_duration", "6"))))
+    video_fails_to_next = max(1, int(db_get("video_fails_to_next", "3")))
+    resp = make_response(render_template(
+        "producer.html",
+        system_prompt=system_prompt,
+        metaprompt=metaprompt,
+        video_post_prompt=video_post_prompt,
+        story_fails_to_next=story_fails_to_next,
+        video_duration=video_duration,
+        video_fails_to_next=video_fails_to_next,
+        app_version=APP_VERSION,
+    ))
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
+
+
 @bp.route("/save", methods=["POST"])
 def save():
     if not is_authenticated():
@@ -228,19 +262,22 @@ def save():
     if file_lifetime_raw:
         db_set("file_lifetime", str(parse_file_lifetime(file_lifetime_raw)))
 
-    db_set("notify_email", request.form.get("notify_email", "").strip())
-    db_set("notify_phone", request.form.get("notify_phone", "").strip())
+    if "notify_email" in request.form:
+        db_set("notify_email", request.form.get("notify_email", "").strip())
+    if "notify_phone" in request.form:
+        db_set("notify_phone", request.form.get("notify_phone", "").strip())
 
-    vk_story_raw = request.form.get("vk_publish_story", "0")
-    vk_wall_raw  = request.form.get("vk_publish_wall",  "0")
-    if vk_story_raw != "1" and vk_wall_raw != "1":
-        vk_story_raw = "1"
-    db_set("vk_publish_story", "1" if vk_story_raw == "1" else "0")
-    db_set("vk_publish_wall",  "1" if vk_wall_raw  == "1" else "0")
-    db_update_target_publish_method_by_slug("vk", {
-        "story": 1 if vk_story_raw == "1" else 0,
-        "wall":  1 if vk_wall_raw  == "1" else 0,
-    })
+    if "vk_publish_story" in request.form or "vk_publish_wall" in request.form:
+        vk_story_raw = request.form.get("vk_publish_story", "0")
+        vk_wall_raw  = request.form.get("vk_publish_wall",  "0")
+        if vk_story_raw != "1" and vk_wall_raw != "1":
+            vk_story_raw = "1"
+        db_set("vk_publish_story", "1" if vk_story_raw == "1" else "0")
+        db_set("vk_publish_wall",  "1" if vk_wall_raw  == "1" else "0")
+        db_update_target_publish_method_by_slug("vk", {
+            "story": 1 if vk_story_raw == "1" else 0,
+            "wall":  1 if vk_wall_raw  == "1" else 0,
+        })
 
     ar_target_id = request.form.get("target_id", "").strip()
     ar_x_raw = request.form.get("aspect_ratio_x", "").strip()
@@ -253,10 +290,11 @@ def save():
         except (ValueError, TypeError):
             pass
 
-    vk_transcode_raw = request.form.get("vk_transcode", "0")
-    db_set("vk_transcode", "1" if vk_transcode_raw == "1" else "0")
-    if ar_target_id:
-        db_update_target_transcode(ar_target_id, vk_transcode_raw == "1")
+    if "vk_transcode" in request.form:
+        vk_transcode_raw = request.form.get("vk_transcode", "0")
+        db_set("vk_transcode", "1" if vk_transcode_raw == "1" else "0")
+        if ar_target_id:
+            db_update_target_transcode(ar_target_id, vk_transcode_raw == "1")
 
     vid_dur_str = request.form.get("video_duration")
     if vid_dur_str is not None:

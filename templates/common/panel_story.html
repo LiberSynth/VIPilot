@@ -1,0 +1,35 @@
+{% macro panel_story(system_prompt, metaprompt, video_post_prompt, story_fails_to_next) %}
+  <div id="panel-story" class="tab-panel">
+    <form id="story-form" style="margin-top:0">
+      <div class="card" style="margin-top:12px">
+        <div class="card-title">Мета-промпт ответа</div>
+        <div class="hint">Инструкция для текстовой модели: формат ответа, стиль, ограничения. Модель получает этот промпт как системное сообщение перед мета-промптом.</div>
+        <textarea name="system_prompt" id="ta_sysprompt" spellcheck="true">{{ system_prompt }}</textarea>
+        <div class="char-count" id="charcount_sysprompt"></div>
+      </div>
+      <div class="card" style="margin-top:12px">
+        <div class="card-title">Мета-промпт сюжета</div>
+        <div class="hint">Стиль, тема и характер сценария. Описание для формирования раскадровки.</div>
+        <textarea name="metaprompt" id="ta" spellcheck="true">{{ metaprompt }}</textarea>
+        <div class="char-count" id="charcount"></div>
+      </div>
+      <div class="card" style="margin-top:12px">
+        <div class="card-title">Суффикс промпта</div>
+        <div class="hint">Текст, добавляемый к сюжету через два переноса строки перед отправкой в видео-модель. Поддерживает тег <code>{продолжительность}</code> — подставляет длительность видео в секундах. Например: «Ролик длится {продолжительность} секунд. Делай конец плавным.»</div>
+        <textarea name="video_post_prompt" id="ta_postprompt" spellcheck="true" style="min-height:80px">{{ video_post_prompt }}</textarea>
+      </div>
+    </form>
+
+    <div class="card" style="margin-top:12px">
+      <div class="card-title">Модели</div>
+      <div class="hint" style="margin-bottom:4px">Попыток на модель</div>
+      <div style="margin-bottom:10px">
+        <input type="number" name="story_fails_to_next" id="story_fails_to_next" value="{{ story_fails_to_next }}" min="1" max="99" step="1" style="max-width:120px">
+      </div>
+      <div class="hint" style="margin-bottom:8px">Активируйте одну или несколько. Порядок задаёт очерёдность перебора при сбое.</div>
+      <div class="model-list" id="text-model-list">
+        <div class="model-loading">Загрузка...</div>
+      </div>
+    </div>
+  </div>
+{% endmacro %}

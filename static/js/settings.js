@@ -36,34 +36,43 @@ if (taSys) { taSys.addEventListener('input', updateSysCount); updateSysCount(); 
 function collectAllSettings(activeTab) {
   const data = new FormData();
   data.set('active_tab', activeTab || 'pipeline');
-  const v = id => { const el = document.getElementById(id); return el ? el.value : ''; };
-  data.set('metaprompt',      ta    ? ta.value    : '');
-  data.set('system_prompt',   taSys ? taSys.value : '');
-  data.set('video_duration',      v('video_duration'));
-  data.set('video_post_prompt',   (function(){ var el = document.getElementById('ta_postprompt'); return el ? el.value : ''; })());
-  data.set('story_fails_to_next', v('story_fails_to_next'));
-  data.set('video_fails_to_next', v('video_fails_to_next'));
+  const setIfExists = (key, id) => { const el = document.getElementById(id); if (el) data.set(key, el.value); };
+  if (ta)    data.set('metaprompt',    ta.value);
+  if (taSys) data.set('system_prompt', taSys.value);
+  setIfExists('video_duration',      'video_duration');
+  setIfExists('video_post_prompt',   'ta_postprompt');
+  setIfExists('story_fails_to_next', 'story_fails_to_next');
+  setIfExists('video_fails_to_next', 'video_fails_to_next');
   const chkStory     = document.getElementById('vk_story_pub_check');
   const chkWall      = document.getElementById('vk_wall_pub_check');
   const chkTranscode = document.getElementById('vk_transcode_check');
-  const storyVal     = chkStory     ? (chkStory.checked     ? '1' : '0') : v('vk_story_pub_hidden');
-  const wallVal      = chkWall      ? (chkWall.checked      ? '1' : '0') : v('vk_wall_pub_hidden');
-  const transcodeVal = chkTranscode ? (chkTranscode.checked ? '1' : '0') : v('vk_transcode_hidden');
-  data.set('vk_publish_story', storyVal);
-  data.set('vk_publish_wall',  wallVal);
-  data.set('vk_transcode',     transcodeVal);
-  data.set('aspect_ratio_x',   v('ar-x'));
-  data.set('aspect_ratio_y',   v('ar-y'));
-  data.set('target_id',        v('target_id'));
-  data.set('notify_email',     v('notify_email'));
-  data.set('notify_phone',     v('notify_phone'));
-  data.set('entries_lifetime', v('entries_lifetime'));
-  data.set('log_lifetime',     v('log_lifetime'));
-  data.set('batch_lifetime',   v('batch_lifetime'));
-  data.set('file_lifetime',    v('file_lifetime'));
-  data.set('buffer_hours',      v('buffer_hours'));
-  data.set('loop_interval',     v('loop_interval'));
-  data.set('max_batch_threads', v('max_batch_threads'));
+  const hidStory     = document.getElementById('vk_story_pub_hidden');
+  const hidWall      = document.getElementById('vk_wall_pub_hidden');
+  const hidTranscode = document.getElementById('vk_transcode_hidden');
+  if (chkStory || hidStory) {
+    const storyVal = chkStory ? (chkStory.checked ? '1' : '0') : hidStory.value;
+    data.set('vk_publish_story', storyVal);
+  }
+  if (chkWall || hidWall) {
+    const wallVal = chkWall ? (chkWall.checked ? '1' : '0') : hidWall.value;
+    data.set('vk_publish_wall', wallVal);
+  }
+  if (chkTranscode || hidTranscode) {
+    const transcodeVal = chkTranscode ? (chkTranscode.checked ? '1' : '0') : hidTranscode.value;
+    data.set('vk_transcode', transcodeVal);
+  }
+  setIfExists('aspect_ratio_x',   'ar-x');
+  setIfExists('aspect_ratio_y',   'ar-y');
+  setIfExists('target_id',        'target_id');
+  setIfExists('notify_email',     'notify_email');
+  setIfExists('notify_phone',     'notify_phone');
+  setIfExists('entries_lifetime', 'entries_lifetime');
+  setIfExists('log_lifetime',     'log_lifetime');
+  setIfExists('batch_lifetime',   'batch_lifetime');
+  setIfExists('file_lifetime',    'file_lifetime');
+  setIfExists('buffer_hours',     'buffer_hours');
+  setIfExists('loop_interval',    'loop_interval');
+  setIfExists('max_batch_threads','max_batch_threads');
   return data;
 }
 
