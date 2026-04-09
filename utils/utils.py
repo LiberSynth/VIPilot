@@ -8,28 +8,32 @@ def parse_hhmm(s):
 
 def parse_batch_lifetime(s):
     try:
-        return max(1, min(365, int(s)))
+        v = int(s)
+        return 0 if v == 0 else max(1, min(365, v))
     except Exception:
         return 7
 
 
 def parse_log_lifetime(s):
     try:
-        return max(1, min(3650, int(s)))
+        v = int(s)
+        return 0 if v == 0 else max(1, min(3650, v))
     except Exception:
         return 365
 
 
 def parse_entries_lifetime(s):
     try:
-        return max(1, min(3650, int(s)))
+        v = int(s)
+        return 0 if v == 0 else max(1, min(3650, v))
     except Exception:
         return 30
 
 
 def parse_file_lifetime(s):
     try:
-        return max(1, min(365, int(s)))
+        v = int(s)
+        return 0 if v == 0 else max(1, min(365, v))
     except Exception:
         return 7
 

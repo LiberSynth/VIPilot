@@ -1284,7 +1284,7 @@ def db_cleanup_logs(short_log_lifetime_days: int) -> int:
 
 
 def db_clear_all_history():
-    """Удаляет всю историю: log_entries, log, завершённые батчи и осиротевшие сюжеты."""
+    """Удаляет всю историю: log_entries, log, завершённые батчи. Истории (stories) не удаляет — они являются заделом сюжетов."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
@@ -1294,16 +1294,9 @@ def db_clear_all_history():
                 ll = cur.rowcount
                 cur.execute("DELETE FROM batches")
                 bl = cur.rowcount
-                cur.execute("""
-                    DELETE FROM stories
-                    WHERE NOT EXISTS (
-                        SELECT 1 FROM batches WHERE story_id = stories.id
-                    )
-                """)
-                sl = cur.rowcount
             conn.commit()
-        print(f"[DB] Очистка истории: log_entries={le}, log={ll}, batches={bl}, stories={sl}")
-        return {"log_entries": le, "logs": ll, "batches": bl, "stories": sl}
+        print(f"[DB] Очистка истории: log_entries={le}, log={ll}, batches={bl}")
+        return {"log_entries": le, "logs": ll, "batches": bl}
     except Exception as e:
         print(f"[DB] Ошибка db_clear_all_history: {e}")
         raise
@@ -1664,7 +1657,7 @@ def db_set_batch_transcoding_by_id(batch_id):
 def db_cleanup_batches(batch_lifetime_days: int) -> int:
     """Удаляет батчи со статусом 'published'/'cancelled', а также пробные батчи
     (type = 'probe') завершённые (probe/story_probe), старше batch_lifetime_days.
-    Удаляет связанные логи и осиротевшие stories.
+    Удаляет связанные логи. Истории (stories) не удаляет — они являются заделом сюжетов.
     Возвращает количество удалённых батчей."""
     try:
         with get_db() as conn:
@@ -1694,13 +1687,6 @@ def db_cleanup_batches(batch_lifetime_days: int) -> int:
                 cur.execute(f"DELETE FROM log WHERE batch_id IN ({fmt})", batch_ids)
 
                 cur.execute(f"DELETE FROM batches WHERE id IN ({fmt})", batch_ids)
-
-                cur.execute("""
-                    DELETE FROM stories
-                    WHERE id NOT IN (
-                        SELECT DISTINCT story_id FROM batches WHERE story_id IS NOT NULL
-                    )
-                """)
 
             conn.commit()
         return len(batch_ids)

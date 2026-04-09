@@ -3,9 +3,10 @@ Pipeline 6 — Сборщик мусора.
 Удаляет устаревшие данные согласно 4 настройкам времени жизни:
   entries_lifetime  — подробные записи log_entries
   log_lifetime      — краткие записи log (заголовки)
-  batch_lifetime    — батчи + осиротевшие stories
+  batch_lifetime    — батчи (истории-задел не удаляются)
   file_lifetime     — обнуляет video_data_transcoded у опубликованных батчей в БД
 
+Если любой из параметров равен 0, соответствующая очистка полностью пропускается.
 Запускается каждые loop_interval секунд; делает всё за один проход.
 """
 
@@ -29,25 +30,29 @@ def run():
 
         summary = []
 
-        n = db_cleanup_log_entries(entries_lifetime)
-        if n:
-            summary.append(f"log_entries: -{n}")
-            print(f"[cleanup] Удалено log_entries: {n}")
+        if entries_lifetime > 0:
+            n = db_cleanup_log_entries(entries_lifetime)
+            if n:
+                summary.append(f"log_entries: -{n}")
+                print(f"[cleanup] Удалено log_entries: {n}")
 
-        n = db_cleanup_logs(log_lifetime)
-        if n:
-            summary.append(f"log: -{n}")
-            print(f"[cleanup] Удалено log-записей: {n}")
+        if log_lifetime > 0:
+            n = db_cleanup_logs(log_lifetime)
+            if n:
+                summary.append(f"log: -{n}")
+                print(f"[cleanup] Удалено log-записей: {n}")
 
-        n = db_cleanup_batches(batch_lifetime)
-        if n:
-            summary.append(f"batches: -{n}")
-            print(f"[cleanup] Удалено батчей: {n}")
+        if batch_lifetime > 0:
+            n = db_cleanup_batches(batch_lifetime)
+            if n:
+                summary.append(f"batches: -{n}")
+                print(f"[cleanup] Удалено батчей: {n}")
 
-        n = db_cleanup_video_data(file_lifetime)
-        if n:
-            summary.append(f"video_data_transcoded: -{n}")
-            print(f"[cleanup] Обнулено video_data_transcoded: {n}")
+        if file_lifetime > 0:
+            n = db_cleanup_video_data(file_lifetime)
+            if n:
+                summary.append(f"video_data_transcoded: -{n}")
+                print(f"[cleanup] Обнулено video_data_transcoded: {n}")
 
         if summary:
             db_log_pipeline("cleanup", "Очистка: " + ", ".join(summary), status="ok")
