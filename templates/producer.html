@@ -33,7 +33,7 @@
 <div class="container">
 
   <!-- ══ ИНФОРМАЦИЯ ══ -->
-  <div id="panel-info" class="tab-panel active">
+  <div id="panel-info" class="tab-panel">
     {% from 'common/info_panel.html' import info_panel %}
     {{ info_panel('PRODUCER', 'Модуль для генерации контента.', show_developer=False, app_version=app_version) }}
   </div>
@@ -51,6 +51,7 @@
 <script src="/static/js/ui.js"></script>
 <script src="/static/js/settings.js"></script>
 <script src="/static/js/models.js"></script>
+<script>switchPanel('story');</script>
 
 </body>
 </html>
