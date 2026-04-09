@@ -6,6 +6,12 @@ import threading
 from datetime import datetime, timezone, timedelta
 from flask import Flask, request
 
+# Ensure Playwright Chromium browser is installed (needed in production/VM deployment)
+try:
+    subprocess.run(["playwright", "install", "chromium"], check=True, timeout=120)
+except Exception as _pw_install_err:
+    print(f"[startup] playwright install chromium: {_pw_install_err}")
+
 from db import (
     init_db, run_upgrades, db_get,
     db_get_schedule, db_get_active_targets, db_ensure_batch, db_get_last_pipeline_run,
