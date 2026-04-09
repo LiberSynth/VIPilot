@@ -1108,6 +1108,54 @@ def _m032_seed_default_users(cur):
     """)
 
 
+def _m033_sync_targets_from_dev(cur):
+    """
+    Синхронизация таблицы targets с dev на прод.
+    Сличает записи по полю name, обновляет aspect_ratio_x, aspect_ratio_y,
+    active, transcode, config, slug. session_context не трогает.
+    Deployed: -
+    """
+    rows = [
+        {
+            'name': 'VKontakte',
+            'aspect_ratio_x': 9,
+            'aspect_ratio_y': 16,
+            'active': True,
+            'transcode': True,
+            'config': '{"group_id": 236929597, "publish_method": {"wall": 1, "story": 0}}',
+            'slug': 'vk',
+        },
+        {
+            'name': 'Дзен',
+            'aspect_ratio_x': 9,
+            'aspect_ratio_y': 16,
+            'active': True,
+            'transcode': True,
+            'config': '{"publisher_id": "69d3ec6ae9ff6e1b8d5c6326", "publish_method": {"video": 1}}',
+            'slug': 'dzen',
+        },
+    ]
+    for r in rows:
+        cur.execute("""
+            UPDATE targets
+               SET aspect_ratio_x = %s,
+                   aspect_ratio_y = %s,
+                   active         = %s,
+                   transcode      = %s,
+                   config         = %s::jsonb,
+                   slug           = %s
+             WHERE name = %s
+        """, (
+            r['aspect_ratio_x'],
+            r['aspect_ratio_y'],
+            r['active'],
+            r['transcode'],
+            r['config'],
+            r['slug'],
+            r['name'],
+        ))
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -1141,6 +1189,7 @@ MIGRATIONS = [
     (30, _m029_user_role_links),
     (31, _m030_user_roles_module_field),
     (32, _m032_seed_default_users),
+    (33, _m033_sync_targets_from_dev),
 ]
 
 
