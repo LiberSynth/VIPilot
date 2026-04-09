@@ -731,10 +731,18 @@ def _m018_targets_browser_session(cur):
 def _m019_rename_session_context(cur):
     """
     Переименовывает колонку browser_session → session_context в таблице targets.
+    Идемпотентна: пропускается если browser_session уже не существует.
     """
     cur.execute("""
-        ALTER TABLE targets
-            RENAME COLUMN browser_session TO session_context
+        DO $$
+        BEGIN
+            IF EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name='targets' AND column_name='browser_session'
+            ) THEN
+                ALTER TABLE targets RENAME COLUMN browser_session TO session_context;
+            END IF;
+        END $$
     """)
 
 
