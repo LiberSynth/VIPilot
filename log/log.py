@@ -213,7 +213,7 @@ def db_get_monitor(batch_limit=50):
                         b.created_at,
                         MAX(l.created_at) AS last_event_at,
                         b.story_id,
-                        (b.video_data_transcoded IS NOT NULL OR b.video_data_original IS NOT NULL) AS has_video_data,
+                        (m.transcoded_data IS NOT NULL OR m.raw_data IS NOT NULL) AS has_video_data,
                         COALESCE(
                             json_agg(
                                 json_build_object(
@@ -242,12 +242,13 @@ def db_get_monitor(batch_limit=50):
                         tm.name AS text_model_name,
                         COALESCE(vm.name, b.data->>'model_name') AS video_model_name
                     FROM batches b
+                    LEFT JOIN movies m ON m.id = b.movie_id
                     LEFT JOIN log l ON l.batch_id = b.id
                     LEFT JOIN stories s ON s.id = b.story_id
                     LEFT JOIN ai_models tm ON tm.id = s.model_id
-                    LEFT JOIN ai_models vm ON vm.id = b.video_model_id
+                    LEFT JOIN ai_models vm ON vm.id = m.model_id
                     GROUP BY b.id, b.scheduled_at, b.type, b.status, b.created_at,
-                             b.story_id, b.video_data_transcoded,
+                             b.story_id, m.transcoded_data, m.raw_data,
                              tm.name, vm.name
                     ORDER BY COALESCE(MAX(l.created_at), b.created_at) DESC
                     LIMIT %s

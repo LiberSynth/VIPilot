@@ -41,10 +41,10 @@ def _get_video(batch_id, log_id):
     video_data = db_get_batch_video_data(batch_id)
     if video_data is None:
         if log_id:
-            db_log_entry(log_id, 'video_data_transcoded отсутствует — использую оригинал (video_data_original)')
+            db_log_entry(log_id, 'movies.transcoded_data отсутствует — использую оригинал (movies.raw_data)')
         video_data = db_get_batch_original_video(batch_id)
         if video_data is None:
-            msg = 'Ни video_data_transcoded, ни video_data_original не найдены в БД — ошибка логики'
+            msg = 'Ни movies.transcoded_data, ни movies.raw_data не найдены в БД — ошибка логики'
             if log_id:
                 db_log_entry(log_id, msg, level='error')
             raise RuntimeError(msg)

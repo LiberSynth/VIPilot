@@ -4,7 +4,7 @@ Pipeline 6 — Сборщик мусора.
   entries_lifetime  — подробные записи log_entries
   log_lifetime      — краткие записи log (заголовки)
   batch_lifetime    — батчи (истории-задел не удаляются)
-  file_lifetime     — обнуляет video_data_transcoded у опубликованных батчей в БД
+  file_lifetime     — обнуляет raw_data/transcoded_data в movies для опубликованных батчей
 
 Если любой из параметров равен 0, соответствующая очистка полностью пропускается.
 Запускается каждые loop_interval секунд; делает всё за один проход.
@@ -51,8 +51,8 @@ def run():
         if file_lifetime > 0:
             n = db_cleanup_video_data(file_lifetime)
             if n:
-                summary.append(f"video_data_transcoded: -{n}")
-                print(f"[cleanup] Обнулено video_data_transcoded: {n}")
+                summary.append(f"movies.video_data: -{n}")
+                print(f"[cleanup] Обнулено movies.raw_data/transcoded_data: {n}")
 
         if summary:
             db_log_pipeline("cleanup", "Очистка: " + ", ".join(summary), status="ok")

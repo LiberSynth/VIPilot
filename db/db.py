@@ -334,16 +334,25 @@ def db_create_adhoc_batch():
 
 def db_create_probe_batch(video_model_id):
     """Создаёт pending-батч с type='probe' и зафиксированной video_model_id.
+    model_id сохраняется в movies при генерации видео через db_set_batch_video_model.
+    Пока создаём batсh и пустую запись movies с model_id.
     Возвращает UUID батча или None."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                    INSERT INTO batches
-                        (status, type, video_model_id)
-                    VALUES ('pending', 'probe', %s)
+                    INSERT INTO movies (model_id)
+                    VALUES (%s)
                     RETURNING id
                 """, (video_model_id,))
+                movie_row = cur.fetchone()
+                movie_id = movie_row[0]
+                cur.execute("""
+                    INSERT INTO batches
+                        (status, type, movie_id)
+                    VALUES ('pending', 'probe', %s)
+                    RETURNING id
+                """, (movie_id,))
                 row = cur.fetchone()
             conn.commit()
         return str(row[0]) if row else None
@@ -437,14 +446,29 @@ def db_set_story_model(story_id, model_id):
 
 
 def db_set_batch_video_model(batch_id, model_id):
-    """Сохраняет id видео-модели, сгенерировавшей видео."""
+    """Сохраняет id видео-модели, сгенерировавшей видео, в запись movies.
+    Если у батча нет movie_id — создаёт запись в movies."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
-                cur.execute(
-                    "UPDATE batches SET video_model_id = %s WHERE id = %s",
-                    (model_id, batch_id),
-                )
+                cur.execute("SELECT movie_id FROM batches WHERE id = %s", (batch_id,))
+                row = cur.fetchone()
+                movie_id = row[0] if row else None
+                if movie_id is None:
+                    cur.execute(
+                        "INSERT INTO movies (model_id) VALUES (%s) RETURNING id",
+                        (model_id,),
+                    )
+                    movie_id = cur.fetchone()[0]
+                    cur.execute(
+                        "UPDATE batches SET movie_id = %s WHERE id = %s",
+                        (movie_id, batch_id),
+                    )
+                else:
+                    cur.execute(
+                        "UPDATE movies SET model_id = %s WHERE id = %s",
+                        (model_id, movie_id),
+                    )
             conn.commit()
         return True
     except Exception as e:
@@ -732,15 +756,34 @@ def db_set_batch_video_pending(batch_id, job_data):
 
 
 def db_set_batch_video_ready(batch_id, video_url):
-    """Сохраняет video_url и переводит батч в status='video_ready'."""
+    """Сохраняет video_url в movies и переводит батч в status='video_ready'.
+    Если у батча нет movie_id — создаёт запись в movies."""
     _assert_known_status('video_ready')
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
-                cur.execute(
-                    "UPDATE batches SET status = 'video_ready', video_url = %s WHERE id = %s",
-                    (video_url, batch_id),
-                )
+                cur.execute("SELECT movie_id FROM batches WHERE id = %s", (batch_id,))
+                row = cur.fetchone()
+                movie_id = row[0] if row else None
+                if movie_id is None:
+                    cur.execute(
+                        "INSERT INTO movies (url) VALUES (%s) RETURNING id",
+                        (video_url,),
+                    )
+                    movie_id = cur.fetchone()[0]
+                    cur.execute(
+                        "UPDATE batches SET status = 'video_ready', movie_id = %s WHERE id = %s",
+                        (movie_id, batch_id),
+                    )
+                else:
+                    cur.execute(
+                        "UPDATE movies SET url = %s WHERE id = %s",
+                        (video_url, movie_id),
+                    )
+                    cur.execute(
+                        "UPDATE batches SET status = 'video_ready' WHERE id = %s",
+                        (batch_id,),
+                    )
             conn.commit()
         return True
     except Exception as e:
@@ -749,14 +792,29 @@ def db_set_batch_video_ready(batch_id, video_url):
 
 
 def db_set_batch_original_video(batch_id, video_data: bytes):
-    """Сохраняет оригинальное видео (до транскодирования) в поле video_data_original."""
+    """Сохраняет оригинальное видео (до транскодирования) в movies.raw_data.
+    Если у батча нет movie_id — создаёт запись в movies."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
-                cur.execute(
-                    "UPDATE batches SET video_data_original = %s WHERE id = %s",
-                    (psycopg2.Binary(video_data), batch_id),
-                )
+                cur.execute("SELECT movie_id FROM batches WHERE id = %s", (batch_id,))
+                row = cur.fetchone()
+                movie_id = row[0] if row else None
+                if movie_id is None:
+                    cur.execute(
+                        "INSERT INTO movies (raw_data) VALUES (%s) RETURNING id",
+                        (psycopg2.Binary(video_data),),
+                    )
+                    movie_id = cur.fetchone()[0]
+                    cur.execute(
+                        "UPDATE batches SET movie_id = %s WHERE id = %s",
+                        (movie_id, batch_id),
+                    )
+                else:
+                    cur.execute(
+                        "UPDATE movies SET raw_data = %s WHERE id = %s",
+                        (psycopg2.Binary(video_data), movie_id),
+                    )
             conn.commit()
         return True
     except Exception as e:
@@ -765,11 +823,15 @@ def db_set_batch_original_video(batch_id, video_data: bytes):
 
 
 def db_get_batch_original_video(batch_id) -> bytes | None:
-    """Возвращает оригинальные байты видео (video_data_original) для батча, или None."""
+    """Возвращает оригинальные байты видео (movies.raw_data) для батча, или None."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
-                cur.execute("SELECT video_data_original FROM batches WHERE id = %s", (batch_id,))
+                cur.execute("""
+                    SELECT m.raw_data FROM batches b
+                    JOIN movies m ON m.id = b.movie_id
+                    WHERE b.id = %s
+                """, (batch_id,))
                 row = cur.fetchone()
         if row and row[0] is not None:
             return bytes(row[0])
@@ -780,21 +842,39 @@ def db_get_batch_original_video(batch_id) -> bytes | None:
 
 
 def db_set_batch_transcode_skip(batch_id):
-    """Переводит батч в status='transcode_ready' без изменения video_data_transcoded.
+    """Переводит батч в status='transcode_ready' без изменения movies.transcoded_data.
     Используется когда транскодирование отключено или завершилось некритичной ошибкой."""
     return db_set_batch_status(batch_id, 'transcode_ready')
 
 
 def db_set_batch_transcode_ready(batch_id, video_data: bytes):
-    """Сохраняет транскодированный файл в БД и переводит батч в status='transcode_ready'."""
+    """Сохраняет транскодированный файл в movies.transcoded_data и переводит батч в status='transcode_ready'."""
     _assert_known_status('transcode_ready')
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
-                cur.execute(
-                    "UPDATE batches SET status = 'transcode_ready', video_data_transcoded = %s WHERE id = %s",
-                    (psycopg2.Binary(video_data), batch_id),
-                )
+                cur.execute("SELECT movie_id FROM batches WHERE id = %s", (batch_id,))
+                row = cur.fetchone()
+                movie_id = row[0] if row else None
+                if movie_id is None:
+                    cur.execute(
+                        "INSERT INTO movies (transcoded_data) VALUES (%s) RETURNING id",
+                        (psycopg2.Binary(video_data),),
+                    )
+                    movie_id = cur.fetchone()[0]
+                    cur.execute(
+                        "UPDATE batches SET status = 'transcode_ready', movie_id = %s WHERE id = %s",
+                        (movie_id, batch_id),
+                    )
+                else:
+                    cur.execute(
+                        "UPDATE movies SET transcoded_data = %s WHERE id = %s",
+                        (psycopg2.Binary(video_data), movie_id),
+                    )
+                    cur.execute(
+                        "UPDATE batches SET status = 'transcode_ready' WHERE id = %s",
+                        (batch_id,),
+                    )
             conn.commit()
         return True
     except Exception as e:
@@ -803,19 +883,18 @@ def db_set_batch_transcode_ready(batch_id, video_data: bytes):
 
 
 def db_get_random_real_original_video() -> tuple[bytes, str, str | None] | None:
-    """Возвращает (video_data_original, batch_id, story_id) случайного батча с реальным видео.
+    """Возвращает (raw_data, batch_id, story_id) случайного батча с реальным видео.
     story_id может быть None, если у донора нет привязанного сюжета."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    SELECT video_data_original, id, story_id::text FROM batches
-                    WHERE video_data_original IS NOT NULL
-                    ORDER BY (video_url NOT LIKE 'emulation://%') DESC, random()
+                cur.execute("""
+                    SELECT m.raw_data, b.id, b.story_id::text FROM batches b
+                    JOIN movies m ON m.id = b.movie_id
+                    WHERE m.raw_data IS NOT NULL
+                    ORDER BY (m.url NOT LIKE 'emulation://%') DESC, random()
                     LIMIT 1
-                    """
-                )
+                """)
                 row = cur.fetchone()
                 return (bytes(row[0]), str(row[1]), row[2]) if row else None
     except Exception as e:
@@ -828,10 +907,11 @@ def db_get_batch_video_data(batch_id) -> bytes | None:
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
-                cur.execute(
-                    "SELECT video_data_transcoded, video_data_original FROM batches WHERE id = %s",
-                    (batch_id,),
-                )
+                cur.execute("""
+                    SELECT m.transcoded_data, m.raw_data FROM batches b
+                    JOIN movies m ON m.id = b.movie_id
+                    WHERE b.id = %s
+                """, (batch_id,))
                 row = cur.fetchone()
         if row:
             if row[0] is not None:
@@ -848,7 +928,7 @@ def db_steal_video_from_cancelled(batch_id) -> str | None:
     """Ищет самый старый батч-донор с видео:
     — отменённые батчи (status = 'cancelled')
     — завершённые пробные батчи (status = 'probe', type = 'probe')
-    Донором считается батч у которого есть video_data_transcoded или video_data_original.
+    Донором считается батч у которого есть movies.transcoded_data или movies.raw_data.
     Если есть транскодированное — переносит его, статус получателя → transcode_ready.
     Если только оригинал — переносит его, статус получателя → video_ready.
     У донора обнуляет перенесённое поле. Возвращает id донора (str) или None."""
@@ -856,50 +936,61 @@ def db_steal_video_from_cancelled(batch_id) -> str | None:
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                    SELECT id, video_data_transcoded, video_data_original, video_url, story_id::text
-                    FROM batches
-                    WHERE (video_data_transcoded IS NOT NULL OR video_data_original IS NOT NULL)
+                    SELECT b.id, m.transcoded_data, m.raw_data, m.url, b.story_id::text, b.movie_id, m.id AS mid
+                    FROM batches b
+                    JOIN movies m ON m.id = b.movie_id
+                    WHERE (m.transcoded_data IS NOT NULL OR m.raw_data IS NOT NULL)
                       AND (
-                        status = 'cancelled'
-                        OR (status = 'probe' AND type = 'probe')
+                        b.status = 'cancelled'
+                        OR (b.status = 'probe' AND b.type = 'probe')
                       )
-                    ORDER BY created_at ASC
+                    ORDER BY b.created_at ASC
                     LIMIT 1
-                    FOR UPDATE SKIP LOCKED
+                    FOR UPDATE OF b SKIP LOCKED
                 """)
                 donor = cur.fetchone()
                 if not donor:
                     return None
 
-                donor_id, video_data_transcoded, video_data_original, video_url, donor_story_id = donor
+                donor_id, video_data_transcoded, video_data_original, video_url, donor_story_id, donor_movie_id, donor_mid = donor
 
                 if video_data_transcoded is not None:
                     # Транскодированное есть — переносим его, получатель сразу в transcode_ready
                     cur.execute("""
+                        INSERT INTO movies (url, transcoded_data)
+                        VALUES (%s, %s)
+                        RETURNING id
+                    """, (video_url, psycopg2.Binary(bytes(video_data_transcoded))))
+                    new_movie_id = cur.fetchone()[0]
+                    cur.execute("""
                         UPDATE batches
-                        SET status                = 'transcode_ready',
-                            video_data_transcoded = %s,
-                            video_url             = %s,
-                            story_id              = COALESCE(story_id, %s)
+                        SET status   = 'transcode_ready',
+                            movie_id = %s,
+                            story_id = COALESCE(story_id, %s)
                         WHERE id = %s
-                    """, (psycopg2.Binary(bytes(video_data_transcoded)), video_url, donor_story_id, batch_id))
+                    """, (new_movie_id, donor_story_id, batch_id))
                     cur.execute(
-                        "UPDATE batches SET video_data_transcoded = NULL WHERE id = %s",
-                        (donor_id,),
+                        "UPDATE movies SET transcoded_data = NULL WHERE id = %s",
+                        (donor_mid,),
                     )
                 else:
                     # Только оригинал — переносим его, получатель идёт на транскодирование
                     cur.execute("""
+                        INSERT INTO movies (url, raw_data)
+                        VALUES (%s, %s)
+                        RETURNING id
+                    """, (video_url, psycopg2.Binary(bytes(video_data_original))))
+                    new_movie_id = cur.fetchone()[0]
+                    cur.execute("""
                         UPDATE batches
-                        SET status               = 'video_ready',
-                            video_data_original  = %s,
-                            video_url            = %s,
-                            story_id             = COALESCE(story_id, %s)
+                        SET status   = 'video_ready',
+                            movie_id = %s,
+                            story_id = COALESCE(story_id, %s)
                         WHERE id = %s
-                    """, (psycopg2.Binary(bytes(video_data_original)), video_url, donor_story_id, batch_id))
+                    """, (new_movie_id, donor_story_id, batch_id))
                     cur.execute(
-                        "UPDATE batches SET video_data_original = NULL WHERE id = %s",
-                        (donor_id,),
+                        "UPDATE movies SET raw_data = NULL WHERE id = %s",
+                        (donor_mid,),
                     )
 
             conn.commit()
@@ -916,11 +1007,12 @@ def db_get_donor_count() -> int:
             with conn.cursor() as cur:
                 cur.execute("""
                     SELECT COUNT(*)
-                    FROM batches
-                    WHERE (video_data_transcoded IS NOT NULL OR video_data_original IS NOT NULL)
+                    FROM batches b
+                    JOIN movies m ON m.id = b.movie_id
+                    WHERE (m.transcoded_data IS NOT NULL OR m.raw_data IS NOT NULL)
                       AND (
-                        status = 'cancelled'
-                        OR (status = 'probe' AND type = 'probe')
+                        b.status = 'cancelled'
+                        OR (b.status = 'probe' AND b.type = 'probe')
                       )
                 """)
                 return cur.fetchone()[0]
@@ -951,14 +1043,15 @@ def db_get_batch_logs(batch_id):
                         b.status                                                AS batch_status,
                         b.created_at,
                         b.story_id::text                                        AS story_id,
-                        (b.video_data_transcoded IS NOT NULL
-                         OR b.video_data_original IS NOT NULL)                  AS has_video_data,
+                        (m.transcoded_data IS NOT NULL
+                         OR m.raw_data IS NOT NULL)                             AS has_video_data,
                         tm.name                                                 AS text_model_name,
                         vm.name                                                 AS video_model_name
                     FROM batches b
+                    LEFT JOIN movies m ON m.id = b.movie_id
                     LEFT JOIN stories s ON s.id = b.story_id
                     LEFT JOIN ai_models tm ON tm.id = s.model_id
-                    LEFT JOIN ai_models vm ON vm.id = b.video_model_id
+                    LEFT JOIN ai_models vm ON vm.id = m.model_id
                     WHERE b.id = %s
                 """, (batch_id,))
                 row = cur.fetchone()
@@ -1098,7 +1191,7 @@ def db_set_batch_story_ready_from_error(batch_id):
 
 
 def db_set_batch_pending(batch_id):
-    """Сбрасывает батч в статус 'pending', очищая story_id, video_url и data.
+    """Сбрасывает батч в статус 'pending', очищая story_id, movie_id и data.
     Используется для перезапуска цикла генерации после фатального сбоя видео."""
     _assert_known_status('pending')
     try:
@@ -1107,7 +1200,7 @@ def db_set_batch_pending(batch_id):
                 cur.execute(
                     """UPDATE batches
                        SET status = 'pending', story_id = NULL,
-                           video_url = NULL, video_file = NULL, data = NULL
+                           movie_id = NULL, data = NULL
                        WHERE id = %s""",
                     (batch_id,),
                 )
@@ -1305,19 +1398,23 @@ def db_clear_all_history():
 
 
 def db_cleanup_video_data(file_lifetime_days: int) -> int:
-    """Обнуляет video_data_transcoded и video_data_original у опубликованных/отменённых батчей
-    старше file_lifetime_days. Сама запись батча сохраняется.
-    Возвращает количество обновлённых батчей."""
+    """Обнуляет transcoded_data и raw_data в movies для опубликованных/отменённых батчей
+    старше file_lifetime_days. Сама запись батча и movies сохраняется.
+    Возвращает количество обновлённых записей movies."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                    UPDATE batches
-                       SET video_data_transcoded = NULL,
-                           video_data_original   = NULL
-                    WHERE status = ANY(%s)
-                      AND completed_at < now() - make_interval(days => %s)
-                      AND COALESCE(video_data_transcoded, video_data_original) IS NOT NULL
+                    UPDATE movies
+                       SET transcoded_data = NULL,
+                           raw_data        = NULL
+                    WHERE id IN (
+                        SELECT movie_id FROM batches
+                        WHERE status = ANY(%s)
+                          AND completed_at < now() - make_interval(days => %s)
+                          AND movie_id IS NOT NULL
+                    )
+                      AND COALESCE(transcoded_data, raw_data) IS NOT NULL
                 """, (list(FINAL_BATCH_STATUSES), file_lifetime_days))
                 count = cur.rowcount
             conn.commit()
@@ -1416,9 +1513,11 @@ def db_get_batch_by_id(batch_id):
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
                 cur.execute("""
                     SELECT b.id, b.scheduled_at, b.type, b.story_id,
-                           b.video_url, b.status, b.data,
-                           b.video_model_id
+                           m.url AS video_url, b.status, b.data,
+                           m.model_id AS video_model_id,
+                           b.movie_id
                     FROM batches b
+                    LEFT JOIN movies m ON m.id = b.movie_id
                     WHERE b.id = %s
                 """, (batch_id,))
                 row = cur.fetchone()

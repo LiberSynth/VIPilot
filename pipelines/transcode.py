@@ -9,7 +9,7 @@ transcode_ready без единой записи в лог.
 Если включено:
   - Отсутствие оригинала в БД → fatal_error (ошибка логики приложения).
   - Любой другой сбой (ffmpeg и т.п.) → некритично: лог-предупреждение,
-    батч всё равно переходит в transcode_ready с пустым video_data_transcoded
+    батч всё равно переходит в transcode_ready с пустым movies.transcoded_data
     (пайплайн публикации возьмёт оригинал как запасной вариант).
 
 Статус: video_ready → transcoding → transcode_ready / transcode_error.
@@ -153,7 +153,7 @@ def run(batch_id):
 
         original_data = db_get_batch_original_video(batch_id)
         if original_data is None:
-            msg = 'video_data_original = NULL у батча в статусе video_ready — ошибка логики'
+            msg = 'movies.raw_data = NULL у батча в статусе video_ready — ошибка логики'
             if log_id:
                 db_log_entry(log_id, msg, level='error')
             raise RuntimeError(msg)

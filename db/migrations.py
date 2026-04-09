@@ -1235,6 +1235,89 @@ def _m035_drop_text_model_id(cur):
     """)
 
 
+def _m036_movies_table(cur):
+    """
+    Выносит видео-данные из batches в отдельную таблицу movies.
+
+    1. Создаёт таблицу movies (id, created_at, url, raw_data, transcoded_data, model_id).
+    2. Переносит данные из batches → movies для батчей с видео.
+    3. Добавляет movie_id (UUID, nullable) в batches.
+    4. Заполняет batches.movie_id по перенесённым записям.
+    5. Удаляет старые поля: video_url, video_file, video_data_original, video_data_transcoded,
+       video_model_id.
+    6. Удаляет триггер trg_batch_model_types и функцию trg_fn_batch_model_types.
+    Deployed: -
+    """
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS movies (
+            id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+            created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+            url             TEXT,
+            raw_data        BYTEA,
+            transcoded_data BYTEA,
+            model_id        UUID
+        )
+    """)
+
+    cur.execute("""
+        ALTER TABLE batches
+            ADD COLUMN IF NOT EXISTS movie_id UUID
+    """)
+
+    cur.execute("""
+        DO $$
+        DECLARE
+            rec RECORD;
+            new_movie_id UUID;
+        BEGIN
+            IF EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'batches' AND column_name = 'video_data_original'
+            ) THEN
+                FOR rec IN
+                    SELECT id, video_url, video_data_original, video_data_transcoded, video_model_id
+                    FROM batches
+                    WHERE video_data_original IS NOT NULL
+                       OR video_data_transcoded IS NOT NULL
+                       OR video_url IS NOT NULL
+                       OR video_model_id IS NOT NULL
+                LOOP
+                    INSERT INTO movies (url, raw_data, transcoded_data, model_id)
+                    VALUES (rec.video_url, rec.video_data_original, rec.video_data_transcoded, rec.video_model_id)
+                    RETURNING id INTO new_movie_id;
+
+                    UPDATE batches SET movie_id = new_movie_id WHERE id = rec.id;
+                END LOOP;
+            END IF;
+        END $$
+    """)
+
+    cur.execute("""
+        DO $$ BEGIN
+            IF EXISTS (
+                SELECT 1 FROM pg_trigger
+                WHERE tgname = 'trg_batch_model_types'
+                  AND tgrelid = 'batches'::regclass
+            ) THEN
+                DROP TRIGGER trg_batch_model_types ON batches;
+            END IF;
+        END $$
+    """)
+
+    cur.execute("""
+        DROP FUNCTION IF EXISTS trg_fn_batch_model_types()
+    """)
+
+    cur.execute("""
+        ALTER TABLE batches
+            DROP COLUMN IF EXISTS video_url,
+            DROP COLUMN IF EXISTS video_file,
+            DROP COLUMN IF EXISTS video_data_original,
+            DROP COLUMN IF EXISTS video_data_transcoded,
+            DROP COLUMN IF EXISTS video_model_id
+    """)
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -1271,6 +1354,7 @@ MIGRATIONS = [
     (33, _m033_sync_targets_from_dev),
     (34, _m034_stories_result_to_content),
     (35, _m035_drop_text_model_id),
+    (36, _m036_movies_table),
 ]
 
 
