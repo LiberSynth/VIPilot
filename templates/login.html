@@ -62,6 +62,15 @@
     color: #ff6060;
     margin-bottom: 16px;
   }
+  .warning {
+    background: rgba(255,200,50,.1);
+    border: 1px solid rgba(255,200,50,.35);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: #f5c842;
+    margin-bottom: 16px;
+  }
   button {
     width: 100%;
     background: linear-gradient(135deg, #4a7cf7, #6f4af7);
@@ -95,6 +104,9 @@
     </div>
     <h1>VIPilot</h1>
   </div>
+  {% if no_roles %}
+  <div class="warning">Вашему аккаунту не назначены роли. Обратитесь к администратору.</div>
+  {% endif %}
   {% if error %}
   <div class="error">Неверный логин или пароль</div>
   {% endif %}

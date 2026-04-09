@@ -58,7 +58,7 @@ def _redirect_after_login():
     if len(roles) > 1:
         return redirect(url_for("web.select_module"))
     session.clear()
-    return redirect(url_for("web.login"))
+    return redirect(url_for("web.login", reason="no_roles"))
 
 
 @bp.route("/favicon.ico")
@@ -82,6 +82,7 @@ def login():
     if is_authenticated():
         return _redirect_after_login()
 
+    no_roles = request.args.get("reason") == "no_roles"
     error = False
     if request.method == "POST":
         login_val = request.form.get("login", "").strip()
@@ -94,7 +95,8 @@ def login():
             session.permanent = True
             return _redirect_after_login()
         error = True
-    return render_template("login.html", error=error)
+        no_roles = False
+    return render_template("login.html", error=error, no_roles=no_roles)
 
 
 @bp.route("/web")
