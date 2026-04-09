@@ -1156,6 +1156,25 @@ def _m033_sync_targets_from_dev(cur):
         ))
 
 
+def _m034_stories_result_to_content(cur):
+    """
+    Переименовывает колонку result → content в таблице stories.
+    Атомарно; данные не теряются.
+    Идемпотентно: пропускает переименование, если result уже отсутствует.
+    """
+    cur.execute("""
+        DO $$
+        BEGIN
+            IF EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'stories' AND column_name = 'result'
+            ) THEN
+                ALTER TABLE stories RENAME COLUMN result TO content;
+            END IF;
+        END $$
+    """)
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -1190,6 +1209,7 @@ MIGRATIONS = [
     (31, _m030_user_roles_module_field),
     (32, _m032_seed_default_users),
     (33, _m033_sync_targets_from_dev),
+    (34, _m034_stories_result_to_content),
 ]
 
 

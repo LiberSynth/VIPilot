@@ -461,7 +461,7 @@ def db_create_story(model_id, title, result):
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "INSERT INTO stories (model_id, title, result) VALUES (%s, %s, %s) RETURNING id",
+                    "INSERT INTO stories (model_id, title, content) VALUES (%s, %s, %s) RETURNING id",
                     (model_id, title, result),
                 )
                 row = cur.fetchone()
@@ -568,11 +568,11 @@ def db_cancel_waiting_batches():
 
 
 def db_get_story_text(story_id):
-    """Возвращает text из stories.result по UUID, или None."""
+    """Возвращает text из stories.content по UUID, или None."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
-                cur.execute("SELECT result FROM stories WHERE id = %s", (story_id,))
+                cur.execute("SELECT content FROM stories WHERE id = %s", (story_id,))
                 row = cur.fetchone()
         return row[0] if row else None
     except Exception as e:
