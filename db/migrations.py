@@ -1091,22 +1091,6 @@ def _m032_seed_default_users(cur):
         )
     """)
 
-    cur.execute("""
-        INSERT INTO user_role_links (user_id, role_id)
-        SELECT u.id, r.id
-        FROM (VALUES
-            ('operator', 'operator'),
-            ('producer', 'producer'),
-            ('producer', 'operator'),
-            ('root',     'root'),
-            ('root',     'producer'),
-            ('root',     'operator')
-        ) AS v(user_login, role_slug)
-        JOIN users      u ON u.login = v.user_login
-        JOIN user_roles r ON r.slug  = v.role_slug
-        ON CONFLICT DO NOTHING
-    """)
-
 
 def _m033_sync_targets_from_dev(cur):
     """
