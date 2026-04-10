@@ -1365,6 +1365,17 @@ def _m040_rename_donating_to_donated(cur):
     """)
 
 
+def _m041_rename_story_error_to_error(cur):
+    """
+    Переименовывает статус батча 'story_error' → 'error'.
+    Статус story_error удалён из кода (Task #83), старые записи в БД приводятся
+    к стандартному 'error'. Идемпотентно.
+    """
+    cur.execute("""
+        UPDATE batches SET status = 'error' WHERE status = 'story_error'
+    """)
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -1406,6 +1417,7 @@ MIGRATIONS = [
     (38, _m038_stories_manual_changed),
     (39, _m039_delete_qwen36_plus_preview),
     (40, _m040_rename_donating_to_donated),
+    (41, _m041_rename_story_error_to_error),
 ]
 
 
