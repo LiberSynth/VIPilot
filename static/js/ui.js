@@ -134,11 +134,15 @@ var setDraftStoryFromRecord;
           '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
           '<polyline points="2,8 6,12 14,4"/></svg></span>';
       }
-      if (s.manual_changed) {
+      if (s.ai_generated && s.manual_changed) {
         icons += '<span class="story-icon story-icon-manual" title="Сгенерировано AI, отредактировано вручную">' +
           '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' +
           '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>' +
           '<path d="M18 2l.8 2.2L21 5l-2.2.8L18 8l-.8-2.2L15 5l2.2-.8z" fill="currentColor" stroke-width="1"/></svg></span>';
+      } else if (s.manual_changed) {
+        icons += '<span class="story-icon story-icon-manual" title="Написано вручную">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+          '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>';
       } else {
         icons += '<span class="story-icon story-icon-ai" title="Сгенерировано AI">' +
           '<svg viewBox="0 0 16 16" fill="currentColor" stroke="none">' +

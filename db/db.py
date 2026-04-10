@@ -518,7 +518,8 @@ def db_create_story(model_id, title, result):
 
 
 def db_get_stories_list():
-    """Возвращает список всех сюжетов с полями id, title, content, grade, manual_changed, used.
+    """Возвращает список всех сюжетов с полями id, title, content, grade, manual_changed, ai_generated, used.
+    ai_generated = True если model_id IS NOT NULL.
     used = True если в batches есть запись с story_id=<id> AND movie_id IS NOT NULL."""
     try:
         with get_db() as conn:
@@ -530,6 +531,7 @@ def db_get_stories_list():
                         s.content,
                         s.grade,
                         s.manual_changed,
+                        s.model_id IS NOT NULL AS ai_generated,
                         EXISTS (
                             SELECT 1 FROM batches b
                             WHERE b.story_id = s.id AND b.movie_id IS NOT NULL
@@ -545,7 +547,8 @@ def db_get_stories_list():
                 "content": row[2] or "",
                 "grade": row[3] or "good",
                 "manual_changed": bool(row[4]),
-                "used": bool(row[5]),
+                "ai_generated": bool(row[5]),
+                "used": bool(row[6]),
             }
             for row in rows
         ]
