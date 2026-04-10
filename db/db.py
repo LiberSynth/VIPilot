@@ -1202,13 +1202,13 @@ def db_set_batch_story_error(batch_id):
 
 def db_set_batch_story_ready_from_error(batch_id):
     """Откатывает батч в story_ready после сбоя видео, сохраняя story_id.
-    Очищает data (request_id/url), но НЕ трогает story_id — сюжет не регенерируется."""
+    НЕ трогает story_id и data — сюжет не регенерируется, данные пайплайна сохраняются."""
     _assert_known_status('story_ready')
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "UPDATE batches SET status = 'story_ready', data = NULL WHERE id = %s",
+                    "UPDATE batches SET status = 'story_ready' WHERE id = %s",
                     (batch_id,),
                 )
             conn.commit()
@@ -1219,8 +1219,9 @@ def db_set_batch_story_ready_from_error(batch_id):
 
 
 def db_set_batch_pending(batch_id):
-    """Сбрасывает батч в статус 'pending', очищая story_id, movie_id и data.
-    Используется для перезапуска цикла генерации после фатального сбоя видео."""
+    """Сбрасывает батч в статус 'pending', очищая story_id и movie_id.
+    Используется для перезапуска цикла генерации после фатального сбоя видео.
+    Поле data не очищается — сохраняется для диагностики."""
     _assert_known_status('pending')
     try:
         with get_db() as conn:
@@ -1228,7 +1229,7 @@ def db_set_batch_pending(batch_id):
                 cur.execute(
                     """UPDATE batches
                        SET status = 'pending', story_id = NULL,
-                           movie_id = NULL, data = NULL
+                           movie_id = NULL
                        WHERE id = %s""",
                     (batch_id,),
                 )
