@@ -136,8 +136,8 @@ var setDraftStoryFromRecord;
       }
       if (s.manual_changed) {
         icons += '<span class="story-icon story-icon-manual" title="Отредактировано вручную">' +
-          '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
-          '<path d="M4 1l1.5 5-2.5 1 3 8 1-4 4 4 1-10-3 3z"/></svg></span>';
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+          '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>';
       } else {
         icons += '<span class="story-icon story-icon-ai" title="Сгенерировано AI">' +
           '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
