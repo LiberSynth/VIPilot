@@ -269,10 +269,13 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
 
     # ── Шаг 4: Загружаем файл ────────────────────────────────────────────
     _log(log_id, "Ищу поле загрузки файла…")
-    # Используем expect_file_chooser — перехватывает диалог выбора файла
-    # независимо от DOM-структуры (в т.ч. shadow DOM).
+    # Ждём появления кнопки ДО входа в expect_file_chooser:
+    # если войти до того, как кнопка видна, click() зависает внутри with-блока
+    # и expect_file_chooser истекает раньше, чем диалог успевает открыться.
+    choose_btn = page.get_by_text("Выбрать видео", exact=False).first
+    choose_btn.wait_for(state="visible", timeout=20_000)
+    _log(log_id, "Кнопка «Выбрать видео» найдена, открываю диалог выбора файла…")
     with page.expect_file_chooser(timeout=15_000) as fc_info:
-        choose_btn = page.get_by_text("Выбрать видео", exact=False).first
         choose_btn.click()
     file_chooser = fc_info.value
     file_chooser.set_files(video_path)
