@@ -145,22 +145,38 @@ def _has_captcha_frame(page) -> bool:
     return False
 
 
+def _has_publish_confirm_dialog(page) -> bool:
+    """Возвращает True если в DOM видна кнопка подтверждения публикации."""
+    for text in ("Опубликовать после обработки", "Опубликовать после подтверждения"):
+        try:
+            btn = page.locator(f"button:has-text('{text}')")
+            if btn.count() > 0 and btn.first.is_visible(timeout=300):
+                return True
+        except Exception:
+            pass
+    return False
+
+
 def _dismiss_popups(page, log_id=None) -> None:
     """
     Закрывает любые видимые диалоги/попапы без разбора.
     Исключения (не трогаем):
-      1. Активная капча-iframe — иначе сломаем прохождение капчи.
-      2. Диалог загрузки файла — input[type=file] в DOM сигнализирует,
+      1. Диалог загрузки файла — input[type=file] в DOM сигнализирует,
          что Дзен показывает страницу/модалку загрузки видео; Escape
          закроет её до того, как файл будет передан браузеру.
+      2. Активная капча-iframe — иначе сломаем прохождение капчи.
+      3. Диалог подтверждения публикации — кнопка «Опубликовать после обработки»
+         или «Опубликовать после подтверждения» видна в DOM.
     """
-    if _has_captcha_frame(page):
-        return
     try:
         if page.locator('input[type="file"]').count() > 0:
             return
     except Exception:
         pass
+    if _has_captcha_frame(page):
+        return
+    if _has_publish_confirm_dialog(page):
+        return
     try:
         page.keyboard.press("Escape")
         page.wait_for_timeout(200)
