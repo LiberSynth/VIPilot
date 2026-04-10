@@ -1,16 +1,38 @@
 /* ── Автосохранение черновика сюжета ── */
 var resetDraftStoryId;
+var setDraftStoryFromRecord;
 (function() {
   var _draftStoryId = null;
   var _draftTimer = null;
   var _draftSaving = false;
   var _draftPendingRetry = false;
 
+  function setDraftCardState(state) {
+    var card = document.getElementById('card-story-draft');
+    if (!card) return;
+    card.classList.remove('card--editing-new', 'card--editing-existing');
+    if (state === 'new') card.classList.add('card--editing-new');
+    else if (state === 'existing') card.classList.add('card--editing-existing');
+  }
+
   resetDraftStoryId = function() {
     _draftStoryId = null;
     _draftSaving = false;
     _draftPendingRetry = false;
     clearTimeout(_draftTimer);
+    setDraftCardState(null);
+  };
+
+  setDraftStoryFromRecord = function(story) {
+    var titleEl = document.getElementById('draft-story-title');
+    var contentEl = document.getElementById('draft-story-content');
+    if (titleEl) titleEl.value = story.title || '';
+    if (contentEl) contentEl.value = story.content || '';
+    _draftStoryId = story.id;
+    _draftSaving = false;
+    _draftPendingRetry = false;
+    clearTimeout(_draftTimer);
+    setDraftCardState('existing');
   };
 
   function saveDraft() {
@@ -35,7 +57,10 @@ var resetDraftStoryId;
       if (d && d.story_id) {
         var isNew = !_draftStoryId;
         _draftStoryId = d.story_id;
-        if (isNew && typeof loadStoriesList === 'function') loadStoriesList();
+        if (isNew) {
+          setDraftCardState('new');
+          if (typeof loadStoriesList === 'function') loadStoriesList();
+        }
       }
       _draftSaving = false;
       if (_draftPendingRetry) {
@@ -131,6 +156,17 @@ var resetDraftStoryId;
       btn.addEventListener('click', function(e) {
         e.stopPropagation();
         cycleGrade(btn);
+      });
+    });
+    container.querySelectorAll('.story-row').forEach(function(row) {
+      var storyId = row.getAttribute('data-id');
+      var storyObj = null;
+      for (var j = 0; j < stories.length; j++) {
+        if (String(stories[j].id) === String(storyId)) { storyObj = stories[j]; break; }
+      }
+      if (!storyObj) return;
+      row.addEventListener('click', function() {
+        if (typeof setDraftStoryFromRecord === 'function') setDraftStoryFromRecord(storyObj);
       });
     });
   }
@@ -236,6 +272,8 @@ function switchPanel(name) {
     if (typeof resetDraftStoryId === 'function') resetDraftStoryId();
   }
   if (name === 'screenwriter') {
+    var draftCard = document.getElementById('card-story-draft');
+    if (draftCard) draftCard.classList.remove('card--editing-new', 'card--editing-existing');
     if (typeof loadStoriesList === 'function') loadStoriesList();
   }
 }
