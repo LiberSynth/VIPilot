@@ -257,14 +257,16 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
     _log(log_id, "«Загрузить видео» нажато")
     page.wait_for_timeout(1500)
     _snap(page, batch_id)
-    _dismiss_popups(page, log_id)
 
     # ── Шаг 4: Загружаем файл ────────────────────────────────────────────
     _log(log_id, "Ищу поле загрузки файла…")
-    # file input скрыт намеренно — ждём только "attached", не "visible"
-    file_input = page.locator('input[type="file"]').first
-    file_input.wait_for(state="attached", timeout=15_000)
-    file_input.set_input_files(video_path)
+    # Используем expect_file_chooser — перехватывает диалог выбора файла
+    # независимо от DOM-структуры (в т.ч. shadow DOM).
+    with page.expect_file_chooser(timeout=15_000) as fc_info:
+        choose_btn = page.get_by_text("Выбрать видео", exact=False).first
+        choose_btn.click()
+    file_chooser = fc_info.value
+    file_chooser.set_files(video_path)
     _log(log_id, "Файл передан браузеру, жду загрузки…")
     _snap(page, batch_id)
 
