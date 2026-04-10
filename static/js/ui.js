@@ -32,7 +32,11 @@ var resetDraftStoryId;
     })
     .then(function(r) { return r.ok ? r.json() : null; })
     .then(function(d) {
-      if (d && d.story_id) _draftStoryId = d.story_id;
+      if (d && d.story_id) {
+        var isNew = !_draftStoryId;
+        _draftStoryId = d.story_id;
+        if (isNew && typeof loadStoriesList === 'function') loadStoriesList();
+      }
       _draftSaving = false;
       if (_draftPendingRetry) {
         _draftPendingRetry = false;
@@ -66,6 +70,112 @@ var resetDraftStoryId;
   } else {
     initDraftAutosave();
   }
+})();
+
+/* ── Список сюжетов в панели Сценариста ── */
+(function() {
+  var GRADE_CYCLE = ['good', 'limited', 'poor', 'rejected'];
+  var GRADE_LABELS = { good: 'хорошо', limited: 'ограничен', poor: 'слабый', rejected: 'отклонён' };
+  var GRADE_COLORS = {
+    good:     'rgba(62,207,142,.18)',
+    limited:  'rgba(245,166,35,.18)',
+    poor:     'rgba(255,140,0,.18)',
+    rejected: 'rgba(255,80,80,.18)',
+  };
+  var GRADE_TEXT_COLORS = {
+    good:     '#3ecf8e',
+    limited:  '#f5a623',
+    poor:     '#ff8c00',
+    rejected: '#ff6060',
+  };
+
+  function renderStories(stories) {
+    var container = document.getElementById('stories-list');
+    if (!container) return;
+    if (!stories || stories.length === 0) {
+      container.innerHTML = '<div class="stories-empty">Нет сюжетов</div>';
+      return;
+    }
+    var html = '';
+    for (var i = 0; i < stories.length; i++) {
+      var s = stories[i];
+      var grade = s.grade || 'good';
+      var label = GRADE_LABELS[grade] || grade;
+      var bg = GRADE_COLORS[grade] || 'rgba(255,255,255,.07)';
+      var tc = GRADE_TEXT_COLORS[grade] || '#aaa';
+      var icons = '';
+      if (s.manual_changed) {
+        icons += '<span class="story-icon story-icon-manual" title="Отредактировано вручную">' +
+          '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
+          '<path d="M11 2l3 3-8 8H3v-3L11 2z"/></svg></span>';
+      }
+      if (s.used) {
+        icons += '<span class="story-icon story-icon-used" title="Использован в производстве">' +
+          '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
+          '<polyline points="2,8 6,12 14,4"/></svg></span>';
+      }
+      html += '<div class="story-row" data-id="' + s.id + '">' +
+        '<div class="story-title">' + escapeHtml(s.title || '(без названия)') + '</div>' +
+        '<div class="story-row-right">' +
+          icons +
+          '<button class="story-grade-badge" data-id="' + s.id + '" data-grade="' + grade + '" ' +
+            'style="background:' + bg + ';color:' + tc + '" ' +
+            'title="Оценка: ' + label + '. Нажмите для смены">' +
+            label +
+          '</button>' +
+        '</div>' +
+      '</div>';
+    }
+    container.innerHTML = html;
+    container.querySelectorAll('.story-grade-badge').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        cycleGrade(btn);
+      });
+    });
+  }
+
+  function cycleGrade(btn) {
+    var storyId = btn.getAttribute('data-id');
+    var currentGrade = btn.getAttribute('data-grade');
+    var idx = GRADE_CYCLE.indexOf(currentGrade);
+    var nextGrade = GRADE_CYCLE[(idx + 1) % GRADE_CYCLE.length];
+    btn.disabled = true;
+    fetch('/producer/story/' + storyId + '/grade', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ grade: nextGrade }),
+    })
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(d) {
+      btn.disabled = false;
+      if (d && d.grade) {
+        var grade = d.grade;
+        btn.setAttribute('data-grade', grade);
+        btn.style.background = GRADE_COLORS[grade] || 'rgba(255,255,255,.07)';
+        btn.style.color = GRADE_TEXT_COLORS[grade] || '#aaa';
+        btn.textContent = GRADE_LABELS[grade] || grade;
+        btn.title = 'Оценка: ' + (GRADE_LABELS[grade] || grade) + '. Нажмите для смены';
+      }
+    })
+    .catch(function() { btn.disabled = false; });
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  window.loadStoriesList = function() {
+    var container = document.getElementById('stories-list');
+    if (!container) return;
+    container.innerHTML = '<div class="stories-loading">Загрузка...</div>';
+    fetch('/producer/stories')
+      .then(function(r) { return r.ok ? r.json() : []; })
+      .then(renderStories)
+      .catch(function() {
+        if (container) container.innerHTML = '<div class="stories-empty">Ошибка загрузки</div>';
+      });
+  };
 })();
 
 const PANEL_TITLES = {
@@ -124,6 +234,9 @@ function switchPanel(name) {
     if (draftTitle) draftTitle.value = '';
     if (draftContent) draftContent.value = '';
     if (typeof resetDraftStoryId === 'function') resetDraftStoryId();
+  }
+  if (name === 'screenwriter') {
+    if (typeof loadStoriesList === 'function') loadStoriesList();
   }
 }
 

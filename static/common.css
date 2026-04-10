@@ -868,6 +868,42 @@
     padding: 24px; text-align: center;
   }
 
+  /* ── Stories list (Сценарист) ── */
+  .stories-list { display: flex; flex-direction: column; gap: 6px; }
+  .stories-loading { font-size: 13px; color: #555; padding: 4px 0; }
+  .stories-empty   { font-size: 13px; color: #555; padding: 4px 0; }
+  .story-row {
+    display: flex; align-items: center; gap: 8px;
+    background: #0f0f13; border: 1px solid #1e1e2e;
+    border-radius: 10px; padding: 9px 12px;
+  }
+  .story-title {
+    flex: 1; font-size: 13px; color: #c8c8e0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    min-width: 0;
+  }
+  .story-row-right {
+    display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+  }
+  .story-grade-badge {
+    font-size: 11px; font-weight: 600;
+    border: none; border-radius: 6px;
+    padding: 3px 8px; cursor: pointer;
+    font-family: inherit;
+    transition: opacity .15s, filter .15s;
+    white-space: nowrap; flex-shrink: 0;
+  }
+  .story-grade-badge:hover { filter: brightness(1.2); }
+  .story-grade-badge:active { filter: brightness(0.85); }
+  .story-grade-badge:disabled { opacity: .5; cursor: default; }
+  .story-icon {
+    width: 16px; height: 16px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .story-icon svg { width: 14px; height: 14px; }
+  .story-icon-manual svg { stroke: #f5a623; opacity: .8; }
+  .story-icon-used   svg { stroke: #3ecf8e; opacity: .8; }
+
   /* ── Тултип долгого нажатия (мобильный) ── */
   #touch-tooltip {
     position: fixed;

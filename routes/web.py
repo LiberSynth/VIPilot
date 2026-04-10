@@ -26,6 +26,8 @@ from db import (
     db_update_target_publish_method_by_slug,
     db_get_user_by_login,
     db_upsert_story_draft,
+    db_get_stories_list,
+    db_set_story_grade,
 )
 from utils.auth import is_authenticated
 from utils.limiter import limiter
@@ -226,6 +228,35 @@ def producer_page():
     resp.headers["Pragma"] = "no-cache"
     resp.headers["Expires"] = "0"
     return resp
+
+
+@bp.route("/producer/stories", methods=["GET"])
+def producer_stories():
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    if not (_has_slug("producer") or _has_slug("root")):
+        return jsonify({"error": "forbidden"}), 403
+    stories = db_get_stories_list()
+    return jsonify(stories)
+
+
+GRADE_CYCLE = ["good", "limited", "poor", "rejected"]
+
+
+@bp.route("/producer/story/<story_id>/grade", methods=["POST"])
+def producer_story_grade(story_id):
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    if not (_has_slug("producer") or _has_slug("root")):
+        return jsonify({"error": "forbidden"}), 403
+    data = request.get_json(silent=True) or {}
+    grade = data.get("grade", "good")
+    if grade not in GRADE_CYCLE:
+        return jsonify({"error": "invalid_grade"}), 400
+    ok = db_set_story_grade(story_id, grade)
+    if ok is None or ok is False:
+        return jsonify({"error": "not_found"}), 404
+    return jsonify({"ok": True, "grade": grade})
 
 
 @bp.route("/producer/story/draft", methods=["POST"])

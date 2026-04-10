@@ -497,6 +497,59 @@ def db_create_story(model_id, title, result):
         return None
 
 
+def db_get_stories_list():
+    """Возвращает список всех сюжетов с полями id, title, grade, manual_changed, used.
+    used = True если в batches есть запись с story_id=<id> AND movie_id IS NOT NULL."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT
+                        s.id::text,
+                        s.title,
+                        s.grade,
+                        s.manual_changed,
+                        EXISTS (
+                            SELECT 1 FROM batches b
+                            WHERE b.story_id = s.id AND b.movie_id IS NOT NULL
+                        ) AS used
+                    FROM stories s
+                    ORDER BY s.created_at DESC
+                """)
+                rows = cur.fetchall()
+        return [
+            {
+                "id": row[0],
+                "title": row[1] or "",
+                "grade": row[2] or "good",
+                "manual_changed": bool(row[3]),
+                "used": bool(row[4]),
+            }
+            for row in rows
+        ]
+    except Exception as e:
+        print(f"[DB] Ошибка db_get_stories_list: {e}")
+        return []
+
+
+def db_set_story_grade(story_id, grade):
+    """Обновляет поле grade у сюжета.
+    Возвращает True при успехе, False если запись не найдена или ошибка БД."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE stories SET grade = %s WHERE id = %s::uuid",
+                    (grade, story_id),
+                )
+                updated = cur.rowcount
+            conn.commit()
+        return updated > 0
+    except Exception as e:
+        print(f"[DB] Ошибка db_set_story_grade: {e}")
+        return False
+
+
 def db_upsert_story_draft(story_id, title, content):
     """Создаёт или обновляет черновик сюжета (model_id=NULL, grade='good').
     Если story_id передан и запись существует — обновляет title и content.
