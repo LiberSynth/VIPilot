@@ -148,10 +148,19 @@ def _has_captcha_frame(page) -> bool:
 def _dismiss_popups(page, log_id=None) -> None:
     """
     Закрывает любые видимые диалоги/попапы без разбора.
-    Пропускает закрытие если активна капча-iframe.
+    Исключения (не трогаем):
+      1. Активная капча-iframe — иначе сломаем прохождение капчи.
+      2. Диалог загрузки файла — input[type=file] в DOM сигнализирует,
+         что Дзен показывает страницу/модалку загрузки видео; Escape
+         закроет её до того, как файл будет передан браузеру.
     """
     if _has_captcha_frame(page):
         return
+    try:
+        if page.locator('input[type="file"]').count() > 0:
+            return
+    except Exception:
+        pass
     try:
         page.keyboard.press("Escape")
         page.wait_for_timeout(200)
@@ -359,8 +368,6 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
 
     _dialog_deadline = _time.monotonic() + _DIALOG_WINDOW / 1000
 
-    _pub_confirm_clicked = False
-
     while _time.monotonic() < _dialog_deadline:
 
         # ── A. Кнопки подтверждения публикации ────────────────────────────
@@ -369,7 +376,6 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
         #   • «Опубликовать» — видео готово (может совпадать с текстом формы,
         #                       но форма к этому моменту уже скрыта)
         # «Опубликовать после обработки» — старый вариант текста, оставляем на всякий случай.
-        _pub_confirm_clicked = False
         try:
             pub_after = page.locator(
                 "button:has-text('Опубликовать после подтверждения'), "
@@ -383,7 +389,6 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
                 page.wait_for_timeout(2000)
                 _snap(page, batch_id)
                 _check_error_toast()
-                _pub_confirm_clicked = True
         except DzenApiError:
             raise
         except Exception:
@@ -458,9 +463,8 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
         #       Закрывать нечего, игнорируем полностью. Escape не отправляем.
 
         # ── D. Закрываем любые другие неизвестные попапы/диалоги ──────────
-        #       Пропускаем если: активна капча ИЛИ только что нажата кнопка
-        #       подтверждения публикации (Escape убьёт диалог раньше времени).
-        if not captcha_clicked and not _pub_confirm_clicked:
+        #       _dismiss_popups сама охраняет капчу и диалог загрузки файла.
+        if not captcha_clicked:
             _dismiss_popups(page, log_id)
 
         # ── Проверяем финальное подтверждение публикации ──────────────────
