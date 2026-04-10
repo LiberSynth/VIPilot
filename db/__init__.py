@@ -55,7 +55,7 @@ from .db import (
     db_steal_video_from_cancelled,
     db_set_batch_story_ready_from_donor,
     db_record_donor_batch_id,
-    db_find_donor_batch,
+    db_claim_donor_batch,
     db_steal_video_from_donor,
     db_get_donor_count,
     db_get_batch_logs,

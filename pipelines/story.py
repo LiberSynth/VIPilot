@@ -20,7 +20,7 @@ from db import (
     db_set_batch_story,
     db_set_batch_story_probe,
     db_set_batch_story_error,
-    db_find_donor_batch,
+    db_claim_donor_batch,
     db_set_batch_story_ready_from_donor,
     env_get,
 )
@@ -134,7 +134,7 @@ def run(batch_id):
 
         if not is_probe and env_get('emulation_mode', '0') != '1' and env_get('use_donor', '1') == '1' \
                 and batch.get('story_id') is None:
-            donor_result = db_find_donor_batch()
+            donor_result = db_claim_donor_batch()
             if donor_result:
                 donor_id, donor_story_id = donor_result
                 if not db_set_batch_story_ready_from_donor(batch_id, donor_id, donor_story_id):

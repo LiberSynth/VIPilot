@@ -1093,10 +1093,13 @@ def db_record_donor_batch_id(batch_id: str, donor_batch_id: str) -> bool:
         return False
 
 
-def db_find_donor_batch() -> tuple | None:
-    """Ищет самый старый батч-донор с видео (SELECT + FOR UPDATE SKIP LOCKED),
-    но не трогает видео и не меняет статус получателя.
+def db_claim_donor_batch() -> tuple | None:
+    """Атомарно захватывает батч-донор: SELECT + UPDATE status='donating' в одной транзакции.
+    Пока транзакция открыта, строка заблокирована (FOR UPDATE SKIP LOCKED) — конкурентный вызов
+    получит 0 строк и вернёт None. После коммита донор уже в статусе 'donating' и не виден
+    другим вызовам (фильтр по cancelled/probe).
     Возвращает (donor_id: str, donor_story_id: str | None) или None."""
+    _assert_known_status('donating')
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
@@ -1116,10 +1119,15 @@ def db_find_donor_batch() -> tuple | None:
                 row = cur.fetchone()
                 if not row:
                     return None
+                donor_id = row[0]
+                cur.execute(
+                    "UPDATE batches SET status = 'donating' WHERE id = %s::uuid",
+                    (donor_id,),
+                )
             conn.commit()
-        return (row[0], row[1])
+        return (donor_id, row[1])
     except Exception as e:
-        print(f"[DB] Ошибка db_find_donor_batch: {e}")
+        print(f"[DB] Ошибка db_claim_donor_batch: {e}")
         return None
 
 
@@ -1140,6 +1148,7 @@ def db_steal_video_from_donor(donor_batch_id: str, batch_id: str) -> str | None:
                     FROM batches b
                     JOIN movies m ON m.id = b.movie_id
                     WHERE b.id = %s::uuid
+                      AND b.status = 'donating'
                     FOR UPDATE OF b SKIP LOCKED
                 """, (donor_batch_id,))
                 donor = cur.fetchone()
@@ -1764,6 +1773,8 @@ KNOWN_BATCH_STATUSES = frozenset({
     'cancelled', 'error', 'probe', 'story_probe', 'story_error',
     'video_error', 'transcode_error', 'publish_error', 'published',
     'published_partially', 'fatal_error',
+    # donor mode: донор атомарно захвачен, ожидает переноса story/video
+    'donating',
 })
 
 _COMPOSITE_STATUS_SUFFIXES = ('.posting', '.published', '.pending', '.failed')
