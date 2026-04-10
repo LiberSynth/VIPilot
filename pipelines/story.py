@@ -264,7 +264,7 @@ def run(batch_id):
             msg = f'Сюжет сгенерирован ({used_model_name})'
             db_log_update(log_id, msg, 'ok')
             if log_id:
-                db_log_entry(log_id, f"Сохранён как story {story_id[:8]}…, батч → story_probe")
+                db_log_entry(log_id, f"Сохранён как story {story_id}, батч → story_probe")
             print(f"[story] Пробный сюжет: story_id={story_id[:8]}…, batch → story_probe")
         else:
             if not db_set_batch_story(batch_id, story_id):
@@ -279,7 +279,7 @@ def run(batch_id):
             msg = f'Сюжет сгенерирован ({used_model_name})'
             db_log_update(log_id, msg, 'ok')
             if log_id:
-                db_log_entry(log_id, f"Сохранён как story {story_id[:8]}…, батч → story_ready")
+                db_log_entry(log_id, f"Сохранён как story {story_id}, батч → story_ready")
             print(f"[story] Готово: story_id={story_id[:8]}…, batch → story_ready")
 
     except Exception as e:
