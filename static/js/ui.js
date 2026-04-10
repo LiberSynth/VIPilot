@@ -147,16 +147,13 @@ var setDraftStoryFromRecord;
           '<path d="M8 1 L9.3 6.7 L15 8 L9.3 9.3 L8 15 L6.7 9.3 L1 8 L6.7 6.7 Z"/></svg></span>';
       }
       var modelLabel = s.model_name ? ' <span class="story-model-name">(' + escapeHtml(s.model_name) + ')</span>' : '';
+      var gradeBadge = '<button class="story-grade-badge" data-id="' + s.id + '" data-grade="' + grade + '" ' +
+        'style="background:' + bg + ';color:' + tc + '" ' +
+        'title="Оценка: ' + label + '. Нажмите для смены">' +
+        label + '</button>';
       html += '<div class="story-row" data-id="' + s.id + '">' +
-        '<div class="story-title">' + escapeHtml(s.title || '(без названия)') + modelLabel + '</div>' +
-        '<div class="story-row-right">' +
-          icons +
-          '<button class="story-grade-badge" data-id="' + s.id + '" data-grade="' + grade + '" ' +
-            'style="background:' + bg + ';color:' + tc + '" ' +
-            'title="Оценка: ' + label + '. Нажмите для смены">' +
-            label +
-          '</button>' +
-        '</div>' +
+        '<div class="story-title">' + escapeHtml(s.title || '(без названия)') + modelLabel + ' ' + gradeBadge + '</div>' +
+        '<div class="story-row-right">' + icons + '</div>' +
       '</div>';
     }
     container.innerHTML = html;
