@@ -2,6 +2,36 @@ var _gradeSequence = ['good', 'limited', 'poor', 'fallback', 'rejected'];
 var _gradeColors   = { good: '#4a8', limited: '#a84', poor: '#b60', fallback: '#a33', rejected: '#666' };
 var _gradeLabels   = { good: 'хорошо', limited: 'ограничен', poor: 'слабо', fallback: 'запасной', rejected: 'отклонён' };
 
+window.probeTextModel = function(id, name, btn) {
+  if (btn) btn.disabled = true;
+  fetch('/api/text-models/' + encodeURIComponent(id) + '/probe', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (btn) btn.disabled = false;
+      if (d.batch_id) showToast('Пробный запрос запущен: ' + name, 'success');
+      else showToast('Ошибка: ' + (d.error || 'неизвестно'), 'error');
+    })
+    .catch(function() {
+      if (btn) btn.disabled = false;
+      showToast('Ошибка соединения', 'error');
+    });
+};
+
+window.probeVideoModel = function(id, name, btn) {
+  if (btn) btn.disabled = true;
+  fetch('/api/video-models/' + encodeURIComponent(id) + '/probe', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (btn) btn.disabled = false;
+      if (d.batch_id) showToast('Пробный запрос запущен: ' + name, 'success');
+      else showToast('Ошибка: ' + (d.error || 'неизвестно'), 'error');
+    })
+    .catch(function() {
+      if (btn) btn.disabled = false;
+      showToast('Ошибка соединения', 'error');
+    });
+};
+
 window.cycleGrade = function(el) {
   var id   = el.getAttribute('data-grade-id');
   var cur  = el.getAttribute('data-grade') || 'good';
