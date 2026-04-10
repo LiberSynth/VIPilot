@@ -254,6 +254,7 @@ def run(batch_id):
 
         print(f"[story] Сюжет получен: {result[:100]}{'…' if len(result) > 100 else ''}")
         if log_id:
+            db_log_entry(log_id, f"Название: {title}")
             db_log_entry(log_id, f"Сюжет:\n{result}")
 
         if is_story_probe:
