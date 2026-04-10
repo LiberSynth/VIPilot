@@ -2,18 +2,28 @@ var _gradeSequence = ['good', 'limited', 'poor', 'fallback', 'rejected'];
 var _gradeColors   = { good: '#4a8', limited: '#a84', poor: '#b60', fallback: '#a33', rejected: '#666' };
 var _gradeLabels   = { good: 'хорошо', limited: 'ограничен', poor: 'слабо', fallback: 'запасной', rejected: 'отклонён' };
 
+function _modelsToast(msg, type) {
+  if (typeof showToast === 'function') { showToast(msg, type); return; }
+  var el = document.createElement('div');
+  el.className = 'flash ' + (type || 'success');
+  el.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:2000;max-width:420px;width:90%;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.4);transition:opacity .3s';
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(function() { el.style.opacity = '0'; setTimeout(function() { el.remove(); }, 300); }, 3500);
+}
+
 window.probeTextModel = function(id, name, btn) {
   if (btn) btn.disabled = true;
   fetch('/api/text-models/' + encodeURIComponent(id) + '/probe', { method: 'POST' })
     .then(function(r) { return r.json(); })
     .then(function(d) {
       if (btn) btn.disabled = false;
-      if (d.batch_id) showToast('Пробный запрос запущен: ' + name, 'success');
-      else showToast('Ошибка: ' + (d.error || 'неизвестно'), 'error');
+      if (d.batch_id) _modelsToast('Пробный запрос запущен: ' + name, 'success');
+      else _modelsToast('Ошибка: ' + (d.error || 'неизвестно'), 'error');
     })
     .catch(function() {
       if (btn) btn.disabled = false;
-      showToast('Ошибка соединения', 'error');
+      _modelsToast('Ошибка соединения', 'error');
     });
 };
 
@@ -23,12 +33,12 @@ window.probeVideoModel = function(id, name, btn) {
     .then(function(r) { return r.json(); })
     .then(function(d) {
       if (btn) btn.disabled = false;
-      if (d.batch_id) showToast('Пробный запрос запущен: ' + name, 'success');
-      else showToast('Ошибка: ' + (d.error || 'неизвестно'), 'error');
+      if (d.batch_id) _modelsToast('Пробный запрос запущен: ' + name, 'success');
+      else _modelsToast('Ошибка: ' + (d.error || 'неизвестно'), 'error');
     })
     .catch(function() {
       if (btn) btn.disabled = false;
-      showToast('Ошибка соединения', 'error');
+      _modelsToast('Ошибка соединения', 'error');
     });
 };
 
