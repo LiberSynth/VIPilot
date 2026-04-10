@@ -359,19 +359,31 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
 
     _dialog_deadline = _time.monotonic() + _DIALOG_WINDOW / 1000
 
+    _pub_confirm_clicked = False
+
     while _time.monotonic() < _dialog_deadline:
 
-        # ── A. Кнопка «Опубликовать после обработки» ──────────────────────
+        # ── A. Кнопки подтверждения публикации ────────────────────────────
+        # Дзен показывает одну из двух кнопок после нажатия «Опубликовать»:
+        #   • «Опубликовать после подтверждения» — видео ещё обрабатывается
+        #   • «Опубликовать» — видео готово (может совпадать с текстом формы,
+        #                       но форма к этому моменту уже скрыта)
+        # «Опубликовать после обработки» — старый вариант текста, оставляем на всякий случай.
+        _pub_confirm_clicked = False
         try:
             pub_after = page.locator(
-                "button:has-text('Опубликовать после обработки')"
+                "button:has-text('Опубликовать после подтверждения'), "
+                "button:has-text('Опубликовать после обработки'), "
+                "button:has-text('Опубликовать')"
             ).first
-            if pub_after.is_visible():
-                _log(log_id, "Нажимаю «Опубликовать после обработки»…")
+            if pub_after.is_visible(timeout=300):
+                btn_text = pub_after.inner_text()
+                _log(log_id, f"Нажимаю кнопку подтверждения публикации: «{btn_text}»…")
                 pub_after.click()
                 page.wait_for_timeout(2000)
                 _snap(page, batch_id)
-                _check_error_toast()   # сразу проверяем тост-ошибку после клика
+                _check_error_toast()
+                _pub_confirm_clicked = True
         except DzenApiError:
             raise
         except Exception:
@@ -446,8 +458,9 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
         #       Закрывать нечего, игнорируем полностью. Escape не отправляем.
 
         # ── D. Закрываем любые другие неизвестные попапы/диалоги ──────────
-        #       _dismiss_popups сама пропустит закрытие если активна капча.
-        if not captcha_clicked:
+        #       Пропускаем если: активна капча ИЛИ только что нажата кнопка
+        #       подтверждения публикации (Escape убьёт диалог раньше времени).
+        if not captcha_clicked and not _pub_confirm_clicked:
             _dismiss_popups(page, log_id)
 
         # ── Проверяем финальное подтверждение публикации ──────────────────
