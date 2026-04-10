@@ -487,6 +487,7 @@
     position: relative; align-self: center;
   }
   .monitor-dot.md-warn    { background: #f5a623; }
+  .monitor-dot.md-white   { background: #ffffff; }
   .monitor-dot.md-ok      { background: #3ecf8e; }
   .monitor-dot.md-error   { background: #ff6060; }
   .monitor-dot.md-active  { background: #4a7cf7; }
