@@ -1038,6 +1038,127 @@ def db_steal_video_from_cancelled(batch_id) -> str | None:
         return None
 
 
+def db_set_batch_story_ready_from_donor(batch_id: str, donor_batch_id: str, donor_story_id: str | None) -> bool:
+    """Записывает donor_batch_id в batches.data, устанавливает story_id через COALESCE
+    (не перезаписывает, если у батча уже есть свой story_id), переводит батч в story_ready.
+    Видео не трогает."""
+    _assert_known_status('story_ready')
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE batches
+                    SET status   = 'story_ready',
+                        story_id = COALESCE(story_id, %s),
+                        data     = COALESCE(data, '{}'::jsonb) || jsonb_build_object('donor_batch_id', %s)
+                    WHERE id = %s
+                    """,
+                    (donor_story_id, donor_batch_id, batch_id),
+                )
+            conn.commit()
+        return True
+    except Exception as e:
+        print(f"[DB] Ошибка db_set_batch_story_ready_from_donor: {e}")
+        return False
+
+
+def db_find_donor_batch() -> tuple | None:
+    """Ищет самый старый батч-донор с видео (SELECT + FOR UPDATE SKIP LOCKED),
+    но не трогает видео и не меняет статус получателя.
+    Возвращает (donor_id: str, donor_story_id: str | None) или None."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT b.id::text, b.story_id::text
+                    FROM batches b
+                    JOIN movies m ON m.id = b.movie_id
+                    WHERE (m.transcoded_data IS NOT NULL OR m.raw_data IS NOT NULL)
+                      AND (
+                        b.status = 'cancelled'
+                        OR (b.status = 'probe' AND b.type = 'probe')
+                      )
+                    ORDER BY b.created_at ASC
+                    LIMIT 1
+                    FOR UPDATE OF b SKIP LOCKED
+                """)
+                row = cur.fetchone()
+                if not row:
+                    return None
+            conn.commit()
+        return (row[0], row[1])
+    except Exception as e:
+        print(f"[DB] Ошибка db_find_donor_batch: {e}")
+        return None
+
+
+def db_steal_video_from_donor(donor_batch_id: str, batch_id: str) -> str | None:
+    """Переносит видео от конкретного донора (donor_batch_id) в батч-получатель (batch_id).
+    Если есть транскодированное — переносит его, получатель → transcode_ready.
+    Если только оригинал — переносит его, получатель → video_ready.
+    У донора обнуляет перенесённое поле.
+    story_id получателя НЕ перезаписывается (уже должен быть проставлен на этапе story).
+    Возвращает id донора (str) или None."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT b.id, m.transcoded_data, m.raw_data, m.url, b.movie_id, m.id AS mid
+                    FROM batches b
+                    JOIN movies m ON m.id = b.movie_id
+                    WHERE b.id = %s::uuid
+                      AND (m.transcoded_data IS NOT NULL OR m.raw_data IS NOT NULL)
+                    FOR UPDATE OF b SKIP LOCKED
+                """, (donor_batch_id,))
+                donor = cur.fetchone()
+                if not donor:
+                    return None
+
+                donor_id, video_data_transcoded, video_data_original, video_url, donor_movie_id, donor_mid = donor
+
+                if video_data_transcoded is not None:
+                    cur.execute("""
+                        INSERT INTO movies (url, transcoded_data)
+                        VALUES (%s, %s)
+                        RETURNING id
+                    """, (video_url, psycopg2.Binary(bytes(video_data_transcoded))))
+                    new_movie_id = cur.fetchone()[0]
+                    cur.execute("""
+                        UPDATE batches
+                        SET status   = 'transcode_ready',
+                            movie_id = %s
+                        WHERE id = %s
+                    """, (new_movie_id, batch_id))
+                    cur.execute(
+                        "UPDATE movies SET transcoded_data = NULL WHERE id = %s",
+                        (donor_mid,),
+                    )
+                else:
+                    cur.execute("""
+                        INSERT INTO movies (url, raw_data)
+                        VALUES (%s, %s)
+                        RETURNING id
+                    """, (video_url, psycopg2.Binary(bytes(video_data_original))))
+                    new_movie_id = cur.fetchone()[0]
+                    cur.execute("""
+                        UPDATE batches
+                        SET status   = 'video_ready',
+                            movie_id = %s
+                        WHERE id = %s
+                    """, (new_movie_id, batch_id))
+                    cur.execute(
+                        "UPDATE movies SET raw_data = NULL WHERE id = %s",
+                        (donor_mid,),
+                    )
+
+            conn.commit()
+        return str(donor_id)
+    except Exception as e:
+        print(f"[DB] Ошибка db_steal_video_from_donor: {e}")
+        return None
+
+
 def db_get_donor_count() -> int:
     """Возвращает количество батчей-доноров (отменённые или пробные с видео)."""
     try:

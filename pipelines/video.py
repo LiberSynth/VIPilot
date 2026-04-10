@@ -33,6 +33,7 @@ from db import (
     db_set_batch_original_video,
     db_get_random_real_original_video,
     db_set_batch_story_id,
+    db_steal_video_from_donor,
 )
 from log import db_log_pipeline, db_log_entry, db_log_update
 from pipelines.base import check_cancelled, handle_critical_error
@@ -188,6 +189,41 @@ def run(batch_id):
             target = tgt.get('name') or 'adhoc'
             ar_x   = tgt.get('aspect_ratio_x') or 9
             ar_y   = tgt.get('aspect_ratio_y') or 16
+        if not resumed and not is_probe:
+            batch_data = batch.get('data') or {}
+            donor_batch_id = batch_data.get('donor_batch_id') if isinstance(batch_data, dict) else None
+            if donor_batch_id:
+                if not check_cancelled('video', batch_id, batch):
+                    print(f"[video] Батч {batch_id[:8]}… — режим донора, переносим видео от {donor_batch_id[:8]}…")
+                    log_id = db_log_pipeline(
+                        'video', 'Видео получено от донора',
+                        status='running', batch_id=batch_id,
+                    )
+                    result_donor_id = db_steal_video_from_donor(donor_batch_id, batch_id)
+                    if result_donor_id:
+                        updated = db_get_batch_by_id(batch_id)
+                        new_status = updated['status'] if updated else None
+                        detail = f"Видео перенесено от донора {donor_batch_id[:8]}…"
+                        if log_id:
+                            db_log_update(log_id, detail, 'ok')
+                            db_log_entry(log_id, detail)
+                        if new_status == 'transcode_ready':
+                            tr_log_id = db_log_pipeline(
+                                'transcode', 'Транскодирование пропущено — видео получено от донора',
+                                status='ok', batch_id=batch_id,
+                            )
+                            if tr_log_id:
+                                db_log_entry(tr_log_id, detail)
+                        print(f"[video] Батч {batch_id[:8]}… — видео от донора, новый статус: {new_status}")
+                    else:
+                        msg = f"Не удалось перенести видео от донора {donor_batch_id[:8]}…"
+                        if log_id:
+                            db_log_update(log_id, msg, 'error')
+                            db_log_entry(log_id, msg, level='error')
+                        db_set_batch_video_error(batch_id)
+                        print(f"[video] {msg}")
+                return
+
         story_id        = batch.get('story_id')
         if story_id is None:
             raise RuntimeError('story_id отсутствует у батча в статусе story_ready/video_generating — ошибка логики')

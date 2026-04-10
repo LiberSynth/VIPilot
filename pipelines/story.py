@@ -20,7 +20,8 @@ from db import (
     db_set_batch_story,
     db_set_batch_story_probe,
     db_set_batch_story_error,
-    db_steal_video_from_cancelled,
+    db_find_donor_batch,
+    db_set_batch_story_ready_from_donor,
     env_get,
 )
 from log import db_log_pipeline, db_log_entry, db_log_update
@@ -132,11 +133,20 @@ def run(batch_id):
             return
 
         if not is_probe and env_get('emulation_mode', '0') != '1' and env_get('use_donor', '1') == '1':
-            donor_id = db_steal_video_from_cancelled(batch_id)
-            if donor_id:
-                updated = db_get_batch_by_id(batch_id)
-                new_status = updated['status'] if updated else None
-                detail = "Включен режим «Использовать донора».  Генерация сюжета не требуется."
+            donor_result = db_find_donor_batch()
+            if donor_result:
+                donor_id, donor_story_id = donor_result
+                if not db_set_batch_story_ready_from_donor(batch_id, donor_id, donor_story_id):
+                    msg = f'Не удалось записать donor_batch_id для батча {batch_id[:8]}… — донор {donor_id[:8]}…'
+                    log_id = db_log_pipeline(
+                        'story', msg,
+                        status='error', batch_id=batch_id,
+                    )
+                    db_set_batch_story_error(batch_id)
+                    print(f"[story] {msg}")
+                    batch_done = True
+                    return
+                detail = "Включен режим «Использовать донора». Сюжет будет взят из текущего батча, видео — от донора."
 
                 log_id = db_log_pipeline(
                     'story', 'Найден донор, генерация не требуется',
@@ -145,22 +155,7 @@ def run(batch_id):
                 if log_id:
                     db_log_entry(log_id, detail)
 
-                video_log_id = db_log_pipeline(
-                    'video', 'Видео получено от донора',
-                    status='ok', batch_id=batch_id,
-                )
-                if video_log_id:
-                    db_log_entry(video_log_id, detail)
-
-                if new_status == 'transcode_ready':
-                    tr_log_id = db_log_pipeline(
-                        'transcode', 'Транскодирование пропущено — видео получено от донора',
-                        status='ok', batch_id=batch_id,
-                    )
-                    if tr_log_id:
-                        db_log_entry(tr_log_id, detail)
-
-                print(f"[story] Батч {batch_id[:8]}… — найден донор {donor_id}, новый статус: {new_status}")
+                print(f"[story] Батч {batch_id[:8]}… — найден донор {donor_id}, батч → story_ready")
                 batch_done = True
                 return
 
