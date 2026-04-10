@@ -1041,6 +1041,7 @@ def db_steal_video_from_cancelled(batch_id) -> str | None:
 def db_set_batch_story_ready_from_donor(batch_id: str, donor_batch_id: str, donor_story_id: str | None) -> bool:
     """Записывает donor_batch_id в batches.data, устанавливает story_id через COALESCE
     (не перезаписывает, если у батча уже есть свой story_id), переводит батч в story_ready.
+    Если story_id взят у донора — очищает story_id у донора. Всё в одной транзакции.
     Видео не трогает."""
     _assert_known_status('story_ready')
     try:
@@ -1053,9 +1054,17 @@ def db_set_batch_story_ready_from_donor(batch_id: str, donor_batch_id: str, dono
                         story_id = COALESCE(story_id, %s),
                         data     = COALESCE(data, '{}'::jsonb) || jsonb_build_object('donor_batch_id', %s)
                     WHERE id = %s
+                    RETURNING story_id
                     """,
                     (donor_story_id, donor_batch_id, batch_id),
                 )
+                row = cur.fetchone()
+                used_story_id = row[0] if row else None
+                if donor_story_id and used_story_id and str(used_story_id) == str(donor_story_id):
+                    cur.execute(
+                        "UPDATE batches SET story_id = NULL WHERE id = %s::uuid",
+                        (donor_batch_id,),
+                    )
             conn.commit()
         return True
     except Exception as e:
@@ -1115,63 +1124,42 @@ def db_find_donor_batch() -> tuple | None:
 
 
 def db_steal_video_from_donor(donor_batch_id: str, batch_id: str) -> str | None:
-    """Переносит видео от конкретного донора (donor_batch_id) в батч-получатель (batch_id).
-    Если есть транскодированное — переносит его, получатель → transcode_ready.
-    Если только оригинал — переносит его, получатель → video_ready.
-    У донора обнуляет перенесённое поле.
-    story_id получателя НЕ перезаписывается (уже должен быть проставлен на этапе story).
-    Возвращает id донора (str) или None."""
+    """Переносит movie_id от донора (donor_batch_id) в батч-получатель (batch_id).
+    У донора обнуляет movie_id. Статус получателя:
+      - transcode_ready если у movie есть transcoded_data
+      - video_ready если только raw_data
+    story_id получателя НЕ перезаписывается (проставлен на этапе story).
+    Всё в одной транзакции. Возвращает id донора (str) или None."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                    SELECT b.id, m.transcoded_data, m.raw_data, m.url, b.movie_id, m.id AS mid
+                    SELECT b.id, b.movie_id,
+                           (m.transcoded_data IS NOT NULL) AS has_transcoded,
+                           (m.raw_data IS NOT NULL) AS has_raw
                     FROM batches b
                     JOIN movies m ON m.id = b.movie_id
                     WHERE b.id = %s::uuid
-                      AND (m.transcoded_data IS NOT NULL OR m.raw_data IS NOT NULL)
                     FOR UPDATE OF b SKIP LOCKED
                 """, (donor_batch_id,))
                 donor = cur.fetchone()
                 if not donor:
                     return None
 
-                donor_id, video_data_transcoded, video_data_original, video_url, donor_movie_id, donor_mid = donor
+                donor_id, donor_movie_id, has_transcoded, has_raw = donor
 
-                if video_data_transcoded is not None:
-                    cur.execute("""
-                        INSERT INTO movies (url, transcoded_data)
-                        VALUES (%s, %s)
-                        RETURNING id
-                    """, (video_url, psycopg2.Binary(bytes(video_data_transcoded))))
-                    new_movie_id = cur.fetchone()[0]
-                    cur.execute("""
-                        UPDATE batches
-                        SET status   = 'transcode_ready',
-                            movie_id = %s
-                        WHERE id = %s
-                    """, (new_movie_id, batch_id))
-                    cur.execute(
-                        "UPDATE movies SET transcoded_data = NULL WHERE id = %s",
-                        (donor_mid,),
-                    )
-                else:
-                    cur.execute("""
-                        INSERT INTO movies (url, raw_data)
-                        VALUES (%s, %s)
-                        RETURNING id
-                    """, (video_url, psycopg2.Binary(bytes(video_data_original))))
-                    new_movie_id = cur.fetchone()[0]
-                    cur.execute("""
-                        UPDATE batches
-                        SET status   = 'video_ready',
-                            movie_id = %s
-                        WHERE id = %s
-                    """, (new_movie_id, batch_id))
-                    cur.execute(
-                        "UPDATE movies SET raw_data = NULL WHERE id = %s",
-                        (donor_mid,),
-                    )
+                new_status = 'transcode_ready' if has_transcoded else 'video_ready'
+                cur.execute("""
+                    UPDATE batches
+                    SET movie_id = %s,
+                        status   = %s
+                    WHERE id = %s::uuid AND movie_id IS NULL
+                """, (donor_movie_id, new_status, batch_id))
+
+                cur.execute(
+                    "UPDATE batches SET movie_id = NULL WHERE id = %s::uuid",
+                    (donor_batch_id,),
+                )
 
             conn.commit()
         return str(donor_id)
