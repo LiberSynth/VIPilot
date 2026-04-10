@@ -10,6 +10,7 @@ from flask import (
     flash,
     send_file,
     make_response,
+    jsonify,
 )
 
 from db import (
@@ -24,6 +25,7 @@ from db import (
     db_update_target_config,
     db_update_target_publish_method_by_slug,
     db_get_user_by_login,
+    db_upsert_story_draft,
 )
 from utils.auth import is_authenticated
 from utils.limiter import limiter
@@ -224,6 +226,22 @@ def producer_page():
     resp.headers["Pragma"] = "no-cache"
     resp.headers["Expires"] = "0"
     return resp
+
+
+@bp.route("/producer/story/draft", methods=["POST"])
+def producer_story_draft():
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    if not (_has_slug("producer") or _has_slug("root")):
+        return jsonify({"error": "forbidden"}), 403
+    data = request.get_json(silent=True) or {}
+    title = data.get("title", "")
+    content = data.get("content", "")
+    story_id = data.get("story_id") or None
+    new_id = db_upsert_story_draft(story_id, title, content)
+    if new_id is None:
+        return jsonify({"error": "db_error"}), 500
+    return jsonify({"story_id": new_id})
 
 
 @bp.route("/save", methods=["POST"])

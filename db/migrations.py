@@ -1318,6 +1318,17 @@ def _m036_movies_table(cur):
     """)
 
 
+def _m037_stories_grade(cur):
+    """
+    Добавляет поле grade TEXT в таблицу stories.
+    Используется для хранения оценки качества сюжета (например 'good').
+    """
+    cur.execute("""
+        ALTER TABLE stories
+            ADD COLUMN IF NOT EXISTS grade TEXT
+    """)
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -1355,6 +1366,7 @@ MIGRATIONS = [
     (34, _m034_stories_result_to_content),
     (35, _m035_drop_text_model_id),
     (36, _m036_movies_table),
+    (37, _m037_stories_grade),
 ]
 
 

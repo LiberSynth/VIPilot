@@ -497,6 +497,34 @@ def db_create_story(model_id, title, result):
         return None
 
 
+def db_upsert_story_draft(story_id, title, content):
+    """Создаёт или обновляет черновик сюжета (model_id=NULL, grade='good').
+    Если story_id передан и запись существует — обновляет title и content.
+    Иначе создаёт новую запись. Возвращает UUID или None."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                if story_id:
+                    cur.execute(
+                        "UPDATE stories SET title = %s, content = %s, grade = 'good' WHERE id = %s::uuid AND model_id IS NULL RETURNING id",
+                        (title, content, story_id),
+                    )
+                    row = cur.fetchone()
+                    if row:
+                        conn.commit()
+                        return str(row[0])
+                cur.execute(
+                    "INSERT INTO stories (model_id, title, content, grade) VALUES (NULL, %s, %s, 'good') RETURNING id",
+                    (title, content),
+                )
+                row = cur.fetchone()
+            conn.commit()
+        return str(row[0]) if row else None
+    except Exception as e:
+        print(f"[DB] Ошибка db_upsert_story_draft: {e}")
+        return None
+
+
 # ---------------------------------------------------------------------------
 # AI-модели (ai_models)
 # ---------------------------------------------------------------------------

@@ -1,3 +1,51 @@
+/* ── Автосохранение черновика сюжета ── */
+var resetDraftStoryId;
+(function() {
+  var _draftStoryId = null;
+  var _draftTimer = null;
+
+  resetDraftStoryId = function() {
+    _draftStoryId = null;
+    clearTimeout(_draftTimer);
+  };
+
+  function saveDraft() {
+    var titleEl = document.getElementById('draft-story-title');
+    var contentEl = document.getElementById('draft-story-content');
+    if (!titleEl || !contentEl) return;
+    var title = titleEl.value;
+    var content = contentEl.value;
+    if (!_draftStoryId && !title && !content) return;
+    fetch('/producer/story/draft', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ story_id: _draftStoryId, title: title, content: content }),
+    })
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(d) { if (d && d.story_id) _draftStoryId = d.story_id; })
+    .catch(function() {});
+  }
+
+  function onDraftInput() {
+    clearTimeout(_draftTimer);
+    _draftTimer = setTimeout(saveDraft, 800);
+  }
+
+  function initDraftAutosave() {
+    var titleEl = document.getElementById('draft-story-title');
+    var contentEl = document.getElementById('draft-story-content');
+    if (!titleEl || !contentEl) return;
+    titleEl.addEventListener('input', onDraftInput);
+    contentEl.addEventListener('input', onDraftInput);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initDraftAutosave);
+  } else {
+    initDraftAutosave();
+  }
+})();
+
 const PANEL_TITLES = {
   screenwriter: 'Сценарист',
   director:     'Режиссер',
@@ -49,6 +97,11 @@ function switchPanel(name) {
   }
   if (name === 'story') {
     if (typeof loadTextModels === 'function') loadTextModels();
+    var draftTitle = document.getElementById('draft-story-title');
+    var draftContent = document.getElementById('draft-story-content');
+    if (draftTitle) draftTitle.value = '';
+    if (draftContent) draftContent.value = '';
+    if (typeof resetDraftStoryId === 'function') resetDraftStoryId();
   }
 }
 
