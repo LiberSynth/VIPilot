@@ -444,6 +444,7 @@ function monitorClockStop() {
 (function() {
   var _DEFAULT_HINT = 'Вы можете сгенерировать сюжет при помощи AI-модели';
   var _pollTimer = null;
+  var _hintResetTimer = null;
 
   function setHint(text) {
     var el = document.getElementById('story-generate-hint');
@@ -452,13 +453,19 @@ function monitorClockStop() {
 
   function resetHint() { setHint(_DEFAULT_HINT); }
 
+  function scheduleResetHint() {
+    if (_hintResetTimer) { clearTimeout(_hintResetTimer); }
+    _hintResetTimer = setTimeout(function() { _hintResetTimer = null; resetHint(); }, 2000);
+  }
+
   function startPoll(batchId) {
     if (_pollTimer) { clearTimeout(_pollTimer); _pollTimer = null; }
+    if (_hintResetTimer) { clearTimeout(_hintResetTimer); _hintResetTimer = null; }
     function poll() {
       fetch('/api/batch/' + batchId + '/logs')
         .then(function(r) { return r.json(); })
         .then(function(d) {
-          if (d.error) { _pollTimer = setTimeout(poll, 2000); return; }
+          if (d.error) { _pollTimer = setTimeout(poll, 700); return; }
           var entries = [];
           if (d.logs && d.logs.length) {
             var lastLog = d.logs[d.logs.length - 1];
@@ -495,21 +502,23 @@ function monitorClockStop() {
                       }
                     }, 400);
                   }
-                  resetHint();
+                  setHint('Сюжет сгенерирован');
+                  scheduleResetHint();
                 })
-                .catch(function() { resetHint(); });
+                .catch(function() { scheduleResetHint(); });
             } else {
-              resetHint();
+              setHint('Сюжет сгенерирован');
+              scheduleResetHint();
             }
           } else if (status === 'story_error' || status === 'error' || status === 'cancelled' || status === 'fatal_error') {
             var btn = document.getElementById('btn-story-generate');
             if (btn) btn.disabled = false;
-            resetHint();
+            scheduleResetHint();
           } else {
-            _pollTimer = setTimeout(poll, 2000);
+            _pollTimer = setTimeout(poll, 700);
           }
         })
-        .catch(function() { _pollTimer = setTimeout(poll, 3000); });
+        .catch(function() { _pollTimer = setTimeout(poll, 700); });
     }
     poll();
   }
