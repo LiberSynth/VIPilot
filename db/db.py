@@ -500,14 +500,24 @@ def db_create_story(model_id, title, result):
 def db_upsert_story_draft(story_id, title, content):
     """Создаёт или обновляет черновик сюжета (model_id=NULL, grade='good').
     Если story_id передан и запись существует — обновляет title и content.
-    Иначе создаёт новую запись. Возвращает UUID или None."""
+    Иначе создаёт новую запись через INSERT ... ON CONFLICT DO UPDATE.
+    Возвращает UUID или None."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
                 if story_id:
                     cur.execute(
-                        "UPDATE stories SET title = %s, content = %s, grade = 'good' WHERE id = %s::uuid AND model_id IS NULL RETURNING id",
-                        (title, content, story_id),
+                        """
+                        INSERT INTO stories (id, model_id, title, content, grade)
+                        VALUES (%s::uuid, NULL, %s, %s, 'good')
+                        ON CONFLICT (id) DO UPDATE
+                            SET title = EXCLUDED.title,
+                                content = EXCLUDED.content,
+                                grade = 'good'
+                            WHERE stories.model_id IS NULL
+                        RETURNING id
+                        """,
+                        (story_id, title, content),
                     )
                     row = cur.fetchone()
                     if row:

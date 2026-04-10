@@ -3,9 +3,13 @@ var resetDraftStoryId;
 (function() {
   var _draftStoryId = null;
   var _draftTimer = null;
+  var _draftSaving = false;
+  var _draftPendingRetry = false;
 
   resetDraftStoryId = function() {
     _draftStoryId = null;
+    _draftSaving = false;
+    _draftPendingRetry = false;
     clearTimeout(_draftTimer);
   };
 
@@ -16,14 +20,32 @@ var resetDraftStoryId;
     var title = titleEl.value;
     var content = contentEl.value;
     if (!_draftStoryId && !title && !content) return;
+    if (_draftSaving && !_draftStoryId) {
+      _draftPendingRetry = true;
+      return;
+    }
+    _draftSaving = true;
     fetch('/producer/story/draft', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ story_id: _draftStoryId, title: title, content: content }),
     })
     .then(function(r) { return r.ok ? r.json() : null; })
-    .then(function(d) { if (d && d.story_id) _draftStoryId = d.story_id; })
-    .catch(function() {});
+    .then(function(d) {
+      if (d && d.story_id) _draftStoryId = d.story_id;
+      _draftSaving = false;
+      if (_draftPendingRetry) {
+        _draftPendingRetry = false;
+        saveDraft();
+      }
+    })
+    .catch(function() {
+      _draftSaving = false;
+      if (_draftPendingRetry) {
+        _draftPendingRetry = false;
+        saveDraft();
+      }
+    });
   }
 
   function onDraftInput() {
