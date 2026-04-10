@@ -891,6 +891,9 @@
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     min-width: 0;
   }
+  .story-model-name {
+    font-size: 11px; color: #7878a0; font-weight: 400;
+  }
   .story-row-right {
     display: flex; align-items: center; gap: 6px; flex-shrink: 0;
   }

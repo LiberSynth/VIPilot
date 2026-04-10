@@ -518,9 +518,10 @@ def db_create_story(model_id, title, result):
 
 
 def db_get_stories_list():
-    """Возвращает список всех сюжетов с полями id, title, content, grade, manual_changed, ai_generated, used.
+    """Возвращает список всех сюжетов с полями id, title, content, grade, manual_changed, ai_generated, used, model_name.
     ai_generated = True если model_id IS NOT NULL.
-    used = True если в batches есть запись с story_id=<id> AND movie_id IS NOT NULL."""
+    used = True если в batches есть запись с story_id=<id> AND movie_id IS NOT NULL.
+    model_name — имя модели из ai_models (NULL если модель не задана)."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
@@ -535,8 +536,10 @@ def db_get_stories_list():
                         EXISTS (
                             SELECT 1 FROM batches b
                             WHERE b.story_id = s.id AND b.movie_id IS NOT NULL
-                        ) AS used
+                        ) AS used,
+                        am.name AS model_name
                     FROM stories s
+                    LEFT JOIN ai_models am ON am.id = s.model_id
                     ORDER BY s.created_at DESC
                 """)
                 rows = cur.fetchall()
@@ -549,6 +552,7 @@ def db_get_stories_list():
                 "manual_changed": bool(row[4]),
                 "ai_generated": bool(row[5]),
                 "used": bool(row[6]),
+                "model_name": row[7] or "",
             }
             for row in rows
         ]
