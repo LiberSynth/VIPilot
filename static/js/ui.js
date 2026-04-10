@@ -132,7 +132,7 @@ var setDraftStoryFromRecord;
       if (s.manual_changed) {
         icons += '<span class="story-icon story-icon-manual" title="Отредактировано вручную">' +
           '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
-          '<path d="M11 2l3 3-8 8H3v-3L11 2z"/></svg></span>';
+          '<path d="M6 1v7M6 1C6 1 4 1 4 3v5M6 1C6 1 8 1 8 3v3M8 6c0 0 2 0 2 2v1M10 8v1c0 2-2 4-4 5-2-1-4-3-4-5V8"/></svg></span>';
       }
       if (s.used) {
         icons += '<span class="story-icon story-icon-used" title="Использован в производстве">' +
@@ -212,6 +212,25 @@ var setDraftStoryFromRecord;
         if (container) container.innerHTML = '<div class="stories-empty">Ошибка загрузки</div>';
       });
   };
+
+  function initNewStoryButton() {
+    var btn = document.getElementById('btn-story-new');
+    if (!btn) return;
+    btn.addEventListener('click', function() {
+      var titleEl = document.getElementById('draft-story-title');
+      var contentEl = document.getElementById('draft-story-content');
+      if (titleEl) titleEl.value = '';
+      if (contentEl) contentEl.value = '';
+      if (typeof resetDraftStoryId === 'function') resetDraftStoryId();
+      if (titleEl) titleEl.focus();
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initNewStoryButton);
+  } else {
+    initNewStoryButton();
+  }
 })();
 
 const PANEL_TITLES = {
