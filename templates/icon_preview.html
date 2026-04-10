@@ -7,115 +7,193 @@
   body {
     background: #111118;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     min-height: 100vh;
-    gap: 80px;
-    padding: 60px;
+    padding: 40px 32px;
     font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    color: #aaa;
+  }
+  h2 {
+    font-size: 11px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: #444;
+    margin-bottom: 32px;
+    font-weight: 500;
+  }
+  .row {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
   }
   .variant {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 20px;
+    gap: 14px;
+    width: 130px;
   }
-  .label {
-    color: #555;
-    font-size: 12px;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    font-weight: 500;
-  }
-  .badge {
-    width: 160px;
-    height: 160px;
-    border-radius: 38px;
+  .icon-box {
+    width: 80px;
+    height: 80px;
+    background: #1a1a24;
+    border-radius: 16px;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 16px 48px rgba(74, 124, 247, 0.4), 0 4px 16px rgba(0,0,0,0.5);
+    border: 1px solid #2a2a38;
   }
-  .badge-a { background: linear-gradient(145deg, #4a7cf7 0%, #6f4af7 100%); }
-  .badge-b { background: linear-gradient(145deg, #5062f7 0%, #8040f0 100%); }
+  .icon-box svg { width: 36px; height: 36px; color: #c0c0d0; }
+  .mini-box {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: #1a1a24;
+    border-radius: 6px;
+    padding: 5px 8px;
+    border: 1px solid #2a2a38;
+  }
+  .mini-box svg { width: 12px; height: 12px; color: #888; flex-shrink: 0; }
+  .mini-text {
+    font-size: 11px;
+    color: #666;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 80px;
+  }
+  .label {
+    font-size: 11px;
+    color: #555;
+    text-align: center;
+    line-height: 1.5;
+  }
+  .label strong {
+    display: block;
+    color: #888;
+    font-size: 12px;
+    margin-bottom: 2px;
+  }
 </style>
 </head>
 <body>
 
-<!-- Вариант А -->
-<div class="variant">
-  <div class="badge badge-a">
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 44 44" fill="none" width="112" height="112">
-      <!-- Телефон: правее и выше -->
-      <rect x="23" y="2" width="17" height="27" rx="3.5"
-            stroke="#F08050" stroke-width="2.2" fill="rgba(240,128,80,0.08)"/>
-      <rect x="27.5" y="4.5" width="8" height="2" rx="1" fill="#F08050" opacity="0.55"/>
-      <rect x="29" y="26.5" width="5" height="1.5" rx="0.75" fill="#F08050" opacity="0.55"/>
-      <path d="M28 12.5 L28 20.5 L35 16.5 Z" fill="#F08050" opacity="0.95"/>
+<h2>Иконка «Отредактировано вручную» — варианты</h2>
 
-      <!-- Нейросеть: слева и ниже -->
-      <circle cx="12" cy="30" r="2.5" fill="#3EEFFF"/>
-      <circle cx="12" cy="22.5" r="1.8" fill="#3EEFFF" opacity="0.85"/>
-      <circle cx="18.5" cy="26" r="1.8" fill="#3EEFFF" opacity="0.85"/>
-      <circle cx="18.5" cy="34" r="1.8" fill="#3EEFFF" opacity="0.85"/>
-      <circle cx="12" cy="37.5" r="1.8" fill="#3EEFFF" opacity="0.85"/>
-      <circle cx="5.5" cy="34" r="1.8" fill="#3EEFFF" opacity="0.85"/>
-      <circle cx="5.5" cy="26" r="1.8" fill="#3EEFFF" opacity="0.85"/>
-      <line x1="12" y1="30" x2="12" y2="22.5" stroke="#3EEFFF" stroke-width="1.3" opacity="0.5"/>
-      <line x1="12" y1="30" x2="18.5" y2="26" stroke="#3EEFFF" stroke-width="1.3" opacity="0.5"/>
-      <line x1="12" y1="30" x2="18.5" y2="34" stroke="#3EEFFF" stroke-width="1.3" opacity="0.5"/>
-      <line x1="12" y1="30" x2="12" y2="37.5" stroke="#3EEFFF" stroke-width="1.3" opacity="0.5"/>
-      <line x1="12" y1="30" x2="5.5" y2="34" stroke="#3EEFFF" stroke-width="1.3" opacity="0.5"/>
-      <line x1="12" y1="30" x2="5.5" y2="26" stroke="#3EEFFF" stroke-width="1.3" opacity="0.5"/>
-      <line x1="12" y1="22.5" x2="18.5" y2="26" stroke="#3EEFFF" stroke-width="0.9" opacity="0.3"/>
-      <line x1="18.5" y1="26" x2="18.5" y2="34" stroke="#3EEFFF" stroke-width="0.9" opacity="0.3"/>
-      <line x1="18.5" y1="34" x2="12" y2="37.5" stroke="#3EEFFF" stroke-width="0.9" opacity="0.3"/>
-      <line x1="12" y1="37.5" x2="5.5" y2="34" stroke="#3EEFFF" stroke-width="0.9" opacity="0.3"/>
-      <line x1="5.5" y1="34" x2="5.5" y2="26" stroke="#3EEFFF" stroke-width="0.9" opacity="0.3"/>
-      <line x1="5.5" y1="26" x2="12" y2="22.5" stroke="#3EEFFF" stroke-width="0.9" opacity="0.3"/>
-      <!-- Коннектор -->
-      <path d="M19 26 C21 23 21 19 23 17" stroke="white" stroke-width="1.6" fill="none" opacity="0.4" stroke-linecap="round"/>
-    </svg>
+<div class="row">
+
+  <!-- А: Карандаш -->
+  <div class="variant">
+    <div class="icon-box">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
+      </svg>
+    </div>
+    <div class="mini-box">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
+      </svg>
+      <span class="mini-text">Название</span>
+    </div>
+    <div class="label"><strong>А — Карандаш</strong>стандартная иконка редактирования</div>
   </div>
-  <div class="label">Вариант А</div>
-</div>
 
-<!-- Вариант Б -->
-<div class="variant">
-  <div class="badge badge-b">
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 44 44" fill="none" width="112" height="112">
-      <!-- Телефон: правее и выше -->
-      <rect x="22" y="1.5" width="18" height="27" rx="4"
-            stroke="#E87840" stroke-width="2.2" fill="rgba(232,120,64,0.08)"/>
-      <rect x="26.5" y="4" width="9" height="2" rx="1" fill="#E87840" opacity="0.55"/>
-      <rect x="28.5" y="26" width="5" height="1.5" rx="0.75" fill="#E87840" opacity="0.55"/>
-      <path d="M27 12 L27 20 L35 16 Z" fill="#E87840" opacity="0.95"/>
-
-      <!-- Нейросеть: слева и ниже -->
-      <circle cx="11" cy="31" r="2.5" fill="#00E8FF"/>
-      <circle cx="11" cy="23.5" r="1.8" fill="#00E8FF" opacity="0.85"/>
-      <circle cx="17.5" cy="27" r="1.8" fill="#00E8FF" opacity="0.85"/>
-      <circle cx="17.5" cy="35" r="1.8" fill="#00E8FF" opacity="0.85"/>
-      <circle cx="11" cy="38.5" r="1.8" fill="#00E8FF" opacity="0.85"/>
-      <circle cx="4.5" cy="35" r="1.8" fill="#00E8FF" opacity="0.85"/>
-      <circle cx="4.5" cy="27" r="1.8" fill="#00E8FF" opacity="0.85"/>
-      <line x1="11" y1="31" x2="11" y2="23.5" stroke="#00E8FF" stroke-width="1.3" opacity="0.5"/>
-      <line x1="11" y1="31" x2="17.5" y2="27" stroke="#00E8FF" stroke-width="1.3" opacity="0.5"/>
-      <line x1="11" y1="31" x2="17.5" y2="35" stroke="#00E8FF" stroke-width="1.3" opacity="0.5"/>
-      <line x1="11" y1="31" x2="11" y2="38.5" stroke="#00E8FF" stroke-width="1.3" opacity="0.5"/>
-      <line x1="11" y1="31" x2="4.5" y2="35" stroke="#00E8FF" stroke-width="1.3" opacity="0.5"/>
-      <line x1="11" y1="31" x2="4.5" y2="27" stroke="#00E8FF" stroke-width="1.3" opacity="0.5"/>
-      <line x1="11" y1="23.5" x2="17.5" y2="27" stroke="#00E8FF" stroke-width="0.9" opacity="0.3"/>
-      <line x1="17.5" y1="27" x2="17.5" y2="35" stroke="#00E8FF" stroke-width="0.9" opacity="0.3"/>
-      <line x1="17.5" y1="35" x2="11" y2="38.5" stroke="#00E8FF" stroke-width="0.9" opacity="0.3"/>
-      <line x1="11" y1="38.5" x2="4.5" y2="35" stroke="#00E8FF" stroke-width="0.9" opacity="0.3"/>
-      <line x1="4.5" y1="35" x2="4.5" y2="27" stroke="#00E8FF" stroke-width="0.9" opacity="0.3"/>
-      <line x1="4.5" y1="27" x2="11" y2="23.5" stroke="#00E8FF" stroke-width="0.9" opacity="0.3"/>
-      <!-- Коннектор пунктирный -->
-      <path d="M18 27 C19.5 24 20.5 22 22 19" stroke="white" stroke-width="1.6" fill="none" opacity="0.4" stroke-linecap="round" stroke-dasharray="2.5 2"/>
-    </svg>
+  <!-- Б: Перо -->
+  <div class="variant">
+    <div class="icon-box">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z"/>
+        <line x1="16" y1="8" x2="2" y2="22"/>
+        <line x1="17.5" y1="15" x2="9" y2="15"/>
+      </svg>
+    </div>
+    <div class="mini-box">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z"/>
+        <line x1="16" y1="8" x2="2" y2="22"/>
+        <line x1="17.5" y1="15" x2="9" y2="15"/>
+      </svg>
+      <span class="mini-text">Название</span>
+    </div>
+    <div class="label"><strong>Б — Перо</strong>авторство / письмо</div>
   </div>
-  <div class="label">Вариант Б</div>
+
+  <!-- В: Рука -->
+  <div class="variant">
+    <div class="icon-box">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 11V5a2 2 0 0 1 4 0v6"/>
+        <path d="M13 11V9a2 2 0 0 1 4 0v5a7 7 0 0 1-14 0v-3a2 2 0 0 1 4 0v1"/>
+      </svg>
+    </div>
+    <div class="mini-box">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 11V5a2 2 0 0 1 4 0v6"/>
+        <path d="M13 11V9a2 2 0 0 1 4 0v5a7 7 0 0 1-14 0v-3a2 2 0 0 1 4 0v1"/>
+      </svg>
+      <span class="mini-text">Название</span>
+    </div>
+    <div class="label"><strong>В — Рука</strong>ручной ввод</div>
+  </div>
+
+  <!-- Г: Пользователь -->
+  <div class="variant">
+    <div class="icon-box">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+        <circle cx="12" cy="7" r="4"/>
+      </svg>
+    </div>
+    <div class="mini-box">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+        <circle cx="12" cy="7" r="4"/>
+      </svg>
+      <span class="mini-text">Название</span>
+    </div>
+    <div class="label"><strong>Г — Человек</strong>человек = вручную</div>
+  </div>
+
+  <!-- Д: Текстовый курсор -->
+  <div class="variant">
+    <div class="icon-box">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="4 7 4 4 20 4 20 7"/>
+        <line x1="9" y1="20" x2="15" y2="20"/>
+        <line x1="12" y1="4" x2="12" y2="20"/>
+      </svg>
+    </div>
+    <div class="mini-box">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="4 7 4 4 20 4 20 7"/>
+        <line x1="9" y1="20" x2="15" y2="20"/>
+        <line x1="12" y1="4" x2="12" y2="20"/>
+      </svg>
+      <span class="mini-text">Название</span>
+    </div>
+    <div class="label"><strong>Д — Текст</strong>набор текста руками</div>
+  </div>
+
+  <!-- Е: Клавиатура -->
+  <div class="variant">
+    <div class="icon-box">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="2" y="6" width="20" height="13" rx="2"/>
+        <path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8"/>
+      </svg>
+    </div>
+    <div class="mini-box">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="2" y="6" width="20" height="13" rx="2"/>
+        <path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8"/>
+      </svg>
+      <span class="mini-text">Название</span>
+    </div>
+    <div class="label"><strong>Е — Клавиатура</strong>буквально «напечатано»</div>
+  </div>
+
 </div>
 
 </body>
