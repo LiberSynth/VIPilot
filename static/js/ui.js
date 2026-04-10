@@ -150,7 +150,7 @@ var setDraftStoryFromRecord;
           '<svg viewBox="0 0 16 16" fill="currentColor" stroke="none">' +
           '<path d="M8 1 L9.3 6.7 L15 8 L9.3 9.3 L8 15 L6.7 9.3 L1 8 L6.7 6.7 Z"/></svg></span>';
       }
-      var modelLabel = (!s.manual_changed && s.model_name) ? ' <span class="story-model-name">(' + escapeHtml(s.model_name) + ')</span>' : '';
+      var modelLabel = s.model_name ? ' <span class="story-model-name">(' + escapeHtml(s.model_name) + ')</span>' : '';
       html += '<div class="story-row" data-id="' + s.id + '">' +
         '<div class="story-title">' + escapeHtml(s.title || '(без названия)') + modelLabel + '</div>' +
         '<div class="story-row-right">' +
