@@ -77,7 +77,7 @@ def db_log_root(message, status='info'):
 
 FINAL_BATCH_STATUSES = (
     'published', 'published_partially', 'probe', 'story_probe',
-    'cancelled', 'error', 'story_error', 'fatal_error',
+    'cancelled', 'error', 'fatal_error',
     'video_error', 'transcode_error', 'publish_error',
 )
 

@@ -19,7 +19,7 @@ from db import (
     db_create_story,
     db_set_batch_story,
     db_set_batch_story_probe,
-    db_set_batch_story_error,
+    db_set_batch_status,
     db_claim_donor_batch,
     db_set_batch_story_ready_from_donor,
     env_get,
@@ -143,7 +143,7 @@ def run(batch_id):
                         'story', msg,
                         status='error', batch_id=batch_id,
                     )
-                    db_set_batch_story_error(batch_id)
+                    db_set_batch_status(batch_id, 'error')
                     print(f"[story] {msg}")
                     batch_done = True
                     return
@@ -243,7 +243,7 @@ def run(batch_id):
                     if log_id:
                         db_log_entry(log_id, msg, level='error')
                     print(f"[story] {msg}")
-                    db_set_batch_story_error(batch_id)
+                    db_set_batch_status(batch_id, 'error')
                     batch_done = True
                     return
                 msg = 'Все активные модели не дали результата — повтор с первой модели'

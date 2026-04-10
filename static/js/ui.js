@@ -510,7 +510,7 @@ function monitorClockStop() {
               setHint('Сюжет сгенерирован');
               scheduleResetHint();
             }
-          } else if (status === 'story_error' || status === 'error' || status === 'cancelled' || status === 'fatal_error') {
+          } else if (status === 'error' || status === 'cancelled' || status === 'fatal_error') {
             var btn = document.getElementById('btn-story-generate');
             if (btn) btn.disabled = false;
             scheduleResetHint();

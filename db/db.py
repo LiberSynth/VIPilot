@@ -1426,11 +1426,6 @@ def db_set_batch_video_error(batch_id):
     return db_set_batch_status(batch_id, 'video_error')
 
 
-def db_set_batch_story_error(batch_id):
-    """Переводит батч в status='story_error'."""
-    return db_set_batch_status(batch_id, 'story_error')
-
-
 def db_set_batch_story_ready_from_error(batch_id):
     """Откатывает батч в story_ready после сбоя видео, сохраняя story_id.
     НЕ трогает story_id и data — сюжет не регенерируется, данные пайплайна сохраняются."""
@@ -1852,7 +1847,7 @@ KNOWN_BATCH_STATUSES = frozenset({
     # publish pipeline entry point
     'transcode_ready',
     # terminal
-    'cancelled', 'error', 'probe', 'story_probe', 'story_error',
+    'cancelled', 'error', 'probe', 'story_probe',
     'video_error', 'transcode_error', 'publish_error', 'published',
     'published_partially', 'fatal_error',
     # donor mode: донор атомарно захвачен, ожидает переноса story/video
