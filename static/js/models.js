@@ -1,12 +1,13 @@
 var _gradeSequence = ['good', 'limited', 'poor', 'fallback', 'rejected'];
 var _gradeColors   = { good: '#4a8', limited: '#a84', poor: '#b60', fallback: '#a33', rejected: '#666' };
+var _gradeLabels   = { good: 'хорошо', limited: 'ограничен', poor: 'слабо', fallback: 'запасной', rejected: 'отклонён' };
 
 window.cycleGrade = function(el) {
   var id   = el.getAttribute('data-grade-id');
   var cur  = el.getAttribute('data-grade') || 'good';
   var next = _gradeSequence[(_gradeSequence.indexOf(cur) + 1) % _gradeSequence.length];
   el.setAttribute('data-grade', next);
-  el.textContent = next;
+  el.textContent = _gradeLabels[next] || next;
   el.style.background = _gradeColors[next] || '#555';
   fetch('/api/text-models/' + encodeURIComponent(id) + '/grade', {
     method: 'POST',
@@ -20,7 +21,7 @@ window.cycleVideoGrade = function(el) {
   var cur  = el.getAttribute('data-grade') || 'good';
   var next = _gradeSequence[(_gradeSequence.indexOf(cur) + 1) % _gradeSequence.length];
   el.setAttribute('data-grade', next);
-  el.textContent = next;
+  el.textContent = _gradeLabels[next] || next;
   el.style.background = _gradeColors[next] || '#555';
   fetch('/api/video-models/' + encodeURIComponent(id) + '/grade', {
     method: 'POST',
@@ -99,7 +100,7 @@ window.cycleVideoGrade = function(el) {
       item.draggable = true;
       var caption = m.platform_name ? escHtml(m.platform_name) + ': ' + escHtml(m.name) : escHtml(m.name);
       var grade = m.grade || 'good';
-      var gradeHtml = '<span data-grade-id="' + m.id + '" data-grade="' + grade + '" onclick="event.stopPropagation();cycleVideoGrade(this)" title="Нажмите для смены" style="cursor:pointer;font-size:10px;padding:1px 6px;border-radius:3px;background:' + (_gradeColors[grade]||'#555') + ';color:#fff;margin-left:6px;opacity:.85">' + grade + '</span>';
+      var gradeHtml = '<span data-grade-id="' + m.id + '" data-grade="' + grade + '" onclick="event.stopPropagation();cycleVideoGrade(this)" title="Нажмите для смены" style="cursor:pointer;font-size:10px;padding:1px 6px;border-radius:3px;background:' + (_gradeColors[grade]||'#555') + ';color:#fff;margin-left:6px;opacity:.85">' + (_gradeLabels[grade]||grade) + '</span>';
       var priceHtml = m.price ? '<span style="font-size:11px;color:#888;margin-left:auto;padding-right:6px;white-space:nowrap">' + escHtml(m.price) + '</span>' : '';
       item.innerHTML =
         '<div class="model-radio" onclick="activateModel(\'' + m.id + '\')">' +
@@ -172,7 +173,7 @@ window.cycleVideoGrade = function(el) {
       item.draggable = true;
       var caption = m.platform_name ? escHtml(m.platform_name) + ': ' + escHtml(m.name) : escHtml(m.name);
       var grade = m.grade || 'good';
-      var gradeHtml = '<span data-grade-id="' + m.id + '" data-grade="' + grade + '" onclick="event.stopPropagation();cycleGrade(this)" title="Нажмите для смены" style="cursor:pointer;font-size:10px;padding:1px 6px;border-radius:3px;background:' + (_gradeColors[grade]||'#555') + ';color:#fff;margin-left:6px;opacity:.85">' + grade + '</span>';
+      var gradeHtml = '<span data-grade-id="' + m.id + '" data-grade="' + grade + '" onclick="event.stopPropagation();cycleGrade(this)" title="Нажмите для смены" style="cursor:pointer;font-size:10px;padding:1px 6px;border-radius:3px;background:' + (_gradeColors[grade]||'#555') + ';color:#fff;margin-left:6px;opacity:.85">' + (_gradeLabels[grade]||grade) + '</span>';
       item.innerHTML =
         '<div class="model-radio" onclick="activateTextModel(\'' + m.id + '\')">' +
           '<div class="model-radio-dot"></div>' +
