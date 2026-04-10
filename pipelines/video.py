@@ -193,6 +193,9 @@ def run(batch_id):
             batch_data = batch.get('data') or {}
             donor_batch_id = batch_data.get('donor_batch_id') if isinstance(batch_data, dict) else None
             if donor_batch_id:
+                if batch.get('movie_id') is not None:
+                    print(f"[video] Батч {batch_id[:8]}… — донор, movie_id уже перенесён (возобновление)")
+                    return
                 if not check_cancelled('video', batch_id, batch):
                     print(f"[video] Батч {batch_id[:8]}… — режим донора, переносим видео от {donor_batch_id[:8]}…")
                     log_id = db_log_pipeline(

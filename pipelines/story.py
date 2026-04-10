@@ -132,7 +132,8 @@ def run(batch_id):
             batch_done = True
             return
 
-        if not is_probe and env_get('emulation_mode', '0') != '1' and env_get('use_donor', '1') == '1':
+        if not is_probe and env_get('emulation_mode', '0') != '1' and env_get('use_donor', '1') == '1' \
+                and batch.get('story_id') is None:
             donor_result = db_find_donor_batch()
             if donor_result:
                 donor_id, donor_story_id = donor_result
