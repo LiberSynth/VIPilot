@@ -141,8 +141,8 @@ var setDraftStoryFromRecord;
           '<path d="M18 2l.8 2.2L21 5l-2.2.8L18 8l-.8-2.2L15 5l2.2-.8z" fill="currentColor" stroke-width="1"/></svg></span>';
       } else {
         icons += '<span class="story-icon story-icon-ai" title="Сгенерировано AI">' +
-          '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
-          '<path d="M8 2l1.2 3.8H13l-3.1 2.2 1.2 3.8L8 9.6l-3.1 2.2 1.2-3.8L3 5.8h3.8z"/></svg></span>';
+          '<svg viewBox="0 0 16 16" fill="currentColor" stroke="none">' +
+          '<path d="M8 1 L9.3 6.7 L15 8 L9.3 9.3 L8 15 L6.7 9.3 L1 8 L6.7 6.7 Z"/></svg></span>';
       }
       html += '<div class="story-row" data-id="' + s.id + '">' +
         '<div class="story-title">' + escapeHtml(s.title || '(без названия)') + '</div>' +
