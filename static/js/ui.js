@@ -1,4 +1,6 @@
 const PANEL_TITLES = {
+  screenwriter: 'Сценарист',
+  director:     'Режиссер',
   pipeline: 'Расписание',
   story:    'Генерация сюжета',
   request:  'Генерация видео',
