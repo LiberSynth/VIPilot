@@ -168,16 +168,26 @@
         copyBtn.title = 'Скопировать';
         copyBtn.innerHTML = _SVG_COPY;
         copyBtn.onclick = function() {
-          navigator.clipboard.writeText(d.text).then(function() { _flashCopied(copyBtn); }).catch(function() {});
+          var copyText = d.title ? d.title + '\n\n' + d.text : d.text;
+          navigator.clipboard.writeText(copyText).then(function() { _flashCopied(copyBtn); }).catch(function() {});
         };
         hdr.appendChild(lbl);
         hdr.appendChild(copyBtn);
+
+        if (d.title) {
+          var titleEl = document.createElement('div');
+          titleEl.className = 'probe-story-title';
+          titleEl.textContent = d.title;
+          wrap.appendChild(hdr);
+          wrap.appendChild(titleEl);
+        } else {
+          wrap.appendChild(hdr);
+        }
 
         var pre = document.createElement('div');
         pre.className = 'probe-story-text';
         pre.textContent = d.text;
 
-        wrap.appendChild(hdr);
         wrap.appendChild(pre);
         body.prepend(sep);
         body.prepend(wrap);
