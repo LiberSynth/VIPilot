@@ -569,7 +569,6 @@ def db_upsert_story_draft(story_id, title, content):
                             SET title = EXCLUDED.title,
                                 content = EXCLUDED.content,
                                 grade = 'good',
-                                model_id = NULL,
                                 manual_changed = TRUE
                         RETURNING id
                         """,

@@ -59,8 +59,8 @@ var setDraftStoryFromRecord;
         _draftStoryId = d.story_id;
         if (isNew) {
           setDraftCardState('new');
-          if (typeof loadStoriesList === 'function') loadStoriesList();
         }
+        if (typeof loadStoriesList === 'function') loadStoriesList();
       }
       _draftSaving = false;
       if (_draftPendingRetry) {
