@@ -1176,12 +1176,12 @@ def db_record_donor_batch_id(batch_id: str, donor_batch_id: str) -> bool:
 
 
 def db_claim_donor_batch() -> tuple | None:
-    """Атомарно захватывает батч-донор: SELECT + UPDATE status='donating' в одной транзакции.
+    """Атомарно захватывает батч-донор: SELECT + UPDATE status='donated' в одной транзакции.
     Пока транзакция открыта, строка заблокирована (FOR UPDATE SKIP LOCKED) — конкурентный вызов
-    получит 0 строк и вернёт None. После коммита донор уже в статусе 'donating' и не виден
+    получит 0 строк и вернёт None. После коммита донор уже в статусе 'donated' и не виден
     другим вызовам (фильтр по cancelled/probe).
     Возвращает (donor_id: str, donor_story_id: str | None) или None."""
-    _assert_known_status('donating')
+    _assert_known_status('donated')
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
@@ -1203,7 +1203,7 @@ def db_claim_donor_batch() -> tuple | None:
                     return None
                 donor_id = row[0]
                 cur.execute(
-                    "UPDATE batches SET status = 'donating' WHERE id = %s::uuid",
+                    "UPDATE batches SET status = 'donated' WHERE id = %s::uuid",
                     (donor_id,),
                 )
             conn.commit()
@@ -1230,7 +1230,7 @@ def db_steal_video_from_donor(donor_batch_id: str, batch_id: str) -> str | None:
                     FROM batches b
                     JOIN movies m ON m.id = b.movie_id
                     WHERE b.id = %s::uuid
-                      AND b.status = 'donating'
+                      AND b.status = 'donated'
                     FOR UPDATE OF b SKIP LOCKED
                 """, (donor_batch_id,))
                 donor = cur.fetchone()
@@ -1851,7 +1851,7 @@ KNOWN_BATCH_STATUSES = frozenset({
     'video_error', 'transcode_error', 'publish_error', 'published',
     'published_partially', 'fatal_error',
     # donor mode: донор атомарно захвачен, ожидает переноса story/video
-    'donating',
+    'donated',
 })
 
 _COMPOSITE_STATUS_SUFFIXES = ('.posting', '.published', '.pending', '.failed')

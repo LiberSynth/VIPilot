@@ -30,7 +30,7 @@
     probe:            'пробный',
     story_probe:      'пробный (сюжет)',
     cancelled:        'отменён',
-    donating:         'донирует',
+    donated:          'донор',
   };
 
   function esc(s) {
@@ -199,7 +199,7 @@
              : partialStatuses.indexOf(bs) >= 0      ? 'md-partial'
              : errorStatuses.indexOf(bs)   >= 0      ? 'md-error'
              : waitStatuses.indexOf(bs)    >= 0      ? 'md-wait'
-             : bs === 'donating'                     ? 'md-white'
+             : bs === 'donated'                      ? 'md-white'
              : 'md-warn';
 
     const logHtml = '<div class="monitor-log-list">' + logs.map(function(log) {

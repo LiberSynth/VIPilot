@@ -1354,6 +1354,17 @@ def _m039_delete_qwen36_plus_preview(cur):
     """)
 
 
+def _m040_rename_donating_to_donated(cur):
+    """
+    Переименовывает статус батча 'donating' → 'donated'.
+    Статус терминальный (батч уже отдал свои данные), прошедшее время точнее.
+    Идемпотентно: UPDATE не затронет строки, если 'donating' уже отсутствует.
+    """
+    cur.execute("""
+        UPDATE batches SET status = 'donated' WHERE status = 'donating'
+    """)
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -1394,6 +1405,7 @@ MIGRATIONS = [
     (37, _m037_stories_grade),
     (38, _m038_stories_manual_changed),
     (39, _m039_delete_qwen36_plus_preview),
+    (40, _m040_rename_donating_to_donated),
 ]
 
 
