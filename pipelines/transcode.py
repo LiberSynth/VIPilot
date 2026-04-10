@@ -141,7 +141,7 @@ def run(batch_id):
 
         if not do_transcode:
             db_set_batch_transcode_skip(batch_id)
-            print(f"[transcode] Батч {batch_id[:8]}… ({target}) — транскод отключён, пропускаю")
+            print(f"[transcode] Батч {batch_id[:8]}… ({target}) — транскод отключен, пропускаю")
             return
 
         print(f"[transcode] Батч {batch_id[:8]}… ({target}) — начало транскодирования")
