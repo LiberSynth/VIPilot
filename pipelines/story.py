@@ -21,7 +21,7 @@ from db import (
     db_set_batch_story_probe,
     db_set_batch_story_error,
     db_find_donor_batch,
-    db_set_batch_story_ready_from_donor,
+    db_record_donor_batch_id,
     env_get,
 )
 from log import db_log_pipeline, db_log_entry, db_log_update
@@ -135,8 +135,8 @@ def run(batch_id):
         if not is_probe and env_get('emulation_mode', '0') != '1' and env_get('use_donor', '1') == '1':
             donor_result = db_find_donor_batch()
             if donor_result:
-                donor_id, donor_story_id = donor_result
-                if not db_set_batch_story_ready_from_donor(batch_id, donor_id, donor_story_id):
+                donor_id, _donor_story_id = donor_result
+                if not db_record_donor_batch_id(batch_id, donor_id):
                     msg = f'Не удалось записать donor_batch_id для батча {batch_id[:8]}… — донор {donor_id[:8]}…'
                     log_id = db_log_pipeline(
                         'story', msg,
@@ -146,18 +146,7 @@ def run(batch_id):
                     print(f"[story] {msg}")
                     batch_done = True
                     return
-                detail = "Включен режим «Использовать донора». Сюжет будет взят из текущего батча, видео — от донора."
-
-                log_id = db_log_pipeline(
-                    'story', 'Найден донор, генерация не требуется',
-                    status='ok', batch_id=batch_id,
-                )
-                if log_id:
-                    db_log_entry(log_id, detail)
-
-                print(f"[story] Батч {batch_id[:8]}… — найден донор {donor_id}, батч → story_ready")
-                batch_done = True
-                return
+                print(f"[story] Батч {batch_id[:8]}… — донор зафиксирован ({donor_id[:8]}…), продолжаю генерацию сюжета")
 
         print(f"[story] Батч {batch_id[:8]}… ({target}) — начало генерации сюжета")
 

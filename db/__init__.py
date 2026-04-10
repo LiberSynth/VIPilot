@@ -54,6 +54,7 @@ from .db import (
     db_get_random_real_original_video,
     db_steal_video_from_cancelled,
     db_set_batch_story_ready_from_donor,
+    db_record_donor_batch_id,
     db_find_donor_batch,
     db_steal_video_from_donor,
     db_get_donor_count,

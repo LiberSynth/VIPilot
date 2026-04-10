@@ -1063,6 +1063,27 @@ def db_set_batch_story_ready_from_donor(batch_id: str, donor_batch_id: str, dono
         return False
 
 
+def db_record_donor_batch_id(batch_id: str, donor_batch_id: str) -> bool:
+    """Записывает donor_batch_id в batches.data без изменения story_id и статуса.
+    Используется в story.py, чтобы зафиксировать донора видео ДО генерации собственного сюжета."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE batches
+                    SET data = COALESCE(data, '{}'::jsonb) || jsonb_build_object('donor_batch_id', %s)
+                    WHERE id = %s
+                    """,
+                    (donor_batch_id, batch_id),
+                )
+            conn.commit()
+        return True
+    except Exception as e:
+        print(f"[DB] Ошибка db_record_donor_batch_id: {e}")
+        return False
+
+
 def db_find_donor_batch() -> tuple | None:
     """Ищет самый старый батч-донор с видео (SELECT + FOR UPDATE SKIP LOCKED),
     но не трогает видео и не меняет статус получателя.
