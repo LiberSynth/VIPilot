@@ -242,7 +242,7 @@ def producer_stories():
     return jsonify(stories)
 
 
-GRADE_CYCLE = ["good", "limited", "poor", "rejected"]
+GRADE_CYCLE = ["good", "bad"]
 
 
 @bp.route("/producer/story/<story_id>/grade", methods=["POST"])

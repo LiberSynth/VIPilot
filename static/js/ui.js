@@ -99,19 +99,15 @@ var setDraftStoryFromRecord;
 
 /* ── Список сюжетов в панели Сценариста ── */
 (function() {
-  var GRADE_CYCLE = ['good', 'limited', 'poor', 'rejected'];
-  var GRADE_LABELS = { good: 'хорошо', limited: 'ограничен', poor: 'слабый', rejected: 'отклонён' };
+  var GRADE_CYCLE = ['good', 'bad'];
+  var GRADE_LABELS = { good: 'хорошо', bad: 'плохо' };
   var GRADE_COLORS = {
-    good:     'rgba(62,207,142,.18)',
-    limited:  'rgba(245,166,35,.18)',
-    poor:     'rgba(255,140,0,.18)',
-    rejected: 'rgba(255,80,80,.18)',
+    good: 'rgba(62,207,142,.18)',
+    bad:  'rgba(255,80,80,.18)',
   };
   var GRADE_TEXT_COLORS = {
-    good:     '#3ecf8e',
-    limited:  '#f5a623',
-    poor:     '#ff8c00',
-    rejected: '#ff6060',
+    good: '#3ecf8e',
+    bad:  '#ff6060',
   };
 
   function renderStories(stories) {
