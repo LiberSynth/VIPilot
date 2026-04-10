@@ -1343,6 +1343,17 @@ def _m038_stories_manual_changed(cur):
     """)
 
 
+def _m039_delete_qwen36_plus_preview(cur):
+    """
+    Удаляет несуществующую модель qwen3.6-plus-preview из ai_models.
+    На OpenRouter такого эндпоинта нет (HTTP 404), модель никогда не работала.
+    Идемпотентно: DELETE ничего не делает, если запись уже отсутствует.
+    """
+    cur.execute("""
+        DELETE FROM ai_models WHERE name = 'qwen3.6-plus-preview'
+    """)
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -1382,6 +1393,7 @@ MIGRATIONS = [
     (36, _m036_movies_table),
     (37, _m037_stories_grade),
     (38, _m038_stories_manual_changed),
+    (39, _m039_delete_qwen36_plus_preview),
 ]
 
 
