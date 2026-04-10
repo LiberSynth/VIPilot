@@ -23,6 +23,7 @@ from db import (
     db_create_adhoc_batch,
     db_reset_batch_pipeline,
     db_get_story_text,
+    db_get_story_title,
     db_get_batch_video_data,
     db_get_text_model_by_id,
     db_get_video_model_by_id,
@@ -397,7 +398,8 @@ def api_get_story(story_id):
     text = db_get_story_text(story_id)
     if text is None:
         return jsonify({"error": "not found"}), 404
-    return jsonify({"text": text})
+    title = db_get_story_title(story_id) or ''
+    return jsonify({"text": text, "title": title})
 
 
 @bp.route("/batch/<batch_id>/publish-frame")

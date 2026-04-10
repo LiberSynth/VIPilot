@@ -28,7 +28,9 @@ from db import (
     db_upsert_story_draft,
     db_get_stories_list,
     db_set_story_grade,
+    db_create_story_generate_batch,
 )
+import utils.workflow_state as wf_state
 from utils.auth import is_authenticated
 from utils.limiter import limiter
 from utils.utils import (
@@ -273,6 +275,19 @@ def producer_story_draft():
     if new_id is None:
         return jsonify({"error": "db_error"}), 500
     return jsonify({"story_id": new_id})
+
+
+@bp.route("/producer/story/generate", methods=["POST"])
+def producer_story_generate():
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    if not (_has_slug("producer") or _has_slug("root")):
+        return jsonify({"error": "forbidden"}), 403
+    batch_id = db_create_story_generate_batch()
+    if not batch_id:
+        return jsonify({"error": "db_error"}), 500
+    wf_state.wakeup_loop()
+    return jsonify({"batch_id": batch_id})
 
 
 @bp.route("/save", methods=["POST"])

@@ -178,7 +178,7 @@ def run(batch_id):
         else:
             return
 
-        is_probe        = batch['type'] == 'probe'
+        is_probe        = batch['type'] == 'movie_probe'
         if is_probe:
             target = 'пробный'
             ar_x   = 9

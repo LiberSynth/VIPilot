@@ -333,7 +333,7 @@ def db_create_adhoc_batch():
 
 
 def db_create_probe_batch(video_model_id):
-    """Создаёт pending-батч с type='probe' и зафиксированной video_model_id.
+    """Создаёт pending-батч с type='movie_probe' и зафиксированной video_model_id.
     model_id сохраняется в movies при генерации видео через db_set_batch_video_model.
     Пока создаём batсh и пустую запись movies с model_id.
     Возвращает UUID батча или None."""
@@ -350,7 +350,7 @@ def db_create_probe_batch(video_model_id):
                 cur.execute("""
                     INSERT INTO batches
                         (status, type, movie_id)
-                    VALUES ('pending', 'probe', %s)
+                    VALUES ('pending', 'movie_probe', %s)
                     RETURNING id
                 """, (movie_id,))
                 row = cur.fetchone()
@@ -362,17 +362,16 @@ def db_create_probe_batch(video_model_id):
 
 
 def db_create_story_probe_batch(text_model_id):
-    """Создаёт pending-батч с type='probe' для пробного запроса сценария.
-    data-флаг story_probe=true сигнализирует пайплайну завершить батч
-    в статусе story_probe (без передачи в видео-конвейер).
-    probe_model_id хранится в data, а не в колонке text_model_id."""
+    """Создаёт pending-батч с type='story_probe' для пробного запроса сценария из ROOT.
+    probe_model_id хранится в data для выбора конкретной модели.
+    data-флаг story_probe=true сохранён для обратной совместимости."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
                     INSERT INTO batches
                         (status, type, data)
-                    VALUES ('pending', 'probe', %s)
+                    VALUES ('pending', 'story_probe', %s)
                     RETURNING id
                 """, (json.dumps({"story_probe": True, "probe_model_id": str(text_model_id)}),))
                 row = cur.fetchone()
@@ -380,6 +379,27 @@ def db_create_story_probe_batch(text_model_id):
         return str(row[0]) if row else None
     except Exception as e:
         print(f"[DB] Ошибка db_create_story_probe_batch: {e}")
+        return None
+
+
+def db_create_story_generate_batch():
+    """Создаёт pending-батч с type='story_probe' для генерации сюжета из PRODUCER.
+    Не содержит probe_model_id — используется стандартный алгоритм активных моделей.
+    Возвращает UUID батча или None."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO batches
+                        (status, type)
+                    VALUES ('pending', 'story_probe')
+                    RETURNING id
+                """)
+                row = cur.fetchone()
+            conn.commit()
+        return str(row[0]) if row else None
+    except Exception as e:
+        print(f"[DB] Ошибка db_create_story_generate_batch: {e}")
         return None
 
 
@@ -1020,7 +1040,7 @@ def db_get_batch_video_data(batch_id) -> bytes | None:
 def db_steal_video_from_cancelled(batch_id) -> str | None:
     """Ищет самый старый батч-донор с видео:
     — отменённые батчи (status = 'cancelled')
-    — завершённые пробные батчи (status = 'probe', type = 'probe')
+    — завершённые пробные батчи (status = 'probe', type = 'movie_probe')
     Донором считается батч у которого есть movies.transcoded_data или movies.raw_data.
     Если есть транскодированное — переносит его, статус получателя → transcode_ready.
     Если только оригинал — переносит его, статус получателя → video_ready.
@@ -1035,7 +1055,7 @@ def db_steal_video_from_cancelled(batch_id) -> str | None:
                     WHERE (m.transcoded_data IS NOT NULL OR m.raw_data IS NOT NULL)
                       AND (
                         b.status = 'cancelled'
-                        OR (b.status = 'probe' AND b.type = 'probe')
+                        OR (b.status = 'probe' AND b.type = 'movie_probe')
                       )
                     ORDER BY b.created_at ASC
                     LIMIT 1
@@ -1165,7 +1185,7 @@ def db_claim_donor_batch() -> tuple | None:
                     WHERE (m.transcoded_data IS NOT NULL OR m.raw_data IS NOT NULL)
                       AND (
                         b.status = 'cancelled'
-                        OR (b.status = 'probe' AND b.type = 'probe')
+                        OR (b.status = 'probe' AND b.type = 'movie_probe')
                       )
                     ORDER BY b.created_at ASC
                     LIMIT 1
@@ -1244,7 +1264,7 @@ def db_get_donor_count() -> int:
                     WHERE (m.transcoded_data IS NOT NULL OR m.raw_data IS NOT NULL)
                       AND (
                         b.status = 'cancelled'
-                        OR (b.status = 'probe' AND b.type = 'probe')
+                        OR (b.status = 'probe' AND b.type = 'movie_probe')
                       )
                 """)
                 return cur.fetchone()[0]
@@ -1992,7 +2012,7 @@ def db_set_batch_transcoding_by_id(batch_id):
 
 def db_cleanup_batches(batch_lifetime_days: int) -> int:
     """Удаляет батчи со статусом 'published'/'cancelled', а также пробные батчи
-    (type = 'probe') завершённые (probe/story_probe), старше batch_lifetime_days.
+    (type = 'movie_probe' или 'story_probe') завершённые (probe/story_probe), старше batch_lifetime_days.
     Удаляет связанные логи. Истории (stories) не удаляет — они являются заделом сюжетов.
     Возвращает количество удалённых батчей."""
     try:
@@ -2002,7 +2022,8 @@ def db_cleanup_batches(batch_lifetime_days: int) -> int:
                     SELECT id FROM batches
                     WHERE (
                         status IN ('published', 'cancelled')
-                        OR (type = 'probe' AND status IN ('probe', 'story_probe'))
+                        OR (type = 'movie_probe' AND status = 'probe')
+                        OR (type = 'story_probe' AND status = 'story_probe')
                     )
                       AND completed_at < now() - make_interval(days => %s)
                 """, (batch_lifetime_days,))

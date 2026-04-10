@@ -125,7 +125,7 @@ def run(batch_id):
             if not db_set_batch_transcoding_by_id(batch_id):
                 return
 
-        is_probe = batch['type'] == 'probe'
+        is_probe = batch['type'] == 'movie_probe'
 
         if not is_probe and check_cancelled('transcode', batch_id, batch):
             return

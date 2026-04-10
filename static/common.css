@@ -292,6 +292,13 @@
   }
   .btn-run-now:active { opacity: .8; }
   .btn-run-now:disabled { opacity: .4; cursor: default; }
+  .story-generate-hint {
+    margin-top: 10px;
+    font-size: 13px;
+    color: #8888b0;
+    min-height: 18px;
+    line-height: 1.5;
+  }
   /* ── Aspect ratio control ── */
   .ar-wrap { display: flex; align-items: center; gap: 16px; margin-top: 14px; }
   .ar-preview-box {

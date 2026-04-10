@@ -162,7 +162,7 @@ def run(batch_id):
             return
 
         if parsed is None:
-            if batch['type'] == 'probe':
+            if batch['type'] == 'movie_probe':
                 log_id = db_log_pipeline('publish', 'Публикация (пробный)…',
                                          status='running', batch_id=batch_id)
                 db_log_entry(log_id, 'Пробный батч — публикация на платформу не выполняется')

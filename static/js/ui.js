@@ -431,3 +431,110 @@ function monitorClockStop() {
   document.addEventListener('touchmove',   function() { clearTimeout(_timer); hideTooltip(); }, { passive: true });
   document.addEventListener('touchcancel', function() { clearTimeout(_timer); hideTooltip(); }, { passive: true });
 })();
+
+/* ── Кнопка «Сгенерировать» в панели Сценариста ── */
+(function() {
+  var _DEFAULT_HINT = 'Вы можете сгенерировать сюжет при помощи AI-модели';
+  var _pollTimer = null;
+
+  function setHint(text) {
+    var el = document.getElementById('story-generate-hint');
+    if (el) el.textContent = text || _DEFAULT_HINT;
+  }
+
+  function resetHint() { setHint(_DEFAULT_HINT); }
+
+  function startPoll(batchId) {
+    if (_pollTimer) { clearTimeout(_pollTimer); _pollTimer = null; }
+    function poll() {
+      fetch('/api/batch/' + batchId + '/logs')
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d.error) { _pollTimer = setTimeout(poll, 2000); return; }
+          var entries = [];
+          if (d.logs && d.logs.length) {
+            var lastLog = d.logs[d.logs.length - 1];
+            if (lastLog.entries && lastLog.entries.length) {
+              entries = lastLog.entries;
+            }
+          }
+          if (entries.length) {
+            setHint(entries[entries.length - 1].message);
+          }
+          var status = d.batch_status;
+          if (status === 'story_probe') {
+            var storyId = d.story_id;
+            var btn = document.getElementById('btn-story-generate');
+            if (btn) btn.disabled = false;
+            if (storyId) {
+              fetch('/api/story/' + encodeURIComponent(storyId))
+                .then(function(r) { return r.json(); })
+                .then(function(s) {
+                  if (typeof setDraftStoryFromRecord === 'function') {
+                    setDraftStoryFromRecord({
+                      id:      storyId,
+                      title:   s.title || '',
+                      content: s.text  || '',
+                    });
+                  }
+                  if (typeof loadStoriesList === 'function') {
+                    loadStoriesList();
+                    setTimeout(function() {
+                      var container = document.getElementById('stories-list');
+                      if (container) {
+                        var row = container.querySelector('.story-row[data-id="' + storyId + '"]');
+                        if (row) row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                      }
+                    }, 400);
+                  }
+                  resetHint();
+                })
+                .catch(function() { resetHint(); });
+            } else {
+              resetHint();
+            }
+          } else if (status === 'story_error' || status === 'error' || status === 'cancelled' || status === 'fatal_error') {
+            var btn = document.getElementById('btn-story-generate');
+            if (btn) btn.disabled = false;
+            resetHint();
+          } else {
+            _pollTimer = setTimeout(poll, 2000);
+          }
+        })
+        .catch(function() { _pollTimer = setTimeout(poll, 3000); });
+    }
+    poll();
+  }
+
+  function initGenerateButton() {
+    var btn = document.getElementById('btn-story-generate');
+    if (!btn) return;
+    btn.addEventListener('click', function() {
+      if (btn.disabled) return;
+      btn.disabled = true;
+      setHint('Запускаю генерацию…');
+      fetch('/producer/story/generate', { method: 'POST' })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d.error) {
+            btn.disabled = false;
+            setHint('Ошибка: ' + d.error);
+            setTimeout(resetHint, 4000);
+            return;
+          }
+          startPoll(d.batch_id);
+        })
+        .catch(function(e) {
+          btn.disabled = false;
+          setHint('Ошибка запроса');
+          setTimeout(resetHint, 4000);
+        });
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initGenerateButton);
+  } else {
+    initGenerateButton();
+  }
+})();

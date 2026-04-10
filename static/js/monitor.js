@@ -160,11 +160,11 @@
     const headTime = batch.created_at;
     const schedStr = batch.type === 'slot'
       ? 'Публикация: ' + fmtMskShort(batch.scheduled_at)
-      : batch.type === 'probe'
-        ? (bs === 'story_probe' ? 'Пробный сюжет'
-            : bs === 'probe'       ? 'Пробное видео'
-            : 'Пробный')
-        : 'Публикация: сейчас';
+      : batch.type === 'movie_probe'
+        ? 'Пробное видео'
+        : batch.type === 'story_probe'
+          ? 'Пробный сюжет'
+          : 'Публикация: сейчас';
     const statusLabel = (bs === 'probe' || bs === 'story_probe') ? 'выполнен' : (STATUS_LABELS[bs] || bs);
     const sub = [schedStr, statusLabel]
       .filter(Boolean).join(' · ');
