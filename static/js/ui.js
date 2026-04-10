@@ -132,7 +132,7 @@ var setDraftStoryFromRecord;
       if (s.manual_changed) {
         icons += '<span class="story-icon story-icon-manual" title="Отредактировано вручную">' +
           '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
-          '<path d="M6 1v7M6 1C6 1 4 1 4 3v5M6 1C6 1 8 1 8 3v3M8 6c0 0 2 0 2 2v1M10 8v1c0 2-2 4-4 5-2-1-4-3-4-5V8"/></svg></span>';
+          '<path d="M8 1v7M8 1C8 1 6 1 6 3v5M8 1C8 1 10 1 10 3v5M10 6c0 0 2 0 2 2v1c0 3-2 5-4 6-2-1-4-3-4-6V8c0-2 2-2 2-2"/></svg></span>';
       }
       if (s.used) {
         icons += '<span class="story-icon story-icon-used" title="Использован в производстве">' +
