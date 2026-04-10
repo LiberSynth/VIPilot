@@ -910,8 +910,9 @@
     display: flex; align-items: center; justify-content: center;
   }
   .story-icon svg { width: 14px; height: 14px; }
-  .story-icon-manual svg { stroke: #f5a623; opacity: .8; }
-  .story-icon-used   svg { stroke: #3ecf8e; opacity: .8; }
+  .story-icon-manual    svg { stroke: #f5a623; opacity: .8; }
+  .story-icon-ai-manual svg { opacity: 1; }
+  .story-icon-used      svg { stroke: #3ecf8e; opacity: .8; }
 
   /* ── Тултип долгого нажатия (мобильный) ── */
   #touch-tooltip {
