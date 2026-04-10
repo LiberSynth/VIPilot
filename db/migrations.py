@@ -1329,6 +1329,20 @@ def _m037_stories_grade(cur):
     """)
 
 
+def _m038_stories_manual_changed(cur):
+    """
+    Добавляет поле manual_changed BOOLEAN NOT NULL DEFAULT FALSE в таблицу stories.
+    Используется для отслеживания вручную изменённых сюжетов в панели Сценарист.
+    """
+    cur.execute("""
+        ALTER TABLE stories
+            ADD COLUMN IF NOT EXISTS manual_changed BOOLEAN NOT NULL DEFAULT FALSE
+    """)
+    cur.execute("""
+        UPDATE stories SET manual_changed = FALSE
+    """)
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -1367,6 +1381,7 @@ MIGRATIONS = [
     (35, _m035_drop_text_model_id),
     (36, _m036_movies_table),
     (37, _m037_stories_grade),
+    (38, _m038_stories_manual_changed),
 ]
 
 

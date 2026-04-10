@@ -508,12 +508,13 @@ def db_upsert_story_draft(story_id, title, content):
                 if story_id:
                     cur.execute(
                         """
-                        INSERT INTO stories (id, model_id, title, content, grade)
-                        VALUES (%s::uuid, NULL, %s, %s, 'good')
+                        INSERT INTO stories (id, model_id, title, content, grade, manual_changed)
+                        VALUES (%s::uuid, NULL, %s, %s, 'good', TRUE)
                         ON CONFLICT (id) DO UPDATE
                             SET title = EXCLUDED.title,
                                 content = EXCLUDED.content,
-                                grade = 'good'
+                                grade = 'good',
+                                manual_changed = TRUE
                             WHERE stories.model_id IS NULL
                         RETURNING id
                         """,
@@ -524,7 +525,7 @@ def db_upsert_story_draft(story_id, title, content):
                         conn.commit()
                         return str(row[0])
                 cur.execute(
-                    "INSERT INTO stories (model_id, title, content, grade) VALUES (NULL, %s, %s, 'good') RETURNING id",
+                    "INSERT INTO stories (model_id, title, content, grade, manual_changed) VALUES (NULL, %s, %s, 'good', TRUE) RETURNING id",
                     (title, content),
                 )
                 row = cur.fetchone()
