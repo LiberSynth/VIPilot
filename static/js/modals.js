@@ -289,10 +289,6 @@
           var status = d.batch_status;
           if (_TERMINAL.indexOf(status) !== -1) {
             if (_probeBtn) { _probeBtn.classList.remove('probing'); _probeBtn = null; }
-            container.querySelectorAll('.monitor-log-item.open').forEach(function(el) {
-              el.classList.remove('open');
-            });
-            body.scrollTop = 0;
             if (onDone) { onDone(d); }
             else if (d.has_video_data) { showVideo(); }
           } else {
