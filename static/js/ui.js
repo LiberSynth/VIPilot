@@ -129,15 +129,19 @@ var setDraftStoryFromRecord;
       var bg = GRADE_COLORS[grade] || 'rgba(255,255,255,.07)';
       var tc = GRADE_TEXT_COLORS[grade] || '#aaa';
       var icons = '';
-      if (s.manual_changed) {
-        icons += '<span class="story-icon story-icon-manual" title="Отредактировано вручную">' +
-          '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
-          '<path d="M8 1v7M8 1C8 1 6 1 6 3v5M8 1C8 1 10 1 10 3v5M10 6c0 0 2 0 2 2v1c0 3-2 5-4 6-2-1-4-3-4-6V8c0-2 2-2 2-2"/></svg></span>';
-      }
       if (s.used) {
         icons += '<span class="story-icon story-icon-used" title="Использован в производстве">' +
           '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
           '<polyline points="2,8 6,12 14,4"/></svg></span>';
+      }
+      if (s.manual_changed) {
+        icons += '<span class="story-icon story-icon-manual" title="Отредактировано вручную">' +
+          '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
+          '<path d="M4 1l1.5 5-2.5 1 3 8 1-4 4 4 1-10-3 3z"/></svg></span>';
+      } else {
+        icons += '<span class="story-icon story-icon-ai" title="Сгенерировано AI">' +
+          '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
+          '<path d="M8 2l1.2 3.8H13l-3.1 2.2 1.2 3.8L8 9.6l-3.1 2.2 1.2-3.8L3 5.8h3.8z"/></svg></span>';
       }
       html += '<div class="story-row" data-id="' + s.id + '">' +
         '<div class="story-title">' + escapeHtml(s.title || '(без названия)') + '</div>' +
@@ -204,7 +208,10 @@ var setDraftStoryFromRecord;
   window.loadStoriesList = function() {
     var container = document.getElementById('stories-list');
     if (!container) return;
-    container.innerHTML = '<div class="stories-loading">Загрузка...</div>';
+    var hasContent = container.querySelector('.story-row');
+    if (!hasContent) {
+      container.innerHTML = '<div class="stories-loading">Загрузка...</div>';
+    }
     fetch('/producer/stories')
       .then(function(r) { return r.ok ? r.json() : []; })
       .then(renderStories)
