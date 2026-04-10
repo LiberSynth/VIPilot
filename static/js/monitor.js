@@ -304,6 +304,7 @@
   var _firstRender   = true;
   var _pubFrameCache    = {};  // batchId → blob URL
   var _pubFrameFetching = {};  // batchId → true (in-flight guard)
+  var _lastRenderedHtml = {};  // key → last rendered HTML string
 
   function getOpenState() {
     var bids = {}, sgkeys = {}, lids = {};
@@ -416,6 +417,12 @@
     });
   });
 
+  function _groupKey(g) {
+    if (g.type === 'batch') return 'batch:' + g.data.batch_id;
+    var items = g.items || [];
+    return 'sys:' + (items[0] ? items[0].created_at : '');
+  }
+
   function renderTimeline(data) {
     var el = document.getElementById('monitor-timeline');
     if (!el) return;
@@ -424,11 +431,65 @@
     var groups = buildTimeline(data.batches, data.system);
     if (groups.length === 0) {
       el.innerHTML = '<div style="font-size:12px;color:#444;padding:4px 0">Нет данных</div>';
+      _firstRender = false;
       return;
     }
-    el.innerHTML = groups.map(function(g) {
-      return g.type === 'batch' ? renderBatch(g.data) : renderSysGroup(g.items);
-    }).join('');
+
+    var newHtmlMap = {};
+    var newKeys    = [];
+    groups.forEach(function(g) {
+      var key = _groupKey(g);
+      newKeys.push(key);
+      newHtmlMap[key] = g.type === 'batch' ? renderBatch(g.data) : renderSysGroup(g.items);
+    });
+
+    var oldEls = {};
+    var unkeyed = [];
+    Array.prototype.slice.call(el.children).forEach(function(child) {
+      var bid   = child.dataset.bid;
+      var sgKey = child.dataset.sgKey;
+      var key   = bid ? ('batch:' + bid) : sgKey ? ('sys:' + sgKey) : null;
+      if (key) oldEls[key] = child;
+      else unkeyed.push(child);
+    });
+
+    unkeyed.forEach(function(child) { el.removeChild(child); });
+
+    var keysSet = {};
+    newKeys.forEach(function(k) { keysSet[k] = true; });
+    Object.keys(oldEls).forEach(function(key) {
+      if (!keysSet[key]) {
+        el.removeChild(oldEls[key]);
+        delete _lastRenderedHtml[key];
+      }
+    });
+
+    var resolvedNodes = newKeys.map(function(key) {
+      var existing = oldEls[key];
+      var newHtml  = newHtmlMap[key];
+      if (existing) {
+        if (_lastRenderedHtml[key] !== newHtml) {
+          var isOpen = existing.classList.contains('open');
+          var tmp = document.createElement('div');
+          tmp.innerHTML = newHtml;
+          var newNode = tmp.firstChild;
+          el.replaceChild(newNode, existing);
+          if (isOpen) newNode.classList.add('open');
+          _lastRenderedHtml[key] = newHtml;
+          return newNode;
+        }
+        return existing;
+      }
+      var tmp2 = document.createElement('div');
+      tmp2.innerHTML = newHtml;
+      _lastRenderedHtml[key] = newHtml;
+      return tmp2.firstChild;
+    });
+
+    var frag = document.createDocumentFragment();
+    resolvedNodes.forEach(function(node) { frag.appendChild(node); });
+    el.appendChild(frag);
+
     restoreOpenState(prev);
     if (!_firstRender) autoExpandNewActivity();
     _firstRender = false;
