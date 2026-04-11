@@ -185,6 +185,19 @@ def run(batch_id):
             ar_y   = 16
         else:
             active_targets = db_get_active_targets()
+            if len(active_targets) > 1:
+                ratios = {
+                    (t.get('aspect_ratio_x') or 9, t.get('aspect_ratio_y') or 16)
+                    for t in active_targets
+                }
+                if len(ratios) > 1:
+                    details = ', '.join(
+                        f"{t.get('name','?')} → {t.get('aspect_ratio_x') or 9}:{t.get('aspect_ratio_y') or 16}"
+                        for t in active_targets
+                    )
+                    raise RuntimeError(
+                        f"Конфликт соотношений сторон у активных таргетов: {details}"
+                    )
             tgt    = active_targets[0] if active_targets else {}
             target = tgt.get('name') or 'adhoc'
             ar_x   = tgt.get('aspect_ratio_x') or 9
