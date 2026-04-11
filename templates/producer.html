@@ -149,6 +149,8 @@
       .catch(function() { _storyPoolLoaded = false; });
   }
 
+  document.addEventListener('DOMContentLoaded', function() { loadDirectorStoryPool(); });
+
   var _origSwitchPanel = window.switchPanel;
   window.switchPanel = function(name) {
     if (_origSwitchPanel) _origSwitchPanel(name);
