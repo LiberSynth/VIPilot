@@ -23,6 +23,7 @@ from db import (
     db_claim_donor_batch,
     db_set_batch_story_ready_from_donor,
     db_claim_unused_story_for_batch,
+    db_get_story_title,
     env_get,
 )
 from log import db_log_pipeline, db_log_entry, db_log_update
@@ -159,7 +160,11 @@ def run(batch_id):
                     print(f"[story] {msg}")
                     batch_done = True
                     return
-                detail = "Включен режим «Использовать донора». Видео будет взято от донора."
+                donor_title = db_get_story_title(donor_story_id) if donor_story_id else None
+                if donor_title:
+                    detail = f"Включен режим «Использовать донора». Контент будет заимствован от донора. Сюжет: «{donor_title}»"
+                else:
+                    detail = "Включен режим «Использовать донора». Контент будет заимствован от донора."
                 log_id = db_log_pipeline(
                     'story', 'Найден донор, генерация сюжета не требуется',
                     status='ok', batch_id=batch_id,
