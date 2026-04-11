@@ -99,16 +99,19 @@ var setDraftStoryFromRecord;
 
 /* ── Список сюжетов в панели Сценариста ── */
 (function() {
-  var GRADE_CYCLE = ['good', 'bad'];
-  var GRADE_LABELS = { good: 'хорошо', bad: 'плохо' };
+  var GRADE_CYCLE = ['good', 'bad', null];
+  var GRADE_LABELS = { good: 'хорошо', bad: 'плохо', 'null': 'не указано' };
   var GRADE_COLORS = {
     good: 'rgba(62,207,142,.18)',
     bad:  'rgba(255,80,80,.18)',
+    'null': 'rgba(255,255,255,.1)',
   };
   var GRADE_TEXT_COLORS = {
     good: '#3ecf8e',
     bad:  '#ff6060',
+    'null': '#888',
   };
+  function gradeKey(g) { return g === null || g === undefined ? 'null' : g; }
 
   function renderStories(stories) {
     var container = document.getElementById('stories-list');
@@ -120,10 +123,11 @@ var setDraftStoryFromRecord;
     var html = '';
     for (var i = 0; i < stories.length; i++) {
       var s = stories[i];
-      var grade = s.grade || 'good';
-      var label = GRADE_LABELS[grade] || grade;
-      var bg = GRADE_COLORS[grade] || 'rgba(255,255,255,.07)';
-      var tc = GRADE_TEXT_COLORS[grade] || '#aaa';
+      var grade = s.grade !== undefined ? s.grade : null;
+      var gk = gradeKey(grade);
+      var label = GRADE_LABELS[gk] || gk;
+      var bg = GRADE_COLORS[gk] || 'rgba(255,255,255,.07)';
+      var tc = GRADE_TEXT_COLORS[gk] || '#aaa';
       var icons = '';
       if (s.used) {
         icons += '<span class="story-icon story-icon-used" title="Использован в производстве">' +
@@ -147,7 +151,7 @@ var setDraftStoryFromRecord;
           '<path d="M8 1 L9.3 6.7 L15 8 L9.3 9.3 L8 15 L6.7 9.3 L1 8 L6.7 6.7 Z"/></svg></span>';
       }
       var modelLabel = s.model_name ? ' <span class="story-model-name">(' + escapeHtml(s.model_name) + ')</span>' : '';
-      var gradeBadge = '<button class="story-grade-badge" data-id="' + s.id + '" data-grade="' + grade + '" ' +
+      var gradeBadge = '<button class="story-grade-badge" data-id="' + s.id + '" data-grade="' + gk + '" ' +
         'style="background:' + bg + ';color:' + tc + '" ' +
         'title="Оценка: ' + label + '. Нажмите для смены">' +
         label + '</button>';
@@ -178,7 +182,8 @@ var setDraftStoryFromRecord;
 
   function cycleGrade(btn) {
     var storyId = btn.getAttribute('data-id');
-    var currentGrade = btn.getAttribute('data-grade');
+    var currentGradeAttr = btn.getAttribute('data-grade');
+    var currentGrade = currentGradeAttr === 'null' ? null : currentGradeAttr;
     var idx = GRADE_CYCLE.indexOf(currentGrade);
     var nextGrade = GRADE_CYCLE[(idx + 1) % GRADE_CYCLE.length];
     btn.disabled = true;
@@ -190,13 +195,14 @@ var setDraftStoryFromRecord;
     .then(function(r) { return r.ok ? r.json() : null; })
     .then(function(d) {
       btn.disabled = false;
-      if (d && d.grade) {
-        var grade = d.grade;
-        btn.setAttribute('data-grade', grade);
-        btn.style.background = GRADE_COLORS[grade] || 'rgba(255,255,255,.07)';
-        btn.style.color = GRADE_TEXT_COLORS[grade] || '#aaa';
-        btn.textContent = GRADE_LABELS[grade] || grade;
-        btn.title = 'Оценка: ' + (GRADE_LABELS[grade] || grade) + '. Нажмите для смены';
+      if (d && d.ok) {
+        var grade = d.grade !== undefined ? d.grade : null;
+        var gk = gradeKey(grade);
+        btn.setAttribute('data-grade', gk);
+        btn.style.background = GRADE_COLORS[gk] || 'rgba(255,255,255,.07)';
+        btn.style.color = GRADE_TEXT_COLORS[gk] || '#aaa';
+        btn.textContent = GRADE_LABELS[gk] || gk;
+        btn.title = 'Оценка: ' + (GRADE_LABELS[gk] || gk) + '. Нажмите для смены';
       }
     })
     .catch(function() { btn.disabled = false; });

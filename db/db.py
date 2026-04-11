@@ -506,7 +506,7 @@ def db_create_story(model_id, title, result):
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "INSERT INTO stories (model_id, title, content) VALUES (%s, %s, %s) RETURNING id",
+                    "INSERT INTO stories (model_id, title, content, grade) VALUES (%s, %s, %s, NULL) RETURNING id",
                     (model_id, title, result),
                 )
                 row = cur.fetchone()
@@ -548,7 +548,7 @@ def db_get_stories_list():
                 "id": row[0],
                 "title": row[1] or "",
                 "content": row[2] or "",
-                "grade": row[3] or "good",
+                "grade": row[3],
                 "manual_changed": bool(row[4]),
                 "ai_generated": bool(row[5]),
                 "used": bool(row[6]),
@@ -595,7 +595,6 @@ def db_upsert_story_draft(story_id, title, content):
                         ON CONFLICT (id) DO UPDATE
                             SET title = EXCLUDED.title,
                                 content = EXCLUDED.content,
-                                grade = 'good',
                                 manual_changed = TRUE
                         RETURNING id
                         """,
