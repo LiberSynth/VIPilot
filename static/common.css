@@ -50,7 +50,7 @@
     width: 30px; height: 30px;
     text-decoration: none;
   }
-  .header-nav-btn svg { width: 14px; height: 14px; }
+  .header-nav-btn svg { width: 16px; height: 16px; }
 
   .hamburger {
     display: flex; flex-direction: column; justify-content: center;
@@ -400,7 +400,7 @@
   @media (max-width: 520px) {
     .wf-btns { margin-left: 0; width: 100%; }
     .wf-btn  { flex: 1; text-align: center; padding: 9px 8px; font-size: 12px; }
-    .header-center { font-size: 11px; }
+    .header-center { font-size: 11px; position: static; transform: none; margin-left: auto; }
   }
 
   /* ── Monitor ── */
