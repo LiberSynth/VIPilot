@@ -109,6 +109,14 @@
       <input type="hidden" id="director-story-id" value="">
       <textarea id="director-story-content" readonly style="min-height:100px; width:100%; box-sizing:border-box; resize:vertical"></textarea>
     </div>
+
+    <div class="card" style="margin-top:0">
+      <div class="card-title">Ролик</div>
+      <div class="hint">Вы можете сгенерировать ролик, нажав кнопку «Создать» на нужной модели.</div>
+    </div>
+
+    {% from 'common/panel_video.html' import model_list_block %}
+    {{ model_list_block('director-model-list', show_attempts=False, show_hint=False) }}
   </div>
 
   <!-- ══ ИНФОРМАЦИЯ ══ -->
@@ -187,7 +195,11 @@
       .catch(function() { _storyPoolLoaded = false; });
   }
 
-  loadDirectorStoryPool();
+  var _origSwitchPanel = window.switchPanel;
+  window.switchPanel = function(name) {
+    if (_origSwitchPanel) _origSwitchPanel(name);
+    if (name === 'director') { loadDirectorStoryPool(); if (window.loadDirectorModels) loadDirectorModels(); }
+  };
 
   var btn = document.getElementById('director-story-btn');
   if (btn) {

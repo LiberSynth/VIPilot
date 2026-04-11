@@ -31,6 +31,8 @@ window.cycleVideoGrade = function(el) {
   });
 };
 
+window.createDirectorVideo = function(id, name, btn) {};
+
 (function() {
   var dragSrcId = null;
 
@@ -86,8 +88,15 @@ window.cycleVideoGrade = function(el) {
     });
   }
 
-  function renderVideoModels(list) {
-    const container = document.getElementById('model-list');
+  window.renderModelList = function(containerId, list, opts) {
+    opts = opts || {};
+    var gradeFn     = opts.gradeFn     || 'cycleVideoGrade';
+    var saveOrderFn = opts.saveOrderFn || saveVideoOrder;
+    var activateFn  = opts.activateFn  || 'activateModel';
+    var actionTitle = opts.actionTitle || 'Пробный запрос';
+    var actionFn    = opts.actionFn    || 'probeVideoModel';
+
+    const container = document.getElementById(containerId);
     if (!container) return;
     if (!list || list.length === 0) {
       container.innerHTML = '<div class="model-loading">Нет моделей</div>';
@@ -101,20 +110,20 @@ window.cycleVideoGrade = function(el) {
       item.draggable = true;
       var caption = m.platform_name ? escHtml(m.platform_name) + ': ' + escHtml(m.name) : escHtml(m.name);
       var grade = m.grade || 'good';
-      var gradeHtml = '<span data-grade-id="' + m.id + '" data-grade="' + grade + '" onclick="event.stopPropagation();cycleVideoGrade(this)" title="Нажмите для смены" style="cursor:pointer;font-size:10px;padding:1px 6px;border-radius:3px;background:' + (_gradeColors[grade]||'#555') + ';color:#fff;margin-left:6px;opacity:.85">' + (_gradeLabels[grade]||grade) + '</span>';
+      var gradeHtml = '<span data-grade-id="' + m.id + '" data-grade="' + grade + '" onclick="event.stopPropagation();' + gradeFn + '(this)" title="Нажмите для смены" style="cursor:pointer;font-size:10px;padding:1px 6px;border-radius:3px;background:' + (_gradeColors[grade]||'#555') + ';color:#fff;margin-left:6px;opacity:.85">' + (_gradeLabels[grade]||grade) + '</span>';
       var priceHtml = m.price ? '<span style="font-size:11px;color:#888;margin-left:auto;padding-right:6px;white-space:nowrap">' + escHtml(m.price) + '</span>' : '';
       item.innerHTML =
-        '<div class="model-radio" onclick="activateModel(\'' + m.id + '\')">' +
+        '<div class="model-radio" onclick="' + activateFn + '(\'' + m.id + '\')">' +
           '<div class="model-radio-dot"></div>' +
         '</div>' +
         '<div class="model-name">' + caption + gradeHtml + '</div>' +
         priceHtml +
-        '<button class="model-probe-btn" title="Пробный запрос" onclick="event.stopPropagation();probeVideoModel(\'' + m.id + '\',\'' + escHtml(m.name) + '\',this)"><svg viewBox="0 0 16 16" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="4,2 13,8 4,14"/></svg></button>' +
+        '<button class="model-probe-btn" title="' + escHtml(actionTitle) + '" onclick="event.stopPropagation();' + actionFn + '(\'' + m.id + '\',\'' + escHtml(m.name) + '\',this)"><svg viewBox="0 0 16 16" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="4,2 13,8 4,14"/></svg></button>' +
         '<div class="model-drag-handle" title="Перетащить">⠿</div>';
-      makeDragHandlers(item, 'model-list', m, saveVideoOrder);
+      makeDragHandlers(item, containerId, m, saveOrderFn);
       container.appendChild(item);
     });
-  }
+  };
 
   function saveVideoOrder(ids) {
     fetch('/api/models/reorder', {
@@ -124,20 +133,46 @@ window.cycleVideoGrade = function(el) {
     }).catch(function(e) { console.error('reorder error', e); loadModels(); });
   }
 
-  window.activateModel = function(id) {
-    var container = document.getElementById('model-list');
+  function saveDirectorOrder(ids) {
+    fetch('/api/models/reorder', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ids: ids})
+    }).catch(function(e) { console.error('reorder error', e); loadDirectorModels(); });
+  }
+
+  function toggleVideoModelActive(containerId, id) {
+    var container = document.getElementById(containerId);
     if (container) {
       var item = container.querySelector('[data-id="' + id + '"]');
       if (item) item.classList.toggle('model-active');
     }
+  }
+
+  window.activateModel = function(id) {
+    toggleVideoModelActive('model-list', id);
     fetch('/api/models/' + id + '/activate', {method: 'POST'})
       .catch(function(e) { console.error('activate error', e); loadModels(); });
+  };
+
+  window.activateDirectorModel = function(id) {
+    toggleVideoModelActive('director-model-list', id);
+    fetch('/api/models/' + id + '/activate', {method: 'POST'})
+      .catch(function(e) { console.error('activate error', e); loadDirectorModels(); });
   };
 
   function loadModels() {
     fetch('/api/models')
       .then(function(r) { return r.json(); })
-      .then(function(data) { renderVideoModels(data); })
+      .then(function(data) {
+        window.renderModelList('model-list', data, {
+          gradeFn: 'cycleVideoGrade',
+          saveOrderFn: saveVideoOrder,
+          activateFn: 'activateModel',
+          actionTitle: 'Пробный запрос',
+          actionFn: 'probeVideoModel'
+        });
+      })
       .catch(function() {
         const c = document.getElementById('model-list');
         if (c) c.innerHTML = '<div class="model-loading">Ошибка загрузки</div>';
@@ -145,6 +180,26 @@ window.cycleVideoGrade = function(el) {
   }
 
   window.loadModels = loadModels;
+
+  function loadDirectorModels() {
+    fetch('/api/models')
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        window.renderModelList('director-model-list', data, {
+          gradeFn: 'cycleVideoGrade',
+          saveOrderFn: saveDirectorOrder,
+          activateFn: 'activateDirectorModel',
+          actionTitle: 'Создать',
+          actionFn: 'createDirectorVideo'
+        });
+      })
+      .catch(function() {
+        const c = document.getElementById('director-model-list');
+        if (c) c.innerHTML = '<div class="model-loading">Ошибка загрузки</div>';
+      });
+  }
+
+  window.loadDirectorModels = loadDirectorModels;
 
   (function() {
     const panel = document.getElementById('panel-request');
