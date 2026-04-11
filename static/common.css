@@ -17,7 +17,7 @@
   header {
     background: #1a1a24;
     border-bottom: 1px solid #2a2a38;
-    padding: 6px;
+    padding: 0 5px 0 6px;
     position: sticky;
     top: 0;
     z-index: 100;
@@ -47,11 +47,11 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 6px;
-    padding-top: 6px;
+    padding-top: 3px;
   }
   .header-clock {
     display: block;
-    padding-bottom: 6px;
+    padding-bottom: 0px;
     font-size: 12px;
     font-weight: 500;
     color: #aaa;
@@ -60,7 +60,7 @@
     white-space: nowrap;
   }
   .header-nav-btn {
-    width: 30px; height: 30px;
+    width: 28px; height: 28px;
     text-decoration: none;
   }
   .header-nav-btn svg { width: 16px; height: 16px; }
@@ -138,7 +138,7 @@
     padding: 12px 12px 6px;
   }
 
-  .container { padding: 18px 16px; max-width: 640px; margin: 0 auto; }
+  .container { padding: 12px 16px; max-width: 640px; margin: 0 auto; }
   .tab-panel { display: none; }
   .tab-panel.active { display: block; }
 
