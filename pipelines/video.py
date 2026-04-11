@@ -45,6 +45,10 @@ class ProviderFatalError(Exception):
     """Raised when a provider returns a permanent, non-retryable billing/account error."""
 
 
+class AspectRatioConflictError(Exception):
+    """Raised when active targets have different aspect ratios."""
+
+
 def _is_fatal_fal(status_code: int, body) -> bool:
     """Detect fal.ai balance-exhausted / account-locked errors (HTTP 403)."""
     if status_code != 403:
@@ -195,7 +199,7 @@ def run(batch_id):
                         f"{t.get('name','?')} → {t.get('aspect_ratio_x') or 9}:{t.get('aspect_ratio_y') or 16}"
                         for t in active_targets
                     )
-                    raise RuntimeError(
+                    raise AspectRatioConflictError(
                         f"Конфликт соотношений сторон у активных таргетов: {details}"
                     )
             tgt    = active_targets[0] if active_targets else {}
@@ -489,6 +493,15 @@ def run(batch_id):
             db_log_entry(log_id, f"URL: {video_url}")
         print(f"[video] Готово: batch → video_ready, url={video_url[:60]}…")
 
+    except AspectRatioConflictError as e:
+        msg = str(e)
+        db_log_pipeline('video', msg, status='error', batch_id=batch_id)
+        if log_id:
+            db_log_update(log_id, msg, 'error')
+        if batch_id:
+            db_set_batch_video_error(batch_id)
+        print(f"[video] {msg}")
+        notify_failure(f"video: {msg}")
     except ProviderFatalError as e:
         msg = str(e)
         db_log_pipeline('video', msg, status='error', batch_id=batch_id)
