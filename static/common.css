@@ -216,6 +216,32 @@
   select:focus { border-color: #4a7cf7; }
   select option { background: #0f0f13; color: #fff; }
 
+  .cust-select { position: relative; margin-bottom: 10px; user-select: none; }
+  .cust-select-btn {
+    width: 100%; display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 14px 12px 16px; box-sizing: border-box;
+    background: #0f0f13; border: 1px solid #2a2a38; border-radius: 11px;
+    color: #fff; font-size: 14px; font-family: inherit;
+    cursor: pointer; text-align: left; transition: border-color .2s;
+  }
+  .cust-select-btn:focus { outline: none; border-color: #4a7cf7; }
+  .cust-select-btn.open { border-color: #3a3a5a; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+  .cust-select-arrow { flex-shrink: 0; color: #666; transition: transform .2s; }
+  .cust-select-btn.open .cust-select-arrow { transform: rotate(180deg); }
+  .cust-select-list {
+    position: absolute; top: 100%; left: 0; right: 0; z-index: 200;
+    background: #0f0f13; border: 1px solid #3a3a5a; border-top: none;
+    border-bottom-left-radius: 11px; border-bottom-right-radius: 11px;
+    max-height: 220px; overflow-y: auto;
+  }
+  .cust-select-option {
+    padding: 10px 16px; font-size: 14px; color: #888; cursor: pointer;
+    transition: background .12s, color .12s;
+  }
+  .cust-select-option:last-child { border-bottom-left-radius: 11px; border-bottom-right-radius: 11px; }
+  .cust-select-option:hover { background: rgba(255,255,255,.05); color: #ccc; }
+  .cust-select-option.selected { color: #e0e0f0; }
+
   .lead-row { display: flex; align-items: center; gap: 12px; }
   input[type="number"] {
     flex: 1; padding: 14px 16px;

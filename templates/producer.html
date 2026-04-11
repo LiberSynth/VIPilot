@@ -95,9 +95,18 @@
 
     <div class="card" style="margin-top:0">
       <div class="card-title">Сюжет</div>
-      <select id="director-story-select">
-        <option value="">Сгенерировать</option>
-      </select>
+      <div class="cust-select" id="director-story-wrap">
+        <button type="button" class="cust-select-btn" id="director-story-btn">
+          <span id="director-story-label">Сгенерировать</span>
+          <svg class="cust-select-arrow" xmlns="http://www.w3.org/2000/svg" width="12" height="7" viewBox="0 0 12 7" fill="none">
+            <path d="M1 1l5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <div class="cust-select-list" id="director-story-list" hidden>
+          <div class="cust-select-option selected" data-value="">Сгенерировать</div>
+        </div>
+      </div>
+      <input type="hidden" id="director-story-id" value="">
       <textarea id="director-story-content" readonly style="min-height:100px; width:100%; box-sizing:border-box; resize:vertical"></textarea>
     </div>
   </div>
@@ -129,6 +138,40 @@
   var _storyPoolLoaded = false;
   var _storyPoolData = [];
 
+  function selectOption(id, label) {
+    var lbl = document.getElementById('director-story-label');
+    var hid = document.getElementById('director-story-id');
+    var ta  = document.getElementById('director-story-content');
+    if (lbl) lbl.textContent = label;
+    if (hid) hid.value = id;
+    document.querySelectorAll('#director-story-list .cust-select-option').forEach(function(o) {
+      o.classList.toggle('selected', o.dataset.value === id);
+    });
+    if (ta) {
+      if (!id) { ta.value = ''; return; }
+      var story = _storyPoolData.find(function(s) { return s.id === id; });
+      ta.value = story ? (story.content || '') : '';
+    }
+  }
+
+  function closeList() {
+    var list = document.getElementById('director-story-list');
+    var btn  = document.getElementById('director-story-btn');
+    if (list) list.hidden = true;
+    if (btn)  btn.classList.remove('open');
+  }
+
+  function addOption(id, label) {
+    var list = document.getElementById('director-story-list');
+    if (!list) return;
+    var opt = document.createElement('div');
+    opt.className = 'cust-select-option';
+    opt.dataset.value = id;
+    opt.textContent = label;
+    opt.addEventListener('click', function() { selectOption(id, label); closeList(); });
+    list.appendChild(opt);
+  }
+
   function loadDirectorStoryPool() {
     if (_storyPoolLoaded) return;
     _storyPoolLoaded = true;
@@ -137,13 +180,8 @@
       .then(function(stories) {
         if (!Array.isArray(stories)) { _storyPoolLoaded = false; return; }
         _storyPoolData = stories;
-        var sel = document.getElementById('director-story-select');
-        if (!sel) return;
         stories.forEach(function(s) {
-          var opt = document.createElement('option');
-          opt.value = s.id;
-          opt.textContent = s.title || ('Сюжет ' + s.id.slice(0, 8));
-          sel.appendChild(opt);
+          addOption(s.id, s.title || ('Сюжет ' + s.id.slice(0, 8)));
         });
       })
       .catch(function() { _storyPoolLoaded = false; });
@@ -151,18 +189,27 @@
 
   loadDirectorStoryPool();
 
-
-  var sel = document.getElementById('director-story-select');
-  if (sel) {
-    sel.addEventListener('change', function() {
-      var ta = document.getElementById('director-story-content');
-      if (!ta) return;
-      var id = sel.value;
-      if (!id) { ta.value = ''; return; }
-      var story = _storyPoolData.find(function(s) { return s.id === id; });
-      ta.value = story ? (story.content || '') : '';
+  var btn = document.getElementById('director-story-btn');
+  if (btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var list = document.getElementById('director-story-list');
+      if (!list) return;
+      if (list.hidden) {
+        list.hidden = false;
+        btn.classList.add('open');
+      } else {
+        closeList();
+      }
     });
   }
+
+  var defaultOpt = document.querySelector('#director-story-list .cust-select-option[data-value=""]');
+  if (defaultOpt) {
+    defaultOpt.addEventListener('click', function() { selectOption('', 'Сгенерировать'); closeList(); });
+  }
+
+  document.addEventListener('click', function() { closeList(); });
 })();
 switchPanel('screenwriter');
 </script>
