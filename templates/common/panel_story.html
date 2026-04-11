@@ -2,6 +2,22 @@
   <div id="panel-story" class="tab-panel">
     <form id="story-form" style="margin-top:0">
       <div class="card" style="margin-top:12px">
+        <div class="card-title">Утверждение сюжета</div>
+        <div class="hint">Если включено, пайплайн берёт из пула только сюжеты с оценкой «хорошо». Если выключено — любой неиспользованный сюжет. Если подходящего нет — запускается AI-генерация.</div>
+        <div class="wf-row" style="margin-top:8px">
+          <div style="flex:1">
+            <div class="toggle-label">Утверждать сюжеты</div>
+          </div>
+          <label class="toggle-wrap" style="margin-left:8px">
+            <input type="checkbox" id="approve_stories_check"
+              {% if approve_stories %}checked{% endif %}
+              onchange="onApproveStoriesToggle(this)">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        <input type="hidden" id="approve_stories_hidden" name="approve_stories" value="{{ '1' if approve_stories else '0' }}">
+      </div>
+      <div class="card" style="margin-top:12px">
         <div class="card-title">Мета-промпт ответа</div>
         <div class="hint">Инструкция для текстовой модели: формат ответа, стиль, ограничения. Модель получает этот промпт как системное сообщение перед мета-промптом.</div>
         <textarea name="system_prompt" id="ta_sysprompt" spellcheck="true">{{ system_prompt }}</textarea>
@@ -17,17 +33,6 @@
         <div class="card-title">Суффикс промпта</div>
         <div class="hint">Текст, добавляемый к сюжету через два переноса строки перед отправкой в видео-модель. Поддерживает тег <code>{продолжительность}</code> — подставляет длительность видео в секундах. Например: «Ролик длится {продолжительность} секунд. Делай конец плавным.»</div>
         <textarea name="video_post_prompt" id="ta_postprompt" spellcheck="true" style="min-height:80px">{{ video_post_prompt }}</textarea>
-      </div>
-      <div class="card" style="margin-top:12px">
-        <div class="card-title">Выбор сюжета</div>
-        <div class="hint">Если включено, пайплайн берёт из пула только сюжеты с оценкой «хорошо». Если выключено — любой неиспользованный сюжет. Если подходящего нет — запускается AI-генерация.</div>
-        <label class="toggle-label" style="margin-top:8px;display:inline-flex;align-items:center;gap:8px;cursor:pointer">
-          <input type="checkbox" id="approve_stories_check"
-            {% if approve_stories %}checked{% endif %}
-            onchange="onApproveStoriesToggle(this)">
-          <span>Утверждать сюжеты</span>
-        </label>
-        <input type="hidden" id="approve_stories_hidden" name="approve_stories" value="{{ '1' if approve_stories else '0' }}">
       </div>
     </form>
 
