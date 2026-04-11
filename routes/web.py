@@ -27,6 +27,7 @@ from db import (
     db_get_user_by_login,
     db_upsert_story_draft,
     db_get_stories_list,
+    db_get_stories_pool,
     db_set_story_grade,
     db_create_story_generate_batch,
 )
@@ -258,6 +259,16 @@ def producer_stories():
     show_used = request.args.get("show_used", "1") != "0"
     show_bad = request.args.get("show_bad", "1") != "0"
     stories = db_get_stories_list(show_used=show_used, show_bad=show_bad)
+    return jsonify(stories)
+
+
+@bp.route("/producer/stories/pool", methods=["GET"])
+def producer_stories_pool():
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    if not (_has_slug("producer") or _has_slug("root")):
+        return jsonify({"error": "forbidden"}), 403
+    stories = db_get_stories_pool()
     return jsonify(stories)
 
 

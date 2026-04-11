@@ -570,6 +570,30 @@ def db_get_stories_list(show_used=True, show_bad=True):
         return []
 
 
+def db_get_stories_pool() -> list:
+    """Возвращает список неиспользованных сюжетов с grade='good' (пул для Режиссёра).
+    Неиспользованный = нет привязки к батчу с movie_id.
+    Возвращает [{id, title, content}], отсортированный по created_at DESC."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT id::text, title, content
+                    FROM stories
+                    WHERE grade = 'good'
+                      AND NOT EXISTS (
+                          SELECT 1 FROM batches b
+                          WHERE b.story_id = stories.id AND b.movie_id IS NOT NULL
+                      )
+                    ORDER BY created_at DESC
+                """)
+                rows = cur.fetchall()
+        return [{"id": row[0], "title": row[1] or "", "content": row[2] or ""} for row in rows]
+    except Exception as e:
+        print(f"[DB] Ошибка db_get_stories_pool: {e}")
+        return []
+
+
 def db_claim_unused_story_for_batch(batch_id: str, grade_required: bool) -> dict | None:
     """Атомарно захватывает неиспользованный сюжет из пула и назначает его батчу.
     Использует SELECT FOR UPDATE SKIP LOCKED — конкурентный вызов не получит ту же строку.

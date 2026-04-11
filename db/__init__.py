@@ -30,6 +30,7 @@ from .db import (
     db_set_batch_video_model,
     db_create_story,
     db_get_stories_list,
+    db_get_stories_pool,
     db_claim_unused_story_for_batch,
     db_set_story_grade,
     db_upsert_story_draft,

@@ -92,6 +92,14 @@
       </div>
       <input type="hidden" id="approve_stories_hidden" name="approve_stories" value="{{ '1' if approve_stories else '0' }}">
     </div>
+
+    <div class="card" style="margin-top:0">
+      <div class="card-title">Сюжет</div>
+      <select id="director-story-select" style="width:100%; margin-bottom:10px">
+        <option value="">Сгенерировать</option>
+      </select>
+      <textarea id="director-story-content" readonly placeholder="Сюжет" style="min-height:100px; width:100%; box-sizing:border-box; resize:vertical"></textarea>
+    </div>
   </div>
 
   <!-- ══ ИНФОРМАЦИЯ ══ -->
@@ -116,7 +124,51 @@
 <script src="/static/js/monitor.js"></script>
 <script src="/static/js/models.js"></script>
 <script src="/static/js/modals.js"></script>
-<script>switchPanel('screenwriter');</script>
+<script>
+(function() {
+  var _storyPoolLoaded = false;
+  var _storyPoolData = [];
+
+  function loadDirectorStoryPool() {
+    if (_storyPoolLoaded) return;
+    _storyPoolLoaded = true;
+    fetch('/producer/stories/pool')
+      .then(function(r) { return r.json(); })
+      .then(function(stories) {
+        if (!Array.isArray(stories)) { _storyPoolLoaded = false; return; }
+        _storyPoolData = stories;
+        var sel = document.getElementById('director-story-select');
+        if (!sel) return;
+        stories.forEach(function(s) {
+          var opt = document.createElement('option');
+          opt.value = s.id;
+          opt.textContent = s.title || ('Сюжет ' + s.id.slice(0, 8));
+          sel.appendChild(opt);
+        });
+      })
+      .catch(function() { _storyPoolLoaded = false; });
+  }
+
+  var _origSwitchPanel = window.switchPanel;
+  window.switchPanel = function(name) {
+    if (_origSwitchPanel) _origSwitchPanel(name);
+    if (name === 'director') loadDirectorStoryPool();
+  };
+
+  var sel = document.getElementById('director-story-select');
+  if (sel) {
+    sel.addEventListener('change', function() {
+      var ta = document.getElementById('director-story-content');
+      if (!ta) return;
+      var id = sel.value;
+      if (!id) { ta.value = ''; return; }
+      var story = _storyPoolData.find(function(s) { return s.id === id; });
+      ta.value = story ? (story.content || '') : '';
+    });
+  }
+})();
+switchPanel('screenwriter');
+</script>
 
 </body>
 </html>
