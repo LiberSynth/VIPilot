@@ -517,15 +517,23 @@ def db_create_story(model_id, title, result):
         return None
 
 
-def db_get_stories_list():
+def db_get_stories_list(show_used=True, show_bad=True):
     """Возвращает список всех сюжетов с полями id, title, content, grade, manual_changed, ai_generated, used, model_name.
     ai_generated = True если model_id IS NOT NULL.
     used = True если в batches есть запись с story_id=<id> AND movie_id IS NOT NULL.
-    model_name — имя модели из ai_models (NULL если модель не задана)."""
+    model_name — имя модели из ai_models (NULL если модель не задана).
+    show_used — если False, исключает сюжеты где used=True.
+    show_bad — если False, исключает сюжеты с grade='bad'."""
+    conditions = []
+    if not show_used:
+        conditions.append("NOT EXISTS (SELECT 1 FROM batches b WHERE b.story_id = s.id AND b.movie_id IS NOT NULL)")
+    if not show_bad:
+        conditions.append("(s.grade IS DISTINCT FROM 'bad')")
+    where_clause = ("WHERE " + " AND ".join(conditions)) if conditions else ""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
-                cur.execute("""
+                cur.execute(f"""
                     SELECT
                         s.id::text,
                         s.title,
@@ -540,6 +548,7 @@ def db_get_stories_list():
                         am.name AS model_name
                     FROM stories s
                     LEFT JOIN ai_models am ON am.id = s.model_id
+                    {where_clause}
                     ORDER BY used ASC, s.created_at DESC
                 """)
                 rows = cur.fetchall()

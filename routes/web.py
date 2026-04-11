@@ -227,6 +227,8 @@ def producer_page():
     video_duration      = max(1, min(60, int(db_get("video_duration", "6"))))
     video_fails_to_next = max(1, int(db_get("video_fails_to_next", "3")))
     approve_stories_prod = db_get("approve_stories", "0") == "1"
+    screenwriter_show_used = env_get("screenwriter_show_used", "0") == "1"
+    screenwriter_show_bad = env_get("screenwriter_show_bad", "1") != "0"
     resp = make_response(render_template(
         "producer.html",
         system_prompt=system_prompt,
@@ -238,6 +240,8 @@ def producer_page():
         approve_stories=approve_stories_prod,
         app_version=APP_VERSION,
         nav_modules=_nav_modules("producer"),
+        screenwriter_show_used=screenwriter_show_used,
+        screenwriter_show_bad=screenwriter_show_bad,
     ))
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     resp.headers["Pragma"] = "no-cache"
@@ -251,8 +255,26 @@ def producer_stories():
         return jsonify({"error": "unauthorized"}), 401
     if not (_has_slug("producer") or _has_slug("root")):
         return jsonify({"error": "forbidden"}), 403
-    stories = db_get_stories_list()
+    show_used = request.args.get("show_used", "1") != "0"
+    show_bad = request.args.get("show_bad", "1") != "0"
+    stories = db_get_stories_list(show_used=show_used, show_bad=show_bad)
     return jsonify(stories)
+
+
+@bp.route("/producer/env", methods=["POST"])
+def producer_env_set():
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    if not (_has_slug("producer") or _has_slug("root")):
+        return jsonify({"error": "forbidden"}), 403
+    data = request.get_json(silent=True) or {}
+    key = data.get("key", "")
+    value = data.get("value", "")
+    allowed_keys = {"screenwriter_show_used", "screenwriter_show_bad"}
+    if key not in allowed_keys:
+        return jsonify({"error": "invalid key"}), 400
+    env_set(key, str(value))
+    return jsonify({"ok": True})
 
 
 GRADE_CYCLE = ["good", "bad", None]

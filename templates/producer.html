@@ -56,7 +56,17 @@
     </div>
 
     <div class="card" style="margin-top:0">
-      <div class="card-title">Сюжеты</div>
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px">
+        <div class="card-title" style="margin-bottom:0">Сюжеты</div>
+        <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end">
+          <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:#ccc; cursor:pointer; user-select:none">
+            <input type="checkbox" id="filter-show-used" {% if screenwriter_show_used %}checked{% endif %}> Показывать использованные
+          </label>
+          <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:#ccc; cursor:pointer; user-select:none">
+            <input type="checkbox" id="filter-show-bad" {% if screenwriter_show_bad %}checked{% endif %}> Показывать плохие
+          </label>
+        </div>
+      </div>
       <div id="stories-list" class="stories-list">
         <div class="stories-loading">Загрузка...</div>
       </div>

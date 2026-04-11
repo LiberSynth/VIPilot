@@ -212,6 +212,15 @@ var setDraftStoryFromRecord;
     return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
+  function getFilterParams() {
+    var showUsed = document.getElementById('filter-show-used');
+    var showBad = document.getElementById('filter-show-bad');
+    var params = new URLSearchParams();
+    params.set('show_used', (showUsed && showUsed.checked) ? '1' : '0');
+    params.set('show_bad', (showBad && showBad.checked) ? '1' : '0');
+    return params.toString();
+  }
+
   window.loadStoriesList = function() {
     var container = document.getElementById('stories-list');
     if (!container) return;
@@ -219,13 +228,38 @@ var setDraftStoryFromRecord;
     if (!hasContent) {
       container.innerHTML = '<div class="stories-loading">Загрузка...</div>';
     }
-    fetch('/producer/stories')
+    fetch('/producer/stories?' + getFilterParams())
       .then(function(r) { return r.ok ? r.json() : []; })
       .then(renderStories)
       .catch(function() {
         if (container) container.innerHTML = '<div class="stories-empty">Ошибка загрузки</div>';
       });
   };
+
+  function initFilterCheckboxes() {
+    var showUsed = document.getElementById('filter-show-used');
+    var showBad = document.getElementById('filter-show-bad');
+    function onFilterChange(key, checkbox) {
+      var value = checkbox.checked ? '1' : '0';
+      fetch('/producer/env', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: key, value: value }),
+      }).then(function() {
+        window.loadStoriesList();
+      });
+    }
+    if (showUsed) {
+      showUsed.addEventListener('change', function() {
+        onFilterChange('screenwriter_show_used', showUsed);
+      });
+    }
+    if (showBad) {
+      showBad.addEventListener('change', function() {
+        onFilterChange('screenwriter_show_bad', showBad);
+      });
+    }
+  }
 
   function initNewStoryButton() {
     var btn = document.getElementById('btn-story-new');
@@ -240,10 +274,15 @@ var setDraftStoryFromRecord;
     });
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initNewStoryButton);
-  } else {
+  function initAll() {
     initNewStoryButton();
+    initFilterCheckboxes();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initAll);
+  } else {
+    initAll();
   }
 })();
 
