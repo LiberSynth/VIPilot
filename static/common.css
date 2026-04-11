@@ -258,6 +258,28 @@
   .toggle-wrap input:checked + .toggle-track { background: #f5a623; }
   .toggle-wrap input:checked + .toggle-track::after { transform: translateX(20px); }
 
+  .sw-filter-row {
+    display: flex; align-items: center; justify-content: flex-end;
+    gap: 7px; cursor: pointer;
+  }
+  .sw-filter-label { font-size: 12px; color: #666; user-select: none; }
+  .sw-filter-check {
+    appearance: none; -webkit-appearance: none;
+    width: 13px; height: 13px; flex-shrink: 0;
+    background: #1a1a24; border: 1px solid #3a3a50;
+    border-radius: 3px; cursor: pointer; position: relative;
+    transition: background .15s, border-color .15s;
+  }
+  .sw-filter-check:checked { background: #3a3a5a; border-color: #5a5a88; }
+  .sw-filter-check:checked::after {
+    content: ''; position: absolute;
+    left: 3px; top: 0;
+    width: 4px; height: 7px;
+    border: 1.5px solid #a0a0cc;
+    border-top: none; border-left: none;
+    transform: rotate(45deg);
+  }
+
   .card.emulation-active { border-color: rgba(245,166,35,.35); }
   .card.card--editing-new { border-color: rgba(245,166,35,.35); }
   .card.card--editing-existing { border-color: rgba(62,207,142,.35); }
