@@ -561,6 +561,53 @@ def db_get_stories_list():
         return []
 
 
+def db_claim_unused_story_for_batch(batch_id: str, grade_required: bool) -> dict | None:
+    """Атомарно захватывает неиспользованный сюжет из пула и назначает его батчу.
+    Использует SELECT FOR UPDATE SKIP LOCKED — конкурентный вызов не получит ту же строку.
+    В одной транзакции: блокируем кандидата, устанавливаем story_id и status='story_ready' батчу.
+    Возвращает словарь {id, title, content} при успехе или None если сюжет не найден."""
+    _assert_known_status('story_ready')
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                if grade_required:
+                    cur.execute("""
+                        SELECT id::text, title, content
+                        FROM stories
+                        WHERE id NOT IN (
+                            SELECT story_id FROM batches WHERE story_id IS NOT NULL
+                        )
+                          AND grade = 'good'
+                        ORDER BY created_at ASC
+                        LIMIT 1
+                        FOR UPDATE SKIP LOCKED
+                    """)
+                else:
+                    cur.execute("""
+                        SELECT id::text, title, content
+                        FROM stories
+                        WHERE id NOT IN (
+                            SELECT story_id FROM batches WHERE story_id IS NOT NULL
+                        )
+                        ORDER BY created_at ASC
+                        LIMIT 1
+                        FOR UPDATE SKIP LOCKED
+                    """)
+                row = cur.fetchone()
+                if not row:
+                    return None
+                story_id = row[0]
+                cur.execute(
+                    "UPDATE batches SET story_id = %s::uuid, status = 'story_ready' WHERE id = %s::uuid",
+                    (story_id, batch_id),
+                )
+            conn.commit()
+        return {"id": story_id, "title": row[1] or "", "content": row[2] or ""}
+    except Exception as e:
+        print(f"[DB] Ошибка db_claim_unused_story_for_batch: {e}")
+        return None
+
+
 def db_set_story_grade(story_id, grade):
     """Обновляет поле grade у сюжета.
     Возвращает True при успехе, False если запись не найдена или ошибка БД."""

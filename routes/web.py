@@ -136,6 +136,7 @@ def root_page():
     max_batch_threads   = max(1, min(32,   int(db_get("max_batch_threads", "2"))))
     story_fails_to_next = max(1, int(db_get("story_fails_to_next", "3")))
     video_fails_to_next = max(1, int(db_get("video_fails_to_next", "3")))
+    approve_stories     = db_get("approve_stories", "0") == "1"
 
     workflow_state = env_get("workflow_state", "running")
 
@@ -180,6 +181,7 @@ def root_page():
         max_batch_threads=max_batch_threads,
         story_fails_to_next=story_fails_to_next,
         video_fails_to_next=video_fails_to_next,
+        approve_stories=approve_stories,
         workflow_state=workflow_state,
         target_id=target_id,
         aspect_ratio_x=aspect_ratio_x,
@@ -216,6 +218,7 @@ def producer_page():
     story_fails_to_next = max(1, int(db_get("story_fails_to_next", "3")))
     video_duration      = max(1, min(60, int(db_get("video_duration", "6"))))
     video_fails_to_next = max(1, int(db_get("video_fails_to_next", "3")))
+    approve_stories_prod = db_get("approve_stories", "0") == "1"
     resp = make_response(render_template(
         "producer.html",
         system_prompt=system_prompt,
@@ -224,6 +227,7 @@ def producer_page():
         story_fails_to_next=story_fails_to_next,
         video_duration=video_duration,
         video_fails_to_next=video_fails_to_next,
+        approve_stories=approve_stories_prod,
         app_version=APP_VERSION,
     ))
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
@@ -401,6 +405,9 @@ def save():
             db_set("video_fails_to_next", str(max(1, int(video_fails_str))))
         except (ValueError, TypeError):
             pass
+
+    if "approve_stories" in request.form:
+        db_set("approve_stories", "1" if request.form.get("approve_stories") == "1" else "0")
 
     max_threads_str = request.form.get("max_batch_threads", "").strip()
     if max_threads_str:

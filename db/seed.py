@@ -32,7 +32,8 @@ def seed_db():
                         ('vk_publish_wall',   '1'),
                         ('video_duration',    '6'),
                         ('buffer_hours',      '24'),
-                        ('loop_interval',     '5')
+                        ('loop_interval',     '5'),
+                        ('approve_stories',   '0')
                     ON CONFLICT (key) DO NOTHING
                 """)
 

@@ -22,6 +22,7 @@ from db import (
     db_set_batch_status,
     db_claim_donor_batch,
     db_set_batch_story_ready_from_donor,
+    db_claim_unused_story_for_batch,
     env_get,
 )
 from log import db_log_pipeline, db_log_entry, db_log_update
@@ -157,6 +158,41 @@ def run(batch_id):
                 print(f"[story] Батч {batch_id[:8]}… — найден донор {donor_id}, батч → story_ready")
                 batch_done = True
                 return
+
+        if not is_probe and env_get('emulation_mode', '0') != '1':
+            approve_stories = db_get('approve_stories', '0') == '1'
+            grade_required  = approve_stories
+            condition_label = 'grade = good' if grade_required else 'любой grade (включая NULL)'
+            pool_log_id = db_log_pipeline(
+                'story', 'Поиск сюжета в пуле…',
+                status='running', batch_id=batch_id,
+            )
+            db_log_entry(
+                pool_log_id,
+                f"Настройка «Утверждать сюжеты»: {'включена' if approve_stories else 'выключена'}. "
+                f"Условие выборки: {condition_label}.",
+            )
+            pool_story = db_claim_unused_story_for_batch(batch_id, grade_required)
+            if pool_story:
+                pool_story_id    = pool_story['id']
+                pool_story_title = pool_story['title']
+                db_log_entry(
+                    pool_log_id,
+                    f"Найден сюжет из пула: id={pool_story_id[:8]}…, название=«{pool_story_title}». "
+                    f"AI-генерация не запускается.",
+                )
+                db_log_update(pool_log_id, f'Сюжет из пула: «{pool_story_title}»', 'ok')
+                print(f"[story] Батч {batch_id[:8]}… — сюжет из пула {pool_story_id[:8]}…, батч → story_ready")
+                batch_done = True
+                return
+            else:
+                reason = (
+                    f"Подходящий сюжет в пуле не найден (условие: {condition_label}). "
+                    f"Переход к AI-генерации."
+                )
+                db_log_entry(pool_log_id, reason)
+                db_log_update(pool_log_id, 'Сюжет в пуле не найден — запускается AI-генерация', 'ok')
+                print(f"[story] Батч {batch_id[:8]}… — {reason}")
 
         print(f"[story] Батч {batch_id[:8]}… ({target}) — начало генерации сюжета")
 

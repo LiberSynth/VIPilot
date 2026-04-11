@@ -73,7 +73,7 @@
 
   <!-- ══ ГЕНЕРАЦИЯ СЮЖЕТА ══ -->
   {% from 'common/panel_story.html' import panel_story %}
-  {{ panel_story(system_prompt, metaprompt, video_post_prompt, story_fails_to_next) }}
+  {{ panel_story(system_prompt, metaprompt, video_post_prompt, story_fails_to_next, approve_stories) }}
 
   <!-- ══ ГЕНЕРАЦИЯ ВИДЕО ══ -->
   {% from 'common/panel_video.html' import panel_video %}
