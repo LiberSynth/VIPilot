@@ -206,13 +206,13 @@
       <div class="card-title">Режимы</div>
       <div class="wf-row" style="margin-top:4px">
         <div style="flex:1">
-          <div class="toggle-label">Эмуляция</div>
-          <div class="hint" style="margin-top:2px">Генерация видео фиктивная.</div>
+          <div class="toggle-label">Утверждать сюжеты</div>
+          <div class="hint" style="margin-top:2px">Из пула берутся только сюжеты с оценкой «хорошо». Если подходящего нет — запускается AI-генерация.</div>
         </div>
-        <span id="emulation-badge" class="emulation-badge" {% if not emulation_mode %}style="display:none"{% endif %}>ВКЛ</span>
+        <span id="approve-stories-badge" class="emulation-badge" {% if not approve_stories %}style="display:none"{% endif %}>ВКЛ</span>
         <label class="toggle-wrap" style="margin-left:8px">
-          <input type="checkbox" id="emulation_check" {% if emulation_mode %}checked{% endif %}
-                 onchange="wfEmulation(this.checked)">
+          <input type="checkbox" id="approve_stories_check" {% if approve_stories %}checked{% endif %}
+                 onchange="onApproveStoriesToggle(this)">
           <span class="toggle-track"></span>
         </label>
       </div>
@@ -230,13 +230,13 @@
       </div>
       <div class="wf-row" style="margin-top:12px;padding-top:10px;border-top:1px solid #1e1e2e">
         <div style="flex:1">
-          <div class="toggle-label">Утверждать сюжеты</div>
-          <div class="hint" style="margin-top:2px">Из пула берутся только сюжеты с оценкой «хорошо». Если подходящего нет — запускается AI-генерация.</div>
+          <div class="toggle-label">Эмуляция</div>
+          <div class="hint" style="margin-top:2px">Генерация видео фиктивная.</div>
         </div>
-        <span id="approve-stories-badge" class="emulation-badge" {% if not approve_stories %}style="display:none"{% endif %}>ВКЛ</span>
+        <span id="emulation-badge" class="emulation-badge" {% if not emulation_mode %}style="display:none"{% endif %}>ВКЛ</span>
         <label class="toggle-wrap" style="margin-left:8px">
-          <input type="checkbox" id="approve_stories_check" {% if approve_stories %}checked{% endif %}
-                 onchange="onApproveStoriesToggle(this)">
+          <input type="checkbox" id="emulation_check" {% if emulation_mode %}checked{% endif %}
+                 onchange="wfEmulation(this.checked)">
           <span class="toggle-track"></span>
         </label>
       </div>
