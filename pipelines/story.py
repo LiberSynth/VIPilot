@@ -197,6 +197,14 @@ def run(batch_id):
                 batch_done = True
                 return
             else:
+                if approve_stories:
+                    msg = 'Пул сюжетов пуст (grade = good) — AI-генерация запрещена (approve_stories включён)'
+                    db_log_entry(pool_log_id, msg, level='error')
+                    db_log_update(pool_log_id, msg, 'error')
+                    db_set_batch_status(batch_id, 'error')
+                    print(f"[story] Батч {batch_id[:8]}… — {msg}")
+                    batch_done = True
+                    return
                 reason = (
                     f"Подходящий сюжет в пуле не найден (условие: {condition_label}). "
                     f"Переход к AI-генерации."
