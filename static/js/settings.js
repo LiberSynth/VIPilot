@@ -112,8 +112,10 @@ function setAR(x, y) {
 updateAR();
 
 function onApproveStoriesToggle(chk) {
-  const hid = document.getElementById('approve_stories_hidden');
-  if (hid) hid.value = chk.checked ? '1' : '0';
+  const hid   = document.getElementById('approve_stories_hidden');
+  const badge = document.getElementById('approve-stories-badge');
+  if (hid)   hid.value            = chk.checked ? '1' : '0';
+  if (badge) badge.style.display  = chk.checked ? ''  : 'none';
   saveStorySettings();
 }
 

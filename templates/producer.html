@@ -64,7 +64,24 @@
   </div>
 
   <!-- ══ РЕЖИССЕР ══ -->
-  <div id="panel-director" class="tab-panel"></div>
+  <div id="panel-director" class="tab-panel">
+    <div class="card" style="margin-top:12px">
+      <div class="card-title">Утверждение сюжета</div>
+      <div class="hint">Если включено, пайплайн берёт из пула только сюжеты с оценкой «хорошо». Если выключено — любой неиспользованный сюжет. Если подходящего нет — запускается AI-генерация.</div>
+      <div class="wf-row" style="margin-top:8px">
+        <div style="flex:1">
+          <div class="toggle-label">Утверждать сюжеты</div>
+        </div>
+        <label class="toggle-wrap" style="margin-left:8px">
+          <input type="checkbox" id="approve_stories_check"
+            {% if approve_stories %}checked{% endif %}
+            onchange="onApproveStoriesToggle(this)">
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+      <input type="hidden" id="approve_stories_hidden" name="approve_stories" value="{{ '1' if approve_stories else '0' }}">
+    </div>
+  </div>
 
   <!-- ══ ИНФОРМАЦИЯ ══ -->
   <div id="panel-info" class="tab-panel">
@@ -74,7 +91,7 @@
 
   <!-- ══ ГЕНЕРАЦИЯ СЮЖЕТА ══ -->
   {% from 'common/panel_story.html' import panel_story %}
-  {{ panel_story(system_prompt, metaprompt, video_post_prompt, story_fails_to_next, approve_stories) }}
+  {{ panel_story(system_prompt, metaprompt, video_post_prompt, story_fails_to_next) }}
 
   <!-- ══ ГЕНЕРАЦИЯ ВИДЕО ══ -->
   {% from 'common/panel_video.html' import panel_video %}

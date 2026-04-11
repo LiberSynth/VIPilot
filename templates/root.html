@@ -73,7 +73,7 @@
 
   <!-- ══ ГЕНЕРАЦИЯ СЮЖЕТА ══ -->
   {% from 'common/panel_story.html' import panel_story %}
-  {{ panel_story(system_prompt, metaprompt, video_post_prompt, story_fails_to_next, approve_stories) }}
+  {{ panel_story(system_prompt, metaprompt, video_post_prompt, story_fails_to_next) }}
 
   <!-- ══ ГЕНЕРАЦИЯ ВИДЕО ══ -->
   {% from 'common/panel_video.html' import panel_video %}
@@ -200,7 +200,11 @@
           <button class="wf-btn wf-restart" id="wf-btn-restart" onclick="openRestartDialog()">Перезапустить</button>
         </div>
       </div>
-      <div class="wf-row" style="margin-top:12px;padding-top:10px;border-top:1px solid #1e1e2e">
+    </div>
+
+    <div class="card" style="margin-top:12px">
+      <div class="card-title">Режимы</div>
+      <div class="wf-row" style="margin-top:4px">
         <div style="flex:1">
           <div class="toggle-label">Эмуляция</div>
           <div class="hint" style="margin-top:2px">Генерация видео фиктивная.</div>
@@ -221,6 +225,18 @@
         <label class="toggle-wrap" style="margin-left:8px">
           <input type="checkbox" id="use_donor_check" {% if use_donor %}checked{% endif %}
                  onchange="wfUseDonor(this.checked)">
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+      <div class="wf-row" style="margin-top:12px;padding-top:10px;border-top:1px solid #1e1e2e">
+        <div style="flex:1">
+          <div class="toggle-label">Утверждать сюжеты</div>
+          <div class="hint" style="margin-top:2px">Из пула берутся только сюжеты с оценкой «хорошо». Если подходящего нет — запускается AI-генерация.</div>
+        </div>
+        <span id="approve-stories-badge" class="emulation-badge" {% if not approve_stories %}style="display:none"{% endif %}>ВКЛ</span>
+        <label class="toggle-wrap" style="margin-left:8px">
+          <input type="checkbox" id="approve_stories_check" {% if approve_stories %}checked{% endif %}
+                 onchange="onApproveStoriesToggle(this)">
           <span class="toggle-track"></span>
         </label>
       </div>
