@@ -570,17 +570,22 @@ def db_get_stories_list(show_used=True, show_bad=True):
         return []
 
 
-def db_get_stories_pool() -> list:
-    """Возвращает список неиспользованных сюжетов с grade='good' (пул для Режиссёра).
+def db_get_stories_pool(grade_required: bool = True) -> list:
+    """Возвращает список неиспользованных сюжетов (пул для Режиссёра).
     Неиспользованный = нет привязки к батчу с movie_id.
+    grade_required=True — только grade='good'; False — исключая grade='bad'.
     Возвращает [{id, title, content}], отсортированный по created_at DESC."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
-                cur.execute("""
+                if grade_required:
+                    grade_clause = "grade = 'good'"
+                else:
+                    grade_clause = "(grade IS NULL OR grade != 'bad')"
+                cur.execute(f"""
                     SELECT id::text, title, content
                     FROM stories
-                    WHERE grade = 'good'
+                    WHERE {grade_clause}
                       AND NOT EXISTS (
                           SELECT 1 FROM batches b
                           WHERE b.story_id = stories.id AND b.movie_id IS NOT NULL

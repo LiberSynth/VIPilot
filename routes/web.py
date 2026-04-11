@@ -268,7 +268,8 @@ def producer_stories_pool():
         return jsonify({"error": "unauthorized"}), 401
     if not (_has_slug("producer") or _has_slug("root")):
         return jsonify({"error": "forbidden"}), 403
-    stories = db_get_stories_pool()
+    approve_stories = db_get("approve_stories", "0") == "1"
+    stories = db_get_stories_pool(grade_required=approve_stories)
     return jsonify(stories)
 
 
