@@ -159,7 +159,7 @@ def run(batch_id):
                 batch_done = True
                 return
 
-        if not is_probe and env_get('emulation_mode', '0') != '1':
+        if batch['type'] != 'story_probe' and env_get('emulation_mode', '0') != '1':
             approve_stories = db_get('approve_stories', '0') == '1'
             grade_required  = approve_stories
             condition_label = 'grade = good' if grade_required else 'любой grade (включая NULL)'
