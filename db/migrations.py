@@ -627,7 +627,7 @@ def _m013_sync_video_models(cur):
         ('kling-video/v1.6/standard', 4, False, '0.450 $/10сек'),
         ('veo2',                      5, False, '5.000 $/10сек'),
         ('minimax/video-01',          6, False, '0.830 $/10сек'),
-        ('ltx-video',                 7, False, None),
+        ('ltx-video',                 7, False, '0.02 $/видео'),
         ('wan-2.6',                   8, False, '1.500 $/10сек'),
     ]
     for name, order, active, price in video_updates:
@@ -1455,6 +1455,13 @@ def _m043_fix_remaining_probe_status(cur):
     """)
 
 
+def _m044_ltx_video_price(cur):
+    """Проставляет цену 0.02 $/видео для модели ltx-video."""
+    cur.execute("""
+        UPDATE ai_models SET price = '0.02 $/видео' WHERE name = 'ltx-video'
+    """)
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -1499,6 +1506,7 @@ MIGRATIONS = [
     (41, _m041_rename_story_error_to_error),
     (42, _m042_donor_refactor),
     (43, _m043_fix_remaining_probe_status),
+    (44, _m044_ltx_video_price),
 ]
 
 
