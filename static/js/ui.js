@@ -286,13 +286,6 @@ function switchPanel(name) {
   const titleEl = document.getElementById('page-title');
   if (titleEl) titleEl.textContent = PANEL_TITLES[name] || name;
   closeSidebar();
-  if (name === 'log') {
-    monitorClockStart('monitor-clock');
-  } else if (name === 'pipeline') {
-    monitorClockStart('schedule-clock');
-  } else {
-    monitorClockStop();
-  }
   if (name === 'request') {
     if (typeof loadModels === 'function') loadModels();
   }
@@ -313,10 +306,9 @@ function switchPanel(name) {
 
 let _monitorClockTimer = null;
 let _monitorClockOffset = 0;
-let _monitorClockActiveId = null;
 
 function monitorClockTick() {
-  const el = _monitorClockActiveId ? document.getElementById(_monitorClockActiveId) : null;
+  const el = document.getElementById('header-clock');
   if (!el) return;
   const serverNow = Date.now() + _monitorClockOffset;
   const msk = new Date(serverNow + 3 * 60 * 60 * 1000);
@@ -328,48 +320,29 @@ function monitorClockTick() {
     pad(msk.getUTCHours()) + ':' +
     pad(msk.getUTCMinutes()) + ':' +
     pad(msk.getUTCSeconds());
-  const timeEl = el.querySelector('[id$="-clock-time"]');
-  if (timeEl) timeEl.textContent = timeStr;
-  else el.textContent = timeStr;
+  el.textContent = timeStr;
 }
 
-function monitorClockStart(elId) {
-  monitorClockStop();
-  const el = document.getElementById(elId);
-  if (!el) return;
-  _monitorClockActiveId = elId;
+function monitorClockStart() {
+  if (_monitorClockTimer) return;
   const t0 = Date.now();
   fetch('/api/time').then(r => r.json()).then(d => {
     const t1 = Date.now();
     _monitorClockOffset = d.utc_ms - Math.round((t0 + t1) / 2);
     monitorClockTick();
-    el.style.display = 'flex';
     if (!_monitorClockTimer) _monitorClockTimer = setInterval(monitorClockTick, 1000);
   }).catch(() => {
     monitorClockTick();
-    el.style.display = 'flex';
     if (!_monitorClockTimer) _monitorClockTimer = setInterval(monitorClockTick, 1000);
   });
 }
 
-function monitorClockStop() {
-  if (_monitorClockTimer) { clearInterval(_monitorClockTimer); _monitorClockTimer = null; }
-  if (_monitorClockActiveId) {
-    const el = document.getElementById(_monitorClockActiveId);
-    if (el) el.style.display = 'none';
-    _monitorClockActiveId = null;
-  }
-}
-
 (function() {
+  monitorClockStart();
   const tab = new URLSearchParams(window.location.search).get('tab');
   if (tab && document.getElementById('panel-' + tab)) {
     switchPanel(tab);
     history.replaceState(null, '', window.location.pathname);
-  } else {
-    const active = document.querySelector('.tab-panel.active');
-    if (active && active.id === 'panel-pipeline') monitorClockStart('schedule-clock');
-    else if (active && active.id === 'panel-log') monitorClockStart('monitor-clock');
   }
 })();
 

@@ -26,6 +26,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    position: relative;
   }
   .header-left { display: flex; align-items: center; gap: 10px; }
   .header-icon {
@@ -36,23 +37,20 @@
     font-size: 16px;
   }
   h1 { font-size: 16px; font-weight: 700; color: #fff; }
-  #monitor-clock,
-  #schedule-clock {
-    display: none;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 8px;
+  .header-center {
+    position: absolute; left: 50%; transform: translateX(-50%);
+    display: flex; align-items: center; justify-content: center;
+    pointer-events: none;
     font-size: 12px; font-weight: 500; color: #aaa;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: 0.04em;
-    margin-bottom: 10px;
+    font-variant-numeric: tabular-nums; letter-spacing: 0.04em;
+    white-space: nowrap;
   }
-  .header-right { display: flex; align-items: center; gap: 10px; }
-  .logout {
-    font-size: 12px; color: #888; text-decoration: none;
-    padding: 5px 10px; border: 1px solid #2a2a38; border-radius: 7px;
+  .header-right { display: flex; align-items: center; gap: 6px; }
+  .header-nav-btn {
+    width: 30px; height: 30px;
+    text-decoration: none;
   }
-  .logout:active { background: #2a2a38; }
+  .header-nav-btn svg { width: 14px; height: 14px; }
 
   .hamburger {
     display: flex; flex-direction: column; justify-content: center;
@@ -402,6 +400,7 @@
   @media (max-width: 520px) {
     .wf-btns { margin-left: 0; width: 100%; }
     .wf-btn  { flex: 1; text-align: center; padding: 9px 8px; font-size: 12px; }
+    .header-center { font-size: 11px; }
   }
 
   /* ── Monitor ── */

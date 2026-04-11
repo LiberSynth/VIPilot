@@ -57,6 +57,13 @@ def _role_url(role):
     return url_for("web.root_page") if role["slug"] == "root" else f"/{role['slug']}"
 
 
+def _nav_modules(current_slug):
+    roles = _get_session_roles()
+    if len(roles) < 2:
+        return []
+    return [r for r in roles if r["slug"] != current_slug]
+
+
 def _redirect_after_login():
     roles = _get_session_roles()
     if len(roles) == 1:
@@ -193,6 +200,7 @@ def root_page():
         dzen_active=dzen_active,
         publish_order=publish_order,
         app_version=APP_VERSION,
+        nav_modules=_nav_modules("root"),
     ))
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     resp.headers["Pragma"] = "no-cache"
@@ -229,6 +237,7 @@ def producer_page():
         video_fails_to_next=video_fails_to_next,
         approve_stories=approve_stories_prod,
         app_version=APP_VERSION,
+        nav_modules=_nav_modules("producer"),
     ))
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     resp.headers["Pragma"] = "no-cache"
@@ -447,7 +456,7 @@ def module_page(slug):
     from jinja2 import TemplateNotFound
     from utils.version import VERSION as APP_VERSION
     try:
-        resp = make_response(render_template(f"{slug}.html", app_version=APP_VERSION))
+        resp = make_response(render_template(f"{slug}.html", app_version=APP_VERSION, nav_modules=_nav_modules(slug)))
     except TemplateNotFound:
         return redirect(url_for("web.select_module"))
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"

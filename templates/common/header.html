@@ -19,8 +19,34 @@
       </div>
       <h1 id="page-title">{{ page_title | default('') }}</h1>
     </div>
+    <div class="header-center">
+      <span id="header-clock"></span>
+    </div>
     <div class="header-right">
-      <a href="/logout" class="logout">Выйти</a>
+      {% if nav_modules is defined and nav_modules %}
+        {% for mod in nav_modules %}
+          {% if mod.slug == 'root' %}
+            <a href="/web" class="cycle-float-btn header-nav-btn" title="Настройки">
+              <svg viewBox="0 0 16 16"><path d="M8 10.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"/><path d="M8 1.5v1.2M8 13.3v1.2M1.5 8h1.2M13.3 8h1.2M3.4 3.4l.85.85M11.75 11.75l.85.85M3.4 12.6l.85-.85M11.75 4.25l.85-.85"/></svg>
+            </a>
+          {% elif mod.slug == 'producer' %}
+            <a href="/producer" class="cycle-float-btn header-nav-btn" title="Продюсер">
+              <svg viewBox="0 0 16 16"><path d="M10.5 2.5l3 3L5 14H2v-3L10.5 2.5z"/></svg>
+            </a>
+          {% elif mod.slug == 'operator' %}
+            <a href="/operator" class="cycle-float-btn header-nav-btn" title="Оператор">
+              <svg viewBox="0 0 16 16"><rect x="1" y="2" width="14" height="9" rx="1.5"/><path d="M5 14h6M8 11v3"/></svg>
+            </a>
+          {% else %}
+            <a href="/{{ mod.slug }}" class="cycle-float-btn header-nav-btn" title="{{ mod.slug }}">
+              <svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/></svg>
+            </a>
+          {% endif %}
+        {% endfor %}
+      {% endif %}
+      <button class="cycle-float-btn header-nav-btn" title="Выйти" onclick="location.href='/logout'">
+        <svg viewBox="0 0 16 16"><path d="M6 2H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/><polyline points="10,5 13,8 10,11"/><line x1="13" y1="8" x2="5" y2="8"/></svg>
+      </button>
     </div>
   </div>
 </header>
