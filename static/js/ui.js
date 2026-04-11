@@ -113,13 +113,32 @@ var setDraftStoryFromRecord;
   };
   function gradeKey(g) { return g === null || g === undefined ? 'null' : g; }
 
+  function updateStoriesCount(n) {
+    var el = document.getElementById('stories-count');
+    if (!el) return;
+    var mod10 = n % 10, mod100 = n % 100;
+    var word;
+    if (mod100 >= 11 && mod100 <= 14) {
+      word = 'записей';
+    } else if (mod10 === 1) {
+      word = 'запись';
+    } else if (mod10 >= 2 && mod10 <= 4) {
+      word = 'записи';
+    } else {
+      word = 'записей';
+    }
+    el.textContent = n + ' ' + word;
+  }
+
   function renderStories(stories) {
     var container = document.getElementById('stories-list');
     if (!container) return;
     if (!stories || stories.length === 0) {
+      updateStoriesCount(0);
       container.innerHTML = '<div class="stories-empty">Нет сюжетов</div>';
       return;
     }
+    updateStoriesCount(stories.length);
     var html = '';
     for (var i = 0; i < stories.length; i++) {
       var s = stories[i];
@@ -233,6 +252,8 @@ var setDraftStoryFromRecord;
       .then(renderStories)
       .catch(function() {
         if (container) container.innerHTML = '<div class="stories-empty">Ошибка загрузки</div>';
+        var countEl = document.getElementById('stories-count');
+        if (countEl) countEl.textContent = '—';
       });
   };
 

@@ -56,16 +56,23 @@
     </div>
 
     <div class="card" style="margin-top:0">
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px">
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:4px">
         <div class="card-title" style="margin-bottom:0">Сюжеты</div>
-        <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end">
-          <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:#ccc; cursor:pointer; user-select:none">
-            <input type="checkbox" id="filter-show-used" {% if screenwriter_show_used %}checked{% endif %}> Показывать использованные
-          </label>
-          <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:#ccc; cursor:pointer; user-select:none">
-            <input type="checkbox" id="filter-show-bad" {% if screenwriter_show_bad %}checked{% endif %}> Показывать плохие
-          </label>
-        </div>
+        <span id="stories-count" style="font-size:12px; color:#888; background:rgba(255,255,255,.07); border-radius:10px; padding:1px 8px;"></span>
+      </div>
+      <div class="toggle-row" style="margin-bottom:4px">
+        <span class="toggle-label">Показывать использованные</span>
+        <label class="toggle-wrap" style="margin-left:8px">
+          <input type="checkbox" id="filter-show-used" {% if screenwriter_show_used %}checked{% endif %}>
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+      <div class="toggle-row" style="margin-bottom:8px">
+        <span class="toggle-label">Показывать плохие</span>
+        <label class="toggle-wrap" style="margin-left:8px">
+          <input type="checkbox" id="filter-show-bad" {% if screenwriter_show_bad %}checked{% endif %}>
+          <span class="toggle-track"></span>
+        </label>
       </div>
       <div id="stories-list" class="stories-list">
         <div class="stories-loading">Загрузка...</div>
