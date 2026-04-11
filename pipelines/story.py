@@ -135,11 +135,22 @@ def run(batch_id):
 
         if not is_probe and env_get('emulation_mode', '0') != '1' and env_get('use_donor', '1') == '1' \
                 and batch.get('story_id') is None:
-            donor_result = db_claim_donor_batch()
-            if donor_result:
-                donor_id, donor_story_id = donor_result
-                if not db_set_batch_story_ready_from_donor(batch_id, donor_id, donor_story_id):
-                    msg = f'Не удалось записать donor_batch_id для батча {batch_id[:8]}… — донор {donor_id[:8]}…'
+            batch_data = batch.get('data') or {}
+            donor_batch_id = batch_data.get('donor_batch_id') if isinstance(batch_data, dict) else None
+
+            if donor_batch_id is None:
+                db_claim_donor_batch(batch_id)
+                batch = db_get_batch_by_id(batch_id)
+                if not batch:
+                    return
+                batch_data = batch.get('data') or {}
+                donor_batch_id = batch_data.get('donor_batch_id') if isinstance(batch_data, dict) else None
+
+            if donor_batch_id:
+                donor_batch = db_get_batch_by_id(donor_batch_id)
+                donor_story_id = str(donor_batch['story_id']) if donor_batch and donor_batch.get('story_id') else None
+                if not db_set_batch_story_ready_from_donor(batch_id, donor_batch_id, donor_story_id):
+                    msg = f'Не удалось записать donor_batch_id для батча {batch_id[:8]}… — донор {donor_batch_id[:8]}…'
                     log_id = db_log_pipeline(
                         'story', msg,
                         status='error', batch_id=batch_id,
@@ -155,7 +166,7 @@ def run(batch_id):
                 )
                 if log_id:
                     db_log_entry(log_id, detail)
-                print(f"[story] Батч {batch_id[:8]}… — найден донор {donor_id}, батч → story_ready")
+                print(f"[story] Батч {batch_id[:8]}… — найден донор {donor_batch_id}, батч → story_ready")
                 batch_done = True
                 return
 

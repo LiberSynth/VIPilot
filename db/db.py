@@ -1090,82 +1090,6 @@ def db_get_batch_video_data(batch_id) -> bytes | None:
         return None
 
 
-def db_steal_video_from_cancelled(batch_id) -> str | None:
-    """Ищет самый старый батч-донор с видео:
-    — отменённые батчи (status = 'cancelled')
-    — завершённые пробные батчи (status = 'probe', type = 'movie_probe')
-    Донором считается батч у которого есть movies.transcoded_data или movies.raw_data.
-    Если есть транскодированное — переносит его, статус получателя → transcode_ready.
-    Если только оригинал — переносит его, статус получателя → video_ready.
-    У донора обнуляет перенесённое поле. Возвращает id донора (str) или None."""
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT b.id, m.transcoded_data, m.raw_data, m.url, b.story_id::text, b.movie_id, m.id AS mid
-                    FROM batches b
-                    JOIN movies m ON m.id = b.movie_id
-                    WHERE (m.transcoded_data IS NOT NULL OR m.raw_data IS NOT NULL)
-                      AND (
-                        b.status = 'cancelled'
-                        OR (b.status = 'probe' AND b.type = 'movie_probe')
-                      )
-                    ORDER BY b.created_at ASC
-                    LIMIT 1
-                    FOR UPDATE OF b SKIP LOCKED
-                """)
-                donor = cur.fetchone()
-                if not donor:
-                    return None
-
-                donor_id, video_data_transcoded, video_data_original, video_url, donor_story_id, donor_movie_id, donor_mid = donor
-
-                if video_data_transcoded is not None:
-                    # Транскодированное есть — переносим его, получатель сразу в transcode_ready
-                    cur.execute("""
-                        INSERT INTO movies (url, transcoded_data)
-                        VALUES (%s, %s)
-                        RETURNING id
-                    """, (video_url, psycopg2.Binary(bytes(video_data_transcoded))))
-                    new_movie_id = cur.fetchone()[0]
-                    cur.execute("""
-                        UPDATE batches
-                        SET status   = 'transcode_ready',
-                            movie_id = %s,
-                            story_id = COALESCE(story_id, %s)
-                        WHERE id = %s
-                    """, (new_movie_id, donor_story_id, batch_id))
-                    cur.execute(
-                        "UPDATE movies SET transcoded_data = NULL WHERE id = %s",
-                        (donor_mid,),
-                    )
-                else:
-                    # Только оригинал — переносим его, получатель идёт на транскодирование
-                    cur.execute("""
-                        INSERT INTO movies (url, raw_data)
-                        VALUES (%s, %s)
-                        RETURNING id
-                    """, (video_url, psycopg2.Binary(bytes(video_data_original))))
-                    new_movie_id = cur.fetchone()[0]
-                    cur.execute("""
-                        UPDATE batches
-                        SET status   = 'video_ready',
-                            movie_id = %s,
-                            story_id = COALESCE(story_id, %s)
-                        WHERE id = %s
-                    """, (new_movie_id, donor_story_id, batch_id))
-                    cur.execute(
-                        "UPDATE movies SET raw_data = NULL WHERE id = %s",
-                        (donor_mid,),
-                    )
-
-            conn.commit()
-        return str(donor_id)
-    except Exception as e:
-        print(f"[DB] Ошибка db_steal_video_from_cancelled: {e}")
-        return None
-
-
 def db_set_batch_story_ready_from_donor(batch_id: str, donor_batch_id: str, donor_story_id: str | None) -> bool:
     """Записывает donor_batch_id в batches.data, устанавливает story_id через COALESCE
     (не перезаписывает, если у батча уже есть свой story_id), переводит батч в story_ready.
@@ -1200,68 +1124,23 @@ def db_set_batch_story_ready_from_donor(batch_id: str, donor_batch_id: str, dono
         return False
 
 
-def db_record_donor_batch_id(batch_id: str, donor_batch_id: str) -> bool:
-    """Записывает donor_batch_id в batches.data без изменения story_id и статуса.
-    Используется в story.py, чтобы зафиксировать донора видео ДО генерации собственного сюжета."""
+def db_claim_donor_batch(batch_id: str) -> None:
+    """Вызывает ХП claim_donor_batch(batch_id): атомарно захватывает донора
+    (pg_advisory_xact_lock), помечает его status='donated', записывает
+    donor_batch_id в batches.data текущего батча. Ничего не возвращает."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    UPDATE batches
-                    SET data = COALESCE(data, '{}'::jsonb) || jsonb_build_object('donor_batch_id', %s)
-                    WHERE id = %s
-                    """,
-                    (donor_batch_id, batch_id),
-                )
+                cur.execute("SELECT claim_donor_batch(%s::uuid)", (batch_id,))
             conn.commit()
-        return True
-    except Exception as e:
-        print(f"[DB] Ошибка db_record_donor_batch_id: {e}")
-        return False
-
-
-def db_claim_donor_batch() -> tuple | None:
-    """Атомарно захватывает батч-донор: SELECT + UPDATE status='donated' в одной транзакции.
-    Пока транзакция открыта, строка заблокирована (FOR UPDATE SKIP LOCKED) — конкурентный вызов
-    получит 0 строк и вернёт None. После коммита донор уже в статусе 'donated' и не виден
-    другим вызовам (фильтр по cancelled/probe).
-    Возвращает (donor_id: str, donor_story_id: str | None) или None."""
-    _assert_known_status('donated')
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT b.id::text, b.story_id::text
-                    FROM batches b
-                    JOIN movies m ON m.id = b.movie_id
-                    WHERE (m.transcoded_data IS NOT NULL OR m.raw_data IS NOT NULL)
-                      AND (
-                        b.status = 'cancelled'
-                        OR (b.status = 'probe' AND b.type = 'movie_probe')
-                      )
-                    ORDER BY b.created_at ASC
-                    LIMIT 1
-                    FOR UPDATE OF b SKIP LOCKED
-                """)
-                row = cur.fetchone()
-                if not row:
-                    return None
-                donor_id = row[0]
-                cur.execute(
-                    "UPDATE batches SET status = 'donated' WHERE id = %s::uuid",
-                    (donor_id,),
-                )
-            conn.commit()
-        return (donor_id, row[1])
     except Exception as e:
         print(f"[DB] Ошибка db_claim_donor_batch: {e}")
-        return None
 
 
-def db_steal_video_from_donor(donor_batch_id: str, batch_id: str) -> str | None:
+def db_get_movie_from_donor(donor_batch_id: str, batch_id: str) -> str | None:
     """Переносит movie_id от донора (donor_batch_id) в батч-получатель (batch_id).
-    У донора обнуляет movie_id. Статус получателя:
+    Донор идентифицирован по конкретному ID из batches.data, дополнительная
+    блокировка избыточна. У донора обнуляет movie_id. Статус получателя:
       - transcode_ready если у movie есть transcoded_data
       - video_ready если только raw_data
     story_id получателя НЕ перезаписывается (проставлен на этапе story).
@@ -1276,8 +1155,6 @@ def db_steal_video_from_donor(donor_batch_id: str, batch_id: str) -> str | None:
                     FROM batches b
                     JOIN movies m ON m.id = b.movie_id
                     WHERE b.id = %s::uuid
-                      AND b.status = 'donated'
-                    FOR UPDATE OF b SKIP LOCKED
                 """, (donor_batch_id,))
                 donor = cur.fetchone()
                 if not donor:
@@ -1292,6 +1169,8 @@ def db_steal_video_from_donor(donor_batch_id: str, batch_id: str) -> str | None:
                         status   = %s
                     WHERE id = %s::uuid AND movie_id IS NULL
                 """, (donor_movie_id, new_status, batch_id))
+                if cur.rowcount == 0:
+                    return None
 
                 cur.execute(
                     "UPDATE batches SET movie_id = NULL WHERE id = %s::uuid",
@@ -1301,25 +1180,16 @@ def db_steal_video_from_donor(donor_batch_id: str, batch_id: str) -> str | None:
             conn.commit()
         return str(donor_id)
     except Exception as e:
-        print(f"[DB] Ошибка db_steal_video_from_donor: {e}")
+        print(f"[DB] Ошибка db_get_movie_from_donor: {e}")
         return None
 
 
 def db_get_donor_count() -> int:
-    """Возвращает количество батчей-доноров (отменённые или пробные с видео)."""
+    """Вызывает PostgreSQL-функцию get_donor_count() — возвращает количество доступных доноров."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT COUNT(*)
-                    FROM batches b
-                    JOIN movies m ON m.id = b.movie_id
-                    WHERE (m.transcoded_data IS NOT NULL OR m.raw_data IS NOT NULL)
-                      AND (
-                        b.status = 'cancelled'
-                        OR (b.status = 'probe' AND b.type = 'movie_probe')
-                      )
-                """)
+                cur.execute("SELECT get_donor_count()")
                 return cur.fetchone()[0]
     except Exception as e:
         print(f"[DB] Ошибка db_get_donor_count: {e}")
@@ -1411,20 +1281,20 @@ def db_get_batch_logs(batch_id):
         return None
 
 
-def db_set_batch_probe(batch_id):
-    """Переводит батч в status='probe' и ставит completed_at."""
-    _assert_known_status('probe')
+def db_set_batch_movie_probe(batch_id):
+    """Переводит батч в status='movie_probe' и ставит completed_at."""
+    _assert_known_status('movie_probe')
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "UPDATE batches SET status = 'probe', completed_at = now() WHERE id = %s",
+                    "UPDATE batches SET status = 'movie_probe', completed_at = now() WHERE id = %s",
                     (batch_id,),
                 )
             conn.commit()
         return True
     except Exception as e:
-        print(f"[DB] Ошибка db_set_batch_probe: {e}")
+        print(f"[DB] Ошибка db_set_batch_movie_probe: {e}")
         return False
 
 
@@ -1892,12 +1762,12 @@ KNOWN_BATCH_STATUSES = frozenset({
     'video_ready', 'transcoding',
     # publish pipeline entry point
     'transcode_ready',
-    # terminal
-    'cancelled', 'error', 'probe', 'story_probe',
+    # terminal (non-final)
+    'story_probe',
+    # terminal (final)
+    'cancelled', 'error', 'movie_probe', 'donated',
     'video_error', 'transcode_error', 'publish_error', 'published',
     'published_partially', 'fatal_error',
-    # donor mode: донор атомарно захвачен, ожидает переноса story/video
-    'donated',
 })
 
 _COMPOSITE_STATUS_SUFFIXES = ('.posting', '.published', '.pending', '.failed')
@@ -2060,7 +1930,7 @@ def db_set_batch_transcoding_by_id(batch_id):
 
 def db_cleanup_batches(batch_lifetime_days: int) -> int:
     """Удаляет батчи со статусом 'published'/'cancelled', а также пробные батчи
-    (type = 'movie_probe' или 'story_probe') завершённые (probe/story_probe), старше batch_lifetime_days.
+    (type = 'movie_probe' или 'story_probe') завершённые (movie_probe/story_probe), старше batch_lifetime_days.
     Удаляет связанные логи. Истории (stories) не удаляет — они являются заделом сюжетов.
     Возвращает количество удалённых батчей."""
     try:
@@ -2070,7 +1940,7 @@ def db_cleanup_batches(batch_lifetime_days: int) -> int:
                     SELECT id FROM batches
                     WHERE (
                         status IN ('published', 'cancelled')
-                        OR (type = 'movie_probe' AND status = 'probe')
+                        OR (type = 'movie_probe' AND status = 'movie_probe')
                         OR (type = 'story_probe' AND status = 'story_probe')
                     )
                       AND completed_at < now() - make_interval(days => %s)

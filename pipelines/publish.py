@@ -20,7 +20,7 @@ from db import (
     db_get_batch_video_data,
     db_get_batch_original_video,
     db_get_story_title,
-    db_set_batch_probe,
+    db_set_batch_movie_probe,
     db_set_batch_published,
     db_set_batch_published_partially,
     db_set_batch_publish_error,
@@ -166,7 +166,7 @@ def run(batch_id):
                 log_id = db_log_pipeline('publish', 'Публикация (пробный)…',
                                          status='running', batch_id=batch_id)
                 db_log_entry(log_id, 'Пробный батч — публикация на платформу не выполняется')
-                db_set_batch_probe(batch_id)
+                db_set_batch_movie_probe(batch_id)
                 db_log_update(log_id, 'Без публикации (пробный батч)', 'ok')
                 print(f"[publish] Батч {batch_id[:8]}… пробный — публикация пропущена")
                 return

@@ -1376,6 +1376,85 @@ def _m041_rename_story_error_to_error(cur):
     """)
 
 
+def _m042_donor_refactor(cur):
+    """
+    Task #91: Рефакторинг механизма донора.
+
+    1. Создаёт ХП claim_donor_batch(batch_id uuid) — атомарный захват донора
+       с pg_advisory_xact_lock. Помечает донора как 'donated', записывает
+       donor_batch_id в batches.data текущего батча.
+    2. Создаёт функцию get_donor_count() — счётчик доступных доноров.
+    3. Переименовывает статус 'probe' → 'movie_probe' у существующих батчей.
+    """
+    cur.execute("""
+        CREATE OR REPLACE FUNCTION claim_donor_batch(p_batch_id uuid)
+        RETURNS void LANGUAGE plpgsql AS $$
+        DECLARE
+            v_donor_id uuid;
+        BEGIN
+            PERFORM pg_advisory_xact_lock(hashtext('donor_claim'));
+
+            SELECT b.id INTO v_donor_id
+            FROM batches b
+            JOIN movies m ON m.id = b.movie_id
+            WHERE (m.transcoded_data IS NOT NULL OR m.raw_data IS NOT NULL)
+              AND b.status IN ('cancelled', 'movie_probe')
+            ORDER BY b.created_at ASC
+            LIMIT 1
+            FOR UPDATE OF b;
+
+            IF v_donor_id IS NULL THEN
+                RETURN;
+            END IF;
+
+            UPDATE batches SET status = 'donated' WHERE id = v_donor_id;
+
+            UPDATE batches
+            SET data = COALESCE(data, '{}'::jsonb)
+                       || jsonb_build_object('donor_batch_id', v_donor_id::text)
+            WHERE id = p_batch_id;
+        END;
+        $$
+    """)
+
+    cur.execute("""
+        CREATE OR REPLACE FUNCTION get_donor_count()
+        RETURNS bigint LANGUAGE plpgsql AS $$
+        DECLARE
+            v_count bigint;
+        BEGIN
+            PERFORM pg_advisory_xact_lock(hashtext('donor_claim'));
+
+            SELECT COUNT(*) INTO v_count
+            FROM batches b
+            JOIN movies m ON m.id = b.movie_id
+            WHERE (m.transcoded_data IS NOT NULL OR m.raw_data IS NOT NULL)
+              AND b.status IN ('cancelled', 'movie_probe');
+
+            RETURN v_count;
+        END;
+        $$
+    """)
+
+    cur.execute("""
+        UPDATE batches SET status = 'movie_probe'
+        WHERE status = 'probe'
+    """)
+
+
+def _m043_fix_remaining_probe_status(cur):
+    """
+    Страховочная миграция: конвертирует все оставшиеся записи 'probe' → 'movie_probe'.
+    m042 уже делает это, но конкретная DB содержала батчи с status='probe' и type,
+    не совпадающим с 'movie_probe' (исторические данные из m021). m043 гарантирует
+    полную чистку независимо от type батча. Идемпотентно.
+    """
+    cur.execute("""
+        UPDATE batches SET status = 'movie_probe'
+        WHERE status = 'probe'
+    """)
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -1418,6 +1497,8 @@ MIGRATIONS = [
     (39, _m039_delete_qwen36_plus_preview),
     (40, _m040_rename_donating_to_donated),
     (41, _m041_rename_story_error_to_error),
+    (42, _m042_donor_refactor),
+    (43, _m043_fix_remaining_probe_status),
 ]
 
 

@@ -33,7 +33,7 @@ from db import (
     db_set_batch_original_video,
     db_get_random_real_original_video,
     db_set_batch_story_id,
-    db_steal_video_from_donor,
+    db_get_movie_from_donor,
 )
 from log import db_log_pipeline, db_log_entry, db_log_update
 from pipelines.base import check_cancelled, handle_critical_error
@@ -202,7 +202,7 @@ def run(batch_id):
                         'video', 'Видео получено от донора',
                         status='running', batch_id=batch_id,
                     )
-                    result_donor_id = db_steal_video_from_donor(donor_batch_id, batch_id)
+                    result_donor_id = db_get_movie_from_donor(donor_batch_id, batch_id)
                     if result_donor_id:
                         updated = db_get_batch_by_id(batch_id)
                         new_status = updated['status'] if updated else None
