@@ -540,7 +540,7 @@ def db_get_stories_list():
                         am.name AS model_name
                     FROM stories s
                     LEFT JOIN ai_models am ON am.id = s.model_id
-                    ORDER BY s.created_at DESC
+                    ORDER BY used ASC, s.created_at DESC
                 """)
                 rows = cur.fetchall()
         return [
