@@ -174,7 +174,7 @@ def run(batch_id):
             if parsed is None:
                 msg = 'Батч отменён — нет активных таргетов'
                 db_set_batch_cancelled(batch_id)
-                db_log_pipeline('publish', msg, status='прервана', batch_id=batch_id)
+                db_log_pipeline('publish', msg, status='cancelled', batch_id=batch_id)
                 pipeline_log(None, f"[publish] {msg} (батч {batch_id[:8]}…)")
             else:
                 msg = 'Нет активных таргетов — публикация невозможна'
@@ -189,7 +189,7 @@ def run(batch_id):
             if parsed is None:
                 msg = 'Батч отменён — нет методов публикации в конфиге таргетов'
                 db_set_batch_cancelled(batch_id)
-                db_log_pipeline('publish', msg, status='прервана', batch_id=batch_id)
+                db_log_pipeline('publish', msg, status='cancelled', batch_id=batch_id)
                 pipeline_log(None, f"[publish] {msg} (батч {batch_id[:8]}…)")
             else:
                 msg = 'Нет методов публикации в конфиге таргетов'

@@ -56,7 +56,7 @@ def check_cancelled(pipeline_name: str, batch_id: str, batch: dict) -> bool:
         db_log_pipeline(
             pipeline_name,
             'Батч отменён — слот удалён из расписания',
-            status='прервана',
+            status='cancelled',
             batch_id=batch_id,
         )
         pipeline_log(None, f"[{pipeline_name}] Батч {batch_id[:8]}… отменён, пропускаю")

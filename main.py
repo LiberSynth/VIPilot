@@ -67,7 +67,7 @@ def main_loop():
                 db_log_pipeline(
                     'publish',
                     'Батч отменён — слот удалён из расписания',
-                    status='прервана',
+                    status='cancelled',
                     batch_id=bid,
                 )
                 print(f"[planning] Батч {bid[:8]}… отменён (слот расписания исчез)")

@@ -641,7 +641,7 @@
   .monitor-log-dot.ls-ok,
   .monitor-log-dot.ls-info      { background: #3ecf8e; }
   .monitor-log-dot.ls-error     { background: #ff6060; }
-  .monitor-log-dot.ls-прервана  { background: #555; }
+  .monitor-log-dot.ls-cancelled { background: #555; }
   .monitor-log-dot.ls-running   { background: #4a7cf7; }
   .monitor-log-dot.ls-partial   {
     background: radial-gradient(circle, #ff2020 32%, #3ecf8e 33%);

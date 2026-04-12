@@ -1507,6 +1507,17 @@ def _m046_drop_ai_platform_id(cur):
     """)
 
 
+def _m047_log_status_cancelled(cur):
+    """
+    Переводит все записи таблицы log со статусом 'прервана' в 'cancelled'.
+    В БД хранятся только английские статусы; 'прервана' было ошибочным
+    русским значением, использовавшимся вместо 'cancelled'.
+    """
+    cur.execute("""
+        UPDATE log SET status = 'cancelled' WHERE status = 'прервана'
+    """)
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -1554,6 +1565,7 @@ MIGRATIONS = [
     (44, _m044_ltx_video_price),
     (45, _m045_add_indexes),
     (46, _m046_drop_ai_platform_id),
+    (47, _m047_log_status_cancelled),
 ]
 
 
