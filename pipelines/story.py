@@ -203,11 +203,8 @@ def run(batch_id):
                 pipeline_log(log_id, f"Модель: {model_name}")
                 pipeline_log(None, f"[story] Запрос к OpenRouter: модель={model_name}")
 
-                def _log_fn(msg, level='info', _log_id=log_id):
-                    pipeline_log(_log_id, msg, level=level)
-
                 for attempt in range(fails_to_next):
-                    result = openrouter.generate(_log_fn, model_name, m, system_prompt, user_prompt)
+                    result = openrouter.generate(log_id, model_name, m, system_prompt, user_prompt)
                     if result:
                         first_line = result.split('\n')[0]
                         if '.' not in first_line:

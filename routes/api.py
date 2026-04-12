@@ -35,7 +35,7 @@ from db import (
     db_upsert_story_draft,
     db_create_story_generate_batch,
 )
-from log import db_get_log, db_get_monitor, db_log_pipeline, db_log_entry
+from log import db_get_log, db_get_monitor, db_log_pipeline, log_entry
 from utils.auth import is_authenticated
 from utils.utils import parse_hhmm, to_msk, to_utc_from_msk
 import utils.workflow_state as wf_state
@@ -63,7 +63,7 @@ def api_run_now():
         batch_id=batch_id,
     )
     if log_id:
-        db_log_entry(log_id, "Запуск по запросу пользователя (внеплановый)")
+        log_entry(log_id, "Запуск по запросу пользователя (внеплановый)")
     return jsonify({"ok": True, "batch_id": batch_id})
 
 

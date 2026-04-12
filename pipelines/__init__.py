@@ -2,16 +2,15 @@
 Пакет пайплайнов.
 
 Регистрирует post-import hook через sys.meta_path: после загрузки любого
-pipeline-модуля (кроме base.py) в его пространство имён подставляются
-guard-обёртки для db_log_entry и print, которые вызывают AssertionError
-при прямом использовании.
+pipeline-модуля (кроме base.py) в его пространство имён подставляется
+guard-обёртка для print, которая вызывает AssertionError при прямом использовании.
 
 Единственный разрешённый способ логирования в файлах pipelines/ — pipeline_log.
 """
 
 import sys
 
-from pipelines.base import _forbidden_db_log_entry, _forbidden_print
+from pipelines.base import _forbidden_print
 
 _GUARDED_MODULES = frozenset({
     'pipelines.planning',
@@ -26,13 +25,12 @@ _currently_loading = set()
 
 
 def _apply_guards_to(mod):
-    """Устанавливает guard-обёртки в пространство имён модуля."""
-    mod.__dict__['db_log_entry'] = _forbidden_db_log_entry
+    """Устанавливает guard-обёртку в пространство имён модуля."""
     mod.__dict__['print'] = _forbidden_print
 
 
 class _PipelineLogGuard:
-    """sys.meta_path finder: после загрузки pipeline-модуля применяет guard-обёртки."""
+    """sys.meta_path finder: после загрузки pipeline-модуля применяет guard-обёртку."""
 
     def find_spec(self, fullname, path, target=None):
         if fullname not in _GUARDED_MODULES:

@@ -1,6 +1,8 @@
 """
 Все функции логирования приложения.
 """
+import builtins as _builtins
+
 from db.connection import get_db
 from statuses import FINAL_BATCH_STATUSES
 
@@ -26,8 +28,17 @@ def db_log_pipeline(pipeline, message, status='info', batch_id=None):
         return None
 
 
-def db_log_entry(log_id, message, level='info'):
-    """Добавляет субзапись к существующей записи лога."""
+def log_entry(log_id, message, level='info'):
+    """Добавляет субзапись к существующей записи лога.
+
+    Если log_id равен None — no-op (запись не производится).
+    """
+    if not log_id:
+        return
+    assert level in ('info', 'warn', 'error'), (
+        f"log_entry: недопустимый уровень {level!r}. "
+        "Допустимые значения: 'info', 'warn', 'error'."
+    )
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
@@ -37,7 +48,7 @@ def db_log_entry(log_id, message, level='info'):
                 )
             conn.commit()
     except Exception as e:
-        print(f"[DB] Ошибка db_log_entry: {e}")
+        _builtins.print(f"[DB] Ошибка log_entry: {e}")
 
 
 def db_log_interrupt_running(pipeline):

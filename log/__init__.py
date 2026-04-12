@@ -1,6 +1,6 @@
 from .log import (
     db_log_pipeline,
-    db_log_entry,
+    log_entry,
     db_log_update,
     db_log_interrupt_running,
     db_log_root,

@@ -242,18 +242,15 @@ def run(batch_id):
                 pipeline_log(log_id, f"Модель: {model_name}")
                 pipeline_log(None, f"[video] Запрос к провайдеру: модель={model_name}, ar={ar_x}:{ar_y}")
 
-                def _log_fn(msg, level='info', _log_id=log_id):
-                    pipeline_log(_log_id, msg, level=level)
-
                 submit_result = None
                 for attempt in range(fails_to_next):
                     submit_result = falai.submit(
-                        _log_fn, model_name, submit_url, platform_url,
+                        log_id, model_name, submit_url, platform_url,
                         body_tpl, story_text, ar_x, ar_y, video_duration,
                     )
                     if submit_result:
                         break
-                    _log_fn(f"[{model_name}] неудачная попытка {attempt + 1}/{fails_to_next}", level='warn')
+                    pipeline_log(log_id, f"[{model_name}] неудачная попытка {attempt + 1}/{fails_to_next}", level='warn')
 
                 if submit_result:
                     request_id   = submit_result['request_id']
@@ -287,10 +284,7 @@ def run(batch_id):
             pipeline_log(log_id, f"Запрос принят ({used_model}): {request_id}")
             pipeline_log(None, f"[video] Генерация запущена: request_id={request_id}")
 
-        def _poll_log(msg, level='info', _log_id=log_id):
-            pipeline_log(_log_id, msg, level=level)
-
-        video_url, poll_err = falai.poll(_poll_log, status_url, response_url)
+        video_url, poll_err = falai.poll(log_id, status_url, response_url)
         if not video_url:
             if poll_err:
                 db_log_update(log_id, poll_err, 'error')
@@ -304,7 +298,7 @@ def run(batch_id):
         pipeline_log(log_id, f"Скачиваю оригинал: {video_url}")
         pipeline_log(None, f"[video] Скачиваю оригинал от провайдера…")
         try:
-            original_data = falai.download_video(_poll_log, video_url)
+            original_data = falai.download_video(log_id, video_url)
             orig_mb = round(len(original_data) / 1024 / 1024, 1)
             db_set_batch_original_video(batch_id, original_data)
             pipeline_log(log_id, f"Оригинал сохранён ({orig_mb} МБ)")
