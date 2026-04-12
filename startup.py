@@ -1,3 +1,7 @@
+from datetime import timedelta
+
+from flask import Flask
+
 from db import (
     db_reset_stalled_batches,
     db_get_batches_with_unknown_status,
@@ -5,9 +9,28 @@ from db import (
 from db.db_simple import _get_dynamic_publish_statuses
 from statuses import KNOWN_BATCH_STATUSES, register_dynamic_statuses
 from log.log import db_log_pipeline
+from utils.consts import FLASK_SECRET
+from utils.limiter import limiter
 
 
-def init_app():
+def create_app() -> Flask:
+    app = Flask('main', static_folder="static", static_url_path="/static")
+    app.secret_key = FLASK_SECRET
+    app.permanent_session_lifetime = timedelta(days=7)
+    limiter.init_app(app)
+    return app
+
+
+def init_app(app: Flask):
+    from routes.web import bp as web_bp
+    from routes.api import bp as api_bp, producer_bp
+    from routes.dzen_browser import bp as dzen_browser_bp
+
+    app.register_blueprint(web_bp)
+    app.register_blueprint(api_bp)
+    app.register_blueprint(producer_bp)
+    app.register_blueprint(dzen_browser_bp)
+
     dynamic = _get_dynamic_publish_statuses()
     register_dynamic_statuses(dynamic)
     _reset_stalled_batches()

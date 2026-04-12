@@ -1,72 +1,24 @@
-import os
-import time
 import atexit
 import threading
-from datetime import datetime, timezone, timedelta
-from flask import Flask, request
+from datetime import datetime, timezone
 
 from db import (
     init_db, run_upgrades, db_get,
-    db_get_schedule, db_get_active_targets, db_ensure_batch, db_get_last_pipeline_run,
     db_get_actionable_batches,
     db_cancel_waiting_batches,
-    env_get, env_set,
+    env_get,
 )
-from startup import init_app
-from log import db_log_root, db_log_pipeline, db_log_entry, db_log_interrupt_running, db_log_fix_orphaned_running
+from startup import init_app, create_app
+from log import db_log_root, db_log_pipeline, db_log_interrupt_running, db_log_fix_orphaned_running
 from pipelines import story, video, transcode, publish, cleanup
-from routes.web import bp as web_bp
-from routes.api import bp as api_bp, producer_bp
-from routes.dzen_browser import bp as dzen_browser_bp
+import pipelines.planning as planning
 from statuses import PUBLISH_ROUTING_SUFFIXES
-from utils.consts import FLASK_SECRET, MSK
-from utils.limiter import limiter
-from utils.utils import parse_hhmm
 import utils.workflow_state as wf_state
+import utils.keepalive as keepalive
+from utils.middleware import register_middleware
 
-flask_app = Flask(__name__, static_folder="static", static_url_path="/static")
-flask_app.secret_key = FLASK_SECRET
-flask_app.permanent_session_lifetime = timedelta(days=7)
-limiter.init_app(flask_app)
-
-flask_app.register_blueprint(web_bp)
-flask_app.register_blueprint(api_bp)
-flask_app.register_blueprint(producer_bp)
-flask_app.register_blueprint(dzen_browser_bp)
-
-
-@flask_app.before_request
-def log_request():
-    method = request.method
-    path = request.full_path if request.query_string else request.path
-    remote = request.remote_addr
-    headers = dict(request.headers)
-    body = ""
-    if request.content_length and request.content_length > 0:
-        try:
-            body = request.get_data(as_text=True)
-        except Exception:
-            body = "<не удалось прочитать тело>"
-    msg = f"[HTTP] {method} {path} | IP: {remote} | Headers: {headers}"
-    if body:
-        msg += f" | Body: {body}"
-    print(msg)
-
-
-def _keepalive_loop():
-    import requests as req
-    domain = os.environ.get('REPLIT_DOMAINS', '').split(',')[0].strip()
-    if not domain:
-        return
-    url = f"https://{domain}/healthz"
-    print(f"[keepalive] Запущен → {url}")
-    while True:
-        time.sleep(4 * 60)
-        try:
-            req.get(url, timeout=10)
-        except Exception as e:
-            print(f"[keepalive] Ошибка: {e}")
-
+flask_app = create_app()
+register_middleware(flask_app)
 
 _STATUS_TO_PIPELINE = {
     'pending':          story,
@@ -89,66 +41,6 @@ def _get_pipeline(status: str):
         return publish
     return None
 
-def _run_planning(loop_interval: int):
-    """Планирование: проверяет расписание и создаёт недостающие батчи."""
-    try:
-        schedule = db_get_schedule()
-        targets  = db_get_active_targets()
-
-        if not schedule or not targets:
-            return
-
-        try:
-            buffer_hours = int(db_get('buffer_hours', '24'))
-        except (ValueError, TypeError):
-            buffer_hours = 24
-
-        now           = datetime.now(timezone.utc)
-        effective_now = now + timedelta(seconds=loop_interval)
-        window_end    = effective_now + timedelta(hours=buffer_hours)
-        A             = db_get_last_pipeline_run('planning')
-
-        for day_offset in range(-1, 2):
-            day = (now + timedelta(days=day_offset)).date()
-            for slot in schedule:
-                h, m = parse_hhmm(slot['time_utc'])
-                dt = datetime(day.year, day.month, day.day, h, m, tzinfo=timezone.utc)
-
-                in_future_window = effective_now <= dt < window_end
-
-                is_catchup = False
-                if dt < now:
-                    if A is None:
-                        is_catchup = False
-                    elif dt < A:
-                        is_catchup = False
-                    elif dt < A + timedelta(hours=buffer_hours):
-                        is_catchup = True
-                    else:
-                        created_at = slot.get('created_at')
-                        is_catchup = (created_at is not None and created_at <= dt)
-
-                if in_future_window or is_catchup:
-                    batch_id = db_ensure_batch(dt)
-                    if batch_id:
-                        log_id = db_log_pipeline(
-                            'planning',
-                            'Батч запланирован',
-                            status='ok',
-                            batch_id=batch_id,
-                        )
-                        if log_id:
-                            dt_msk = dt.astimezone(MSK)
-                            db_log_entry(log_id, f"Запланирована публикация: {dt_msk.strftime('%d.%m.%Y %H:%M')} МСК")
-                            target_names = ', '.join(t['name'] for t in targets)
-                            db_log_entry(log_id, f"Таргеты: {target_names}")
-                            db_log_entry(log_id, f"Горизонт планирования: {buffer_hours} ч")
-                        print(f"[planning] Создан батч: {dt.strftime('%d.%m %H:%M')} UTC")
-
-    except Exception as e:
-        db_log_pipeline('planning', f"Сбой планирования: {e}", status='error')
-        print(f"[planning] Ошибка: {e}")
-
 
 def main_loop():
     _cleanup_thread = None
@@ -168,7 +60,7 @@ def main_loop():
             except (ValueError, TypeError):
                 max_threads = 2
 
-            _run_planning(interval)
+            planning.run(interval)
 
             cancelled = db_cancel_waiting_batches()
             for bid in cancelled:
@@ -237,7 +129,7 @@ def start_main_loop():
         _main_loop_started = True
         init_db()
         run_upgrades()
-        init_app()
+        init_app(flask_app)
         wf_state.reset_active_threads()
         if env_get('workflow_state', 'running') == 'pause':
             wf_state.set_paused()
@@ -250,7 +142,7 @@ def start_main_loop():
         atexit.register(_on_exit)
         t = threading.Thread(target=main_loop, daemon=True)
         t.start()
-        ka = threading.Thread(target=_keepalive_loop, daemon=True)
+        ka = threading.Thread(target=keepalive.loop, daemon=True)
         ka.start()
 
 
