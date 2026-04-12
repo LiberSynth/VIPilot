@@ -154,6 +154,7 @@ def run(batch_id):
             db_set_batch_original_video(batch_id, sample)
             if donor_story_id:
                 db_set_batch_story_id(batch_id, donor_story_id)
+                pipeline_log(log_id, f"story_id подменён: {story_id[:8]}… → {donor_story_id[:8]}…", level='info')
             db_set_batch_video_ready(batch_id, 'emulation://skipped')
             db_log_update(log_id, 'Видео [эмуляция]', 'ok')
             return
