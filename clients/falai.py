@@ -92,59 +92,56 @@ def build_body(body_tpl, prompt, ar_x, ar_y, video_duration, log_fn=None):
 
 def submit(log_fn, model_name: str, submit_url: str, platform_url: str,
            body_tpl: dict, prompt: str, ar_x: int, ar_y: int,
-           video_duration: int, fails_to_next: int):
+           video_duration: int):
     """
-    Отправляет задание на генерацию видео в fal.ai.
+    Отправляет задание на генерацию видео в fal.ai (одна попытка).
 
     Возвращает словарь {'request_id', 'status_url', 'response_url'} при успехе или None.
     Бросает ProviderFatalError при фатальной ошибке провайдера.
 
     :param log_fn: callable(msg, level='info') — функция логирования
     """
-    for attempt in range(fails_to_next):
-        try:
-            body = build_body(body_tpl, prompt, ar_x, ar_y, video_duration, log_fn)
-            resp = requests.post(submit_url, headers=_headers(), json=body, timeout=30)
-        except requests.exceptions.Timeout:
-            log_fn(f"[{model_name}] таймаут (30 с), попытка {attempt + 1}/{fails_to_next}", level='warn')
-            continue
-        except requests.exceptions.RequestException as e:
-            log_fn(f"[{model_name}] ошибка соединения: {e}", level='warn')
-            continue
+    try:
+        body = build_body(body_tpl, prompt, ar_x, ar_y, video_duration, log_fn)
+        resp = requests.post(submit_url, headers=_headers(), json=body, timeout=30)
+    except requests.exceptions.Timeout:
+        log_fn(f"[{model_name}] таймаут (30 с)", level='warn')
+        return None
+    except requests.exceptions.RequestException as e:
+        log_fn(f"[{model_name}] ошибка соединения: {e}", level='warn')
+        return None
 
-        try:
-            data = resp.json()
-        except ValueError:
-            if _is_provider_fatal(resp.status_code, resp.text):
-                msg = f"[{model_name}] Фатальная ошибка провайдера (HTTP {resp.status_code}): {resp.text}"
-                log_fn(msg, level='error')
-                raise ProviderFatalError(msg)
-            log_fn(f"[{model_name}] не-JSON (HTTP {resp.status_code}): {resp.text}", level='warn')
-            continue
+    try:
+        data = resp.json()
+    except ValueError:
+        if _is_provider_fatal(resp.status_code, resp.text):
+            msg = f"[{model_name}] Фатальная ошибка провайдера (HTTP {resp.status_code}): {resp.text}"
+            log_fn(msg, level='error')
+            raise ProviderFatalError(msg)
+        log_fn(f"[{model_name}] не-JSON (HTTP {resp.status_code}): {resp.text}", level='warn')
+        return None
 
-        if resp.status_code >= 400:
-            err = data.get('error', data)
-            if _is_provider_fatal(resp.status_code, err):
-                msg = f"[{model_name}] Фатальная ошибка провайдера (HTTP {resp.status_code}): {err}"
-                log_fn(msg, level='error')
-                raise ProviderFatalError(msg)
-            log_fn(f"[{model_name}] HTTP {resp.status_code}: {err}", level='warn')
-            continue
+    if resp.status_code >= 400:
+        err = data.get('error', data)
+        if _is_provider_fatal(resp.status_code, err):
+            msg = f"[{model_name}] Фатальная ошибка провайдера (HTTP {resp.status_code}): {err}"
+            log_fn(msg, level='error')
+            raise ProviderFatalError(msg)
+        log_fn(f"[{model_name}] HTTP {resp.status_code}: {err}", level='warn')
+        return None
 
-        if 'request_id' not in data:
-            log_fn(f"[{model_name}] нет request_id: {str(data)}", level='warn')
-            continue
+    if 'request_id' not in data:
+        log_fn(f"[{model_name}] нет request_id: {str(data)}", level='warn')
+        return None
 
-        request_id   = data['request_id']
-        status_url   = data.get('status_url', f"{platform_url}/requests/{request_id}/status")
-        response_url = data.get('response_url', f"{platform_url}/requests/{request_id}")
-        return {
-            'request_id':   request_id,
-            'status_url':   status_url,
-            'response_url': response_url,
-        }
-
-    return None
+    request_id   = data['request_id']
+    status_url   = data.get('status_url', f"{platform_url}/requests/{request_id}/status")
+    response_url = data.get('response_url', f"{platform_url}/requests/{request_id}")
+    return {
+        'request_id':   request_id,
+        'status_url':   status_url,
+        'response_url': response_url,
+    }
 
 
 def poll(log_fn, status_url: str, response_url: str):

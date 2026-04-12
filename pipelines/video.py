@@ -245,10 +245,15 @@ def run(batch_id):
                 def _log_fn(msg, level='info', _log_id=log_id):
                     pipeline_log(_log_id, msg, level=level)
 
-                submit_result = falai.submit(
-                    _log_fn, model_name, submit_url, platform_url,
-                    body_tpl, story_text, ar_x, ar_y, video_duration, fails_to_next,
-                )
+                submit_result = None
+                for attempt in range(fails_to_next):
+                    submit_result = falai.submit(
+                        _log_fn, model_name, submit_url, platform_url,
+                        body_tpl, story_text, ar_x, ar_y, video_duration,
+                    )
+                    if submit_result:
+                        break
+                    _log_fn(f"[{model_name}] неудачная попытка {attempt + 1}/{fails_to_next}", level='warn')
 
                 if submit_result:
                     request_id   = submit_result['request_id']
