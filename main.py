@@ -56,9 +56,9 @@ def main_loop():
                 interval = 5
 
             try:
-                max_threads = max(1, min(32, int(db_get('max_batch_threads', '2'))))
+                max_threads = max(1, min(32, int(db_get('max_batch_threads', '5'))))
             except (ValueError, TypeError):
-                max_threads = 2
+                max_threads = 5
 
             planning.run(interval)
 
