@@ -594,7 +594,7 @@
 
   .monitor-hdr-actions-always {
     display: flex; gap: 4px; flex-shrink: 0; align-items: center;
-    width: 100%; justify-content: flex-end;
+    width: 100%; justify-content: flex-end; padding: 6px 8px 2px;
   }
 
   .cycle-float-btn {
