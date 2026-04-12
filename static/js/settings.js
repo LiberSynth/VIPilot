@@ -51,10 +51,8 @@ function collectAllSettings(activeTab) {
   }
   const chkStory     = document.getElementById('vk_story_pub_check');
   const chkWall      = document.getElementById('vk_wall_pub_check');
-  const chkTranscode = document.getElementById('vk_transcode_check');
   const hidStory     = document.getElementById('vk_story_pub_hidden');
   const hidWall      = document.getElementById('vk_wall_pub_hidden');
-  const hidTranscode = document.getElementById('vk_transcode_hidden');
   if (chkStory || hidStory) {
     const storyVal = chkStory ? (chkStory.checked ? '1' : '0') : hidStory.value;
     data.set('vk_publish_story', storyVal);
@@ -62,10 +60,6 @@ function collectAllSettings(activeTab) {
   if (chkWall || hidWall) {
     const wallVal = chkWall ? (chkWall.checked ? '1' : '0') : hidWall.value;
     data.set('vk_publish_wall', wallVal);
-  }
-  if (chkTranscode || hidTranscode) {
-    const transcodeVal = chkTranscode ? (chkTranscode.checked ? '1' : '0') : hidTranscode.value;
-    data.set('vk_transcode', transcodeVal);
   }
   setIfExists('aspect_ratio_x',   'ar-x');
   setIfExists('aspect_ratio_y',   'ar-y');

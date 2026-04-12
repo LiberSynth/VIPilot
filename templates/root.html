@@ -134,18 +134,6 @@
             <span class="toggle-track"></span>
           </label>
         </div>
-        <div class="hint" style="margin-top:10px">При включении видео перекодируется в H.264 перед публикацией. При выключении оригинал с модели публикуется напрямую.</div>
-        <div class="toggle-row" style="margin-top:4px">
-          <div>
-            <div class="toggle-label">Транскодирование</div>
-          </div>
-          <label class="toggle-wrap">
-            <input type="hidden" name="vk_transcode" id="vk_transcode_hidden" value="{{ '1' if vk_transcode else '0' }}">
-            <input type="checkbox" id="vk_transcode_check" {% if vk_transcode %}checked{% endif %}
-                   onchange="document.getElementById('vk_transcode_hidden').value = this.checked ? '1' : '0'; savePublishSettings();">
-            <span class="toggle-track"></span>
-          </label>
-        </div>
       </div>
       {% endif %}
 

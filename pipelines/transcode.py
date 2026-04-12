@@ -103,7 +103,7 @@ def run(batch_id):
 
         if is_probe:
             target       = 'пробный'
-            do_transcode = db_get('vk_transcode', '1') == '1'
+            do_transcode = True
         else:
             active_targets = db_get_active_targets()
             tgt          = active_targets[0] if active_targets else {}

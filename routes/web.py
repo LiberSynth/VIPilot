@@ -17,7 +17,6 @@ from db import (
     db_set,
     env_get,
     db_get_active_targets,
-    db_update_target_transcode,
     db_update_target_aspect_ratio,
     db_get_target_by_name,
     db_update_target_publish_method_by_slug,
@@ -155,7 +154,6 @@ def root_page():
     target_id       = target["id"] if target else None
     aspect_ratio_x  = target["aspect_ratio_x"] if target else 9
     aspect_ratio_y  = target["aspect_ratio_y"] if target else 16
-    vk_transcode    = db_get("vk_transcode", "1") == "1"
     publish_order   = [t["slug"] for t in active_targets if t.get("slug") in ("vk", "dzen")]
 
     resp = make_response(render_template(
@@ -172,7 +170,6 @@ def root_page():
         notify_phone=notify_phone,
         vk_publish_story=vk_publish_story,
         vk_publish_wall=vk_publish_wall,
-        vk_transcode=vk_transcode,
         video_duration=video_duration,
         video_post_prompt=video_post_prompt,
         buffer_hours=buffer_hours,
@@ -305,12 +302,6 @@ def save():
                 db_update_target_aspect_ratio(ar_target_id, ax, ay)
         except (ValueError, TypeError):
             pass
-
-    if "vk_transcode" in request.form:
-        vk_transcode_raw = request.form.get("vk_transcode", "0")
-        db_set("vk_transcode", "1" if vk_transcode_raw == "1" else "0")
-        if ar_target_id:
-            db_update_target_transcode(ar_target_id, vk_transcode_raw == "1")
 
     vid_dur_str = request.form.get("video_duration")
     if vid_dur_str is not None:
