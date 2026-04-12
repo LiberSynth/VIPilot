@@ -92,12 +92,7 @@ def _call_dzen(slug, method, batch_id, log_id, target):
             pipeline_log(log_id, 'Дзен: браузерная сессия не сохранена — авторизуйтесь на вкладке «Публикация»', level='error')
         return False
 
-    video_data = db_get_batch_video_data(batch_id)
-    if video_data is None:
-        video_data = db_get_batch_original_video(batch_id)
-    if video_data is None:
-        pipeline_log(log_id, 'Видео не найдено в БД (ни transcoded, ни original)', level='error')
-        return False
+    video_data = _get_video(batch_id, log_id)
 
     title = _resolve_title(batch_id, log_id)
     return dzen_client.publish(video_data, cfg, title, log_id, batch_id=batch_id, target_id=target_id)
