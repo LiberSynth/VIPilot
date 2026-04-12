@@ -184,6 +184,11 @@ def run(batch_id):
                 notify_failure(f"video: {msg}")
                 return
 
+            try:
+                fails_to_next = max(1, int(db_get('video_fails_to_next', '3')))
+            except (ValueError, TypeError):
+                fails_to_next = 3
+
             if pinned_model_id:
                 pinned_m = db_get_video_model_by_id(pinned_model_id)
                 if not pinned_m:
@@ -192,7 +197,6 @@ def run(batch_id):
                     pipeline_log(None, f"[video] {msg}")
                     return
                 models = [pinned_m]
-                fails_to_next = 1
             else:
                 models = db_get_active_video_models()
                 if not models:
@@ -201,10 +205,6 @@ def run(batch_id):
                     pipeline_log(None, f"[video] {msg}")
                     notify_failure(f"video: {msg}")
                     return
-                try:
-                    fails_to_next = max(1, int(db_get('video_fails_to_next', '3')))
-                except (ValueError, TypeError):
-                    fails_to_next = 3
 
             story_text = db_get_story_text(story_id)
             if not story_text:
@@ -224,7 +224,7 @@ def run(batch_id):
                 status='running', batch_id=batch_id,
             )
             pipeline_log(log_id, f"Соотношение сторон: {ar_x}:{ar_y}")
-            if pinned_model_id:
+            if is_probe:
                 pipeline_log(log_id, f"Пробная модель: {models[0]['name']}, попыток: {fails_to_next}")
             else:
                 pipeline_log(log_id, f"Моделей: {len(models)}, попыток на модель: {fails_to_next}")
@@ -265,7 +265,7 @@ def run(batch_id):
                 if request_id:
                     break
 
-                if pinned_model_id:
+                if is_probe:
                     msg = f'Пробная модель {models[0]["name"]} исчерпала все попытки ({fails_to_next})'
                     db_log_update(log_id, msg, 'error')
                     pipeline_log(log_id, msg, level='error')
