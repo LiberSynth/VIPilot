@@ -23,7 +23,7 @@ PIPELINE_RESET_STATUS = {
     'publish':   'transcode_ready',
 }
 
-_COMPOSITE_STATUS_SUFFIXES = ('.posting', '.published', '.pending', '.failed')
+COMPOSITE_BATCH_STATUS_SUFFIXES = frozenset({'.posting', '.published', '.pending', '.failed'})
 
 PUBLISH_ROUTING_SUFFIXES = ('.pending', '.published')
 
@@ -38,7 +38,7 @@ def register_dynamic_statuses(s: set) -> None:
 def _assert_known_status(status: str) -> None:
     if status in KNOWN_BATCH_STATUSES:
         return
-    if any(status.endswith(sfx) for sfx in _COMPOSITE_STATUS_SUFFIXES):
+    if any(status.endswith(sfx) for sfx in COMPOSITE_BATCH_STATUS_SUFFIXES):
         if status in _dynamic_statuses:
             return
     raise ValueError(

@@ -430,7 +430,7 @@ def db_get_last_pipeline_run(pipeline):
 
 
 def _get_dynamic_publish_statuses() -> set:
-    from statuses import _COMPOSITE_STATUS_SUFFIXES
+    from statuses import COMPOSITE_BATCH_STATUS_SUFFIXES
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
@@ -442,7 +442,7 @@ def _get_dynamic_publish_statuses() -> set:
         for slug, cfg in rows:
             methods = (cfg or {}).get('publish_method', {})
             for method in methods:
-                for suffix in _COMPOSITE_STATUS_SUFFIXES:
+                for suffix in COMPOSITE_BATCH_STATUS_SUFFIXES:
                     statuses.add(f"{slug}.{method}{suffix}")
         return statuses
     except Exception:

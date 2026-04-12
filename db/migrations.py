@@ -1462,6 +1462,51 @@ def _m044_ltx_video_price(cur):
     """)
 
 
+def _m045_add_indexes(cur):
+    """
+    Добавляет явные индексы на все колонки, участвующие в WHERE/JOIN/ORDER BY.
+    Используется IF NOT EXISTS — идемпотентно.
+    """
+    indexes = [
+        ("idx_batches_status",       "batches",     "status"),
+        ("idx_batches_story_id",      "batches",     "story_id"),
+        ("idx_batches_movie_id",      "batches",     "movie_id"),
+        ("idx_batches_scheduled_at",  "batches",     "scheduled_at"),
+        ("idx_batches_type",          "batches",     "type"),
+        ("idx_batches_completed_at",  "batches",     "completed_at"),
+        ("idx_batches_created_at",    "batches",     "created_at"),
+        ("idx_stories_grade",         "stories",     "grade"),
+        ("idx_stories_created_at",    "stories",     "created_at"),
+        ("idx_stories_model_id",      "stories",     "model_id"),
+        ("idx_movies_model_id",       "movies",      "model_id"),
+        ("idx_log_batch_id",          "log",         "batch_id"),
+        ("idx_log_created_at",        "log",         "created_at"),
+        ("idx_log_entries_log_id",    "log_entries", "log_id"),
+        ("idx_ai_models_type",        "ai_models",   "type"),
+        ("idx_ai_models_active",      "ai_models",   "active"),
+        ("idx_ai_models_platform_id", "ai_models",   "platform_id"),
+        ("idx_targets_active",        "targets",     "active"),
+        ("idx_targets_slug",          "targets",     "slug"),
+        ("idx_schedule_time_utc",     "schedule",    "time_utc"),
+    ]
+    for idx_name, table, column in indexes:
+        cur.execute(
+            f'CREATE INDEX IF NOT EXISTS {idx_name} ON {table} ({column})'
+        )
+
+
+def _m046_drop_ai_platform_id(cur):
+    """
+    Удаляет дублирующее поле ai_platform_id из таблицы ai_models.
+    Активным кодом используется только platform_id.
+    Идемпотентно: DROP COLUMN IF EXISTS.
+    """
+    cur.execute("""
+        ALTER TABLE ai_models
+            DROP COLUMN IF EXISTS ai_platform_id
+    """)
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -1507,6 +1552,8 @@ MIGRATIONS = [
     (42, _m042_donor_refactor),
     (43, _m043_fix_remaining_probe_status),
     (44, _m044_ltx_video_price),
+    (45, _m045_add_indexes),
+    (46, _m046_drop_ai_platform_id),
 ]
 
 
