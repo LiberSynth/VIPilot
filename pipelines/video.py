@@ -10,9 +10,7 @@ Pipeline 3 — Генерация видео.
                                                   → video_error
 """
 
-import os
 import time
-import requests
 
 from utils.notify import notify_failure
 
@@ -37,128 +35,12 @@ from db import (
 )
 from log import db_log_pipeline, db_log_update
 from pipelines.base import check_cancelled, handle_critical_error, pipeline_log
-
-_FAL_KEY = os.environ.get('FAL_API_KEY', '')
-
-
-class ProviderFatalError(Exception):
-    """Raised when a provider returns a permanent, non-retryable billing/account error."""
+from clients import falai
+from clients.falai import ProviderFatalError
 
 
 class AspectRatioConflictError(Exception):
     """Raised when active targets have different aspect ratios."""
-
-
-def _is_fatal_fal(status_code: int, body) -> bool:
-    """Detect fal.ai balance-exhausted / account-locked errors (HTTP 403)."""
-    if status_code != 403:
-        return False
-    text = str(body).lower()
-    return 'exhausted balance' in text or 'locked' in text
-
-
-_FATAL_DETECTORS = [_is_fatal_fal]
-
-
-def _is_provider_fatal(status_code: int, body) -> bool:
-    return any(fn(status_code, body) for fn in _FATAL_DETECTORS)
-
-
-_POLL_INTERVAL = 30
-_POLL_MAX      = 240
-
-
-def _headers():
-    return {
-        'Authorization': f'Key {_FAL_KEY}',
-        'Content-Type': 'application/json',
-    }
-
-
-def _build_body(body_tpl, prompt, ar_x, ar_y, video_duration, log_id=None):
-    body = dict(body_tpl)
-    if 'prompt' in body:
-        body['prompt'] = str(body['prompt']).format(prompt)
-    if ar_x <= ar_y:
-        calc_h = 1024
-        calc_w = round(1024 * ar_x / ar_y / 32) * 32
-    else:
-        calc_w = 1024
-        calc_h = round(1024 * ar_y / ar_x / 32) * 32
-
-    _INT_VALUES = {
-        'duration':   video_duration,
-        'width':      calc_w,
-        'height':     calc_h,
-        'num_frames': video_duration * 25,
-    }
-
-    for field, val in list(body.items()):
-        if val == '{:int}' and field in _INT_VALUES:
-            body[field] = _INT_VALUES[field]
-        elif isinstance(val, str) and val != '{:int}':
-            if field == 'aspect_ratio':
-                body[field] = val.format(ar_x, ar_y)
-            elif field == 'prompt':
-                pass
-            else:
-                try:
-                    body[field] = val.format(video_duration)
-                except (IndexError, KeyError) as e:
-                    pipeline_log(
-                        log_id,
-                        f"Поле «{field}» шаблона не поддерживает подстановку video_duration — оставляем как есть ({e})",
-                        level='warn',
-                    )
-
-    return body
-
-
-def _poll(log_id, status_url, response_url):
-    """Поллит fal.ai до завершения.
-    Возвращает (video_url, None) при успехе или (None, error_msg) при сбое."""
-    for attempt in range(_POLL_MAX):
-        time.sleep(_POLL_INTERVAL)
-        try:
-            s = requests.get(
-                status_url,
-                headers={'Authorization': f'Key {_FAL_KEY}'},
-                timeout=15,
-            ).json()
-            status = s.get('status')
-            pipeline_log(log_id, f"Статус [{attempt + 1}]: {status}")
-
-            if status == 'COMPLETED':
-                result = requests.get(
-                    response_url,
-                    headers={'Authorization': f'Key {_FAL_KEY}'},
-                    timeout=15,
-                ).json()
-                detail = result.get('detail')
-                if detail:
-                    types = [d.get('type', '') for d in detail] if isinstance(detail, list) else []
-                    if any('content_policy' in t for t in types):
-                        msg = 'fal.ai отклонил промпт: нарушение политики контента'
-                        pipeline_log(log_id, msg, level='error')
-                        return None, msg
-                video_url = result.get('video', {}).get('url')
-                if not video_url:
-                    msg = f'Нет URL видео в ответе fal.ai: {str(result)}'
-                    pipeline_log(log_id, msg, level='error')
-                    return None, msg
-                return video_url, None
-
-            elif status == 'FAILED':
-                msg = f'fal.ai: генерация провалилась: {str(s)}'
-                pipeline_log(log_id, msg, level='error')
-                return None, msg
-
-        except Exception as e:
-            pipeline_log(log_id, f"Ошибка опроса статуса: {e}", level='warn')
-
-    msg = 'Таймаут генерации видео (2 часа)'
-    pipeline_log(log_id, msg, level='error')
-    return None, msg
 
 
 def run(batch_id):
@@ -295,7 +177,7 @@ def run(batch_id):
             pipeline_log(log_id, f"Возобновление: request_id={request_id}")
 
         else:
-            if not _FAL_KEY:
+            if not falai.is_configured():
                 msg = 'FAL_API_KEY не задан — генерация невозможна'
                 db_log_pipeline('video', msg, status='error', batch_id=batch_id)
                 pipeline_log(None, f"[video] {msg}")
@@ -358,52 +240,22 @@ def run(batch_id):
                 body_tpl     = m['body_tpl']
 
                 pipeline_log(log_id, f"Модель: {model_name}")
-                pipeline_log(None, f"[video] Запрос к fal.ai: модель={model_name}, ar={ar_x}:{ar_y}")
+                pipeline_log(None, f"[video] Запрос к провайдеру: модель={model_name}, ar={ar_x}:{ar_y}")
 
-                for attempt in range(fails_to_next):
-                    try:
-                        body = _build_body(body_tpl, story_text, ar_x, ar_y, video_duration, log_id)
-                        resp = requests.post(submit_url, headers=_headers(), json=body, timeout=30)
-                    except requests.exceptions.Timeout:
-                        pipeline_log(log_id, f"[{model_name}] таймаут (30 с), попытка {attempt + 1}/{fails_to_next}", level='warn')
-                        continue
-                    except requests.exceptions.RequestException as e:
-                        pipeline_log(log_id, f"[{model_name}] ошибка соединения: {e}", level='warn')
-                        continue
+                def _log_fn(msg, level='info', _log_id=log_id):
+                    pipeline_log(_log_id, msg, level=level)
 
-                    try:
-                        data = resp.json()
-                    except ValueError:
-                        if _is_provider_fatal(resp.status_code, resp.text):
-                            msg = f"[{model_name}] Фатальная ошибка провайдера (HTTP {resp.status_code}): {resp.text}"
-                            pipeline_log(log_id, msg, level='error')
-                            raise ProviderFatalError(msg)
-                        pipeline_log(log_id, f"[{model_name}] не-JSON (HTTP {resp.status_code}): {resp.text}", level='warn')
-                        continue
+                submit_result = falai.submit(
+                    _log_fn, model_name, submit_url, platform_url,
+                    body_tpl, story_text, ar_x, ar_y, video_duration, fails_to_next,
+                )
 
-                    if resp.status_code >= 400:
-                        err = data.get('error', data)
-                        if _is_provider_fatal(resp.status_code, err):
-                            msg = f"[{model_name}] Фатальная ошибка провайдера (HTTP {resp.status_code}): {err}"
-                            pipeline_log(log_id, msg, level='error')
-                            raise ProviderFatalError(msg)
-                        pipeline_log(log_id, f"[{model_name}] HTTP {resp.status_code}: {err}", level='warn')
-                        continue
-
-                    if 'request_id' not in data:
-                        pipeline_log(log_id, f"[{model_name}] нет request_id: {str(data)}", level='warn')
-                        continue
-
-                    request_id   = data['request_id']
-                    status_url   = data.get('status_url',
-                                            f"{platform_url}/requests/{request_id}/status")
-                    response_url = data.get('response_url',
-                                            f"{platform_url}/requests/{request_id}")
+                if submit_result:
+                    request_id   = submit_result['request_id']
+                    status_url   = submit_result['status_url']
+                    response_url = submit_result['response_url']
                     used_model    = model_name
                     used_model_id = m['id']
-                    break
-
-                if request_id:
                     break
 
             if not request_id:
@@ -430,7 +282,10 @@ def run(batch_id):
             pipeline_log(log_id, f"Запрос принят ({used_model}): {request_id}")
             pipeline_log(None, f"[video] Генерация запущена: request_id={request_id}")
 
-        video_url, poll_err = _poll(log_id, status_url, response_url)
+        def _poll_log(msg, level='info', _log_id=log_id):
+            pipeline_log(_log_id, msg, level=level)
+
+        video_url, poll_err = falai.poll(_poll_log, status_url, response_url)
         if not video_url:
             if poll_err:
                 db_log_update(log_id, poll_err, 'error')
@@ -442,11 +297,9 @@ def run(batch_id):
             return
 
         pipeline_log(log_id, f"Скачиваю оригинал: {video_url}")
-        pipeline_log(None, f"[video] Скачиваю оригинал с fal.ai…")
+        pipeline_log(None, f"[video] Скачиваю оригинал от провайдера…")
         try:
-            r = requests.get(video_url, timeout=120, stream=True)
-            r.raise_for_status()
-            original_data = b''.join(r.iter_content(chunk_size=256 * 1024))
+            original_data = falai.download_video(_poll_log, video_url)
             orig_mb = round(len(original_data) / 1024 / 1024, 1)
             db_set_batch_original_video(batch_id, original_data)
             pipeline_log(log_id, f"Оригинал сохранён ({orig_mb} МБ)")

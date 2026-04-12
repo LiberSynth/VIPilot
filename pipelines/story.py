@@ -5,9 +5,6 @@ Pipeline 2 — Генерация сюжета.
 генерирует текст через OpenRouter и сохраняет результат.
 """
 
-import os
-import requests
-
 from db import (
     db_set_story_model,
     db_get,
@@ -28,76 +25,7 @@ from db import (
 )
 from log import db_log_pipeline, db_log_update
 from pipelines.base import check_cancelled, handle_critical_error, pipeline_log
-
-_API_KEY = os.environ.get('OPENROUTER_API_KEY', '')
-
-
-def _headers():
-    return {
-        'Authorization': f'Bearer {_API_KEY}',
-        'Content-Type': 'application/json',
-    }
-
-
-def _build_body(body_tpl, model_url, system_prompt, user_prompt):
-    body = dict(body_tpl)
-    if 'messages' in body:
-        has_system = any(m.get('role') == 'system' for m in body['messages'])
-        messages = []
-        for msg in body['messages']:
-            m = dict(msg)
-            if m.get('role') == 'system':
-                m['content'] = str(m['content']).format(system_prompt)
-            elif m.get('role') == 'user':
-                if has_system:
-                    m['content'] = str(m['content']).format(user_prompt)
-                else:
-                    merged = (system_prompt.strip() + '\n\n' + user_prompt.strip()).strip() \
-                             if system_prompt else user_prompt
-                    m['content'] = str(m['content']).format(merged)
-            messages.append(m)
-        body['messages'] = messages
-    body['model'] = model_url
-    return body
-
-
-def _try_model(log_id, m, system_prompt, user_prompt):
-    """Один запрос к одной модели. Возвращает текст сюжета или None."""
-    model_name = m['name']
-    try:
-        body = _build_body(m['body_tpl'], m['model_url'], system_prompt, user_prompt)
-        resp = requests.post(m['platform_url'], headers=_headers(), json=body, timeout=60)
-    except requests.exceptions.Timeout:
-        pipeline_log(log_id, f"[{model_name}] таймаут (60 с)", level='warn')
-        return None
-    except requests.exceptions.RequestException as e:
-        pipeline_log(log_id, f"[{model_name}] ошибка соединения: {e}", level='warn')
-        return None
-
-    try:
-        data = resp.json()
-    except ValueError:
-        pipeline_log(log_id, f"[{model_name}] не-JSON (HTTP {resp.status_code}): {resp.text}", level='warn')
-        return None
-
-    if resp.status_code >= 400:
-        err = data.get('error', {})
-        if isinstance(err, dict):
-            err = err.get('message', data)
-        pipeline_log(log_id, f"[{model_name}] HTTP {resp.status_code}: {err}", level='warn')
-        return None
-
-    choices = data.get('choices')
-    if not choices:
-        pipeline_log(log_id, f"[{model_name}] нет поля choices в ответе", level='warn')
-        return None
-
-    result = ((choices[0].get('message') or {}).get('content') or '').strip()
-    if not result:
-        pipeline_log(log_id, f"[{model_name}] пустой текст", level='warn')
-        return None
-
-    return result
+from clients import openrouter
 
 
 def run(batch_id):
@@ -231,7 +159,7 @@ def run(batch_id):
             status='running', batch_id=batch_id,
         )
 
-        if not _API_KEY:
+        if not openrouter.is_configured():
             msg = 'OPENROUTER_API_KEY не задан — генерация невозможна'
             db_log_update(log_id, msg, 'error')
             pipeline_log(log_id, msg, level='error')
@@ -275,8 +203,11 @@ def run(batch_id):
                 pipeline_log(log_id, f"Модель: {model_name}")
                 pipeline_log(None, f"[story] Запрос к OpenRouter: модель={model_name}")
 
+                def _log_fn(msg, level='info', _log_id=log_id):
+                    pipeline_log(_log_id, msg, level=level)
+
                 for attempt in range(fails_to_next):
-                    result = _try_model(log_id, m, system_prompt, user_prompt)
+                    result = openrouter.generate(_log_fn, model_name, m, system_prompt, user_prompt)
                     if result:
                         first_line = result.split('\n')[0]
                         if '.' not in first_line:

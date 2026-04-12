@@ -49,68 +49,73 @@ def _get_video(batch_id, log_id):
     return video_data
 
 
-def _call_client(slug, method, batch_id, log_id, target):
-    """Вызывает нужный клиент для данного slug+method. Возвращает True при успехе."""
+def _resolve_title(batch_id, log_id):
+    """Возвращает заголовок сюжета батча или 'Видео'."""
+    batch = db_get_batch_by_id(batch_id)
+    story_id = batch.get('story_id') if batch else None
+    if story_id:
+        try:
+            title = db_get_story_title(story_id) or ''
+            if title:
+                return title
+        except Exception as e:
+            pipeline_log(log_id, f"Не удалось получить заголовок сюжета: {e}", level='warn')
+    return 'Видео'
+
+
+def _call_vk(slug, method, batch_id, log_id, target):
+    cfg = target.get('config') or {}
+    if not vk.is_configured():
+        pipeline_log(log_id, 'VK_USER_TOKEN не задан', level='error')
+        return False
+    video_data = _get_video(batch_id, log_id)
+    group_id = int(cfg.get('group_id', 236929597))
+    title = _resolve_title(batch_id, log_id)
+    if method == 'story':
+        pipeline_log(log_id, 'Публикую историю…')
+        return vk.publish_story(video_data, group_id, log_id, title=title) is not None
+    elif method == 'wall':
+        pipeline_log(log_id, 'Публикую на стену…')
+        return vk.publish_wall(video_data, group_id, log_id, title=title) is not None
+    else:
+        pipeline_log(log_id, f'VK: неизвестный метод «{method}» — пропуск', level='warn')
+        return False
+
+
+def _call_dzen(slug, method, batch_id, log_id, target):
     cfg = target.get('config') or {}
     target_id = target.get('id')
-
-    if slug == 'vk':
-        if not vk.is_configured():
-            pipeline_log(log_id, 'VK_USER_TOKEN не задан', level='error')
-            return False
-        video_data = _get_video(batch_id, log_id)
-        group_id = int(cfg.get('group_id', 236929597))
-        batch = db_get_batch_by_id(batch_id)
-        story_id = batch.get('story_id') if batch else None
-        title = ''
-        if story_id:
-            try:
-                title = db_get_story_title(story_id) or ''
-            except Exception as e:
-                pipeline_log(log_id, f"Не удалось получить заголовок сюжета: {e}", level='warn')
-        if not title:
-            title = 'Видео'
-        if method == 'story':
-            pipeline_log(log_id, 'Публикую историю…')
-            return vk.publish_story(video_data, group_id, log_id, title=title) is not None
-        elif method == 'wall':
-            pipeline_log(log_id, 'Публикую на стену…')
-            return vk.publish_wall(video_data, group_id, log_id, title=title) is not None
+    if not dzen_client.is_configured(cfg, target_id):
+        if not cfg.get('publisher_id'):
+            pipeline_log(log_id, 'Дзен не настроен: publisher_id отсутствует', level='error')
         else:
-            pipeline_log(log_id, f'VK: неизвестный метод «{method}» — пропуск', level='warn')
-            return False
+            pipeline_log(log_id, 'Дзен: браузерная сессия не сохранена — авторизуйтесь на вкладке «Публикация»', level='error')
+        return False
 
-    elif slug == 'dzen':
-        if not dzen_client.is_configured(cfg, target_id):
-            if not cfg.get('publisher_id'):
-                pipeline_log(log_id, 'Дзен не настроен: publisher_id отсутствует', level='error')
-            else:
-                pipeline_log(log_id, 'Дзен: браузерная сессия не сохранена — авторизуйтесь на вкладке «Публикация»', level='error')
-            return False
+    video_data = db_get_batch_video_data(batch_id)
+    if video_data is None:
+        video_data = db_get_batch_original_video(batch_id)
+    if video_data is None:
+        pipeline_log(log_id, 'Видео не найдено в БД (ни transcoded, ни original)', level='error')
+        return False
 
-        video_data = db_get_batch_video_data(batch_id)
-        if video_data is None:
-            video_data = db_get_batch_original_video(batch_id)
-        if video_data is None:
-            pipeline_log(log_id, 'Видео не найдено в БД (ни transcoded, ни original)', level='error')
-            return False
+    title = _resolve_title(batch_id, log_id)
+    return dzen_client.publish(video_data, cfg, title, log_id, batch_id=batch_id, target_id=target_id)
 
-        batch = db_get_batch_by_id(batch_id)
-        story_id = batch.get('story_id') if batch else None
-        title = ''
-        if story_id:
-            try:
-                title = db_get_story_title(story_id) or ''
-            except Exception as e:
-                pipeline_log(log_id, f"Не удалось получить заголовок сюжета: {e}", level='warn')
-        if not title:
-            title = 'Видео'
 
-        return dzen_client.publish(video_data, cfg, title, log_id, batch_id=batch_id, target_id=target_id)
+_CLIENTS = {
+    'vk':   _call_vk,
+    'dzen': _call_dzen,
+}
 
-    else:
+
+def _call_client(slug, method, batch_id, log_id, target):
+    """Диспетчеризует вызов клиента по реестру _CLIENTS. Возвращает True при успехе."""
+    handler = _CLIENTS.get(slug)
+    if handler is None:
         pipeline_log(log_id, f'Платформа «{slug}» не поддерживается', level='warn')
         return False
+    return handler(slug, method, batch_id, log_id, target)
 
 
 def _parse_composite_status(status: str):
