@@ -226,6 +226,17 @@
   }
 
   document.addEventListener('click', function() { closeList(); });
+
+  (function() {
+    var ta = document.getElementById('director-story-content');
+    if (!ta) return;
+    var LS_KEY = 'vip_director_story_ta_h';
+    var saved = localStorage.getItem(LS_KEY);
+    if (saved) ta.style.height = saved;
+    ta.addEventListener('mouseup', function() {
+      if (ta.style.height) localStorage.setItem(LS_KEY, ta.style.height);
+    });
+  })();
 })();
 switchPanel('screenwriter');
 </script>
