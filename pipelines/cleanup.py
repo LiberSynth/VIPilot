@@ -19,6 +19,7 @@ from db import (
 )
 from log import db_log_pipeline
 from utils.utils import parse_entries_lifetime, parse_log_lifetime, parse_batch_lifetime, parse_file_lifetime
+from pipelines.base import pipeline_log, handle_critical_error
 
 
 def run():
@@ -34,29 +35,28 @@ def run():
             n = db_cleanup_log_entries(entries_lifetime)
             if n:
                 summary.append(f"log_entries: -{n}")
-                print(f"[cleanup] Удалено log_entries: {n}")
+                pipeline_log(None, f"[cleanup] Удалено log_entries: {n}")
 
         if log_lifetime > 0:
             n = db_cleanup_logs(log_lifetime)
             if n:
                 summary.append(f"log: -{n}")
-                print(f"[cleanup] Удалено log-записей: {n}")
+                pipeline_log(None, f"[cleanup] Удалено log-записей: {n}")
 
         if batch_lifetime > 0:
             n = db_cleanup_batches(batch_lifetime)
             if n:
                 summary.append(f"batches: -{n}")
-                print(f"[cleanup] Удалено батчей: {n}")
+                pipeline_log(None, f"[cleanup] Удалено батчей: {n}")
 
         if file_lifetime > 0:
             n = db_cleanup_video_data(file_lifetime)
             if n:
                 summary.append(f"movies.video_data: -{n}")
-                print(f"[cleanup] Обнулено movies.raw_data/transcoded_data: {n}")
+                pipeline_log(None, f"[cleanup] Обнулено movies.raw_data/transcoded_data: {n}")
 
         if summary:
             db_log_pipeline("cleanup", "Очистка: " + ", ".join(summary), status="ok")
 
     except Exception as e:
-        db_log_pipeline("cleanup", f"Сбой пайплайна: {e}", status="error")
-        print(f"[cleanup] Ошибка: {e}")
+        handle_critical_error('cleanup', None, None, e)

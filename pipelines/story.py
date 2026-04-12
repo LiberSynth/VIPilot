@@ -26,8 +26,8 @@ from db import (
     db_get_story_title,
     env_get,
 )
-from log import db_log_pipeline, db_log_entry, db_log_update
-from pipelines.base import check_cancelled, handle_critical_error
+from log import db_log_pipeline, db_log_update
+from pipelines.base import check_cancelled, handle_critical_error, pipeline_log
 
 _API_KEY = os.environ.get('OPENROUTER_API_KEY', '')
 
@@ -68,39 +68,33 @@ def _try_model(log_id, m, system_prompt, user_prompt):
         body = _build_body(m['body_tpl'], m['model_url'], system_prompt, user_prompt)
         resp = requests.post(m['platform_url'], headers=_headers(), json=body, timeout=60)
     except requests.exceptions.Timeout:
-        if log_id:
-            db_log_entry(log_id, f"[{model_name}] таймаут (60 с)", level='warn')
+        pipeline_log(log_id, f"[{model_name}] таймаут (60 с)", level='warn')
         return None
     except requests.exceptions.RequestException as e:
-        if log_id:
-            db_log_entry(log_id, f"[{model_name}] ошибка соединения: {e}", level='warn')
+        pipeline_log(log_id, f"[{model_name}] ошибка соединения: {e}", level='warn')
         return None
 
     try:
         data = resp.json()
     except ValueError:
-        if log_id:
-            db_log_entry(log_id, f"[{model_name}] не-JSON (HTTP {resp.status_code}): {resp.text}", level='warn')
+        pipeline_log(log_id, f"[{model_name}] не-JSON (HTTP {resp.status_code}): {resp.text}", level='warn')
         return None
 
     if resp.status_code >= 400:
         err = data.get('error', {})
         if isinstance(err, dict):
             err = err.get('message', data)
-        if log_id:
-            db_log_entry(log_id, f"[{model_name}] HTTP {resp.status_code}: {err}", level='warn')
+        pipeline_log(log_id, f"[{model_name}] HTTP {resp.status_code}: {err}", level='warn')
         return None
 
     choices = data.get('choices')
     if not choices:
-        if log_id:
-            db_log_entry(log_id, f"[{model_name}] нет поля choices в ответе", level='warn')
+        pipeline_log(log_id, f"[{model_name}] нет поля choices в ответе", level='warn')
         return None
 
     result = ((choices[0].get('message') or {}).get('content') or '').strip()
     if not result:
-        if log_id:
-            db_log_entry(log_id, f"[{model_name}] пустой текст", level='warn')
+        pipeline_log(log_id, f"[{model_name}] пустой текст", level='warn')
         return None
 
     return result
@@ -136,9 +130,8 @@ def run(batch_id):
                 'story', 'Сюжет задан вручную — пропуск поиска и генерации',
                 status='ok', batch_id=batch_id,
             )
-            if log_id:
-                db_log_entry(log_id, f"Используется заданный сюжет id={preset_story_id[:8]}…")
-            print(f"[story] Батч {batch_id[:8]}… — story_id задан вручную ({preset_story_id[:8]}…), батч → story_ready")
+            pipeline_log(log_id, f"Используется заданный сюжет id={preset_story_id[:8]}…")
+            pipeline_log(None, f"[story] Батч {batch_id[:8]}… — story_id задан вручную ({preset_story_id[:8]}…), батч → story_ready")
             if not db_set_batch_story(batch_id, preset_story_id):
                 db_set_batch_status(batch_id, 'error')
             batch_done = True
@@ -171,7 +164,7 @@ def run(batch_id):
                         status='error', batch_id=batch_id,
                     )
                     db_set_batch_status(batch_id, 'error')
-                    print(f"[story] {msg}")
+                    pipeline_log(None, f"[story] {msg}")
                     batch_done = True
                     return
                 donor_title = db_get_story_title(donor_story_id) if donor_story_id else None
@@ -183,9 +176,8 @@ def run(batch_id):
                     'story', 'Найден донор, генерация сюжета не требуется',
                     status='ok', batch_id=batch_id,
                 )
-                if log_id:
-                    db_log_entry(log_id, detail)
-                print(f"[story] Батч {batch_id[:8]}… — найден донор {donor_batch_id}, батч → story_ready")
+                pipeline_log(log_id, detail)
+                pipeline_log(None, f"[story] Батч {batch_id[:8]}… — найден донор {donor_batch_id}, батч → story_ready")
                 batch_done = True
                 return
 
@@ -197,7 +189,7 @@ def run(batch_id):
                 'story', 'Поиск сюжета в пуле…',
                 status='running', batch_id=batch_id,
             )
-            db_log_entry(
+            pipeline_log(
                 pool_log_id,
                 f"Настройка «Утверждать сюжеты»: {'включена' if approve_stories else 'выключена'}. "
                 f"Условие выборки: {condition_label}.",
@@ -206,33 +198,33 @@ def run(batch_id):
             if pool_story:
                 pool_story_id    = pool_story['id']
                 pool_story_title = pool_story['title']
-                db_log_entry(
+                pipeline_log(
                     pool_log_id,
                     f"Найден сюжет из пула: id={pool_story_id[:8]}…, название=«{pool_story_title}». "
                     f"AI-генерация не запускается.",
                 )
                 db_log_update(pool_log_id, f'Сюжет из пула: «{pool_story_title}»', 'ok')
-                print(f"[story] Батч {batch_id[:8]}… — сюжет из пула {pool_story_id[:8]}…, батч → story_ready")
+                pipeline_log(None, f"[story] Батч {batch_id[:8]}… — сюжет из пула {pool_story_id[:8]}…, батч → story_ready")
                 batch_done = True
                 return
             else:
                 if approve_stories:
                     msg = 'Пул сюжетов пуст (grade = good) — AI-генерация запрещена (approve_stories включён)'
-                    db_log_entry(pool_log_id, msg, level='error')
+                    pipeline_log(pool_log_id, msg, level='error')
                     db_log_update(pool_log_id, msg, 'error')
                     db_set_batch_status(batch_id, 'error')
-                    print(f"[story] Батч {batch_id[:8]}… — {msg}")
+                    pipeline_log(None, f"[story] Батч {batch_id[:8]}… — {msg}")
                     batch_done = True
                     return
                 reason = (
                     f"Подходящий сюжет в пуле не найден (условие: {condition_label}). "
                     f"Переход к AI-генерации."
                 )
-                db_log_entry(pool_log_id, reason)
+                pipeline_log(pool_log_id, reason)
                 db_log_update(pool_log_id, 'Сюжет в пуле не найден — запускается AI-генерация', 'ok')
-                print(f"[story] Батч {batch_id[:8]}… — {reason}")
+                pipeline_log(None, f"[story] Батч {batch_id[:8]}… — {reason}")
 
-        print(f"[story] Батч {batch_id[:8]}… ({target}) — начало генерации сюжета")
+        pipeline_log(None, f"[story] Батч {batch_id[:8]}… ({target}) — начало генерации сюжета")
 
         log_id = db_log_pipeline(
             'story', 'Генерация сюжета…',
@@ -242,9 +234,8 @@ def run(batch_id):
         if not _API_KEY:
             msg = 'OPENROUTER_API_KEY не задан — генерация невозможна'
             db_log_update(log_id, msg, 'error')
-            if log_id:
-                db_log_entry(log_id, msg, level='error')
-            print(f"[story] {msg}")
+            pipeline_log(log_id, msg, level='error')
+            pipeline_log(None, f"[story] {msg}")
             return
 
         batch_data     = batch.get('data') or {}
@@ -260,9 +251,8 @@ def run(batch_id):
         if not models:
             msg = 'Нет активных text-моделей в ai_models'
             db_log_update(log_id, msg, 'error')
-            if log_id:
-                db_log_entry(log_id, msg, level='error')
-            print(f"[story] {msg}")
+            pipeline_log(log_id, msg, level='error')
+            pipeline_log(None, f"[story] {msg}")
             return
 
         try:
@@ -273,8 +263,7 @@ def run(batch_id):
         system_prompt = db_get('system_prompt', '')
         user_prompt   = db_get('metaprompt', '')
 
-        if log_id:
-            db_log_entry(log_id, f"Моделей: {len(models)}, попыток на модель: {fails_to_next}")
+        pipeline_log(log_id, f"Моделей: {len(models)}, попыток на модель: {fails_to_next}")
 
         story_id        = None
         used_model_name = None
@@ -283,9 +272,8 @@ def run(batch_id):
         while not story_id:
             for m in models:
                 model_name = m['name']
-                if log_id:
-                    db_log_entry(log_id, f"Модель: {model_name}")
-                print(f"[story] Запрос к OpenRouter: модель={model_name}")
+                pipeline_log(log_id, f"Модель: {model_name}")
+                pipeline_log(None, f"[story] Запрос к OpenRouter: модель={model_name}")
 
                 for attempt in range(fails_to_next):
                     result = _try_model(log_id, m, system_prompt, user_prompt)
@@ -301,11 +289,9 @@ def run(batch_id):
                             used_model_name = model_name
                             used_model_id   = m['id']
                             break
-                        if log_id:
-                            db_log_entry(log_id, f"[{model_name}] не удалось сохранить сюжет", level='warn')
+                        pipeline_log(log_id, f"[{model_name}] не удалось сохранить сюжет", level='warn')
                     else:
-                        if log_id:
-                            db_log_entry(log_id, f"[{model_name}] попытка {attempt + 1}/{fails_to_next} не удалась", level='warn')
+                        pipeline_log(log_id, f"[{model_name}] попытка {attempt + 1}/{fails_to_next} не удалась", level='warn')
 
                 if story_id:
                     break
@@ -314,22 +300,19 @@ def run(batch_id):
                 if is_story_probe:
                     msg = f'Модель не ответила после {fails_to_next} попыток — пробный сюжет не получен'
                     db_log_update(log_id, msg, 'error')
-                    if log_id:
-                        db_log_entry(log_id, msg, level='error')
-                    print(f"[story] {msg}")
+                    pipeline_log(log_id, msg, level='error')
+                    pipeline_log(None, f"[story] {msg}")
                     db_set_batch_status(batch_id, 'error')
                     batch_done = True
                     return
                 msg = 'Все активные модели не дали результата — повтор с первой модели'
                 db_log_update(log_id, msg, 'warn')
-                if log_id:
-                    db_log_entry(log_id, msg, level='warn')
-                print(f"[story] {msg}")
+                pipeline_log(log_id, msg, level='warn')
+                pipeline_log(None, f"[story] {msg}")
 
-        print(f"[story] Сюжет получен: {result[:100]}{'…' if len(result) > 100 else ''}")
-        if log_id:
-            db_log_entry(log_id, f"Название: {title}")
-            db_log_entry(log_id, f"Сюжет:\n{result}")
+        pipeline_log(None, f"[story] Сюжет получен: {result[:100]}{'…' if len(result) > 100 else ''}")
+        pipeline_log(log_id, f"Название: {title}")
+        pipeline_log(log_id, f"Сюжет:\n{result}")
 
         if is_story_probe:
             db_set_batch_story_probe(batch_id, story_id)
@@ -337,25 +320,21 @@ def run(batch_id):
             batch_done = True
             msg = f'Сюжет сгенерирован ({used_model_name})'
             db_log_update(log_id, msg, 'ok')
-            if log_id:
-                db_log_entry(log_id, f"Сохранён как story {story_id}, батч → story_probe")
-            print(f"[story] Пробный сюжет: story_id={story_id[:8]}…, batch → story_probe")
+            pipeline_log(log_id, f"Сохранён как story {story_id}, батч → story_probe")
+            pipeline_log(None, f"[story] Пробный сюжет: story_id={story_id[:8]}…, batch → story_probe")
         else:
             if not db_set_batch_story(batch_id, story_id):
                 msg = 'Ошибка сохранения статуса батча (db_set_batch_story вернул False)'
                 db_log_update(log_id, msg, 'error')
-                if log_id:
-                    db_log_entry(log_id, msg, level='error')
-                print(f"[story] {msg}")
+                pipeline_log(log_id, msg, level='error')
+                pipeline_log(None, f"[story] {msg}")
                 return
             db_set_story_model(story_id, used_model_id)
             batch_done = True
             msg = f'Сюжет сгенерирован ({used_model_name})'
             db_log_update(log_id, msg, 'ok')
-            if log_id:
-                db_log_entry(log_id, f"Сохранён как story {story_id}, батч → story_ready")
-            print(f"[story] Готово: story_id={story_id[:8]}…, batch → story_ready")
+            pipeline_log(log_id, f"Сохранён как story {story_id}, батч → story_ready")
+            pipeline_log(None, f"[story] Готово: story_id={story_id[:8]}…, batch → story_ready")
 
     except Exception as e:
         handle_critical_error('story', batch_id, log_id, e)
-

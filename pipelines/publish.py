@@ -28,8 +28,8 @@ from db import (
     db_set_batch_status,
     db_claim_batch_status,
 )
-from log import db_log_pipeline, db_log_entry, db_log_update, db_get_log_entries
-from pipelines.base import check_cancelled, handle_critical_error
+from log import db_log_pipeline, db_log_update, db_get_log_entries
+from pipelines.base import check_cancelled, handle_critical_error, pipeline_log
 from clients import vk
 from clients import dzen as dzen_client
 from clients.dzen import DzenCsrfExpired, DzenSessionMissing
@@ -40,13 +40,11 @@ def _get_video(batch_id, log_id):
     Бросает RuntimeError если оба поля NULL."""
     video_data = db_get_batch_video_data(batch_id)
     if video_data is None:
-        if log_id:
-            db_log_entry(log_id, 'movies.transcoded_data отсутствует — использую оригинал (movies.raw_data)')
+        pipeline_log(log_id, 'movies.transcoded_data отсутствует — использую оригинал (movies.raw_data)')
         video_data = db_get_batch_original_video(batch_id)
         if video_data is None:
             msg = 'Ни movies.transcoded_data, ни movies.raw_data не найдены в БД — ошибка логики'
-            if log_id:
-                db_log_entry(log_id, msg, level='error')
+            pipeline_log(log_id, msg, level='error')
             raise RuntimeError(msg)
     return video_data
 
@@ -58,8 +56,7 @@ def _call_client(slug, method, batch_id, log_id, target):
 
     if slug == 'vk':
         if not vk.is_configured():
-            if log_id:
-                db_log_entry(log_id, 'VK_USER_TOKEN не задан', level='error')
+            pipeline_log(log_id, 'VK_USER_TOKEN не задан', level='error')
             return False
         video_data = _get_video(batch_id, log_id)
         group_id = int(cfg.get('group_id', 236929597))
@@ -69,38 +66,33 @@ def _call_client(slug, method, batch_id, log_id, target):
         if story_id:
             try:
                 title = db_get_story_title(story_id) or ''
-            except Exception:
-                pass
+            except Exception as e:
+                pipeline_log(log_id, f"Не удалось получить заголовок сюжета: {e}", level='warn')
         if not title:
             title = 'Видео'
         if method == 'story':
-            if log_id:
-                db_log_entry(log_id, 'Публикую историю…')
+            pipeline_log(log_id, 'Публикую историю…')
             return vk.publish_story(video_data, group_id, log_id, title=title) is not None
         elif method == 'wall':
-            if log_id:
-                db_log_entry(log_id, 'Публикую на стену…')
+            pipeline_log(log_id, 'Публикую на стену…')
             return vk.publish_wall(video_data, group_id, log_id, title=title) is not None
         else:
-            if log_id:
-                db_log_entry(log_id, f'VK: неизвестный метод «{method}» — пропуск', level='warn')
+            pipeline_log(log_id, f'VK: неизвестный метод «{method}» — пропуск', level='warn')
             return False
 
     elif slug == 'dzen':
         if not dzen_client.is_configured(cfg, target_id):
-            if log_id:
-                if not cfg.get('publisher_id'):
-                    db_log_entry(log_id, 'Дзен не настроен: publisher_id отсутствует', level='error')
-                else:
-                    db_log_entry(log_id, 'Дзен: браузерная сессия не сохранена — авторизуйтесь на вкладке «Публикация»', level='error')
+            if not cfg.get('publisher_id'):
+                pipeline_log(log_id, 'Дзен не настроен: publisher_id отсутствует', level='error')
+            else:
+                pipeline_log(log_id, 'Дзен: браузерная сессия не сохранена — авторизуйтесь на вкладке «Публикация»', level='error')
             return False
 
         video_data = db_get_batch_video_data(batch_id)
         if video_data is None:
             video_data = db_get_batch_original_video(batch_id)
         if video_data is None:
-            if log_id:
-                db_log_entry(log_id, 'Видео не найдено в БД (ни transcoded, ни original)', level='error')
+            pipeline_log(log_id, 'Видео не найдено в БД (ни transcoded, ни original)', level='error')
             return False
 
         batch = db_get_batch_by_id(batch_id)
@@ -109,17 +101,15 @@ def _call_client(slug, method, batch_id, log_id, target):
         if story_id:
             try:
                 title = db_get_story_title(story_id) or ''
-            except Exception:
-                pass
+            except Exception as e:
+                pipeline_log(log_id, f"Не удалось получить заголовок сюжета: {e}", level='warn')
         if not title:
             title = 'Видео'
-
 
         return dzen_client.publish(video_data, cfg, title, log_id, batch_id=batch_id, target_id=target_id)
 
     else:
-        if log_id:
-            db_log_entry(log_id, f'Платформа «{slug}» не поддерживается', level='warn')
+        pipeline_log(log_id, f'Платформа «{slug}» не поддерживается', level='warn')
         return False
 
 
@@ -165,10 +155,10 @@ def run(batch_id):
             if batch['type'] == 'movie_probe':
                 log_id = db_log_pipeline('publish', 'Публикация (пробный)…',
                                          status='running', batch_id=batch_id)
-                db_log_entry(log_id, 'Пробный батч — публикация на платформу не выполняется')
+                pipeline_log(log_id, 'Пробный батч — публикация на платформу не выполняется')
                 db_set_batch_movie_probe(batch_id)
                 db_log_update(log_id, 'Без публикации (пробный батч)', 'ok')
-                print(f"[publish] Батч {batch_id[:8]}… пробный — публикация пропущена")
+                pipeline_log(None, f"[publish] Батч {batch_id[:8]}… пробный — публикация пропущена")
                 return
 
             if check_cancelled('publish', batch_id, batch):
@@ -177,7 +167,7 @@ def run(batch_id):
             now = datetime.now(timezone.utc)
             if batch['scheduled_at'] is not None and now < batch['scheduled_at']:
                 remaining = int((batch['scheduled_at'] - now).total_seconds() / 60)
-                print(f"[publish] Батч {batch_id[:8]}… ещё не время ({remaining} мин до публикации)")
+                pipeline_log(None, f"[publish] Батч {batch_id[:8]}… ещё не время ({remaining} мин до публикации)")
                 return
 
         if not active_targets:
@@ -185,12 +175,12 @@ def run(batch_id):
                 msg = 'Батч отменён — нет активных таргетов'
                 db_set_batch_cancelled(batch_id)
                 db_log_pipeline('publish', msg, status='прервана', batch_id=batch_id)
-                print(f"[publish] {msg} (батч {batch_id[:8]}…)")
+                pipeline_log(None, f"[publish] {msg} (батч {batch_id[:8]}…)")
             else:
                 msg = 'Нет активных таргетов — публикация невозможна'
                 log_id = db_log_pipeline('publish', msg, status='error', batch_id=batch_id)
                 db_set_batch_publish_error(batch_id)
-                print(f"[publish] {msg}")
+                pipeline_log(None, f"[publish] {msg}")
                 notify_failure(f"publish: {msg} (батч {batch_id[:8]})")
             return
 
@@ -200,12 +190,12 @@ def run(batch_id):
                 msg = 'Батч отменён — нет методов публикации в конфиге таргетов'
                 db_set_batch_cancelled(batch_id)
                 db_log_pipeline('publish', msg, status='прервана', batch_id=batch_id)
-                print(f"[publish] {msg} (батч {batch_id[:8]}…)")
+                pipeline_log(None, f"[publish] {msg} (батч {batch_id[:8]}…)")
             else:
                 msg = 'Нет методов публикации в конфиге таргетов'
                 log_id = db_log_pipeline('publish', msg, status='error', batch_id=batch_id)
                 db_set_batch_publish_error(batch_id)
-                print(f"[publish] {msg}")
+                pipeline_log(None, f"[publish] {msg}")
                 notify_failure(f"publish: {msg} (батч {batch_id[:8]})")
             return
 
@@ -226,11 +216,10 @@ def run(batch_id):
                 step_found = any(slug == cur_slug and method == cur_method for slug, method, _ in steps)
                 if step_found:
                     resume_from = (cur_slug, cur_method)
-                    print(f"[publish] Батч {batch_id[:8]}… resume с шага {cur_slug}.{cur_method}")
+                    pipeline_log(None, f"[publish] Батч {batch_id[:8]}… resume с шага {cur_slug}.{cur_method}")
                 else:
-                    if log_id:
-                        db_log_entry(log_id, f'Шаг {cur_slug}.{cur_method} более не активен в конфиге — перевожу в ошибку', level='error')
-                    print(f"[publish] Батч {batch_id[:8]}… шаг {cur_slug}.{cur_method} не найден в текущем конфиге")
+                    pipeline_log(log_id, f'Шаг {cur_slug}.{cur_method} более не активен в конфиге — перевожу в ошибку', level='error')
+                    pipeline_log(None, f"[publish] Батч {batch_id[:8]}… шаг {cur_slug}.{cur_method} не найден в текущем конфиге")
                     db_set_batch_publish_error(batch_id)
                     db_log_update(log_id, f'Шаг {cur_slug}.{cur_method} удалён из конфига — батч требует ручной проверки', 'error')
                     notify_failure(f"publish: батч {batch_id[:8]} завис в {cur_slug}.{cur_method}.pending, а шаг удалён из конфига")
@@ -243,9 +232,8 @@ def run(batch_id):
                         break
 
                 if found_idx is None:
-                    if log_id:
-                        db_log_entry(log_id, f'Шаг {cur_slug}.{cur_method} удалён из конфига — батч требует ручной проверки', level='error')
-                    print(f"[publish] Батч {batch_id[:8]}… шаг {cur_slug}.{cur_method} не найден в текущем конфиге")
+                    pipeline_log(log_id, f'Шаг {cur_slug}.{cur_method} удалён из конфига — батч требует ручной проверки', level='error')
+                    pipeline_log(None, f"[publish] Батч {batch_id[:8]}… шаг {cur_slug}.{cur_method} не найден в текущем конфиге")
                     db_set_batch_publish_error(batch_id)
                     db_log_update(log_id, f'Шаг {cur_slug}.{cur_method} удалён из конфига — батч требует ручной проверки', 'error')
                     notify_failure(f"publish: батч {batch_id[:8]} завис в {cur_slug}.{cur_method}.{cur_phase}, а шаг удалён из конфига")
@@ -253,12 +241,12 @@ def run(batch_id):
                 elif found_idx + 1 < len(steps):
                     ns, nm, _ = steps[found_idx + 1]
                     resume_from = (ns, nm)
-                    print(f"[publish] Батч {batch_id[:8]}… resume с шага {ns}.{nm}")
+                    pipeline_log(None, f"[publish] Батч {batch_id[:8]}… resume с шага {ns}.{nm}")
                 else:
                     saved = db_set_batch_published(batch_id)
                     if saved:
                         db_log_update(log_id, 'Опубликовано (возобновление — все шаги завершены)', 'ok')
-                        print(f"[publish] Батч {batch_id[:8]}… опубликован (возобновление)")
+                        pipeline_log(None, f"[publish] Батч {batch_id[:8]}… опубликован (возобновление)")
                     else:
                         db_set_batch_publish_error(batch_id)
                         db_log_update(log_id, 'Ошибка записи published в БД (возобновление)', 'error')
@@ -279,12 +267,11 @@ def run(batch_id):
             failed_status = f"{slug}.{method}.failed"
 
             if not db_claim_batch_status(batch_id, expected_from, posting_status):
-                print(f"[publish] Батч {batch_id[:8]}… уже захвачен другим процессом для {posting_status} — пропуск")
+                pipeline_log(None, f"[publish] Батч {batch_id[:8]}… уже захвачен другим процессом для {posting_status} — пропуск")
                 db_log_update(log_id, f'Захват {posting_status} не удался — пропуск', 'ok')
                 return
 
-            if log_id:
-                db_log_entry(log_id, f'Шаг {slug}.{method}: выполняю…')
+            pipeline_log(log_id, f'Шаг {slug}.{method}: выполняю…')
 
             step_error = None
             try:
@@ -292,18 +279,16 @@ def run(batch_id):
             except (DzenSessionMissing, DzenCsrfExpired) as e:
                 ok = False
                 step_error = str(e)
-                if log_id:
-                    db_log_entry(log_id, f'{slug}.{method}: {e}', level='error')
+                pipeline_log(log_id, f'{slug}.{method}: {e}', level='error')
             except Exception as e:
                 ok = False
                 step_error = str(e)
-                if log_id:
-                    db_log_entry(log_id, f'{slug}.{method}: неожиданная ошибка: {e}', level='error')
+                pipeline_log(log_id, f'{slug}.{method}: неожиданная ошибка: {e}', level='error')
 
             if not ok:
                 failed_steps.append(f"{slug}.{method}")
                 err_msg = step_error or 'ошибка публикации'
-                print(f"[publish] Батч {batch_id[:8]}… ошибка {slug}.{method}: {err_msg}")
+                pipeline_log(None, f"[publish] Батч {batch_id[:8]}… ошибка {slug}.{method}: {err_msg}")
                 notify_failure(f"publish: ошибка {slug}.{method} батча {batch_id[:8]}: {err_msg}")
                 step_saved = db_set_batch_status(batch_id, failed_status)
                 if not step_saved:
@@ -321,8 +306,7 @@ def run(batch_id):
                 db_log_update(log_id, f'Шаг {slug}.{method}: опубликовано, но ошибка записи статуса в БД', 'error')
                 notify_failure(f"publish: шаг {slug}.{method} батча {batch_id[:8]} выполнен, но статус не сохранён")
                 return
-            if log_id:
-                db_log_entry(log_id, f'Шаг {slug}.{method}: опубликовано')
+            pipeline_log(log_id, f'Шаг {slug}.{method}: опубликовано')
             expected_from = published_status
 
         if any_ok:
@@ -331,7 +315,7 @@ def run(batch_id):
                 saved = db_set_batch_published_partially(batch_id)
                 if saved:
                     db_log_update(log_id, f'Частично опубликовано ({target_names}); ошибки: {fail_list}', 'ok')
-                    print(f"[publish] Батч {batch_id[:8]}… частично опубликован (ошибки: {fail_list})")
+                    pipeline_log(None, f"[publish] Батч {batch_id[:8]}… частично опубликован (ошибки: {fail_list})")
                     entries = db_get_log_entries(log_id) if log_id else []
                     err_entries = [e for e in entries if e['level'] in ('warn', 'error')]
                     notify_failure(
@@ -342,13 +326,13 @@ def run(batch_id):
                 else:
                     db_set_batch_publish_error(batch_id)
                     db_log_update(log_id, 'Частично опубликовано, но ошибка записи статуса в БД', 'error')
-                    print(f"[publish] Батч {batch_id[:8]}… ошибка записи published_partially в БД")
+                    pipeline_log(None, f"[publish] Батч {batch_id[:8]}… ошибка записи published_partially в БД")
                     notify_failure(f"publish: частично опубликовано, но статус не сохранён в БД — батч {batch_id[:8]}")
             else:
                 saved = db_set_batch_published(batch_id)
                 if saved:
                     db_log_update(log_id, f'Опубликовано ({target_names})', 'ok')
-                    print(f"[publish] Батч {batch_id[:8]}… опубликован")
+                    pipeline_log(None, f"[publish] Батч {batch_id[:8]}… опубликован")
                     if log_id:
                         entries = db_get_log_entries(log_id)
                         warn_entries = [e for e in entries if e['level'] in ('warn', 'error')]
@@ -361,12 +345,12 @@ def run(batch_id):
                 else:
                     db_set_batch_publish_error(batch_id)
                     db_log_update(log_id, 'Опубликовано, но ошибка записи статуса в БД', 'error')
-                    print(f"[publish] Батч {batch_id[:8]}… ошибка записи published в БД")
+                    pipeline_log(None, f"[publish] Батч {batch_id[:8]}… ошибка записи published в БД")
                     notify_failure(f"publish: опубликовано, но статус не сохранён в БД — батч {batch_id[:8]}")
         else:
             db_set_batch_publish_error(batch_id)
             db_log_update(log_id, 'Ошибка публикации', 'error')
-            print(f"[publish] Батч {batch_id[:8]}… ошибка публикации")
+            pipeline_log(None, f"[publish] Батч {batch_id[:8]}… ошибка публикации")
             notify_failure(f"publish: ошибка публикации батча {batch_id[:8]} ({target_names})")
 
     except Exception as e:

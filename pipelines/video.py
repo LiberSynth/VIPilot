@@ -35,8 +35,8 @@ from db import (
     db_set_batch_story_id,
     db_get_movie_from_donor,
 )
-from log import db_log_pipeline, db_log_entry, db_log_update
-from pipelines.base import check_cancelled, handle_critical_error
+from log import db_log_pipeline, db_log_update
+from pipelines.base import check_cancelled, handle_critical_error, pipeline_log
 
 _FAL_KEY = os.environ.get('FAL_API_KEY', '')
 
@@ -75,7 +75,7 @@ def _headers():
     }
 
 
-def _build_body(body_tpl, prompt, ar_x, ar_y, video_duration):
+def _build_body(body_tpl, prompt, ar_x, ar_y, video_duration, log_id=None):
     body = dict(body_tpl)
     if 'prompt' in body:
         body['prompt'] = str(body['prompt']).format(prompt)
@@ -104,8 +104,12 @@ def _build_body(body_tpl, prompt, ar_x, ar_y, video_duration):
             else:
                 try:
                     body[field] = val.format(video_duration)
-                except (IndexError, KeyError):
-                    pass
+                except (IndexError, KeyError) as e:
+                    pipeline_log(
+                        log_id,
+                        f"Поле «{field}» шаблона не поддерживает подстановку video_duration — оставляем как есть ({e})",
+                        level='warn',
+                    )
 
     return body
 
@@ -122,8 +126,7 @@ def _poll(log_id, status_url, response_url):
                 timeout=15,
             ).json()
             status = s.get('status')
-            if log_id:
-                db_log_entry(log_id, f"Статус [{attempt + 1}]: {status}")
+            pipeline_log(log_id, f"Статус [{attempt + 1}]: {status}")
 
             if status == 'COMPLETED':
                 result = requests.get(
@@ -136,30 +139,25 @@ def _poll(log_id, status_url, response_url):
                     types = [d.get('type', '') for d in detail] if isinstance(detail, list) else []
                     if any('content_policy' in t for t in types):
                         msg = 'fal.ai отклонил промпт: нарушение политики контента'
-                        if log_id:
-                            db_log_entry(log_id, msg, level='error')
+                        pipeline_log(log_id, msg, level='error')
                         return None, msg
                 video_url = result.get('video', {}).get('url')
                 if not video_url:
                     msg = f'Нет URL видео в ответе fal.ai: {str(result)}'
-                    if log_id:
-                        db_log_entry(log_id, msg, level='error')
+                    pipeline_log(log_id, msg, level='error')
                     return None, msg
                 return video_url, None
 
             elif status == 'FAILED':
                 msg = f'fal.ai: генерация провалилась: {str(s)}'
-                if log_id:
-                    db_log_entry(log_id, msg, level='error')
+                pipeline_log(log_id, msg, level='error')
                 return None, msg
 
         except Exception as e:
-            if log_id:
-                db_log_entry(log_id, f"Ошибка опроса статуса: {e}", level='warn')
+            pipeline_log(log_id, f"Ошибка опроса статуса: {e}", level='warn')
 
     msg = 'Таймаут генерации видео (2 часа)'
-    if log_id:
-        db_log_entry(log_id, msg, level='error')
+    pipeline_log(log_id, msg, level='error')
     return None, msg
 
 
@@ -211,10 +209,10 @@ def run(batch_id):
             donor_batch_id = batch_data.get('donor_batch_id') if isinstance(batch_data, dict) else None
             if donor_batch_id:
                 if batch.get('movie_id') is not None:
-                    print(f"[video] Батч {batch_id[:8]}… — донор, movie_id уже перенесён (возобновление)")
+                    pipeline_log(None, f"[video] Батч {batch_id[:8]}… — донор, movie_id уже перенесён (возобновление)")
                     return
                 if not check_cancelled('video', batch_id, batch):
-                    print(f"[video] Батч {batch_id[:8]}… — режим донора, переносим видео от {donor_batch_id[:8]}…")
+                    pipeline_log(None, f"[video] Батч {batch_id[:8]}… — режим донора, переносим видео от {donor_batch_id[:8]}…")
                     log_id = db_log_pipeline(
                         'video', 'Видео получено от донора',
                         status='running', batch_id=batch_id,
@@ -224,24 +222,21 @@ def run(batch_id):
                         updated = db_get_batch_by_id(batch_id)
                         new_status = updated['status'] if updated else None
                         detail = f"Видео перенесено от донора {donor_batch_id[:8]}…"
-                        if log_id:
-                            db_log_update(log_id, detail, 'ok')
-                            db_log_entry(log_id, detail)
+                        db_log_update(log_id, detail, 'ok')
+                        pipeline_log(log_id, detail)
                         if new_status == 'transcode_ready':
                             tr_log_id = db_log_pipeline(
                                 'transcode', 'Транскодирование пропущено — видео получено от донора',
                                 status='ok', batch_id=batch_id,
                             )
-                            if tr_log_id:
-                                db_log_entry(tr_log_id, detail)
-                        print(f"[video] Батч {batch_id[:8]}… — видео от донора, новый статус: {new_status}")
+                            pipeline_log(tr_log_id, detail)
+                        pipeline_log(None, f"[video] Батч {batch_id[:8]}… — видео от донора, новый статус: {new_status}")
                     else:
                         msg = f"Не удалось перенести видео от донора {donor_batch_id[:8]}…"
-                        if log_id:
-                            db_log_update(log_id, msg, 'error')
-                            db_log_entry(log_id, msg, level='error')
+                        db_log_update(log_id, msg, 'error')
+                        pipeline_log(log_id, msg, level='error')
                         db_set_batch_video_error(batch_id)
-                        print(f"[video] {msg}")
+                        pipeline_log(None, f"[video] {msg}")
                 return
 
         story_id        = batch.get('story_id')
@@ -259,7 +254,7 @@ def run(batch_id):
             return
 
         if env_get("emulation_mode", "0") == "1":
-            print(f"[video] Батч {batch_id[:8]}… — эмуляция генерации видео")
+            pipeline_log(None, f"[video] Батч {batch_id[:8]}… — эмуляция генерации видео")
             log_id = db_log_pipeline(
                 'video', 'Видео [эмуляция]',
                 status='running', batch_id=batch_id,
@@ -268,14 +263,12 @@ def run(batch_id):
             if result is None:
                 msg = '[эмуляция] Нет видео в пуле — невозможно скопировать оригинал'
                 db_log_update(log_id, msg, 'error')
-                if log_id:
-                    db_log_entry(log_id, msg, level='error')
+                pipeline_log(log_id, msg, level='error')
                 db_set_batch_video_error(batch_id)
-                print(f"[video] {msg}")
+                pipeline_log(None, f"[video] {msg}")
                 return
             sample, donor_batch_id, donor_story_id = result
-            if log_id:
-                db_log_entry(log_id, f"Видео заимствовано из батча: {donor_batch_id}", level='info')
+            pipeline_log(log_id, f"Видео заимствовано из батча: {donor_batch_id}", level='info')
             db_set_batch_original_video(batch_id, sample)
             if donor_story_id:
                 db_set_batch_story_id(batch_id, donor_story_id)
@@ -283,8 +276,8 @@ def run(batch_id):
             db_log_update(log_id, 'Видео [эмуляция]', 'ok')
             return
 
-        print(f"[video] Батч {batch_id[:8]}… ({target}) — "
-              f"{'возобновление' if resumed else 'начало'} генерации видео")
+        pipeline_log(None, f"[video] Батч {batch_id[:8]}… ({target}) — "
+                     f"{'возобновление' if resumed else 'начало'} генерации видео")
 
         used_model    = None
         used_model_id = None
@@ -299,14 +292,13 @@ def run(batch_id):
                 'video', 'Генерация видео… (возобновление)',
                 status='running', batch_id=batch_id,
             )
-            if log_id:
-                db_log_entry(log_id, f"Возобновление: request_id={request_id}")
+            pipeline_log(log_id, f"Возобновление: request_id={request_id}")
 
         else:
             if not _FAL_KEY:
                 msg = 'FAL_API_KEY не задан — генерация невозможна'
                 db_log_pipeline('video', msg, status='error', batch_id=batch_id)
-                print(f"[video] {msg}")
+                pipeline_log(None, f"[video] {msg}")
                 notify_failure(f"video: {msg}")
                 return
 
@@ -315,7 +307,7 @@ def run(batch_id):
                 if not pinned_m:
                     msg = f'Пробная модель {str(pinned_model_id)[:8]}… не найдена'
                     db_log_pipeline('video', msg, status='error', batch_id=batch_id)
-                    print(f"[video] {msg}")
+                    pipeline_log(None, f"[video] {msg}")
                     return
                 models = [pinned_m]
                 fails_to_next = 1
@@ -324,7 +316,7 @@ def run(batch_id):
                 if not models:
                     msg = 'Нет активных video-моделей в ai_models (type=text-to-video)'
                     db_log_pipeline('video', msg, status='error', batch_id=batch_id)
-                    print(f"[video] {msg}")
+                    pipeline_log(None, f"[video] {msg}")
                     notify_failure(f"video: {msg}")
                     return
                 try:
@@ -336,7 +328,7 @@ def run(batch_id):
             if not story_text:
                 msg = f'Не найден сюжет story_id={story_id[:8]}…'
                 db_log_pipeline('video', msg, status='error', batch_id=batch_id)
-                print(f"[video] {msg}")
+                pipeline_log(None, f"[video] {msg}")
                 notify_failure(f"video: {msg} (батч {batch_id[:8]})")
                 return
 
@@ -349,12 +341,11 @@ def run(batch_id):
                 'video', 'Генерация видео…',
                 status='running', batch_id=batch_id,
             )
-            if log_id:
-                db_log_entry(log_id, f"Соотношение сторон: {ar_x}:{ar_y}")
-                if pinned_model_id:
-                    db_log_entry(log_id, f"Пробная модель: {models[0]['name']}, попыток: {fails_to_next}")
-                else:
-                    db_log_entry(log_id, f"Моделей: {len(models)}, попыток на модель: {fails_to_next}")
+            pipeline_log(log_id, f"Соотношение сторон: {ar_x}:{ar_y}")
+            if pinned_model_id:
+                pipeline_log(log_id, f"Пробная модель: {models[0]['name']}, попыток: {fails_to_next}")
+            else:
+                pipeline_log(log_id, f"Моделей: {len(models)}, попыток на модель: {fails_to_next}")
 
             request_id   = None
             status_url   = None
@@ -366,21 +357,18 @@ def run(batch_id):
                 platform_url = m['platform_url']
                 body_tpl     = m['body_tpl']
 
-                if log_id:
-                    db_log_entry(log_id, f"Модель: {model_name}")
-                print(f"[video] Запрос к fal.ai: модель={model_name}, ar={ar_x}:{ar_y}")
+                pipeline_log(log_id, f"Модель: {model_name}")
+                pipeline_log(None, f"[video] Запрос к fal.ai: модель={model_name}, ar={ar_x}:{ar_y}")
 
                 for attempt in range(fails_to_next):
                     try:
-                        body = _build_body(body_tpl, story_text, ar_x, ar_y, video_duration)
+                        body = _build_body(body_tpl, story_text, ar_x, ar_y, video_duration, log_id)
                         resp = requests.post(submit_url, headers=_headers(), json=body, timeout=30)
                     except requests.exceptions.Timeout:
-                        if log_id:
-                            db_log_entry(log_id, f"[{model_name}] таймаут (30 с), попытка {attempt + 1}/{fails_to_next}", level='warn')
+                        pipeline_log(log_id, f"[{model_name}] таймаут (30 с), попытка {attempt + 1}/{fails_to_next}", level='warn')
                         continue
                     except requests.exceptions.RequestException as e:
-                        if log_id:
-                            db_log_entry(log_id, f"[{model_name}] ошибка соединения: {e}", level='warn')
+                        pipeline_log(log_id, f"[{model_name}] ошибка соединения: {e}", level='warn')
                         continue
 
                     try:
@@ -388,27 +376,22 @@ def run(batch_id):
                     except ValueError:
                         if _is_provider_fatal(resp.status_code, resp.text):
                             msg = f"[{model_name}] Фатальная ошибка провайдера (HTTP {resp.status_code}): {resp.text}"
-                            if log_id:
-                                db_log_entry(log_id, msg, level='error')
+                            pipeline_log(log_id, msg, level='error')
                             raise ProviderFatalError(msg)
-                        if log_id:
-                            db_log_entry(log_id, f"[{model_name}] не-JSON (HTTP {resp.status_code}): {resp.text}", level='warn')
+                        pipeline_log(log_id, f"[{model_name}] не-JSON (HTTP {resp.status_code}): {resp.text}", level='warn')
                         continue
 
                     if resp.status_code >= 400:
                         err = data.get('error', data)
                         if _is_provider_fatal(resp.status_code, err):
                             msg = f"[{model_name}] Фатальная ошибка провайдера (HTTP {resp.status_code}): {err}"
-                            if log_id:
-                                db_log_entry(log_id, msg, level='error')
+                            pipeline_log(log_id, msg, level='error')
                             raise ProviderFatalError(msg)
-                        if log_id:
-                            db_log_entry(log_id, f"[{model_name}] HTTP {resp.status_code}: {err}", level='warn')
+                        pipeline_log(log_id, f"[{model_name}] HTTP {resp.status_code}: {err}", level='warn')
                         continue
 
                     if 'request_id' not in data:
-                        if log_id:
-                            db_log_entry(log_id, f"[{model_name}] нет request_id: {str(data)}", level='warn')
+                        pipeline_log(log_id, f"[{model_name}] нет request_id: {str(data)}", level='warn')
                         continue
 
                     request_id   = data['request_id']
@@ -426,18 +409,16 @@ def run(batch_id):
             if not request_id:
                 if pinned_model_id:
                     msg = f'Пробная модель {models[0]["name"]} исчерпала все попытки ({fails_to_next})'
-                    if log_id:
-                        db_log_update(log_id, msg, 'error')
-                        db_log_entry(log_id, msg, level='error')
+                    db_log_update(log_id, msg, 'error')
+                    pipeline_log(log_id, msg, level='error')
                     db_set_batch_video_error(batch_id)
-                    print(f"[video] {msg}")
+                    pipeline_log(None, f"[video] {msg}")
                     return
                 else:
                     msg = 'Все активные видео-модели не приняли запрос — повтор с первой модели'
-                    if log_id:
-                        db_log_update(log_id, msg, 'warn')
-                        db_log_entry(log_id, msg, level='warn')
-                    print(f"[video] {msg}")
+                    db_log_update(log_id, msg, 'warn')
+                    pipeline_log(log_id, msg, level='warn')
+                    pipeline_log(None, f"[video] {msg}")
                     return
 
             db_set_batch_video_pending(batch_id, {
@@ -446,15 +427,13 @@ def run(batch_id):
                 'response_url': response_url,
                 'model_name':   used_model,
             })
-            if log_id:
-                db_log_entry(log_id, f"Запрос принят ({used_model}): {request_id}")
-            print(f"[video] Генерация запущена: request_id={request_id}")
+            pipeline_log(log_id, f"Запрос принят ({used_model}): {request_id}")
+            pipeline_log(None, f"[video] Генерация запущена: request_id={request_id}")
 
         video_url, poll_err = _poll(log_id, status_url, response_url)
         if not video_url:
             if poll_err:
-                if log_id:
-                    db_log_update(log_id, poll_err, 'error')
+                db_log_update(log_id, poll_err, 'error')
                 notify_failure(f"video: {poll_err} (батч {batch_id[:8]})")
             if is_probe:
                 db_set_batch_video_error(batch_id)
@@ -462,25 +441,22 @@ def run(batch_id):
                 db_set_batch_story_ready_from_error(batch_id)
             return
 
-        if log_id:
-            db_log_entry(log_id, f"Скачиваю оригинал: {video_url}")
-        print(f"[video] Скачиваю оригинал с fal.ai…")
+        pipeline_log(log_id, f"Скачиваю оригинал: {video_url}")
+        pipeline_log(None, f"[video] Скачиваю оригинал с fal.ai…")
         try:
             r = requests.get(video_url, timeout=120, stream=True)
             r.raise_for_status()
             original_data = b''.join(r.iter_content(chunk_size=256 * 1024))
             orig_mb = round(len(original_data) / 1024 / 1024, 1)
             db_set_batch_original_video(batch_id, original_data)
-            if log_id:
-                db_log_entry(log_id, f"Оригинал сохранён ({orig_mb} МБ)")
-            print(f"[video] Оригинал сохранён в БД ({orig_mb} МБ)")
+            pipeline_log(log_id, f"Оригинал сохранён ({orig_mb} МБ)")
+            pipeline_log(None, f"[video] Оригинал сохранён в БД ({orig_mb} МБ)")
         except Exception as e:
             msg = f"Ошибка скачивания оригинала: {e}"
             db_log_update(log_id, msg, 'error')
-            if log_id:
-                db_log_entry(log_id, msg, level='error')
+            pipeline_log(log_id, msg, level='error')
             db_set_batch_video_error(batch_id)
-            print(f"[video] {msg}")
+            pipeline_log(None, f"[video] {msg}")
             notify_failure(f"video: {msg} (батч {batch_id[:8]})")
             return
 
@@ -489,9 +465,8 @@ def run(batch_id):
             db_set_batch_video_model(batch_id, used_model_id)
         msg = f'Видео сгенерировано ({used_model})' if used_model else 'Видео сгенерировано'
         db_log_update(log_id, msg, 'ok')
-        if log_id:
-            db_log_entry(log_id, f"URL: {video_url}")
-        print(f"[video] Готово: batch → video_ready, url={video_url[:60]}…")
+        pipeline_log(log_id, f"URL: {video_url}")
+        pipeline_log(None, f"[video] Готово: batch → video_ready, url={video_url[:60]}…")
 
     except AspectRatioConflictError as e:
         msg = str(e)
@@ -500,7 +475,7 @@ def run(batch_id):
             db_log_update(log_id, msg, 'error')
         if batch_id:
             db_set_batch_video_error(batch_id)
-        print(f"[video] {msg}")
+        pipeline_log(None, f"[video] {msg}")
         notify_failure(f"video: {msg}")
     except ProviderFatalError as e:
         msg = str(e)
@@ -509,7 +484,7 @@ def run(batch_id):
             db_log_update(log_id, msg, 'error')
         if batch_id:
             db_set_batch_video_error(batch_id)
-        print(f"[video] Фатальная ошибка провайдера: {msg}")
+        pipeline_log(None, f"[video] Фатальная ошибка провайдера: {msg}")
         notify_failure(f"video: фатальная ошибка провайдера — {msg}")
     except Exception as e:
         handle_critical_error('video', batch_id, log_id, e)

@@ -4,9 +4,10 @@ from db import (
     db_get,
     db_get_schedule, db_get_active_targets, db_ensure_batch, db_get_last_pipeline_run,
 )
-from log import db_log_pipeline, db_log_entry
+from log import db_log_pipeline
 from utils.consts import MSK
 from utils.utils import parse_hhmm
+from pipelines.base import pipeline_log, handle_critical_error
 
 
 def run(loop_interval: int):
@@ -59,12 +60,11 @@ def run(loop_interval: int):
                         )
                         if log_id:
                             dt_msk = dt.astimezone(MSK)
-                            db_log_entry(log_id, f"Запланирована публикация: {dt_msk.strftime('%d.%m.%Y %H:%M')} МСК")
+                            pipeline_log(log_id, f"Запланирована публикация: {dt_msk.strftime('%d.%m.%Y %H:%M')} МСК")
                             target_names = ', '.join(t['name'] for t in targets)
-                            db_log_entry(log_id, f"Таргеты: {target_names}")
-                            db_log_entry(log_id, f"Горизонт планирования: {buffer_hours} ч")
-                        print(f"[planning] Создан батч: {dt.strftime('%d.%m %H:%M')} UTC")
+                            pipeline_log(log_id, f"Таргеты: {target_names}")
+                            pipeline_log(log_id, f"Горизонт планирования: {buffer_hours} ч")
+                        pipeline_log(None, f"[planning] Создан батч: {dt.strftime('%d.%m %H:%M')} UTC")
 
     except Exception as e:
-        db_log_pipeline('planning', f"Сбой планирования: {e}", status='error')
-        print(f"[planning] Ошибка: {e}")
+        handle_critical_error('planning', None, None, e)

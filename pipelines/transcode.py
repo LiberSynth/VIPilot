@@ -30,29 +30,35 @@ from db import (
     db_set_batch_transcode_ready,
     db_set_batch_transcode_error,
 )
-from log import db_log_pipeline, db_log_entry, db_log_update
-from pipelines.base import check_cancelled, handle_critical_error
+from log import db_log_pipeline, db_log_update
+from pipelines.base import check_cancelled, handle_critical_error, pipeline_log
 
 
 def _probe_duration(src):
-    """Возвращает длительность видео в секундах через ffprobe, или None при ошибке."""
-    try:
-        result = subprocess.run(
-            [
-                'ffprobe', '-v', 'error',
-                '-select_streams', 'v:0',
-                '-show_entries', 'format=duration',
-                '-of', 'default=noprint_wrappers=1:nokey=1',
-                src,
-            ],
-            capture_output=True,
-            timeout=30,
-        )
-        if result.returncode == 0:
-            return float(result.stdout.decode().strip())
-    except Exception:
-        pass
-    return None
+    """Возвращает длительность видео в секундах через ffprobe.
+
+    Бросает RuntimeError при любом сбое (ненулевой код возврата, невалидный вывод,
+    недоступный ffprobe) — это признак битого окружения, который должен
+    всплыть до run() как fatal.
+    """
+    result = subprocess.run(
+        [
+            'ffprobe', '-v', 'error',
+            '-select_streams', 'v:0',
+            '-show_entries', 'format=duration',
+            '-of', 'default=noprint_wrappers=1:nokey=1',
+            src,
+        ],
+        capture_output=True,
+        timeout=30,
+    )
+    if result.returncode != 0:
+        stderr = result.stderr.decode(errors='replace').strip()
+        raise RuntimeError(f"ffprobe завершился с кодом {result.returncode}: {stderr}")
+    raw = result.stdout.decode().strip()
+    if not raw:
+        raise RuntimeError("ffprobe вернул пустой вывод — длительность не определена")
+    return float(raw)
 
 
 def _ffmpeg(src, dst, log_id):
@@ -73,10 +79,7 @@ def _ffmpeg(src, dst, log_id):
         '-movflags', '+faststart',
     ]
 
-    if duration is not None:
-        cmd += ['-t', str(duration)]
-    else:
-        cmd += ['-shortest']
+    cmd += ['-t', str(duration)]
 
     cmd.append(dst)
 
@@ -91,22 +94,17 @@ def _ffmpeg(src, dst, log_id):
             proc.kill()
             proc.communicate()
         msg = f'Таймаут ffmpeg ({timeout_sec // 60} мин)'
-        if log_id:
-            db_log_entry(log_id, msg, level='warn')
-        print(f"[transcode] {msg}")
+        pipeline_log(log_id, f"[transcode] {msg}", level='warn')
         return False
     except Exception as e:
         msg = f'ffmpeg исключение: {e}'
-        if log_id:
-            db_log_entry(log_id, msg, level='warn')
-        print(f"[transcode] {msg}")
+        pipeline_log(log_id, f"[transcode] {msg}", level='warn')
         return False
 
     if returncode != 0:
         err = stderr_bytes.decode(errors='replace')[-600:]
-        if log_id:
-            db_log_entry(log_id, f'ffmpeg код {returncode}: {err}', level='warn')
-        print(f"[transcode] ffmpeg завершился с кодом {returncode}. Хвост stderr:\n{err}")
+        pipeline_log(log_id, f'ffmpeg код {returncode}: {err}', level='warn')
+        pipeline_log(log_id, f"[transcode] ffmpeg завершился с кодом {returncode}. Хвост stderr:\n{err}", level='warn')
         return False
     return True
 
@@ -141,10 +139,10 @@ def run(batch_id):
 
         if not do_transcode:
             db_set_batch_transcode_skip(batch_id)
-            print(f"[transcode] Батч {batch_id[:8]}… ({target}) — транскод отключен, пропускаю")
+            pipeline_log(None, f"[transcode] Батч {batch_id[:8]}… ({target}) — транскод отключен, пропускаю")
             return
 
-        print(f"[transcode] Батч {batch_id[:8]}… ({target}) — начало транскодирования")
+        pipeline_log(None, f"[transcode] Батч {batch_id[:8]}… ({target}) — начало транскодирования")
 
         log_id = db_log_pipeline(
             'transcode', 'Транскодирование…',
@@ -154,14 +152,12 @@ def run(batch_id):
         original_data = db_get_batch_original_video(batch_id)
         if original_data is None:
             msg = 'movies.raw_data = NULL у батча в статусе video_ready — ошибка логики'
-            if log_id:
-                db_log_entry(log_id, msg, level='error')
+            pipeline_log(log_id, msg, level='error')
             raise RuntimeError(msg)
 
         src_mb = round(len(original_data) / 1024 / 1024, 1)
-        if log_id:
-            db_log_entry(log_id, f'Оригинал получен из БД ({src_mb} МБ), запускаю ffmpeg…')
-        print(f"[transcode] Оригинал {src_mb} МБ, запускаю ffmpeg…")
+        pipeline_log(log_id, f'Оригинал получен из БД ({src_mb} МБ), запускаю ffmpeg…')
+        pipeline_log(None, f"[transcode] Оригинал {src_mb} МБ, запускаю ffmpeg…")
 
         tmp_src_path = None
         tmp_out_path = None
@@ -178,20 +174,19 @@ def run(batch_id):
             if tmp_src_path:
                 try:
                     os.unlink(tmp_src_path)
-                except Exception:
-                    pass
+                except Exception as e:
+                    pipeline_log(log_id, f"Не удалось удалить временный файл {tmp_src_path}: {e}", level='warn')
 
         if not ok:
             try:
                 os.unlink(tmp_out_path)
-            except Exception:
-                pass
+            except Exception as e:
+                pipeline_log(log_id, f"Не удалось удалить временный файл {tmp_out_path}: {e}", level='warn')
             msg = 'Ошибка ffmpeg — транскод пропущен, публикация использует оригинал'
             db_log_update(log_id, msg, 'warn')
-            if log_id:
-                db_log_entry(log_id, msg, level='warn')
+            pipeline_log(log_id, msg, level='warn')
             db_set_batch_transcode_skip(batch_id)
-            print(f"[transcode] {msg}")
+            pipeline_log(None, f"[transcode] {msg}")
             notify_failure(f"transcode: ffmpeg сбой (некритично) — батч {batch_id[:8]}", partial=True)
             return
 
@@ -202,10 +197,9 @@ def run(batch_id):
 
         msg = f'Транскодировано (H.264, {out_mb} МБ)'
         db_log_update(log_id, msg, 'ok')
-        if log_id:
-            db_log_entry(log_id, msg)
+        pipeline_log(log_id, msg)
         db_set_batch_transcode_ready(batch_id, video_data)
-        print(f"[transcode] Готово: {out_mb} МБ → БД")
+        pipeline_log(None, f"[transcode] Готово: {out_mb} МБ → БД")
 
     except Exception as e:
         handle_critical_error('transcode', batch_id, log_id, e)
