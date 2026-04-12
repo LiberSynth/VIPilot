@@ -159,7 +159,7 @@ def poll(log_id, status_url: str, response_url: str):
         try:
             s = requests.get(
                 status_url,
-                headers={'Authorization': f'Key {_FAL_KEY}'},
+                headers=_headers(),
                 timeout=15,
             ).json()
             status = s.get('status')
@@ -168,7 +168,7 @@ def poll(log_id, status_url: str, response_url: str):
             if status == 'COMPLETED':
                 result = requests.get(
                     response_url,
-                    headers={'Authorization': f'Key {_FAL_KEY}'},
+                    headers=_headers(),
                     timeout=15,
                 ).json()
                 detail = result.get('detail')
