@@ -593,7 +593,8 @@
   .monitor-sysgroup.open .monitor-hdr-actions { display: flex; }
 
   .monitor-hdr-actions-always {
-    display: flex; gap: 4px; flex-shrink: 0; align-items: center;
+    display: flex; gap: 4px; align-items: center;
+    justify-content: flex-end; padding: 4px 8px;
   }
 
   .cycle-float-btn {
