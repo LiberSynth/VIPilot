@@ -29,8 +29,7 @@ from clients import openrouter
 
 
 def run(batch_id):
-    batch_done = False
-    log_id     = None
+    log_id = None
 
     try:
         batch = db_get_batch_by_id(batch_id)
@@ -62,11 +61,9 @@ def run(batch_id):
             pipeline_log(None, f"[story] Батч {batch_id[:8]}… — story_id задан вручную ({preset_story_id[:8]}…), батч → story_ready")
             if not db_set_batch_story(batch_id, preset_story_id):
                 db_set_batch_status(batch_id, 'error')
-            batch_done = True
             return
 
         if not is_probe and check_cancelled('story', batch_id, batch):
-            batch_done = True
             return
 
         if not is_probe and env_get('emulation_mode', '0') != '1' and env_get('use_donor', '1') == '1' \
@@ -93,7 +90,6 @@ def run(batch_id):
                     )
                     db_set_batch_status(batch_id, 'error')
                     pipeline_log(None, f"[story] {msg}")
-                    batch_done = True
                     return
                 donor_title = db_get_story_title(donor_story_id) if donor_story_id else None
                 if donor_title:
@@ -106,7 +102,6 @@ def run(batch_id):
                 )
                 pipeline_log(log_id, detail)
                 pipeline_log(None, f"[story] Батч {batch_id[:8]}… — найден донор {donor_batch_id}, батч → story_ready")
-                batch_done = True
                 return
 
         if batch['type'] != 'story_probe':
@@ -133,7 +128,6 @@ def run(batch_id):
                 )
                 db_log_update(pool_log_id, f'Сюжет из пула: «{pool_story_title}»', 'ok')
                 pipeline_log(None, f"[story] Батч {batch_id[:8]}… — сюжет из пула {pool_story_id[:8]}…, батч → story_ready")
-                batch_done = True
                 return
             else:
                 if approve_stories:
@@ -142,7 +136,6 @@ def run(batch_id):
                     db_log_update(pool_log_id, msg, 'error')
                     db_set_batch_status(batch_id, 'error')
                     pipeline_log(None, f"[story] Батч {batch_id[:8]}… — {msg}")
-                    batch_done = True
                     return
                 reason = (
                     f"Подходящий сюжет в пуле не найден (условие: {condition_label}). "
@@ -234,7 +227,6 @@ def run(batch_id):
                 pipeline_log(log_id, msg, level='error')
                 pipeline_log(None, f"[story] {msg}")
                 db_set_batch_status(batch_id, 'error')
-                batch_done = True
                 return
 
             if pass_num < max_passes - 1:
@@ -248,7 +240,6 @@ def run(batch_id):
                 pipeline_log(log_id, msg, level='error')
                 pipeline_log(None, f"[story] {msg}")
                 db_set_batch_status(batch_id, 'error')
-                batch_done = True
                 return
 
         pipeline_log(None, f"[story] Сюжет получен: {result[:100]}{'…' if len(result) > 100 else ''}")
@@ -258,7 +249,6 @@ def run(batch_id):
         if is_story_probe:
             db_set_batch_story_probe(batch_id, story_id)
             db_set_story_model(story_id, used_model_id)
-            batch_done = True
             msg = f'Сюжет сгенерирован ({used_model_name})'
             db_log_update(log_id, msg, 'ok')
             pipeline_log(log_id, f"Сохранён как story {story_id}, батч → story_probe")
@@ -271,7 +261,6 @@ def run(batch_id):
                 pipeline_log(None, f"[story] {msg}")
                 return
             db_set_story_model(story_id, used_model_id)
-            batch_done = True
             msg = f'Сюжет сгенерирован ({used_model_name})'
             db_log_update(log_id, msg, 'ok')
             pipeline_log(log_id, f"Сохранён как story {story_id}, батч → story_ready")
