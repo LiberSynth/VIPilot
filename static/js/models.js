@@ -38,11 +38,21 @@ window.createDirectorVideo = function(modelId, modelName, btn) {
   var hintEl = document.getElementById('director-video-hint');
   var videoWrap = document.getElementById('director-video-wrap');
   var _DEFAULT_HINT = 'Вы можете сгенерировать ролик, нажав кнопку «Создать» на нужной модели.';
+  var _hintResetTimer = null;
+
+  function setHint(text) {
+    if (hintEl) hintEl.textContent = text;
+  }
+
+  function scheduleResetHint() {
+    if (_hintResetTimer) clearTimeout(_hintResetTimer);
+    _hintResetTimer = setTimeout(function() { _hintResetTimer = null; setHint(_DEFAULT_HINT); }, 2000);
+  }
 
   btn.classList.add('probing');
 
   if (videoWrap) { videoWrap.innerHTML = ''; videoWrap.style.display = 'none'; }
-  if (hintEl) hintEl.textContent = _DEFAULT_HINT;
+  setHint(_DEFAULT_HINT);
 
   fetch('/api/video-models/' + encodeURIComponent(modelId) + '/probe', {
     method: 'POST',
@@ -53,7 +63,7 @@ window.createDirectorVideo = function(modelId, modelName, btn) {
     .then(function(data) {
       if (data.error) {
         btn.classList.remove('probing');
-        if (hintEl) hintEl.textContent = 'Ошибка: ' + data.error;
+        setHint('Ошибка: ' + data.error);
         return;
       }
       var batchId = data.batch_id;
@@ -63,13 +73,17 @@ window.createDirectorVideo = function(modelId, modelName, btn) {
         fetch('/api/batch/' + batchId + '/logs')
           .then(function(r) { return r.json(); })
           .then(function(d) {
-            if (d.error) { setTimeout(poll, 2000); return; }
+            if (d.error) { setTimeout(poll, 700); return; }
             var logs = d.logs || [];
-            var lastMsg = '';
-            for (var i = logs.length - 1; i >= 0; i--) {
-              if (logs[i].message) { lastMsg = logs[i].message; break; }
+            if (logs.length) {
+              var lastLog = logs[logs.length - 1];
+              var entries = lastLog.entries || [];
+              if (entries.length) {
+                setHint(entries[entries.length - 1].message);
+              } else if (lastLog.message) {
+                setHint(lastLog.message);
+              }
             }
-            if (hintEl && lastMsg) hintEl.textContent = lastMsg;
             var status = d.batch_status;
             if (_TERMINAL.indexOf(status) !== -1) {
               btn.classList.remove('probing');
@@ -79,20 +93,19 @@ window.createDirectorVideo = function(modelId, modelName, btn) {
                   videoWrap.innerHTML = '<video class="probe-video" controls autoplay src="' + src + '"></video>';
                   videoWrap.style.display = 'block';
                 }
-              } else {
-                if (hintEl) hintEl.textContent = _DEFAULT_HINT;
               }
+              scheduleResetHint();
             } else {
-              setTimeout(poll, 2000);
+              setTimeout(poll, 700);
             }
           })
-          .catch(function() { setTimeout(poll, 3000); });
+          .catch(function() { setTimeout(poll, 700); });
       }
       poll();
     })
     .catch(function(e) {
       btn.classList.remove('probing');
-      if (hintEl) hintEl.textContent = 'Ошибка запроса: ' + e;
+      setHint('Ошибка запроса: ' + e);
     });
 };
 
