@@ -34,35 +34,8 @@ from log import db_log_pipeline, db_log_update
 from pipelines.base import check_cancelled, handle_critical_error, pipeline_log
 
 
-def _probe_duration(src):
-    """Возвращает длительность видео в секундах через ffprobe.
-
-    Бросает RuntimeError при любом сбое (ненулевой код возврата, невалидный вывод,
-    недоступный ffprobe) — это признак битого окружения, который должен
-    всплыть до run() как fatal.
-    """
-    result = subprocess.run(
-        [
-            'ffprobe', '-v', 'error',
-            '-select_streams', 'v:0',
-            '-show_entries', 'format=duration',
-            '-of', 'default=noprint_wrappers=1:nokey=1',
-            src,
-        ],
-        capture_output=True,
-        timeout=30,
-    )
-    if result.returncode != 0:
-        stderr = result.stderr.decode(errors='replace').strip()
-        raise RuntimeError(f"ffprobe завершился с кодом {result.returncode}: {stderr}")
-    raw = result.stdout.decode().strip()
-    if not raw:
-        raise RuntimeError("ffprobe вернул пустой вывод — длительность не определена")
-    return float(raw)
-
-
 def _ffmpeg(src, dst, log_id):
-    duration = _probe_duration(src)
+    duration = float(db_get('video_duration', '60'))
 
     cmd = [
         'ffmpeg', '-y',
