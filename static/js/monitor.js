@@ -27,7 +27,7 @@
     published:            'опубликовано',
     published_partially:  'частично опубликовано',
     publish_error:        'публикация: ошибка',
-    probe:            'пробный',
+    movie_probe:      'пробный',
     story_probe:      'пробный (сюжет)',
     cancelled:        'отменён',
     donated:          'донор',
@@ -166,7 +166,7 @@
         : batch.type === 'story_probe'
           ? 'Пробный сюжет'
           : 'Публикация: сейчас';
-    const statusLabel = (bs === 'probe' || bs === 'story_probe') ? 'выполнен' : (STATUS_LABELS[bs] || bs);
+    const statusLabel = (bs === 'movie_probe' || bs === 'story_probe') ? 'выполнен' : (STATUS_LABELS[bs] || bs);
     const sub = [schedStr, statusLabel]
       .filter(Boolean).join(' · ');
 
@@ -183,7 +183,7 @@
       '</div>';
     }
 
-    const doneStatuses    = ['published', 'probe', 'story_probe'];
+    const doneStatuses    = ['published', 'movie_probe', 'story_probe'];
     const partialStatuses = ['published_partially'];
     const waitStatuses    = ['story_ready', 'video_pending', 'video_ready', 'transcode_ready'];
     const errorStatuses   = ['error', 'video_error', 'transcode_error', 'publish_error', 'fatal_error'];
