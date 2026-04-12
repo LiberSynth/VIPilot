@@ -112,7 +112,8 @@
 
     <div class="card" style="margin-top:0">
       <div class="card-title">Ролик</div>
-      <div class="hint">Вы можете сгенерировать ролик, нажав кнопку «Создать» на нужной модели.</div>
+      <div class="hint" id="director-video-hint">Вы можете сгенерировать ролик, нажав кнопку «Создать» на нужной модели.</div>
+      <div id="director-video-wrap" style="display:none"></div>
     </div>
 
     {% from 'common/panel_video.html' import model_list_block %}

@@ -228,7 +228,10 @@ def api_video_model_probe(model_id):
     if not m:
         return jsonify({"error": "Модель не найдена"}), 404
 
-    batch_id = db_create_probe_batch(model_id)
+    body = request.get_json(silent=True) or {}
+    story_id = body.get("story_id") or None
+
+    batch_id = db_create_probe_batch(model_id, story_id=story_id)
     if not batch_id:
         return jsonify({"error": "Не удалось создать батч"}), 500
     wf_state.wakeup_loop()

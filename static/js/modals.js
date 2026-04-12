@@ -138,7 +138,7 @@
         body.innerHTML = '';
         _doBatchLogPoll(data.batch_id, body, function(d) {
           if (d.story_id) _showStoryResult(d.story_id, body);
-        });
+        }, btn);
       })
       .catch(function(e) {
         if (_probeBtn) { _probeBtn.classList.remove('probing'); _probeBtn = null; }
@@ -196,7 +196,7 @@
       .catch(function() {});
   }
 
-  window.probeVideoModel = function(modelId, modelName, btn) {
+  window.createProbeVideo = function(modelId, modelName, btn) {
     if (!_openProbeOverlay(modelName)) return;
     var body = document.getElementById('probe-modal-body');
     var overlay = document.getElementById('probe-modal-overlay');
@@ -215,7 +215,7 @@
         }
         if (overlay && overlay.dataset) overlay.dataset.batchId = data.batch_id;
         body.innerHTML = '';
-        _doBatchLogPoll(data.batch_id, body, null);
+        _doBatchLogPoll(data.batch_id, body, null, btn);
       })
       .catch(function(e) {
         if (_probeBtn) { _probeBtn.classList.remove('probing'); _probeBtn = null; }
@@ -224,8 +224,8 @@
       });
   };
 
-  function _doBatchLogPoll(batchId, body, onDone) {
-    var _TERMINAL = ['probe', 'story_probe', 'video_error', 'transcode_error', 'publish_error', 'cancelled'];
+  function _doBatchLogPoll(batchId, body, onDone, btn) {
+    var _TERMINAL = ['probe', 'movie_probe', 'story_probe', 'video_error', 'transcode_error', 'publish_error', 'cancelled', 'error'];
 
     var videoSection = document.createElement('div');
     videoSection.className    = 'probe-modal-video-section';
@@ -276,7 +276,7 @@
 
     function showVideo() {
       var src = '/api/batch/' + encodeURIComponent(batchId) + '/video';
-      videoSection.innerHTML    = '<video controls autoplay src="' + src + '"></video>';
+      videoSection.innerHTML    = '<video class="probe-video" controls autoplay src="' + src + '"></video>';
       videoSection.style.display = 'block';
     }
 
@@ -288,7 +288,7 @@
           render(d);
           var status = d.batch_status;
           if (_TERMINAL.indexOf(status) !== -1) {
-            if (_probeBtn) { _probeBtn.classList.remove('probing'); _probeBtn = null; }
+            if (btn) { btn.classList.remove('probing'); btn = null; }
             if (onDone) { onDone(d); }
             else if (d.has_video_data) { showVideo(); }
           } else {
@@ -299,6 +299,8 @@
     }
     poll();
   }
+
+  window._doBatchLogPoll = _doBatchLogPoll;
 
   window.closeProbeModal = function() {
     var overlay = document.getElementById('probe-modal-overlay');

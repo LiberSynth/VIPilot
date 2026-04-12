@@ -31,7 +31,70 @@ window.cycleVideoGrade = function(el) {
   });
 };
 
-window.createDirectorVideo = function(id, name, btn) {};
+window.createDirectorVideo = function(modelId, modelName, btn) {
+  var storyIdEl = document.getElementById('director-story-id');
+  var storyId = storyIdEl ? (storyIdEl.value || '') : '';
+
+  var hintEl = document.getElementById('director-video-hint');
+  var videoWrap = document.getElementById('director-video-wrap');
+  var _DEFAULT_HINT = 'Вы можете сгенерировать ролик, нажав кнопку «Создать» на нужной модели.';
+
+  btn.classList.add('probing');
+
+  if (videoWrap) { videoWrap.innerHTML = ''; videoWrap.style.display = 'none'; }
+  if (hintEl) hintEl.textContent = _DEFAULT_HINT;
+
+  fetch('/api/video-models/' + encodeURIComponent(modelId) + '/probe', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(storyId ? { story_id: storyId } : {})
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error) {
+        btn.classList.remove('probing');
+        if (hintEl) hintEl.textContent = 'Ошибка: ' + data.error;
+        return;
+      }
+      var batchId = data.batch_id;
+      var _TERMINAL = ['probe', 'movie_probe', 'story_probe', 'video_error', 'transcode_error', 'publish_error', 'cancelled', 'error'];
+
+      function poll() {
+        fetch('/api/batch/' + batchId + '/logs')
+          .then(function(r) { return r.json(); })
+          .then(function(d) {
+            if (d.error) { setTimeout(poll, 2000); return; }
+            var logs = d.logs || [];
+            var lastMsg = '';
+            for (var i = logs.length - 1; i >= 0; i--) {
+              if (logs[i].message) { lastMsg = logs[i].message; break; }
+            }
+            if (hintEl && lastMsg) hintEl.textContent = lastMsg;
+            var status = d.batch_status;
+            if (_TERMINAL.indexOf(status) !== -1) {
+              btn.classList.remove('probing');
+              if (d.has_video_data) {
+                var src = '/api/batch/' + encodeURIComponent(batchId) + '/video';
+                if (videoWrap) {
+                  videoWrap.innerHTML = '<video class="probe-video" controls autoplay src="' + src + '"></video>';
+                  videoWrap.style.display = 'block';
+                }
+              } else {
+                if (hintEl) hintEl.textContent = _DEFAULT_HINT;
+              }
+            } else {
+              setTimeout(poll, 2000);
+            }
+          })
+          .catch(function() { setTimeout(poll, 3000); });
+      }
+      poll();
+    })
+    .catch(function(e) {
+      btn.classList.remove('probing');
+      if (hintEl) hintEl.textContent = 'Ошибка запроса: ' + e;
+    });
+};
 
 (function() {
   var dragSrcId = null;
@@ -94,7 +157,7 @@ window.createDirectorVideo = function(id, name, btn) {};
     var saveOrderFn = opts.saveOrderFn || saveVideoOrder;
     var activateFn  = opts.activateFn  || 'activateModel';
     var actionTitle = opts.actionTitle || 'Пробный запрос';
-    var actionFn    = opts.actionFn    || 'probeVideoModel';
+    var actionFn    = opts.actionFn    || 'createProbeVideo';
 
     const container = document.getElementById(containerId);
     if (!container) return;
@@ -170,7 +233,7 @@ window.createDirectorVideo = function(id, name, btn) {};
           saveOrderFn: saveVideoOrder,
           activateFn: 'activateModel',
           actionTitle: 'Пробный запрос',
-          actionFn: 'probeVideoModel'
+          actionFn: 'createProbeVideo'
         });
       })
       .catch(function() {

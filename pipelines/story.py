@@ -130,6 +130,20 @@ def run(batch_id):
             tgt    = active_targets[0] if active_targets else {}
             target = tgt.get('name') or 'adhoc'
 
+        if batch.get('story_id') is not None and batch['type'] == 'movie_probe':
+            preset_story_id = str(batch['story_id'])
+            log_id = db_log_pipeline(
+                'story', 'Сюжет задан вручную — пропуск поиска и генерации',
+                status='ok', batch_id=batch_id,
+            )
+            if log_id:
+                db_log_entry(log_id, f"Используется заданный сюжет id={preset_story_id[:8]}…")
+            print(f"[story] Батч {batch_id[:8]}… — story_id задан вручную ({preset_story_id[:8]}…), батч → story_ready")
+            if not db_set_batch_story(batch_id, preset_story_id):
+                db_set_batch_status(batch_id, 'error')
+            batch_done = True
+            return
+
         if not is_probe and check_cancelled('story', batch_id, batch):
             batch_done = True
             return
