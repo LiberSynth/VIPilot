@@ -59,4 +59,5 @@ def run():
             db_log_pipeline("cleanup", "Очистка: " + ", ".join(summary), status="ok")
 
     except Exception as e:
+        # notify_failure не импортируется напрямую — он вызывается внутри handle_critical_error (см. base.py)
         handle_critical_error('cleanup', None, None, e)

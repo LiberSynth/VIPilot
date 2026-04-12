@@ -67,4 +67,5 @@ def run(loop_interval: int):
                         pipeline_log(None, f"[planning] Создан батч: {dt.strftime('%d.%m %H:%M')} UTC")
 
     except Exception as e:
+        # notify_failure не импортируется напрямую — он вызывается внутри handle_critical_error (см. base.py)
         handle_critical_error('planning', None, None, e)
