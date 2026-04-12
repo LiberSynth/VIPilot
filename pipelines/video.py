@@ -233,34 +233,38 @@ def run(batch_id):
             status_url   = None
             response_url = None
 
-            for m in models:
-                model_name   = m['name']
-                submit_url   = m['submit_url']
-                platform_url = m['platform_url']
-                body_tpl     = m['body_tpl']
+            max_passes = 5
+            for pass_num in range(max_passes):
+                for m in models:
+                    model_name   = m['name']
+                    submit_url   = m['submit_url']
+                    platform_url = m['platform_url']
+                    body_tpl     = m['body_tpl']
 
-                pipeline_log(log_id, f"Модель: {model_name}")
-                pipeline_log(None, f"[video] Запрос к провайдеру: модель={model_name}, ar={ar_x}:{ar_y}")
+                    pipeline_log(log_id, f"Модель: {model_name}")
+                    pipeline_log(None, f"[video] Запрос к провайдеру: модель={model_name}, ar={ar_x}:{ar_y}")
 
-                submit_result = None
-                for attempt in range(fails_to_next):
-                    submit_result = falai.submit(
-                        log_id, model_name, submit_url, platform_url,
-                        body_tpl, story_text, ar_x, ar_y, video_duration,
-                    )
+                    submit_result = None
+                    for attempt in range(fails_to_next):
+                        submit_result = falai.submit(
+                            log_id, model_name, submit_url, platform_url,
+                            body_tpl, story_text, ar_x, ar_y, video_duration,
+                        )
+                        if submit_result:
+                            break
+                        pipeline_log(log_id, f"[{model_name}] неудачная попытка {attempt + 1}/{fails_to_next}", level='warn')
+
                     if submit_result:
+                        request_id   = submit_result['request_id']
+                        status_url   = submit_result['status_url']
+                        response_url = submit_result['response_url']
+                        used_model    = model_name
+                        used_model_id = m['id']
                         break
-                    pipeline_log(log_id, f"[{model_name}] неудачная попытка {attempt + 1}/{fails_to_next}", level='warn')
 
-                if submit_result:
-                    request_id   = submit_result['request_id']
-                    status_url   = submit_result['status_url']
-                    response_url = submit_result['response_url']
-                    used_model    = model_name
-                    used_model_id = m['id']
+                if request_id:
                     break
 
-            if not request_id:
                 if pinned_model_id:
                     msg = f'Пробная модель {models[0]["name"]} исчерпала все попытки ({fails_to_next})'
                     db_log_update(log_id, msg, 'error')
@@ -268,11 +272,18 @@ def run(batch_id):
                     db_set_batch_video_error(batch_id)
                     pipeline_log(None, f"[video] {msg}")
                     return
-                else:
-                    msg = 'Все активные видео-модели не приняли запрос — повтор с первой модели'
+
+                if pass_num < max_passes - 1:
+                    msg = f'Все активные видео-модели не приняли запрос — повтор с первой модели (проход {pass_num + 1}/{max_passes})'
                     db_log_update(log_id, msg, 'warn')
                     pipeline_log(log_id, msg, level='warn')
                     pipeline_log(None, f"[video] {msg}")
+                else:
+                    msg = f'Все активные видео-модели не приняли запрос после {max_passes} проходов'
+                    db_log_update(log_id, msg, 'error')
+                    pipeline_log(log_id, msg, level='error')
+                    pipeline_log(None, f"[video] {msg}")
+                    db_set_batch_video_error(batch_id)
                     return
 
             db_set_batch_video_pending(batch_id, {

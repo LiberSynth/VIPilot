@@ -197,7 +197,8 @@ def run(batch_id):
         used_model_name = None
         used_model_id   = None
 
-        while not story_id:
+        max_passes = 5
+        for pass_num in range(max_passes):
             for m in models:
                 model_name = m['name']
                 pipeline_log(log_id, f"Модель: {model_name}")
@@ -224,19 +225,31 @@ def run(batch_id):
                 if story_id:
                     break
 
-            if not story_id:
-                if is_story_probe:
-                    msg = f'Модель не ответила после {fails_to_next} попыток — пробный сюжет не получен'
-                    db_log_update(log_id, msg, 'error')
-                    pipeline_log(log_id, msg, level='error')
-                    pipeline_log(None, f"[story] {msg}")
-                    db_set_batch_status(batch_id, 'error')
-                    batch_done = True
-                    return
-                msg = 'Все активные модели не дали результата — повтор с первой модели'
+            if story_id:
+                break
+
+            if is_story_probe:
+                msg = f'Модель не ответила после {fails_to_next} попыток — пробный сюжет не получен'
+                db_log_update(log_id, msg, 'error')
+                pipeline_log(log_id, msg, level='error')
+                pipeline_log(None, f"[story] {msg}")
+                db_set_batch_status(batch_id, 'error')
+                batch_done = True
+                return
+
+            if pass_num < max_passes - 1:
+                msg = f'Все активные модели не дали результата — повтор с первой модели (проход {pass_num + 1}/{max_passes})'
                 db_log_update(log_id, msg, 'warn')
                 pipeline_log(log_id, msg, level='warn')
                 pipeline_log(None, f"[story] {msg}")
+            else:
+                msg = f'Все активные модели не дали результата после {max_passes} проходов'
+                db_log_update(log_id, msg, 'error')
+                pipeline_log(log_id, msg, level='error')
+                pipeline_log(None, f"[story] {msg}")
+                db_set_batch_status(batch_id, 'error')
+                batch_done = True
+                return
 
         pipeline_log(None, f"[story] Сюжет получен: {result[:100]}{'…' if len(result) > 100 else ''}")
         pipeline_log(log_id, f"Название: {title}")
