@@ -3,8 +3,6 @@ import threading
 import time
 from flask import Blueprint, jsonify, request, Response
 
-
-
 from log import db_log_root
 
 from db import (
@@ -31,6 +29,11 @@ from db import (
     db_create_story_probe_batch,
     db_get_batch_logs,
     db_get,
+    db_get_stories_list,
+    db_get_stories_pool,
+    db_set_story_grade,
+    db_upsert_story_draft,
+    db_create_story_generate_batch,
 )
 from log import db_get_log, db_get_monitor, db_log_pipeline, db_log_entry
 from utils.auth import is_authenticated
@@ -416,5 +419,100 @@ def api_batch_publish_frame(batch_id):
         mimetype="image/jpeg",
         headers={"Cache-Control": "no-store, no-cache"},
     )
+
+
+producer_bp = Blueprint("producer_api", __name__)
+
+
+def _producer_auth_check():
+    from flask import session
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    roles = session.get("roles", [])
+    slugs = {r["slug"] for r in roles}
+    if not (slugs & {"producer", "root"}):
+        return jsonify({"error": "forbidden"}), 403
+    return None
+
+
+@producer_bp.route("/producer/stories", methods=["GET"])
+def api_producer_stories():
+    err = _producer_auth_check()
+    if err:
+        return err
+    show_used = request.args.get("show_used", "1") != "0"
+    show_bad = request.args.get("show_bad", "1") != "0"
+    stories = db_get_stories_list(show_used=show_used, show_bad=show_bad)
+    return jsonify(stories)
+
+
+@producer_bp.route("/producer/stories/pool", methods=["GET"])
+def api_producer_stories_pool():
+    err = _producer_auth_check()
+    if err:
+        return err
+    approve_stories = db_get("approve_stories", "0") == "1"
+    stories = db_get_stories_pool(grade_required=approve_stories)
+    return jsonify(stories)
+
+
+@producer_bp.route("/producer/env", methods=["POST"])
+def api_producer_env_set():
+    err = _producer_auth_check()
+    if err:
+        return err
+    data = request.get_json(silent=True) or {}
+    key = data.get("key", "")
+    value = data.get("value", "")
+    allowed_keys = {"screenwriter_show_used", "screenwriter_show_bad"}
+    if key not in allowed_keys:
+        return jsonify({"error": "invalid key"}), 400
+    env_set(key, str(value))
+    return jsonify({"ok": True})
+
+
+_PRODUCER_GRADE_CYCLE = ["good", "bad", None]
+
+
+@producer_bp.route("/producer/story/<story_id>/grade", methods=["POST"])
+def api_producer_story_grade(story_id):
+    err = _producer_auth_check()
+    if err:
+        return err
+    data = request.get_json(silent=True) or {}
+    grade = data.get("grade", "good")
+    if grade not in _PRODUCER_GRADE_CYCLE:
+        return jsonify({"error": "invalid_grade"}), 400
+    ok = db_set_story_grade(story_id, grade)
+    if ok is None or ok is False:
+        return jsonify({"error": "not_found"}), 404
+    return jsonify({"ok": True, "grade": grade})
+
+
+@producer_bp.route("/producer/story/draft", methods=["POST"])
+def api_producer_story_draft():
+    err = _producer_auth_check()
+    if err:
+        return err
+    data = request.get_json(silent=True) or {}
+    title = data.get("title", "")
+    content = data.get("content", "")
+    story_id = data.get("story_id") or None
+    new_id = db_upsert_story_draft(story_id, title, content)
+    if new_id is None:
+        return jsonify({"error": "db_error"}), 500
+    return jsonify({"story_id": new_id})
+
+
+@producer_bp.route("/producer/story/generate", methods=["POST"])
+def api_producer_story_generate():
+    err = _producer_auth_check()
+    if err:
+        return err
+    batch_id = db_create_story_generate_batch()
+    if not batch_id:
+        return jsonify({"error": "db_error"}), 500
+    wf_state.wakeup_loop()
+    return jsonify({"batch_id": batch_id})
 
 

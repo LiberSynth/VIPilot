@@ -10,28 +10,19 @@ from flask import (
     flash,
     send_file,
     make_response,
-    jsonify,
 )
 
 from db import (
     db_get,
     db_set,
     env_get,
-    env_set,
     db_get_active_targets,
     db_update_target_transcode,
     db_update_target_aspect_ratio,
     db_get_target_by_name,
-    db_update_target_config,
     db_update_target_publish_method_by_slug,
     db_get_user_by_login,
-    db_upsert_story_draft,
-    db_get_stories_list,
-    db_get_stories_pool,
-    db_set_story_grade,
-    db_create_story_generate_batch,
 )
-import utils.workflow_state as wf_state
 from utils.auth import is_authenticated
 from utils.limiter import limiter
 from utils.utils import (
@@ -250,93 +241,6 @@ def producer_page():
     return resp
 
 
-@bp.route("/producer/stories", methods=["GET"])
-def producer_stories():
-    if not is_authenticated():
-        return jsonify({"error": "unauthorized"}), 401
-    if not (_has_slug("producer") or _has_slug("root")):
-        return jsonify({"error": "forbidden"}), 403
-    show_used = request.args.get("show_used", "1") != "0"
-    show_bad = request.args.get("show_bad", "1") != "0"
-    stories = db_get_stories_list(show_used=show_used, show_bad=show_bad)
-    return jsonify(stories)
-
-
-@bp.route("/producer/stories/pool", methods=["GET"])
-def producer_stories_pool():
-    if not is_authenticated():
-        return jsonify({"error": "unauthorized"}), 401
-    if not (_has_slug("producer") or _has_slug("root")):
-        return jsonify({"error": "forbidden"}), 403
-    approve_stories = db_get("approve_stories", "0") == "1"
-    stories = db_get_stories_pool(grade_required=approve_stories)
-    return jsonify(stories)
-
-
-@bp.route("/producer/env", methods=["POST"])
-def producer_env_set():
-    if not is_authenticated():
-        return jsonify({"error": "unauthorized"}), 401
-    if not (_has_slug("producer") or _has_slug("root")):
-        return jsonify({"error": "forbidden"}), 403
-    data = request.get_json(silent=True) or {}
-    key = data.get("key", "")
-    value = data.get("value", "")
-    allowed_keys = {"screenwriter_show_used", "screenwriter_show_bad"}
-    if key not in allowed_keys:
-        return jsonify({"error": "invalid key"}), 400
-    env_set(key, str(value))
-    return jsonify({"ok": True})
-
-
-GRADE_CYCLE = ["good", "bad", None]
-
-
-@bp.route("/producer/story/<story_id>/grade", methods=["POST"])
-def producer_story_grade(story_id):
-    if not is_authenticated():
-        return jsonify({"error": "unauthorized"}), 401
-    if not (_has_slug("producer") or _has_slug("root")):
-        return jsonify({"error": "forbidden"}), 403
-    data = request.get_json(silent=True) or {}
-    grade = data.get("grade", "good")
-    if grade not in GRADE_CYCLE:
-        return jsonify({"error": "invalid_grade"}), 400
-    ok = db_set_story_grade(story_id, grade)
-    if ok is None or ok is False:
-        return jsonify({"error": "not_found"}), 404
-    return jsonify({"ok": True, "grade": grade})
-
-
-@bp.route("/producer/story/draft", methods=["POST"])
-def producer_story_draft():
-    if not is_authenticated():
-        return jsonify({"error": "unauthorized"}), 401
-    if not (_has_slug("producer") or _has_slug("root")):
-        return jsonify({"error": "forbidden"}), 403
-    data = request.get_json(silent=True) or {}
-    title = data.get("title", "")
-    content = data.get("content", "")
-    story_id = data.get("story_id") or None
-    new_id = db_upsert_story_draft(story_id, title, content)
-    if new_id is None:
-        return jsonify({"error": "db_error"}), 500
-    return jsonify({"story_id": new_id})
-
-
-@bp.route("/producer/story/generate", methods=["POST"])
-def producer_story_generate():
-    if not is_authenticated():
-        return jsonify({"error": "unauthorized"}), 401
-    if not (_has_slug("producer") or _has_slug("root")):
-        return jsonify({"error": "forbidden"}), 403
-    batch_id = db_create_story_generate_batch()
-    if not batch_id:
-        return jsonify({"error": "db_error"}), 500
-    wf_state.wakeup_loop()
-    return jsonify({"batch_id": batch_id})
-
-
 @bp.route("/save", methods=["POST"])
 def save():
     if not is_authenticated():
@@ -350,7 +254,6 @@ def save():
     active_tab = request.form.get("active_tab", "pipeline")
     if not metaprompt:
         if active_tab == "story":
-            print("[SAVE] Попытка сохранить пустой мета-промпт — отклонено")
             flash("Мета-промпт не может быть пустым", "error")
             return redirect(url_for("web.root_page"))
     else:
