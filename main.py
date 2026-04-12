@@ -1,5 +1,4 @@
 import os
-import subprocess
 import time
 import atexit
 import threading
@@ -10,17 +9,16 @@ from db import (
     init_db, run_upgrades, db_get,
     db_get_schedule, db_get_active_targets, db_ensure_batch, db_get_last_pipeline_run,
     db_get_actionable_batches,
-    db_get_batches_with_unknown_status,
     db_cancel_waiting_batches,
-    db_reset_stalled_batches,
-    KNOWN_BATCH_STATUSES,
     env_get, env_set,
 )
+from startup import init_app
 from log import db_log_root, db_log_pipeline, db_log_entry, db_log_interrupt_running, db_log_fix_orphaned_running
 from pipelines import story, video, transcode, publish, cleanup
 from routes.web import bp as web_bp
 from routes.api import bp as api_bp, producer_bp
 from routes.dzen_browser import bp as dzen_browser_bp
+from statuses import PUBLISH_ROUTING_SUFFIXES
 from utils.consts import FLASK_SECRET, MSK
 from utils.limiter import limiter
 from utils.utils import parse_hhmm
@@ -81,49 +79,15 @@ _STATUS_TO_PIPELINE = {
     'transcode_ready':  publish,
 }
 
-_PUBLISH_STATUS_SUFFIXES = ('.pending', '.published')
-
-
 def _get_pipeline(status: str):
     """Возвращает модуль пайплайна для данного статуса батча.
     Составные статусы вида slug.method.pending / slug.method.published → publish."""
     pipeline = _STATUS_TO_PIPELINE.get(status)
     if pipeline is not None:
         return pipeline
-    if any(status.endswith(sfx) for sfx in _PUBLISH_STATUS_SUFFIXES):
+    if any(status.endswith(sfx) for sfx in PUBLISH_ROUTING_SUFFIXES):
         return publish
     return None
-
-def _reset_stalled_batches():
-    """Сбрасывает незавершённые батчи на старте: story_generating→pending, video_generating→story_ready."""
-    affected = db_reset_stalled_batches()
-    if not affected:
-        print("[startup] Незавершённых батчей не обнаружено.")
-        return
-    for item in affected:
-        bid  = item["id"]
-        old  = item["old_status"]
-        new  = item["new_status"]
-        msg  = f"Батч сброшен при рестарте: {old} → {new}"
-        db_log_pipeline('startup', msg, status='warn', batch_id=bid)
-        print(f"[startup] Батч {bid[:8]}… сброшен: {old} → {new}")
-
-
-def _validate_batch_statuses():
-    """Проверяет, нет ли батчей с неизвестным статусом. Вызывается при старте.
-    Составные статусы publish-пайплайна (slug.method.posting/published/pending) считаются известными."""
-    from db.db import _get_dynamic_publish_statuses
-    dynamic = _get_dynamic_publish_statuses()
-    all_known = KNOWN_BATCH_STATUSES | dynamic
-    unknown_batches = db_get_batches_with_unknown_status(all_known)
-    if unknown_batches:
-        for batch_id, status in unknown_batches.items():
-            msg = f"[validate] ВНИМАНИЕ: батч имеет неизвестный статус: {status!r}"
-            db_log_pipeline('validate', msg, status='error', batch_id=batch_id)
-            print(f"[validate] batch_id={batch_id}: неизвестный статус {status!r}")
-    else:
-        print("[validate] Все статусы батчей известны.")
-
 
 def _run_planning(loop_interval: int):
     """Планирование: проверяет расписание и создаёт недостающие батчи."""
@@ -267,35 +231,13 @@ def _on_exit():
     print("[main] Приложение остановлено")
 
 
-def _check_ffmpeg():
-    """Проверяет наличие ffmpeg и выводит версию в консоль при старте."""
-    try:
-        result = subprocess.run(
-            ['ffmpeg', '-version'],
-            capture_output=True,
-            timeout=10,
-        )
-        if result.returncode == 0:
-            first_line = result.stdout.decode(errors='replace').splitlines()[0]
-            print(f"[startup] ffmpeg доступен: {first_line}")
-        else:
-            err = result.stderr.decode(errors='replace')[:200]
-            print(f"[startup] ВНИМАНИЕ: ffmpeg вернул код {result.returncode}: {err}")
-    except FileNotFoundError:
-        print("[startup] ВНИМАНИЕ: ffmpeg не найден в PATH — транскодирование недоступно")
-    except Exception as e:
-        print(f"[startup] ВНИМАНИЕ: ffmpeg проверка не удалась: {e}")
-
-
 def start_main_loop():
     global _main_loop_started
     if not _main_loop_started:
         _main_loop_started = True
         init_db()
         run_upgrades()
-        _check_ffmpeg()
-        _validate_batch_statuses()
-        _reset_stalled_batches()
+        init_app()
         wf_state.reset_active_threads()
         if env_get('workflow_state', 'running') == 'pause':
             wf_state.set_paused()

@@ -2,6 +2,7 @@
 Все функции логирования приложения.
 """
 from db.connection import get_db
+from statuses import FINAL_BATCH_STATUSES
 
 
 def db_log_pipeline(pipeline, message, status='info', batch_id=None):
@@ -73,14 +74,6 @@ def db_log_update(log_id, message, status):
 def db_log_root(message, status='info'):
     """Системная запись уровня приложения (pipeline='root', без батча)."""
     return db_log_pipeline('root', message, status=status, batch_id=None)
-
-
-FINAL_BATCH_STATUSES = (
-    'published', 'published_partially', 'movie_probe', 'story_probe',
-    'cancelled', 'error', 'fatal_error',
-    'video_error', 'transcode_error', 'publish_error',
-    'donated',
-)
 
 
 def db_log_fix_orphaned_running(fix=True):
