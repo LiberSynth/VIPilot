@@ -427,23 +427,3 @@ def db_get_last_pipeline_run(pipeline):
     except Exception as e:
         print(f"[DB] Ошибка db_get_last_pipeline_run: {e}")
         return None
-
-
-def _get_dynamic_publish_statuses() -> set:
-    from statuses import COMPOSITE_BATCH_STATUS_SUFFIXES
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "SELECT slug, config FROM targets WHERE slug IS NOT NULL AND slug != ''"
-                )
-                rows = cur.fetchall()
-        statuses = set()
-        for slug, cfg in rows:
-            methods = (cfg or {}).get('publish_method', {})
-            for method in methods:
-                for suffix in COMPOSITE_BATCH_STATUS_SUFFIXES:
-                    statuses.add(f"{slug}.{method}{suffix}")
-        return statuses
-    except Exception:
-        return set()

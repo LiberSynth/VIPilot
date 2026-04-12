@@ -27,20 +27,15 @@ COMPOSITE_BATCH_STATUS_SUFFIXES = frozenset({'.posting', '.published', '.pending
 
 PUBLISH_ROUTING_SUFFIXES = ('.pending', '.published')
 
-_dynamic_statuses: set = set()
-
-
-def register_dynamic_statuses(s: set) -> None:
-    global _dynamic_statuses
-    _dynamic_statuses = set(s)
-
 
 def _assert_known_status(status: str) -> None:
     if status in KNOWN_BATCH_STATUSES:
         return
+    # Для составных статусов вида {slug}.{method}.{phase} проверяется только суффикс (фаза).
+    # {slug} и {method} не верифицируются — они приходят из статической конфигурации таргета
+    # и проверяются на этапе его внедрения.
     if any(status.endswith(sfx) for sfx in COMPOSITE_BATCH_STATUS_SUFFIXES):
-        if status in _dynamic_statuses:
-            return
+        return
     raise ValueError(
         f"[DB] Неизвестный статус '{status}' — добавь его в KNOWN_BATCH_STATUSES или проверь конфиг таргета"
     )

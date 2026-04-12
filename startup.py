@@ -6,8 +6,7 @@ from db import (
     db_reset_stalled_batches,
     db_get_batches_with_unknown_status,
 )
-from db.db_simple import _get_dynamic_publish_statuses
-from statuses import KNOWN_BATCH_STATUSES, register_dynamic_statuses
+from statuses import KNOWN_BATCH_STATUSES, COMPOSITE_BATCH_STATUS_SUFFIXES
 from log.log import db_log_pipeline
 from utils.consts import FLASK_SECRET
 from utils.limiter import limiter
@@ -31,8 +30,6 @@ def init_app(app: Flask):
     app.register_blueprint(producer_bp)
     app.register_blueprint(dzen_browser_bp)
 
-    dynamic = _get_dynamic_publish_statuses()
-    register_dynamic_statuses(dynamic)
     _reset_stalled_batches()
     _validate_batch_statuses()
 
@@ -52,11 +49,14 @@ def _reset_stalled_batches():
 
 
 def _validate_batch_statuses():
-    from statuses import _dynamic_statuses
-    all_known = KNOWN_BATCH_STATUSES | _dynamic_statuses
-    unknown_batches = db_get_batches_with_unknown_status(all_known)
-    if unknown_batches:
-        for batch_id, status in unknown_batches.items():
+    unknown_batches = db_get_batches_with_unknown_status(KNOWN_BATCH_STATUSES)
+    truly_unknown = {
+        batch_id: status
+        for batch_id, status in unknown_batches.items()
+        if not any(status.endswith(sfx) for sfx in COMPOSITE_BATCH_STATUS_SUFFIXES)
+    }
+    if truly_unknown:
+        for batch_id, status in truly_unknown.items():
             msg = f"[validate] ВНИМАНИЕ: батч имеет неизвестный статус: {status!r}"
             db_log_pipeline('validate', msg, status='error', batch_id=batch_id)
             print(f"[validate] batch_id={batch_id}: неизвестный статус {status!r}")
