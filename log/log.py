@@ -1,15 +1,24 @@
 """
 Все функции логирования приложения.
 """
+
 import builtins as _builtins
 
 from db.connection import get_db
 
 
-_ALLOWED_PIPELINES = {'story', 'video', 'transcode', 'publish', 'planning', 'cleanup', 'root'}
+_ALLOWED_PIPELINES = {
+    "story",
+    "video",
+    "transcode",
+    "publish",
+    "planning",
+    "cleanup",
+    "root",
+}
 
 
-def db_log_pipeline(pipeline, message, status='info', batch_id=None):
+def db_log_pipeline(pipeline, message, status="info", batch_id=None):
     """Записывает событие пайплайна в таблицу log. Возвращает log_id или None."""
     assert pipeline in _ALLOWED_PIPELINES, (
         f"db_log_pipeline: недопустимое имя пайплайна {pipeline!r}. "
@@ -37,16 +46,17 @@ def db_log_pipeline(pipeline, message, status='info', batch_id=None):
 def _notify_on_error(log_id, message, level):
     """Вызывает notify_failure при уровнях 'error' и 'fatal_error'.
     Импорт отложен, чтобы избежать циклических зависимостей."""
-    if level not in ('error', 'fatal_error'):
+    if level not in ("error", "fatal_error"):
         return
     try:
         from utils.notify import notify_failure
+
         notify_failure(f"log#{log_id}: {message}")
     except Exception as e:
         _builtins.print(f"[log] Ошибка вызова notify_failure: {e}")
 
 
-def log_entry(log_id, message, level='info'):
+def log_entry(log_id, message, level="info"):
     """Добавляет субзапись к существующей записи лога.
 
     Всегда выводит сообщение в консоль.
@@ -55,12 +65,13 @@ def log_entry(log_id, message, level='info'):
     """
     import utils.workflow_state as wf_state
     from db.db_simple import db_insert_log_entry
-    assert level in ('info', 'warn', 'error', 'fatal_error', 'silent'), (
+
+    assert level in ("info", "warn", "error", "fatal_error", "silent"), (
         f"log_entry: недопустимый уровень {level!r}. "
         "Допустимые значения: 'info', 'warn', 'error', 'fatal_error', 'silent'."
     )
     _builtins.print(message)
-    if not log_id or level == 'silent':
+    if level == "silent":
         return
     token = wf_state.asserted_log_entry.set(True)
     try:
@@ -140,13 +151,13 @@ def db_get_log(limit=200):
                 rows = cur.fetchall()
         return [
             {
-                "id":         str(row[0]),
-                "batch_id":   str(row[1]) if row[1] else None,
-                "pipeline":   row[2],
-                "message":    row[3],
-                "status":     row[4],
+                "id": str(row[0]),
+                "batch_id": str(row[1]) if row[1] else None,
+                "pipeline": row[2],
+                "message": row[3],
+                "status": row[4],
                 "created_at": row[5].isoformat() if row[5] else None,
-                "entries":    row[6],
+                "entries": row[6],
             }
             for row in rows
         ]
@@ -247,28 +258,28 @@ def db_get_monitor(batch_limit=50):
 
         batches = [
             {
-                "batch_id":         str(r[0]),
-                "scheduled_at":     r[1].isoformat() if r[1] else None,
-                "type":             r[2],
-                "batch_status":     r[3],
-                "created_at":       r[4].isoformat() if r[4] else None,
-                "last_event_at":    r[5].isoformat() if r[5] else None,
-                "story_id":         str(r[6]) if r[6] else None,
-                "has_video_data":   bool(r[7]),
-                "logs":             r[8],
-                "text_model_name":  r[9],
+                "batch_id": str(r[0]),
+                "scheduled_at": r[1].isoformat() if r[1] else None,
+                "type": r[2],
+                "batch_status": r[3],
+                "created_at": r[4].isoformat() if r[4] else None,
+                "last_event_at": r[5].isoformat() if r[5] else None,
+                "story_id": str(r[6]) if r[6] else None,
+                "has_video_data": bool(r[7]),
+                "logs": r[8],
+                "text_model_name": r[9],
                 "video_model_name": r[10],
             }
             for r in batch_rows
         ]
         system = [
             {
-                "id":         str(r[0]),
-                "pipeline":   r[1],
-                "message":    r[2],
-                "status":     r[3],
+                "id": str(r[0]),
+                "pipeline": r[1],
+                "message": r[2],
+                "status": r[3],
                 "created_at": r[4].isoformat() if r[4] else None,
-                "entries":    r[5],
+                "entries": r[5],
             }
             for r in sys_rows
         ]
