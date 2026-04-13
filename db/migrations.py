@@ -1532,6 +1532,21 @@ def _m048_remove_model_name_from_batch_data(cur):
     """)
 
 
+def _m050_remove_story_probe_and_model_name_from_batch_data(cur):
+    """
+    Удаляет мусорные ключи 'story_probe' и 'model_name' из поля data всех строк batches.
+    - story_probe: булев флаг True, писался при создании батча, нигде не читался из data.
+      Тип батча определяется через колонку batches.type, а не через этот флаг.
+    - model_name: устаревший костыль, убранный миграцией #48 из кода.
+      Здесь вычищаем остатки из уже существующих строк.
+    """
+    cur.execute("""
+        UPDATE batches
+           SET data = data - 'story_probe' - 'model_name'
+         WHERE data ? 'story_probe' OR data ? 'model_name'
+    """)
+
+
 def _m049_widen_log_entries_level(cur):
     """
     Расширяет log_entries.level с VARCHAR(10) до VARCHAR(20).
@@ -1592,6 +1607,7 @@ MIGRATIONS = [
     (47, _m047_log_status_cancelled),
     (48, _m048_remove_model_name_from_batch_data),
     (49, _m049_widen_log_entries_level),
+    (50, _m050_remove_story_probe_and_model_name_from_batch_data),
 ]
 
 
