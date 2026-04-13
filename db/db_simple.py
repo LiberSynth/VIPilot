@@ -3,6 +3,20 @@ import psycopg2
 import psycopg2.extras
 
 from .connection import get_db
+from exceptions import FatalError
+
+
+def db_insert_log_entry(log_id, message, level):
+    import utils.workflow_state as wf_state
+    if not wf_state.asserted_log_entry.get():
+        raise FatalError("db_insert_log_entry вызвана без guard-флага asserted_log_entry")
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO log_entries (log_id, message, level) VALUES (%s, %s, %s)",
+                (log_id, message, level),
+            )
+        conn.commit()
 
 
 def env_get(key, default=""):

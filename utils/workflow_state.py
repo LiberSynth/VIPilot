@@ -1,8 +1,12 @@
 import threading
+from contextvars import ContextVar
 
 from db import env_get
 
 _resume_event = threading.Event()
+
+asserted_log_entry: ContextVar[bool] = ContextVar('asserted_log_entry', default=False)
+
 _resume_event.set()
 
 _wakeup_event = threading.Event()

@@ -49,29 +49,26 @@ def _notify_on_error(log_id, message, level):
 def log_entry(log_id, message, level='info'):
     """Добавляет субзапись к существующей записи лога.
 
-    Если log_id равен None и level != 'silent' — no-op (запись не производится).
-    При уровне 'silent' — только print(), без записи в БД и без notify_failure.
+    Всегда выводит сообщение в консоль.
+    Если log_id равен None или level == 'silent' — запись в БД не производится.
     При уровнях 'error' и 'fatal_error' вызывает notify_failure.
     """
+    import utils.workflow_state as wf_state
+    from db.db_simple import db_insert_log_entry
     assert level in ('info', 'warn', 'error', 'fatal_error', 'silent'), (
         f"log_entry: недопустимый уровень {level!r}. "
         "Допустимые значения: 'info', 'warn', 'error', 'fatal_error', 'silent'."
     )
-    if level == 'silent':
-        _builtins.print(message)
+    _builtins.print(message)
+    if not log_id or level == 'silent':
         return
-    if not log_id:
-        return
+    token = wf_state.asserted_log_entry.set(True)
     try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "INSERT INTO log_entries (log_id, message, level) VALUES (%s, %s, %s)",
-                    (log_id, message, level),
-                )
-            conn.commit()
+        db_insert_log_entry(log_id, message, level)
     except Exception as e:
         _builtins.print(f"[DB] Ошибка log_entry: {e}")
+    finally:
+        wf_state.asserted_log_entry.reset(token)
     _notify_on_error(log_id, message, level)
 
 
