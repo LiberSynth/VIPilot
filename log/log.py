@@ -60,7 +60,8 @@ def log_entry(log_id, message, level="info"):
     """Добавляет субзапись к существующей записи лога.
 
     Всегда выводит сообщение в консоль.
-    Если log_id равен None или level == 'silent' — запись в БД не производится.
+    Если level == 'silent' — запись в БД не производится.
+    Если log_id равен None — запись в log_entries вставляется с log_id=NULL.
     При уровнях 'error' и 'fatal_error' вызывает notify_failure.
     """
     import utils.workflow_state as wf_state
@@ -76,8 +77,6 @@ def log_entry(log_id, message, level="info"):
     token = wf_state.asserted_log_entry.set(True)
     try:
         db_insert_log_entry(log_id, message, level)
-    except Exception as e:
-        _builtins.print(f"[DB] Ошибка log_entry: {e}")
     finally:
         wf_state.asserted_log_entry.reset(token)
     _notify_on_error(log_id, message, level)

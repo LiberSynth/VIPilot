@@ -1611,6 +1611,17 @@ def _m052_model_durations(cur):
             """, (model_id, d))
 
 
+def _m053_log_entries_log_id_nullable(cur):
+    """
+    Снимает ограничение NOT NULL с поля log_id в таблице log_entries,
+    чтобы можно было вставлять записи без привязки к конкретному log (log_id=NULL).
+    """
+    cur.execute("""
+        ALTER TABLE log_entries
+            ALTER COLUMN log_id DROP NOT NULL
+    """)
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -1664,6 +1675,7 @@ MIGRATIONS = [
     (50, _m050_remove_story_probe_and_model_name_from_batch_data),
     (51, _m051_remove_obsolete_settings),
     (52, _m052_model_durations),
+    (53, _m053_log_entries_log_id_nullable),
 ]
 
 

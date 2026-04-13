@@ -55,11 +55,11 @@ def main_loop():
         except AppException as e:
             if e.batch_id:
                 db_set_batch_status(e.batch_id, 'error')
-            db_log_pipeline(e.pipeline, e.message, status='error', batch_id=e.batch_id)
-            log_entry(None, f"[main_loop] AppException ({e.pipeline}): {e.message}", level='silent')
+            log_id = db_log_pipeline(e.pipeline, e.message, status='error', batch_id=e.batch_id)
+            log_entry(log_id, f"[main_loop] AppException ({e.pipeline}): {e.message}", level='error')
         except Exception as e:
-            db_log_pipeline('root', f"Ошибка главного цикла: {e}", status='error')
-            log_entry(None, f"[main_loop] Ошибка: {e}", level='silent')
+            log_id = db_log_pipeline('root', f"Ошибка главного цикла: {e}", status='error')
+            log_entry(log_id, f"[main_loop] Ошибка: {e}", level='error')
 
         wf_state.wait_for_wakeup(interval)
 
@@ -68,8 +68,8 @@ _main_loop_started = False
 
 
 def _on_exit():
-    db_log_pipeline('root', "Приложение остановлено", status='info')
-    log_entry(None, "[main] Приложение остановлено", level='silent')
+    log_id = db_log_pipeline('root', "Приложение остановлено", status='info')
+    log_entry(log_id, "[main] Приложение остановлено", level='info')
 
 
 def start_main_loop():
