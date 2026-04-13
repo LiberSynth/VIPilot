@@ -1557,6 +1557,16 @@ def _m049_widen_log_entries_level(cur):
     cur.execute("ALTER TABLE log_entries ALTER COLUMN level TYPE VARCHAR(20)")
 
 
+def _m051_remove_obsolete_settings(cur):
+    """
+    Удаляет мёртвые ключи из таблицы settings:
+    - vk_transcode — нигде в коде не используется
+    - history_days — только в документации, кодом не читается
+    Deployed: -
+    """
+    cur.execute("DELETE FROM settings WHERE key IN ('vk_transcode', 'history_days')")
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -1608,6 +1618,7 @@ MIGRATIONS = [
     (48, _m048_remove_model_name_from_batch_data),
     (49, _m049_widen_log_entries_level),
     (50, _m050_remove_story_probe_and_model_name_from_batch_data),
+    (51, _m051_remove_obsolete_settings),
 ]
 
 
