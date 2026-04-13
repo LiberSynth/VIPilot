@@ -18,6 +18,7 @@ import utils.workflow_state as wf_state
 import utils.keepalive as keepalive
 from utils.middleware import register_middleware
 from exceptions import AppException
+from upgrade import check_upgrade
 
 flask_app = create_app()
 register_middleware(flask_app)
@@ -154,6 +155,7 @@ def start_main_loop():
         _main_loop_started = True
         init_db()
         run_upgrades()
+        check_upgrade()
         init_app(flask_app)
         wf_state.reset_active_threads()
         if env_get('workflow_state', 'running') == 'pause':
