@@ -12,6 +12,7 @@ import tempfile
 import time as _time
 
 from log import log_entry
+from utils.utils import fmt_id_msg
 
 
 _NAV_TIMEOUT = 30_000   # ms — таймаут навигации
@@ -79,7 +80,7 @@ def publish(
     saved_cookies = session.get("cookies", [])
 
     if log_id:
-        log_entry(log_id, f"Дзен: {len(video_data) // 1024} КБ, publisher={publisher_id[:12]}…")
+        log_entry(log_id, fmt_id_msg("Дзен: {} КБ, publisher={}", len(video_data) // 1024, publisher_id))
 
     # Пишем видео во временный файл с именем = заголовок (Дзен автоподставляет имя файла)
     safe_name = re.sub(r'[^\w\s\-]', '', title, flags=re.UNICODE).strip()[:80] or "video"

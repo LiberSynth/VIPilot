@@ -17,6 +17,7 @@ from db import (
     db_is_batch_scheduled,
 )
 from log import db_log_pipeline, log_entry, db_log_update
+from utils.utils import fmt_id_msg
 
 
 def _forbidden_print(*args, **kwargs):
@@ -61,7 +62,7 @@ def check_cancelled(pipeline_name: str, batch_id: str, batch: dict) -> bool:
             status='cancelled',
             batch_id=batch_id,
         )
-        pipeline_log(None, f"[{pipeline_name}] Батч {batch_id[:8]}… отменён, пропускаю")
+        pipeline_log(None, fmt_id_msg("[{}] Батч {} отменён, пропускаю", pipeline_name, batch_id))
         return True
     return False
 

@@ -5,6 +5,7 @@ import builtins as _builtins
 
 from db.connection import get_db
 from statuses import FINAL_BATCH_STATUSES
+from utils.utils import fmt_id_msg
 
 
 def db_log_pipeline(pipeline, message, status='info', batch_id=None):
@@ -128,9 +129,11 @@ def db_log_fix_orphaned_running(fix=True):
                     for row in rows:
                         log_id, pipeline, batch_id, batch_status = row
                         print(
-                            f"[log] WARN: лог #{log_id} (pipeline={pipeline}, "
-                            f"batch={str(batch_id)[:8]}…) завис в 'running', "
-                            f"батч уже в статусе '{batch_status}'"
+                            fmt_id_msg(
+                                "[log] WARN: лог #{} (pipeline={}, batch={}) завис в 'running', "
+                                "батч уже в статусе '{}'",
+                                log_id, pipeline, batch_id, batch_status
+                            )
                         )
                     if fix:
                         ids = [r[0] for r in rows]

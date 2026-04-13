@@ -27,6 +27,7 @@ from log import db_log_pipeline, db_log_update
 from pipelines.base import check_cancelled, pipeline_log, iterate_models
 from exceptions import AppException
 from clients import openrouter
+from utils.utils import fmt_id_msg
 
 
 def run(batch_id):
@@ -58,10 +59,10 @@ def run(batch_id):
                 'story', 'Сюжет задан вручную — пропуск поиска и генерации',
                 status='ok', batch_id=batch_id,
             )
-            pipeline_log(log_id, f"Используется заданный сюжет id={preset_story_id[:8]}…")
-            pipeline_log(None, f"[story] Батч {batch_id[:8]}… — story_id задан вручную ({preset_story_id[:8]}…), батч → story_ready")
+            pipeline_log(log_id, fmt_id_msg("Используется заданный сюжет id={}", preset_story_id))
+            pipeline_log(None, fmt_id_msg("[story] Батч {} — story_id задан вручную ({}), батч → story_ready", batch_id, preset_story_id))
             if not db_set_batch_story(batch_id, preset_story_id):
-                msg = f'Ошибка записи story_id={preset_story_id[:8]}… в БД'
+                msg = fmt_id_msg('Ошибка записи story_id={} в БД', preset_story_id)
                 pipeline_log(log_id, msg, level='error')
                 raise AppException(batch_id, 'story', msg)
             return
@@ -86,7 +87,7 @@ def run(batch_id):
                 donor_batch = db_get_batch_by_id(donor_batch_id)
                 donor_story_id = str(donor_batch['story_id']) if donor_batch and donor_batch.get('story_id') else None
                 if not db_set_batch_story_ready_from_donor(batch_id, donor_batch_id, donor_story_id):
-                    msg = f'Не удалось записать donor_batch_id для батча {batch_id[:8]}… — донор {donor_batch_id[:8]}…'
+                    msg = fmt_id_msg('Не удалось записать donor_batch_id для батча {} — донор {}', batch_id, donor_batch_id)
                     db_log_pipeline('story', msg, status='error', batch_id=batch_id)
                     pipeline_log(None, f"[story] {msg}")
                     raise AppException(batch_id, 'story', msg)
@@ -100,7 +101,7 @@ def run(batch_id):
                     status='ok', batch_id=batch_id,
                 )
                 pipeline_log(log_id, detail)
-                pipeline_log(None, f"[story] Батч {batch_id[:8]}… — найден донор {donor_batch_id}, батч → story_ready")
+                pipeline_log(None, fmt_id_msg("[story] Батч {} — найден донор {}, батч → story_ready", batch_id, donor_batch_id))
                 return
 
         if batch['type'] != 'story_probe':
@@ -122,18 +123,17 @@ def run(batch_id):
                 pool_story_title = pool_story['title']
                 pipeline_log(
                     pool_log_id,
-                    f"Найден сюжет из пула: id={pool_story_id[:8]}…, название=«{pool_story_title}». "
-                    f"AI-генерация не запускается.",
+                    fmt_id_msg("Найден сюжет из пула: id={}, название=«{}». AI-генерация не запускается.", pool_story_id, pool_story_title),
                 )
                 db_log_update(pool_log_id, f'Сюжет из пула: «{pool_story_title}»', 'ok')
-                pipeline_log(None, f"[story] Батч {batch_id[:8]}… — сюжет из пула {pool_story_id[:8]}…, батч → story_ready")
+                pipeline_log(None, fmt_id_msg("[story] Батч {} — сюжет из пула {}, батч → story_ready", batch_id, pool_story_id))
                 return
             else:
                 if approve_stories:
                     msg = 'Пул сюжетов пуст (grade = good) — AI-генерация запрещена (approve_stories включён)'
                     pipeline_log(pool_log_id, msg, level='error')
                     db_log_update(pool_log_id, msg, 'error')
-                    pipeline_log(None, f"[story] Батч {batch_id[:8]}… — {msg}")
+                    pipeline_log(None, fmt_id_msg("[story] Батч {} — {}", batch_id, msg))
                     raise AppException(batch_id, 'story', msg)
                 reason = (
                     f"Подходящий сюжет в пуле не найден (условие: {condition_label}). "
@@ -141,9 +141,9 @@ def run(batch_id):
                 )
                 pipeline_log(pool_log_id, reason)
                 db_log_update(pool_log_id, 'Сюжет в пуле не найден — запускается AI-генерация', 'ok')
-                pipeline_log(None, f"[story] Батч {batch_id[:8]}… — {reason}")
+                pipeline_log(None, fmt_id_msg("[story] Батч {} — {}", batch_id, reason))
 
-        pipeline_log(None, f"[story] Батч {batch_id[:8]}… ({target}) — начало генерации сюжета")
+        pipeline_log(None, fmt_id_msg("[story] Батч {} ({}) — начало генерации сюжета", batch_id, target))
 
         log_id = db_log_pipeline(
             'story', 'Генерация сюжета…',
@@ -242,8 +242,8 @@ def run(batch_id):
             db_set_story_model(story_id, used_model_id)
             msg = f'Сюжет сгенерирован ({used_model_name})'
             db_log_update(log_id, msg, 'ok')
-            pipeline_log(log_id, f"Сохранён как story {story_id}, батч → story_probe")
-            pipeline_log(None, f"[story] Пробный сюжет: story_id={story_id[:8]}…, batch → story_probe")
+            pipeline_log(log_id, fmt_id_msg("Сохранён как story {}, батч → story_probe", story_id))
+            pipeline_log(None, fmt_id_msg("[story] Пробный сюжет: story_id={}, batch → story_probe", story_id))
         else:
             if not db_set_batch_story(batch_id, story_id):
                 msg = 'Ошибка сохранения статуса батча (db_set_batch_story вернул False)'
@@ -254,8 +254,8 @@ def run(batch_id):
             db_set_story_model(story_id, used_model_id)
             msg = f'Сюжет сгенерирован ({used_model_name})'
             db_log_update(log_id, msg, 'ok')
-            pipeline_log(log_id, f"Сохранён как story {story_id}, батч → story_ready")
-            pipeline_log(None, f"[story] Готово: story_id={story_id[:8]}…, batch → story_ready")
+            pipeline_log(log_id, fmt_id_msg("Сохранён как story {}, батч → story_ready", story_id))
+            pipeline_log(None, fmt_id_msg("[story] Готово: story_id={}, batch → story_ready", story_id))
 
     except AppException:
         raise

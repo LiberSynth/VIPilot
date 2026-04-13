@@ -1,3 +1,8 @@
+def fmt_id_msg(template: str, *ids) -> str:
+    """Подставляет каждый идентификатор целиком (без обрезки) в соответствующий {} плейсхолдер шаблона."""
+    return template.format(*[str(i) for i in ids])
+
+
 def parse_hhmm(s):
     try:
         h, m = s.strip().split(":")

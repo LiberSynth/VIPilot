@@ -32,6 +32,7 @@ from db import (
 from log import db_log_pipeline, db_log_update
 from pipelines.base import check_cancelled, pipeline_log
 from exceptions import AppException
+from utils.utils import fmt_id_msg
 
 
 def _ffmpeg(src, dst, log_id):
@@ -112,10 +113,10 @@ def run(batch_id):
 
         if not do_transcode:
             db_set_batch_transcode_skip(batch_id)
-            pipeline_log(None, f"[transcode] Батч {batch_id[:8]}… ({target}) — транскод отключен, пропускаю")
+            pipeline_log(None, fmt_id_msg("[transcode] Батч {} ({}) — транскод отключен, пропускаю", batch_id, target))
             return
 
-        pipeline_log(None, f"[transcode] Батч {batch_id[:8]}… ({target}) — начало транскодирования")
+        pipeline_log(None, fmt_id_msg("[transcode] Батч {} ({}) — начало транскодирования", batch_id, target))
 
         log_id = db_log_pipeline(
             'transcode', 'Транскодирование…',
@@ -160,7 +161,7 @@ def run(batch_id):
             pipeline_log(log_id, msg, level='warn')
             db_set_batch_transcode_skip(batch_id)
             pipeline_log(None, f"[transcode] {msg}")
-            notify_failure(f"transcode: ffmpeg сбой (некритично) — батч {batch_id[:8]}", partial=True)
+            notify_failure(fmt_id_msg("transcode: ffmpeg сбой (некритично) — батч {}", batch_id), partial=True)
             return
 
         out_mb = round(os.path.getsize(tmp_out_path) / 1024 / 1024, 1)

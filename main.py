@@ -19,6 +19,7 @@ import utils.keepalive as keepalive
 from utils.middleware import register_middleware
 from exceptions import AppException
 from upgrade import check_upgrade
+from utils.utils import fmt_id_msg
 
 flask_app = create_app()
 register_middleware(flask_app)
@@ -73,7 +74,7 @@ def main_loop():
                     status='cancelled',
                     batch_id=bid,
                 )
-                log_entry(None, f"[planning] Батч {bid[:8]}… отменён (слот расписания исчез)", level='silent')
+                log_entry(None, fmt_id_msg("[planning] Батч {} отменён (слот расписания исчез)", bid), level='silent')
 
             if wf_state.get_active_threads() < max_threads:
                 batches = db_get_actionable_batches()
@@ -110,7 +111,7 @@ def main_loop():
                                 db_log_root(msg, status='error')
                             else:
                                 log_entry(lid, msg, level='error')
-                            log_entry(None, f"[{pipeline_name}] AppException батч {batch_id[:8]}…: {exc.message}", level='silent')
+                            log_entry(None, fmt_id_msg("[{}] AppException батч {}: {}", pipeline_name, batch_id, exc.message), level='silent')
                         except Exception as e:
                             db_set_batch_status(batch_id, 'fatal_error')
                             msg = f"Критическая ошибка: {e}"
@@ -122,7 +123,7 @@ def main_loop():
                                 db_log_root(msg, status='fatal_error')
                             else:
                                 log_entry(lid, msg, level='fatal_error')
-                            log_entry(None, f"[{pipeline_name}] Критическая ошибка батч {batch_id[:8]}…: {e}", level='silent')
+                            log_entry(None, fmt_id_msg("[{}] Критическая ошибка батч {}: {}", pipeline_name, batch_id, e), level='silent')
                         finally:
                             wf_state.release_batch(batch_id)
                             wf_state.wakeup_loop()

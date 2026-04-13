@@ -36,6 +36,7 @@ from pipelines.base import check_cancelled, pipeline_log, iterate_models
 from exceptions import AppException
 from clients import falai
 from clients.falai import ProviderFatalError
+from utils.utils import fmt_id_msg
 
 
 class AspectRatioConflictError(Exception):
@@ -90,10 +91,10 @@ def run(batch_id):
             donor_batch_id = batch_data.get('donor_batch_id') if isinstance(batch_data, dict) else None
             if donor_batch_id:
                 if batch.get('movie_id') is not None:
-                    pipeline_log(None, f"[video] Батч {batch_id[:8]}… — донор, movie_id уже перенесён (возобновление)")
+                    pipeline_log(None, fmt_id_msg("[video] Батч {} — донор, movie_id уже перенесён (возобновление)", batch_id))
                     return
                 if not check_cancelled('video', batch_id, batch):
-                    pipeline_log(None, f"[video] Батч {batch_id[:8]}… — режим донора, переносим видео от {donor_batch_id[:8]}…")
+                    pipeline_log(None, fmt_id_msg("[video] Батч {} — режим донора, переносим видео от {}", batch_id, donor_batch_id))
                     log_id = db_log_pipeline(
                         'video', 'Видео получено от донора',
                         status='running', batch_id=batch_id,
@@ -102,7 +103,7 @@ def run(batch_id):
                     if result_donor_id:
                         updated = db_get_batch_by_id(batch_id)
                         new_status = updated['status'] if updated else None
-                        detail = f"Видео перенесено от донора {donor_batch_id[:8]}…"
+                        detail = fmt_id_msg("Видео перенесено от донора {}", donor_batch_id)
                         db_log_update(log_id, detail, 'ok')
                         pipeline_log(log_id, detail)
                         if new_status == 'transcode_ready':
@@ -111,9 +112,9 @@ def run(batch_id):
                                 status='ok', batch_id=batch_id,
                             )
                             pipeline_log(tr_log_id, detail)
-                        pipeline_log(None, f"[video] Батч {batch_id[:8]}… — видео от донора, новый статус: {new_status}")
+                        pipeline_log(None, fmt_id_msg("[video] Батч {} — видео от донора, новый статус: {}", batch_id, new_status))
                     else:
-                        msg = f"Не удалось перенести видео от донора {donor_batch_id[:8]}…"
+                        msg = fmt_id_msg("Не удалось перенести видео от донора {}", donor_batch_id)
                         db_log_update(log_id, msg, 'error')
                         pipeline_log(log_id, msg, level='error')
                         pipeline_log(None, f"[video] {msg}")
@@ -135,7 +136,7 @@ def run(batch_id):
             return
 
         if env_get("emulation_mode", "0") == "1":
-            pipeline_log(None, f"[video] Батч {batch_id[:8]}… — эмуляция генерации видео")
+            pipeline_log(None, fmt_id_msg("[video] Батч {} — эмуляция генерации видео", batch_id))
             log_id = db_log_pipeline(
                 'video', 'Видео [эмуляция]',
                 status='running', batch_id=batch_id,
@@ -148,17 +149,17 @@ def run(batch_id):
                 pipeline_log(None, f"[video] {msg}")
                 raise AppException(batch_id, 'video', msg)
             sample, donor_batch_id, donor_story_id = result
-            pipeline_log(log_id, f"Видео заимствовано из батча: {donor_batch_id}", level='info')
+            pipeline_log(log_id, fmt_id_msg("Видео заимствовано из батча: {}", donor_batch_id), level='info')
             db_set_batch_original_video(batch_id, sample)
             if donor_story_id:
                 db_set_batch_story_id(batch_id, donor_story_id)
-                pipeline_log(log_id, f"story_id подменён: {story_id[:8]}… → {donor_story_id[:8]}…", level='info')
+                pipeline_log(log_id, fmt_id_msg("story_id подменён: {} → {}", story_id, donor_story_id), level='info')
             db_set_batch_video_ready(batch_id, 'emulation://skipped')
             db_log_update(log_id, 'Видео [эмуляция]', 'ok')
             return
 
-        pipeline_log(None, f"[video] Батч {batch_id[:8]}… ({target}) — "
-                     f"{'возобновление' if resumed else 'начало'} генерации видео")
+        pipeline_log(None, fmt_id_msg("[video] Батч {} ({}) — {} генерации видео",
+                                      batch_id, target, 'возобновление' if resumed else 'начало'))
 
         if not falai.is_configured():
             msg = 'FAL_API_KEY не задан — генерация невозможна'
@@ -174,7 +175,7 @@ def run(batch_id):
         if pinned_model_id:
             pinned_m = db_get_video_model_by_id(pinned_model_id)
             if not pinned_m:
-                msg = f'Пробная модель {str(pinned_model_id)[:8]}… не найдена'
+                msg = fmt_id_msg('Пробная модель {} не найдена', pinned_model_id)
                 db_log_pipeline('video', msg, status='error', batch_id=batch_id)
                 pipeline_log(None, f"[video] {msg}")
                 raise AppException(batch_id, 'video', msg)
@@ -189,7 +190,7 @@ def run(batch_id):
 
         story_text = db_get_story_text(story_id)
         if not story_text:
-            msg = f'Не найден сюжет story_id={story_id[:8]}…'
+            msg = fmt_id_msg('Не найден сюжет story_id={}', story_id)
             db_log_pipeline('video', msg, status='error', batch_id=batch_id)
             pipeline_log(None, f"[video] {msg}")
             raise AppException(batch_id, 'video', msg)
@@ -240,7 +241,7 @@ def run(batch_id):
             saved_model_id     = current_data.get('model_id')
 
             if saved_request_id:
-                pipeline_log(log_id, f"Возобновление: request_id={saved_request_id}")
+                pipeline_log(log_id, fmt_id_msg("Возобновление: request_id={}", saved_request_id))
                 video_url, poll_err = falai.poll(log_id, saved_status_url, saved_response_url)
                 if video_url:
                     used_model_id = saved_model_id
@@ -281,8 +282,8 @@ def run(batch_id):
                 'response_url': r_url,
                 'model_id':     m_id,
             })
-            pipeline_log(log_id, f"Запрос принят ({model_name}): {req_id}")
-            pipeline_log(None, f"[video] Генерация запущена: request_id={req_id}")
+            pipeline_log(log_id, fmt_id_msg("Запрос принят ({}): {}", model_name, req_id))
+            pipeline_log(None, fmt_id_msg("[video] Генерация запущена: request_id={}", req_id))
 
             video_url, poll_err = falai.poll(log_id, s_url, r_url)
             if video_url:

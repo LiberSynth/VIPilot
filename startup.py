@@ -10,6 +10,7 @@ from statuses import KNOWN_BATCH_STATUSES, COMPOSITE_BATCH_STATUS_SUFFIXES
 from log.log import db_log_pipeline, log_entry
 from utils.consts import FLASK_SECRET
 from utils.limiter import limiter
+from utils.utils import fmt_id_msg
 
 
 def create_app() -> Flask:
@@ -45,7 +46,7 @@ def _reset_stalled_batches():
         new = item["new_status"]
         msg = f"Батч сброшен при рестарте: {old} → {new}"
         db_log_pipeline('startup', msg, status='warn', batch_id=bid)
-        log_entry(None, f"[startup] Батч {bid[:8]}… сброшен: {old} → {new}", level='silent')
+        log_entry(None, fmt_id_msg("[startup] Батч {} сброшен: {} → {}", bid, old, new), level='silent')
 
 
 def _validate_batch_statuses():
@@ -59,6 +60,6 @@ def _validate_batch_statuses():
         for batch_id, status in truly_unknown.items():
             msg = f"[validate] ВНИМАНИЕ: батч имеет неизвестный статус: {status!r}"
             db_log_pipeline('validate', msg, status='error', batch_id=batch_id)
-            log_entry(None, f"[validate] batch_id={batch_id}: неизвестный статус {status!r}", level='silent')
+            log_entry(None, fmt_id_msg("[validate] batch_id={}: неизвестный статус {}", batch_id, repr(status)), level='silent')
     else:
         log_entry(None, "[validate] Все статусы батчей известны.", level='silent')
