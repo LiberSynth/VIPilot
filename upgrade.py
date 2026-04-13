@@ -1,11 +1,16 @@
 """
 upgrade.py — пост-апгрейд обработка.
 
+Единственная точка, где проверяется и устанавливается серверное окружение.
 Вызывается из main.py при каждом старте приложения.
-check_upgrade() сравнивает build_number из environment с _build.py,
-обновляет значение в БД и при обнаружении обновления запускает
-проверку серверного окружения.
+
+На деве (REPLIT_DEPLOYMENT != "1") возвращает управление немедленно.
+На проде сравнивает build_number из таблицы environment с BUILD из _build.py.
+При обнаружении обновления запускает проверку всего серверного окружения
+и бросает исключение если хотя бы одна проверка не прошла.
+env_set(build_number) вызывается только после успешного завершения всех проверок.
 """
+import os
 import pathlib
 import shutil
 import subprocess
@@ -72,6 +77,20 @@ def _check_playwright() -> tuple[bool, str]:
             return False, 'playwright не установлен'
 
 
+def _install_chromium() -> bool:
+    """Запускает playwright install chromium. Возвращает True при успехе."""
+    try:
+        result = subprocess.run(
+            ["playwright", "install", "chromium"],
+            timeout=180,
+            check=False,
+        )
+        return result.returncode == 0
+    except Exception as e:
+        print(f'[upgrade] Ошибка установки Chromium: {e}')
+        return False
+
+
 def _check_chromium() -> tuple[bool, str]:
     path = (shutil.which('chromium')
             or shutil.which('chromium-browser')
@@ -85,8 +104,10 @@ def _check_chromium() -> tuple[bool, str]:
         p.stop()
         if pathlib.Path(exe).exists():
             return True, f'chromium (playwright): {exe}'
-        return False, (f'chromium: нет по пути {exe} — '
-                       f'запустите: playwright install chromium')
+        print('[upgrade] Chromium не найден — устанавливаю через playwright...')
+        if _install_chromium():
+            return True, 'chromium: установлен через playwright install chromium'
+        return False, 'chromium: не удалось установить через playwright install chromium'
     except Exception as e:
         return False, f'chromium: {e}'
 
@@ -102,9 +123,12 @@ _CHECKS = [
 ]
 
 
-def _run_env_checks() -> bool:
+def _run_env_checks() -> None:
+    """
+    Проверяет серверное окружение. Бросает RuntimeError если хотя бы одна проверка не прошла.
+    """
     print('[upgrade] Проверка серверного окружения...')
-    all_ok = True
+    failed = []
     for name, fn in _CHECKS:
         try:
             ok, msg = fn()
@@ -113,23 +137,31 @@ def _run_env_checks() -> bool:
         tag = 'OK  ' if ok else 'FAIL'
         print(f'[upgrade]   [{tag}] {msg}')
         if not ok:
-            all_ok = False
-    status = 'всё в порядке' if all_ok else 'есть проблемы!'
-    print(f'[upgrade] Окружение: {status}')
-    return all_ok
+            failed.append(msg)
+    if failed:
+        summary = '; '.join(failed)
+        raise RuntimeError(f'[upgrade] Проверка окружения не пройдена: {summary}')
+    print('[upgrade] Окружение: всё в порядке')
 
 
 def check_upgrade() -> bool:
     """
     Возвращает True если приложение обновилось с последнего запуска.
 
-    Сравнивает build_number из таблицы environment с текущим BUILD.
-    При изменении — обновляет значение в БД и запускает проверку окружения.
+    На деве (REPLIT_DEPLOYMENT != "1") немедленно возвращает False без каких-либо действий.
+    На проде сравнивает build_number из таблицы environment с текущим BUILD.
+    При изменении — запускает проверку окружения и только после её успеха
+    обновляет значение build_number в БД.
+    Бросает исключение если проверка окружения не прошла.
     """
+    if os.environ.get('REPLIT_DEPLOYMENT') != '1':
+        return False
+
     stored = env_get(_BUILD_KEY, '')
     if stored == BUILD:
         return False
-    env_set(_BUILD_KEY, BUILD)
+
     print(f'[upgrade] Обновление: {stored or "первый запуск"} → {BUILD}')
     _run_env_checks()
+    env_set(_BUILD_KEY, BUILD)
     return True

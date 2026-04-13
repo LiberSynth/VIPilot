@@ -3,7 +3,7 @@ import threading
 from datetime import datetime, timezone
 
 from db import (
-    init_db, run_upgrades, db_get,
+    init_db, db_get,
     db_get_actionable_batches,
     db_cancel_waiting_batches,
     db_set_batch_status,
@@ -154,7 +154,6 @@ def start_main_loop():
     if not _main_loop_started:
         _main_loop_started = True
         init_db()
-        run_upgrades()
         check_upgrade()
         init_app(flask_app)
         wf_state.reset_active_threads()

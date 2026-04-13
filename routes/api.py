@@ -14,7 +14,6 @@ from db import (
     db_toggle_model,
     db_reorder_models,
     init_db,
-    run_upgrades,
     db_clear_all_history,
     env_get,
     env_set,
@@ -254,7 +253,6 @@ def api_reseed():
         return jsonify({"error": "unauthorized"}), 401
     try:
         init_db()
-        run_upgrades()
         return jsonify({"ok": True})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500

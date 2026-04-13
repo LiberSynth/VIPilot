@@ -13,7 +13,15 @@ def _get_build_number() -> str:
         ).decode().strip()
         if count:
             with open(_BUILD_FILE, "w") as f:
-                f.write(f'BUILD = "{count}"\n')
+                f.write(
+                    "# _build.py — фиксированный номер сборки приложения.\n"
+                    "#\n"
+                    "# Назначение: хранить BUILD между запусками, когда git недоступен на проде.\n"
+                    "# Обновляется автоматически при запуске utils/version.py (если доступен git),\n"
+                    "# поэтому является исходным файлом, а не временным — должен коммититься в репо.\n"
+                    "# Значение используется в upgrade.py для сравнения с build_number в БД.\n"
+                    f'BUILD = "{count}"\n'
+                )
             return count
     except Exception:
         pass

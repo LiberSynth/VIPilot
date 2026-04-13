@@ -1,6 +1,5 @@
 from .connection import get_db
 from .init import init_db
-from .upgrade import run_upgrades
 from .db_simple import (
     env_get,
     env_set,

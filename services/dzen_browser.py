@@ -23,7 +23,6 @@
 import base64
 import os
 import queue
-import subprocess
 import threading
 import time
 from datetime import datetime, timezone
@@ -37,31 +36,6 @@ from log import log_entry
 
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DZEN_PROFILE_DIR = os.path.join(_PROJECT_ROOT, "data", "dzen_profile")
-
-
-def _is_chromium_installed() -> bool:
-    """Проверяет наличие бинарника Chromium на диске."""
-    try:
-        from playwright.sync_api import sync_playwright
-        with sync_playwright() as pw:
-            path = pw.chromium.executable_path
-        return os.path.isfile(path)
-    except Exception:
-        return False
-
-
-def _install_chromium() -> bool:
-    """Запускает playwright install chromium. Возвращает True при успехе."""
-    try:
-        result = subprocess.run(
-            ["playwright", "install", "chromium"],
-            timeout=180,
-            check=False,
-        )
-        return result.returncode == 0
-    except Exception as e:
-        log_entry(None, f"[dzen_browser] Ошибка установки Chromium: {e}", level='silent')
-        return False
 
 
 def get_session_saved_at(target_id: str | None = None) -> str | None:
@@ -164,15 +138,7 @@ def _browser_loop(target_id: str):
 
     from playwright.sync_api import sync_playwright
 
-    _set_status("starting", "Проверяю Chromium…")
-    if not _is_chromium_installed():
-        _set_status("starting", "Устанавливаю Chromium…")
-        log_entry(None, "[dzen_browser] Chromium не найден — устанавливаю…", level='silent')
-        if not _install_chromium():
-            _set_status("error", "Не удалось установить Chromium")
-            log_entry(None, "[dzen_browser] Ошибка установки Chromium", level='silent')
-            return
-
+    _set_status("starting", "Запуск браузера…")
     os.makedirs(DZEN_PROFILE_DIR, exist_ok=True)
     log_entry(None, f"[dzen_browser] Профиль Chrome: {DZEN_PROFILE_DIR}", level='silent')
 
@@ -371,11 +337,6 @@ def run_pipeline_browser(fn, cookies: list) -> dict:
     Возвращает {"ok": bool, "result": ..., "error": str|None}.
     """
     global _running, _pipeline_taking_over
-
-    if not _is_chromium_installed():
-        msg = "Playwright Chromium не установлен — браузерная публикация недоступна"
-        log_entry(None, f"[dzen_pipeline] {msg}", level='silent')
-        return {"ok": False, "error": msg}
 
     # Сигнализируем ДО остановки login-браузера — frame_generator не пошлёт STOPPED
     _pipeline_taking_over = True
