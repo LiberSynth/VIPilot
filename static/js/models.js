@@ -222,6 +222,7 @@ window.createDirectorVideo = function(modelId, modelName, btn) {
     var icon = supported ? '✓' : '⚠';
     var color = supported ? '#4a8' : '#c80';
     var span = document.createElement('span');
+    span.setAttribute('data-role', 'duration-indicator');
     span.textContent = icon;
     span.title = tipText;
     span.style.cssText = 'font-size:13px;color:' + color + ';margin-left:auto;margin-right:4px;cursor:default;user-select:none;flex-shrink:0;';
@@ -262,6 +263,8 @@ window.createDirectorVideo = function(modelId, modelName, btn) {
       item.className = 'model-item' + (m.active ? ' model-active' : '');
       item.dataset.id = m.id;
       item.draggable = true;
+      if (m.allowed_durations) item.dataset.allowedDurations = JSON.stringify(m.allowed_durations);
+      if (m.price) item.dataset.price = m.price;
       var caption = m.platform_name ? escHtml(m.platform_name) + ': ' + escHtml(m.name) : escHtml(m.name);
       var grade = m.grade || 'good';
       var gradeHtml = '<span data-grade-id="' + m.id + '" data-grade="' + grade + '" onclick="event.stopPropagation();' + gradeFn + '(this)" title="Нажмите для смены" style="cursor:pointer;font-size:10px;padding:1px 6px;border-radius:3px;background:' + (_gradeColors[grade]||'#555') + ';color:#fff;margin-left:6px;opacity:.85">' + (_gradeLabels[grade]||grade) + '</span>';
@@ -274,28 +277,60 @@ window.createDirectorVideo = function(modelId, modelName, btn) {
         '<div class="model-drag-handle" title="Перетащить">⠿</div>';
       var probeBtn = item.querySelector('.model-probe-btn');
       if (probeBtn) {
+        if (m.price) {
+          var priceSpan = document.createElement('span');
+          priceSpan.style.cssText = 'font-size:11px;color:#888;margin-left:auto;padding-right:6px;white-space:nowrap';
+          priceSpan.textContent = m.price;
+          item.insertBefore(priceSpan, probeBtn);
+        }
         var durationIndicator = makeDurationIndicator(m, videoDuration);
         if (durationIndicator) {
-          var insertBefore = probeBtn;
-          if (m.price) {
-            var priceSpan = document.createElement('span');
-            priceSpan.style.cssText = 'font-size:11px;color:#888;padding-right:6px;white-space:nowrap';
-            priceSpan.textContent = m.price;
-            item.insertBefore(priceSpan, probeBtn);
-            insertBefore = priceSpan;
-          }
-          item.insertBefore(durationIndicator, insertBefore);
-        } else if (m.price) {
-          var priceSpan2 = document.createElement('span');
-          priceSpan2.style.cssText = 'font-size:11px;color:#888;margin-left:auto;padding-right:6px;white-space:nowrap';
-          priceSpan2.textContent = m.price;
-          item.insertBefore(priceSpan2, probeBtn);
+          if (m.price) durationIndicator.style.marginLeft = '';
+          item.insertBefore(durationIndicator, probeBtn);
         }
       }
       makeDragHandlers(item, containerId, m, saveOrderFn);
       container.appendChild(item);
     });
   };
+
+  function refreshDurationIndicators(containerId, videoDuration) {
+    var container = document.getElementById(containerId);
+    if (!container) return;
+    container.querySelectorAll('.model-item').forEach(function(item) {
+      var existing = item.querySelector('[data-role="duration-indicator"]');
+      if (existing) existing.parentNode.removeChild(existing);
+      var rawDurations = item.dataset.allowedDurations;
+      if (!rawDurations) return;
+      var allowed;
+      try { allowed = JSON.parse(rawDurations); } catch(e) { return; }
+      var fakeModel = { allowed_durations: allowed };
+      var newIndicator = makeDurationIndicator(fakeModel, videoDuration);
+      if (newIndicator) {
+        var probeBtn = item.querySelector('.model-probe-btn');
+        if (probeBtn) {
+          if (item.dataset.price) newIndicator.style.marginLeft = '';
+          item.insertBefore(newIndicator, probeBtn);
+        }
+      }
+    });
+  }
+
+  var _videoDurationListenerAdded = false;
+
+  function attachVideoDurationListener() {
+    if (_videoDurationListenerAdded) return;
+    var durationEl = document.getElementById('video_duration');
+    if (!durationEl) return;
+    _videoDurationListenerAdded = true;
+    durationEl.addEventListener('input', function() {
+      var duration = getVideoDuration();
+      refreshDurationIndicators('model-list', duration);
+      refreshDurationIndicators('director-model-list', duration);
+    });
+  }
+
+  window.attachVideoDurationListener = attachVideoDurationListener;
 
   function saveVideoOrder(ids) {
     fetch('/api/models/reorder', {
@@ -351,6 +386,7 @@ window.createDirectorVideo = function(modelId, modelName, btn) {
           actionFn: 'createProbeVideo',
           videoDuration: getVideoDuration()
         });
+        attachVideoDurationListener();
       })
       .catch(function() {
         const c = document.getElementById('model-list');
@@ -372,6 +408,7 @@ window.createDirectorVideo = function(modelId, modelName, btn) {
           actionFn: 'createDirectorVideo',
           videoDuration: getVideoDuration()
         });
+        attachVideoDurationListener();
       })
       .catch(function() {
         const c = document.getElementById('director-model-list');
