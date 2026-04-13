@@ -43,15 +43,19 @@ def _notify_on_error(log_id, message, level):
 def log_entry(log_id, message, level='info'):
     """Добавляет субзапись к существующей записи лога.
 
-    Если log_id равен None — no-op (запись не производится).
+    Если log_id равен None и level != 'silent' — no-op (запись не производится).
+    При уровне 'silent' — только print(), без записи в БД и без notify_failure.
     При уровнях 'error' и 'fatal_error' вызывает notify_failure.
     """
+    assert level in ('info', 'warn', 'error', 'fatal_error', 'silent'), (
+        f"log_entry: недопустимый уровень {level!r}. "
+        "Допустимые значения: 'info', 'warn', 'error', 'fatal_error', 'silent'."
+    )
+    if level == 'silent':
+        _builtins.print(message)
+        return
     if not log_id:
         return
-    assert level in ('info', 'warn', 'error', 'fatal_error'), (
-        f"log_entry: недопустимый уровень {level!r}. "
-        "Допустимые значения: 'info', 'warn', 'error', 'fatal_error'."
-    )
     try:
         with get_db() as conn:
             with conn.cursor() as cur:

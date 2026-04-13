@@ -73,7 +73,7 @@ def main_loop():
                     status='cancelled',
                     batch_id=bid,
                 )
-                print(f"[planning] Батч {bid[:8]}… отменён (слот расписания исчез)")
+                log_entry(None, f"[planning] Батч {bid[:8]}… отменён (слот расписания исчез)", level='silent')
 
             if wf_state.get_active_threads() < max_threads:
                 batches = db_get_actionable_batches()
@@ -110,7 +110,7 @@ def main_loop():
                                 db_log_root(msg, status='error')
                             else:
                                 log_entry(lid, msg, level='error')
-                            print(f"[{pipeline_name}] AppException батч {batch_id[:8]}…: {exc.message}")
+                            log_entry(None, f"[{pipeline_name}] AppException батч {batch_id[:8]}…: {exc.message}", level='silent')
                         except Exception as e:
                             db_set_batch_status(batch_id, 'fatal_error')
                             msg = f"Критическая ошибка: {e}"
@@ -122,7 +122,7 @@ def main_loop():
                                 db_log_root(msg, status='fatal_error')
                             else:
                                 log_entry(lid, msg, level='fatal_error')
-                            print(f"[{pipeline_name}] Критическая ошибка батч {batch_id[:8]}…: {e}")
+                            log_entry(None, f"[{pipeline_name}] Критическая ошибка батч {batch_id[:8]}…: {e}", level='silent')
                         finally:
                             wf_state.release_batch(batch_id)
                             wf_state.wakeup_loop()
@@ -136,7 +136,7 @@ def main_loop():
 
         except Exception as e:
             db_log_root(f"Ошибка главного цикла: {e}", status='error')
-            print(f"[main_loop] Ошибка: {e}")
+            log_entry(None, f"[main_loop] Ошибка: {e}", level='silent')
 
         wf_state.wait_for_wakeup(interval)
 
@@ -146,7 +146,7 @@ _main_loop_started = False
 
 def _on_exit():
     db_log_root("Приложение остановлено", status='info')
-    print("[main] Приложение остановлено")
+    log_entry(None, "[main] Приложение остановлено", level='silent')
 
 
 def start_main_loop():

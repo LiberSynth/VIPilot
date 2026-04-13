@@ -33,12 +33,16 @@ def pipeline_log(log_id, msg: str, level: str = 'info') -> None:
     """Тонкая обёртка над log_entry: пишет в БД (если log_id задан) и делает print.
 
     Это реэкспорт-обёртка единой функции логирования из log/.
-    level: 'info' | 'warn' | 'error'
+    level: 'info' | 'warn' | 'error' | 'silent'
+    При уровне 'silent' — только print(), без записи в БД.
     """
-    assert level in ('info', 'warn', 'error'), (
+    assert level in ('info', 'warn', 'error', 'silent'), (
         f"pipeline_log: недопустимый уровень {level!r}. "
-        "Допустимые значения: 'info', 'warn', 'error'."
+        "Допустимые значения: 'info', 'warn', 'error', 'silent'."
     )
+    if level == 'silent':
+        _builtins.print(msg)
+        return
     log_entry(log_id, msg, level=level)
     _builtins.print(msg)
 

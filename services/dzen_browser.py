@@ -29,6 +29,8 @@ import time
 from datetime import datetime, timezone
 from typing import Optional
 
+from log import log_entry
+
 # ---------------------------------------------------------------------------
 # Путь к персистентному профилю Chrome
 # ---------------------------------------------------------------------------
@@ -58,7 +60,7 @@ def _install_chromium() -> bool:
         )
         return result.returncode == 0
     except Exception as e:
-        print(f"[dzen_browser] Ошибка установки Chromium: {e}")
+        log_entry(None, f"[dzen_browser] Ошибка установки Chromium: {e}", level='silent')
         return False
 
 
@@ -150,7 +152,7 @@ def _process_event(page, ev: dict):
             if url:
                 page.goto(url, wait_until="domcontentloaded", timeout=30_000)
     except Exception as e:
-        print(f"[dzen_browser] Ошибка события {ev_type!r}: {e}")
+        log_entry(None, f"[dzen_browser] Ошибка события {ev_type!r}: {e}", level='silent')
 
 
 # ---------------------------------------------------------------------------
@@ -165,14 +167,14 @@ def _browser_loop(target_id: str):
     _set_status("starting", "Проверяю Chromium…")
     if not _is_chromium_installed():
         _set_status("starting", "Устанавливаю Chromium…")
-        print("[dzen_browser] Chromium не найден — устанавливаю…")
+        log_entry(None, "[dzen_browser] Chromium не найден — устанавливаю…", level='silent')
         if not _install_chromium():
             _set_status("error", "Не удалось установить Chromium")
-            print("[dzen_browser] Ошибка установки Chromium")
+            log_entry(None, "[dzen_browser] Ошибка установки Chromium", level='silent')
             return
 
     os.makedirs(DZEN_PROFILE_DIR, exist_ok=True)
-    print(f"[dzen_browser] Профиль Chrome: {DZEN_PROFILE_DIR}")
+    log_entry(None, f"[dzen_browser] Профиль Chrome: {DZEN_PROFILE_DIR}", level='silent')
 
     try:
         with sync_playwright() as pw:
@@ -201,7 +203,7 @@ def _browser_loop(target_id: str):
                     timeout=30_000,
                 )
             except Exception as e:
-                print(f"[dzen_browser] Ошибка навигации: {e}")
+                log_entry(None, f"[dzen_browser] Ошибка навигации: {e}", level='silent')
 
             _set_status("running")
 
@@ -217,7 +219,7 @@ def _browser_loop(target_id: str):
                         ok = db_set_target_session_context(_current_target_id, state)
                         if ok:
                             _save_result = {"ok": True, "error": None}
-                            print(f"[dzen_browser] Сессия сохранена в БД: {len(cookies)} куков, target={_current_target_id}")
+                            log_entry(None, f"[dzen_browser] Сессия сохранена в БД: {len(cookies)} куков, target={_current_target_id}", level='silent')
                         else:
                             _save_result = {"ok": False, "error": "Ошибка записи в БД"}
                     except Exception as e:
@@ -242,7 +244,7 @@ def _browser_loop(target_id: str):
                         _frame_counter += 1
                     _new_frame_event.set()
                 except Exception as e:
-                    print(f"[dzen_browser] Ошибка скриншота: {e}")
+                    log_entry(None, f"[dzen_browser] Ошибка скриншота: {e}", level='silent')
 
                 time.sleep(0.2)
 
@@ -250,7 +252,7 @@ def _browser_loop(target_id: str):
 
     except Exception as e:
         _set_status("error", str(e))
-        print(f"[dzen_browser] Критическая ошибка: {e}")
+        log_entry(None, f"[dzen_browser] Критическая ошибка: {e}", level='silent')
         return
 
     if not _pipeline_taking_over:
@@ -372,7 +374,7 @@ def run_pipeline_browser(fn, cookies: list) -> dict:
 
     if not _is_chromium_installed():
         msg = "Playwright Chromium не установлен — браузерная публикация недоступна"
-        print(f"[dzen_pipeline] {msg}")
+        log_entry(None, f"[dzen_pipeline] {msg}", level='silent')
         return {"ok": False, "error": msg}
 
     # Сигнализируем ДО остановки login-браузера — frame_generator не пошлёт STOPPED
@@ -410,9 +412,9 @@ def run_pipeline_browser(fn, cookies: list) -> dict:
             if cookies:
                 try:
                     ctx.add_cookies(cookies)
-                    print(f"[dzen_pipeline] Загружено {len(cookies)} куков")
+                    log_entry(None, f"[dzen_pipeline] Загружено {len(cookies)} куков", level='silent')
                 except Exception as e:
-                    print(f"[dzen_pipeline] Ошибка куков: {e}")
+                    log_entry(None, f"[dzen_pipeline] Ошибка куков: {e}", level='silent')
 
             page = ctx.new_page()
 

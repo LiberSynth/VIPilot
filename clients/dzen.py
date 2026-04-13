@@ -121,7 +121,7 @@ def _snap(page, batch_id=None) -> None:
         if batch_id:
             push_frame_for_batch(batch_id, img)
     except Exception as _e:
-        print(f"[dzen] _snap: {_e}")
+        log_entry(None, f"[dzen] _snap: {_e}", level='silent')
 
 
 def _has_captcha_frame(page) -> bool:
@@ -201,7 +201,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
     studio_url = f"https://dzen.ru/profile/editor/id/{publisher_id}/"
 
     # ── Шаг 1: Переходим в студию ────────────────────────────────────────
-    print(f"[dzen] Переход в студию: {studio_url}")
+    log_entry(None, f"[dzen] Переход в студию: {studio_url}", level='silent')
     if log_id:
         log_entry(log_id, f"Дзен: Переход в студию: {studio_url}")
     page.goto(studio_url, wait_until="domcontentloaded", timeout=_NAV_TIMEOUT)
@@ -209,7 +209,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
     _snap(page, batch_id)
 
     cur = page.url
-    print(f"[dzen] URL после перехода: {cur}")
+    log_entry(None, f"[dzen] URL после перехода: {cur}", level='silent')
     if "passport.yandex" in cur or "/auth" in cur:
         raise DzenCsrfExpired(
             "Сессия истекла — авторизуйтесь снова в браузере (вкладка «Публикация»)"
@@ -219,7 +219,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
     try:
         overlay = page.locator("[data-testid='modal-overlay']").first
         if overlay.is_visible():
-            print("[dzen] Закрываю модальное окно…")
+            log_entry(None, "[dzen] Закрываю модальное окно…", level='silent')
             if log_id:
                 log_entry(log_id, "Дзен: Закрываю модальное окно…")
             # Сначала пробуем кнопку ×, затем клик по оверлею
@@ -251,7 +251,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
     _dismiss_popups(page, log_id)
 
     # ── Шаг 2: Кнопка «+» (плюсик) в правом верхнем углу ────────────────
-    print("[dzen] Ищу кнопку «+» для создания публикации…")
+    log_entry(None, "[dzen] Ищу кнопку «+» для создания публикации…", level='silent')
     if log_id:
         log_entry(log_id, "Дзен: Ищу кнопку «+» для создания публикации…")
     plus_btn = page.locator(
@@ -265,34 +265,34 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
     ).first
     plus_btn.wait_for(state="visible", timeout=15_000)
     plus_btn.click()
-    print("[dzen] Кнопка «+» нажата, жду меню…")
+    log_entry(None, "[dzen] Кнопка «+» нажата, жду меню…", level='silent')
     if log_id:
         log_entry(log_id, "Дзен: Кнопка «+» нажата, жду меню…")
     page.wait_for_timeout(1500)
     _snap(page, batch_id)
 
     # ── Шаг 3: «Загрузить видео» из выпадающего меню ─────────────────────
-    print("[dzen] Выбираю «Загрузить видео»…")
+    log_entry(None, "[dzen] Выбираю «Загрузить видео»…", level='silent')
     if log_id:
         log_entry(log_id, "Дзен: Выбираю «Загрузить видео»…")
     upload_item = page.get_by_text("Загрузить видео", exact=True).first
     try:
         upload_item.wait_for(state="visible", timeout=8_000)
     except Exception:
-        print("[dzen] exact-match не нашёл — пробую contains…")
+        log_entry(None, "[dzen] exact-match не нашёл — пробую contains…", level='silent')
         if log_id:
             log_entry(log_id, "Дзен: exact-match не нашёл — пробую contains…")
         upload_item = page.locator("text=Загрузить видео").first
         upload_item.wait_for(state="visible", timeout=5_000)
     upload_item.click()
-    print("[dzen] «Загрузить видео» нажато")
+    log_entry(None, "[dzen] «Загрузить видео» нажато", level='silent')
     if log_id:
         log_entry(log_id, "Дзен: «Загрузить видео» нажато")
     page.wait_for_timeout(1500)
     _snap(page, batch_id)
 
     # ── Шаг 4: Загружаем файл ────────────────────────────────────────────
-    print("[dzen] Ищу поле загрузки файла…")
+    log_entry(None, "[dzen] Ищу поле загрузки файла…", level='silent')
     if log_id:
         log_entry(log_id, "Дзен: Ищу поле загрузки файла…")
     # Ждём появления кнопки ДО входа в expect_file_chooser:
@@ -300,14 +300,14 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
     # и expect_file_chooser истекает раньше, чем диалог успевает открыться.
     choose_btn = page.get_by_text("Выбрать видео", exact=False).first
     choose_btn.wait_for(state="visible", timeout=20_000)
-    print("[dzen] Кнопка «Выбрать видео» найдена, открываю диалог выбора файла…")
+    log_entry(None, "[dzen] Кнопка «Выбрать видео» найдена, открываю диалог выбора файла…", level='silent')
     if log_id:
         log_entry(log_id, "Дзен: Кнопка «Выбрать видео» найдена, открываю диалог выбора файла…")
     with page.expect_file_chooser(timeout=15_000) as fc_info:
         choose_btn.click()
     file_chooser = fc_info.value
     file_chooser.set_files(video_path)
-    print("[dzen] Файл передан браузеру, жду загрузки…")
+    log_entry(None, "[dzen] Файл передан браузеру, жду загрузки…", level='silent')
     if log_id:
         log_entry(log_id, "Дзен: Файл передан браузеру, жду загрузки…")
     _snap(page, batch_id)
@@ -315,7 +315,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
     # Ждём одно из двух:
     #   a) ?videoEditorPublicationId=...  — редактор открылся, нужно кликать «Опубликовать»
     #   b) ?state=published               — Дзен опубликовал сам, ничего больше не нужно
-    print("[dzen] Жду открытия редактора видео или авто-публикации…")
+    log_entry(None, "[dzen] Жду открытия редактора видео или авто-публикации…", level='silent')
     if log_id:
         log_entry(log_id, "Дзен: Жду открытия редактора видео или авто-публикации…")
     _editor_opened = False
@@ -328,12 +328,12 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
         _cur = page.url
         if "state=published" in _cur:
             _auto_published = True
-            print(f"[dzen] Дзен опубликовал видео автоматически: {_cur}")
+            log_entry(None, f"[dzen] Дзен опубликовал видео автоматически: {_cur}", level='silent')
             if log_id:
                 log_entry(log_id, f"Дзен: Дзен опубликовал видео автоматически: {_cur}")
         else:
             _editor_opened = True
-            print(f"[dzen] Редактор видео открылся: {_cur}")
+            log_entry(None, f"[dzen] Редактор видео открылся: {_cur}", level='silent')
             if log_id:
                 log_entry(log_id, f"Дзен: Редактор видео открылся: {_cur}")
     except Exception:
@@ -342,14 +342,14 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
     if _auto_published:
         # Видео уже опубликовано — пропускаем шаги 5-7
         _snap(page, batch_id)
-        print("[dzen] Публикация завершена!")
+        log_entry(None, "[dzen] Публикация завершена!", level='silent')
         if log_id:
             log_entry(log_id, "Дзен: Публикация завершена!")
         return
 
     if not _editor_opened:
         # Запасной вариант: ждём поле заголовка или кнопку в диалоге
-        print("[dzen] URL редактора не появился, жду форму…")
+        log_entry(None, "[dzen] URL редактора не появился, жду форму…", level='silent')
         if log_id:
             log_entry(log_id, "Дзен: URL редактора не появился, жду форму…")
         try:
@@ -360,14 +360,14 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
                 timeout=15_000,
             )
         except Exception:
-            print("[dzen] Форма не обнаружена — продолжаю по таймауту…")
+            log_entry(None, "[dzen] Форма не обнаружена — продолжаю по таймауту…", level='silent')
             if log_id:
                 log_entry(log_id, "Дзен: Форма не обнаружена — продолжаю по таймауту…")
             page.wait_for_timeout(5000)
     _snap(page, batch_id)
 
     # ── Шаг 5: Публикуем ─────────────────────────────────────────────────
-    print("[dzen] Нажимаю «Опубликовать»…")
+    log_entry(None, "[dzen] Нажимаю «Опубликовать»…", level='silent')
     if log_id:
         log_entry(log_id, "Дзен: Нажимаю «Опубликовать»…")
     pub_btn = page.locator("button:has-text('Опубликовать')").first
@@ -431,7 +431,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
             ).first
             if pub_after.is_visible(timeout=300):
                 btn_text = pub_after.inner_text()
-                print(f"[dzen] Нажимаю кнопку подтверждения публикации: «{btn_text}»…")
+                log_entry(None, f"[dzen] Нажимаю кнопку подтверждения публикации: «{btn_text}»…", level='silent')
                 if log_id:
                     log_entry(log_id, f"Дзен: Нажимаю кнопку подтверждения публикации: «{btn_text}»…")
                 pub_after.click()
@@ -447,7 +447,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
         if not captcha_clicked:
             try:
                 all_frames = page.frames
-                print(f"[dzen] Фреймы: {[f.url for f in all_frames]}")
+                log_entry(None, f"[dzen] Фреймы: {[f.url for f in all_frames]}", level='silent')
                 if log_id:
                     log_entry(log_id, f"Дзен: Фреймы: {[f.url for f in all_frames]}")
                 for frame in all_frames:
@@ -461,7 +461,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
                     ))
                     if not is_captcha:
                         continue
-                    print(f"[dzen] Капча-фрейм найден: {frame.url!r}")
+                    log_entry(None, f"[dzen] Капча-фрейм найден: {frame.url!r}", level='silent')
                     if log_id:
                         log_entry(log_id, f"Дзен: Капча-фрейм найден: {frame.url!r}")
                     # Вариант 1: JS-клик напрямую по input[type=checkbox] внутри фрейма.
@@ -478,7 +478,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
                                 f'if (el) {{ el.click(); return true; }} return false; }}'
                             )
                             if done:
-                                print(f"[dzen] Капча: JS-клик по {js_sel!r} — выполнен")
+                                log_entry(None, f"[dzen] Капча: JS-клик по {js_sel!r} — выполнен", level='silent')
                                 if log_id:
                                     log_entry(log_id, f"Дзен: Капча: JS-клик по {js_sel!r} — выполнен")
                                 _js_clicked = True
@@ -501,7 +501,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
                         try:
                             el = frame.locator(sel).first
                             if el.is_visible():
-                                print(f"[dzen] Капча: Playwright-клик {sel!r}…")
+                                log_entry(None, f"[dzen] Капча: Playwright-клик {sel!r}…", level='silent')
                                 if log_id:
                                     log_entry(log_id, f"Дзен: Капча: Playwright-клик {sel!r}…")
                                 el.click(force=True, timeout=2000)
@@ -532,7 +532,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
                 "[data-testid='publish-success']"
             ).first
             if success_now.is_visible():
-                print("[dzen] Публикация подтверждена ещё в шаге 6.")
+                log_entry(None, "[dzen] Публикация подтверждена ещё в шаге 6.", level='silent')
                 if log_id:
                     log_entry(log_id, "Дзен: Публикация подтверждена ещё в шаге 6.")
                 captcha_clicked = True
@@ -543,11 +543,11 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
         page.wait_for_timeout(_DIALOG_POLL)
 
     if captcha_clicked:
-        print("[dzen] Действия в шаге 6 выполнены, жду подтверждения публикации…")
+        log_entry(None, "[dzen] Действия в шаге 6 выполнены, жду подтверждения публикации…", level='silent')
         if log_id:
             log_entry(log_id, "Дзен: Действия в шаге 6 выполнены, жду подтверждения публикации…")
     else:
-        print("[dzen] Шаг 6 завершён (капча/попап не обнаружены), жду подтверждения…")
+        log_entry(None, "[dzen] Шаг 6 завершён (капча/попап не обнаружены), жду подтверждения…", level='silent')
         if log_id:
             log_entry(log_id, "Дзен: Шаг 6 завершён (капча/попап не обнаружены), жду подтверждения…")
 
@@ -596,7 +596,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
             el = page.locator(css_success_selector).first
             if el.is_visible():
                 confirmed = True
-                print("[dzen] Уведомление об успешной публикации получено (CSS).")
+                log_entry(None, "[dzen] Уведомление об успешной публикации получено (CSS).", level='silent')
                 if log_id:
                     log_entry(log_id, "Дзен: Уведомление об успешной публикации получено (CSS).")
                 break
@@ -609,7 +609,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
                 el = page.locator(pat).first
                 if el.is_visible():
                     confirmed = True
-                    print(f"[dzen] Успех по тексту: {pat!r}")
+                    log_entry(None, f"[dzen] Успех по тексту: {pat!r}", level='silent')
                     if log_id:
                         log_entry(log_id, f"Дзен: Успех по тексту: {pat!r}")
                     break
@@ -627,14 +627,14 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
             # state=published — Дзен подтвердил публикацию
             if "state=published" in url_now:
                 confirmed = True
-                print(f"[dzen] URL → state=published — публикация подтверждена.")
+                log_entry(None, f"[dzen] URL → state=published — публикация подтверждена.", level='silent')
                 if log_id:
                     log_entry(log_id, f"Дзен: URL → state=published — публикация подтверждена.")
                 break
             video_match = re.search(r"/video/|/shorts/|/watch\?", url_now)
             if video_match or "editor" not in url_now:
                 confirmed = True
-                print(f"[dzen] URL сменился ({url_now}) — публикация подтверждена.")
+                log_entry(None, f"[dzen] URL сменился ({url_now}) — публикация подтверждена.", level='silent')
                 if log_id:
                     log_entry(log_id, f"Дзен: URL сменился ({url_now}) — публикация подтверждена.")
                 break
@@ -646,23 +646,23 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
     if not confirmed:
         # Финальный URL-снимок
         url_after = page.url
-        print(f"[dzen] URL до публикации: {url_before}")
-        print(f"[dzen] URL после публикации: {url_after}")
+        log_entry(None, f"[dzen] URL до публикации: {url_before}", level='silent')
+        log_entry(None, f"[dzen] URL после публикации: {url_after}", level='silent')
         if "state=published" in url_after:
             confirmed = True
-            print(f"[dzen] URL → state=published — публикация подтверждена (финал).")
+            log_entry(None, f"[dzen] URL → state=published — публикация подтверждена (финал).", level='silent')
             if log_id:
                 log_entry(log_id, f"Дзен: URL → state=published — публикация подтверждена (финал).")
         else:
             video_url_pattern = re.search(r"/video/|/shorts/|/watch\?", url_after)
             if video_url_pattern and url_after != url_before:
                 confirmed = True
-                print(f"[dzen] URL сменился на страницу видео ({url_after}) — публикация подтверждена.")
+                log_entry(None, f"[dzen] URL сменился на страницу видео ({url_after}) — публикация подтверждена.", level='silent')
                 if log_id:
                     log_entry(log_id, f"Дзен: URL сменился на страницу видео ({url_after}) — публикация подтверждена.")
             elif url_after != url_before and "editor" not in url_after:
                 confirmed = True
-                print(f"[dzen] URL сменился ({url_after}) — публикация предположительно подтверждена.")
+                log_entry(None, f"[dzen] URL сменился ({url_after}) — публикация предположительно подтверждена.", level='silent')
                 if log_id:
                     log_entry(log_id, f"Дзен: URL сменился ({url_after}) — публикация предположительно подтверждена.")
 
@@ -674,13 +674,13 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
             "Подтверждение публикации не получено за 60 с, "
             "но явных ошибок нет — публикация предположительно выполнена"
         )
-        print(f"[dzen] {msg}")
+        log_entry(None, f"[dzen] {msg}", level='silent')
         if log_id:
             log_entry(log_id, f"Дзен: {msg}")
         _snap(page, batch_id)
 
     final_url = page.url
-    print(f"[dzen] URL после публикации: {final_url}")
-    print("[dzen] Публикация завершена!")
+    log_entry(None, f"[dzen] URL после публикации: {final_url}", level='silent')
+    log_entry(None, "[dzen] Публикация завершена!", level='silent')
     if log_id:
         log_entry(log_id, "Дзен: Публикация завершена!")
