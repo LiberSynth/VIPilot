@@ -10,6 +10,8 @@ Pipeline 6 — Сборщик мусора.
 Запускается каждые loop_interval секунд; делает всё за один проход.
 """
 
+import threading
+
 from db import (
     db_get,
     db_cleanup_log_entries,
@@ -20,6 +22,16 @@ from db import (
 from log import db_log_pipeline
 from utils.utils import parse_entries_lifetime, parse_log_lifetime, parse_batch_lifetime, parse_file_lifetime
 from pipelines.base import pipeline_log
+
+_thread = None
+
+
+def tick():
+    """Запускает поток очистки, если предыдущий уже завершился."""
+    global _thread
+    if _thread is None or not _thread.is_alive():
+        _thread = threading.Thread(target=run, daemon=True)
+        _thread.start()
 
 
 def run():

@@ -4,9 +4,10 @@ from flask import Flask
 
 from db import (
     db_reset_stalled_batches,
-    db_get_batches_with_unknown_status,
+    db_get_distinct_batch_statuses,
 )
-from statuses import KNOWN_BATCH_STATUSES, COMPOSITE_BATCH_STATUS_SUFFIXES
+from db.connection import get_db
+from statuses import FINAL_BATCH_STATUSES, _assert_known_status
 from log.log import db_log_pipeline, log_entry
 from utils.consts import FLASK_SECRET
 from utils.limiter import limiter
@@ -32,6 +33,8 @@ def init_app(app: Flask):
     app.register_blueprint(dzen_browser_bp)
 
     _reset_stalled_batches()
+    _interrupt_running_pipelines()
+    _fix_orphaned_running()
     _validate_batch_statuses()
 
 
@@ -45,21 +48,65 @@ def _reset_stalled_batches():
         old = item["old_status"]
         new = item["new_status"]
         msg = f"Батч сброшен при рестарте: {old} → {new}"
-        db_log_pipeline('startup', msg, status='warn', batch_id=bid)
+        db_log_pipeline('planning', msg, status='warn', batch_id=bid)
         log_entry(None, fmt_id_msg("[startup] Батч {} сброшен: {} → {}", bid, old, new), level='silent')
 
 
+def _interrupt_running_pipelines():
+    for pipeline in ('story', 'video', 'transcode', 'publish'):
+        try:
+            with get_db() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "UPDATE log SET status = 'cancelled' WHERE pipeline = %s AND status = 'running'",
+                        (pipeline,),
+                    )
+                    count = cur.rowcount
+                conn.commit()
+            if count:
+                print(f"[startup] {pipeline}: {count} незавершённых записей → cancelled")
+        except Exception as e:
+            print(f"[DB] Ошибка прерывания running для {pipeline}: {e}")
+
+
+def _fix_orphaned_running():
+    try:
+        placeholders = ', '.join(['%s'] * len(FINAL_BATCH_STATUSES))
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"""
+                    SELECT l.id, l.pipeline, l.batch_id, b.status
+                    FROM log l
+                    JOIN batches b ON b.id = l.batch_id
+                    WHERE l.status = 'running'
+                      AND b.status IN ({placeholders})
+                    """,
+                    FINAL_BATCH_STATUSES,
+                )
+                rows = cur.fetchall()
+                if rows:
+                    for row in rows:
+                        log_id, pipeline, batch_id, batch_status = row
+                        print(
+                            fmt_id_msg(
+                                "[startup] WARN: лог #{} (pipeline={}, batch={}) завис в 'running', "
+                                "батч уже в статусе '{}'",
+                                log_id, pipeline, batch_id, batch_status
+                            )
+                        )
+                    ids = [r[0] for r in rows]
+                    cur.execute(
+                        "UPDATE log SET status = 'cancelled' WHERE id = ANY(%s)",
+                        (ids,),
+                    )
+                    conn.commit()
+                    print(f"[startup] {len(ids)} зависших 'running' записей → cancelled")
+    except Exception as e:
+        print(f"[DB] Ошибка _fix_orphaned_running: {e}")
+
+
 def _validate_batch_statuses():
-    unknown_batches = db_get_batches_with_unknown_status(KNOWN_BATCH_STATUSES)
-    truly_unknown = {
-        batch_id: status
-        for batch_id, status in unknown_batches.items()
-        if not any(status.endswith(sfx) for sfx in COMPOSITE_BATCH_STATUS_SUFFIXES)
-    }
-    if truly_unknown:
-        for batch_id, status in truly_unknown.items():
-            msg = f"[validate] ВНИМАНИЕ: батч имеет неизвестный статус: {status!r}"
-            db_log_pipeline('validate', msg, status='error', batch_id=batch_id)
-            log_entry(None, fmt_id_msg("[validate] batch_id={}: неизвестный статус {}", batch_id, repr(status)), level='silent')
-    else:
-        log_entry(None, "[validate] Все статусы батчей известны.", level='silent')
+    for status in db_get_distinct_batch_statuses():
+        _assert_known_status(status)
+    log_entry(None, "[startup] Все статусы батчей известны.", level='silent')

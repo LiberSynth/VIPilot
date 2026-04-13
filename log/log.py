@@ -4,12 +4,17 @@
 import builtins as _builtins
 
 from db.connection import get_db
-from statuses import FINAL_BATCH_STATUSES
-from utils.utils import fmt_id_msg
+
+
+_ALLOWED_PIPELINES = {'story', 'video', 'transcode', 'publish', 'planning', 'cleanup', 'root'}
 
 
 def db_log_pipeline(pipeline, message, status='info', batch_id=None):
     """Записывает событие пайплайна в таблицу log. Возвращает log_id или None."""
+    assert pipeline in _ALLOWED_PIPELINES, (
+        f"db_log_pipeline: недопустимое имя пайплайна {pipeline!r}. "
+        f"Допустимые: {sorted(_ALLOWED_PIPELINES)}"
+    )
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
@@ -70,23 +75,6 @@ def log_entry(log_id, message, level='info'):
     _notify_on_error(log_id, message, level)
 
 
-def db_log_interrupt_running(pipeline):
-    """Переводит все незавершённые записи пайплайна из 'running' в 'cancelled'."""
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "UPDATE log SET status = 'cancelled' WHERE pipeline = %s AND status = 'running'",
-                    (pipeline,),
-                )
-                count = cur.rowcount
-            conn.commit()
-        if count:
-            print(f"[log] {pipeline}: {count} незавершённых записей → cancelled")
-    except Exception as e:
-        print(f"[DB] Ошибка db_log_interrupt_running: {e}")
-
-
 def db_log_update(log_id, message, status):
     """Обновляет message и status существующей записи лога."""
     try:
@@ -99,54 +87,6 @@ def db_log_update(log_id, message, status):
             conn.commit()
     except Exception as e:
         print(f"[DB] Ошибка db_log_update: {e}")
-
-
-def db_log_root(message, status='info'):
-    """Системная запись уровня приложения (pipeline='root', без батча)."""
-    return db_log_pipeline('root', message, status=status, batch_id=None)
-
-
-def db_log_fix_orphaned_running(fix=True):
-    """Находит записи лога со статусом 'running', чей батч уже в финальном статусе.
-    Логирует предупреждение для каждой такой записи.
-    Если fix=True — переводит их в статус 'cancelled'."""
-    try:
-        placeholders = ', '.join(['%s'] * len(FINAL_BATCH_STATUSES))
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    f"""
-                    SELECT l.id, l.pipeline, l.batch_id, b.status
-                    FROM log l
-                    JOIN batches b ON b.id = l.batch_id
-                    WHERE l.status = 'running'
-                      AND b.status IN ({placeholders})
-                    """,
-                    FINAL_BATCH_STATUSES,
-                )
-                rows = cur.fetchall()
-                if rows:
-                    for row in rows:
-                        log_id, pipeline, batch_id, batch_status = row
-                        print(
-                            fmt_id_msg(
-                                "[log] WARN: лог #{} (pipeline={}, batch={}) завис в 'running', "
-                                "батч уже в статусе '{}'",
-                                log_id, pipeline, batch_id, batch_status
-                            )
-                        )
-                    if fix:
-                        ids = [r[0] for r in rows]
-                        cur.execute(
-                            "UPDATE log SET status = 'cancelled' WHERE id = ANY(%s)",
-                            (ids,),
-                        )
-                        conn.commit()
-                        print(f"[log] {len(ids)} зависших 'running' записей → cancelled")
-        return len(rows) if rows else 0
-    except Exception as e:
-        print(f"[DB] Ошибка db_log_fix_orphaned_running: {e}")
-        return 0
 
 
 def db_get_log_entries(log_id):

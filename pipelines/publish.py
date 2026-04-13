@@ -35,6 +35,16 @@ from clients import dzen as dzen_client
 from clients.dzen import DzenCsrfExpired, DzenSessionMissing
 
 
+def is_scheduled(batch) -> bool:
+    """Возвращает True если батч ещё не наступило время публиковать."""
+    sched = batch.get('scheduled_at')
+    if sched is None:
+        return False
+    if sched.tzinfo is None:
+        sched = sched.replace(tzinfo=timezone.utc)
+    return datetime.now(timezone.utc) < sched
+
+
 def _get_video(batch_id, log_id):
     """Возвращает видеоданные батча (transcoded или original).
     Бросает RuntimeError если оба поля NULL."""

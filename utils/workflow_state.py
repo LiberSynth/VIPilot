@@ -1,5 +1,7 @@
 import threading
 
+from db import env_get
+
 _resume_event = threading.Event()
 _resume_event.set()
 
@@ -71,3 +73,12 @@ def is_batch_active(batch_id: str) -> bool:
 def get_active_batch_ids() -> set:
     with _threads_lock:
         return set(_active_batch_ids)
+
+
+def init_from_db():
+    """Инициализирует состояние workflow из БД."""
+    reset_active_threads()
+    if env_get('workflow_state', 'running') == 'pause':
+        set_paused()
+    else:
+        set_running()

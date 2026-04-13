@@ -2,17 +2,30 @@ from datetime import datetime, timezone, timedelta
 
 from db import (
     db_get,
+    db_cancel_waiting_batches,
     db_get_schedule, db_get_active_targets, db_ensure_batch, db_get_last_pipeline_run,
 )
 from log import db_log_pipeline
 from utils.consts import MSK
-from utils.utils import parse_hhmm
+from utils.utils import parse_hhmm, fmt_id_msg
 from pipelines.base import pipeline_log
 
 
-def run(loop_interval: int):
+def run():
     """Планирование: проверяет расписание и создаёт недостающие батчи."""
     try:
+        loop_interval = int(db_get('loop_interval'))
+
+        cancelled = db_cancel_waiting_batches()
+        for bid in cancelled:
+            db_log_pipeline(
+                'publish',
+                'Батч отменён — слот удалён из расписания',
+                status='cancelled',
+                batch_id=bid,
+            )
+            pipeline_log(None, fmt_id_msg("[planning] Батч {} отменён (слот расписания исчез)", bid), level='silent')
+
         schedule = db_get_schedule()
         targets  = db_get_active_targets()
 

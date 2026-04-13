@@ -17,6 +17,7 @@ import subprocess
 
 from utils._build import BUILD
 from db import env_get, env_set
+from db.init import _bootstrap, run_migrations, seed_db
 
 _BUILD_KEY = 'build_number'
 
@@ -146,22 +147,30 @@ def _run_env_checks() -> None:
 
 def check_upgrade() -> bool:
     """
-    Возвращает True если приложение обновилось с последнего запуска.
+    Инициализирует БД и возвращает True если приложение обновилось с последнего запуска.
 
-    На деве (REPLIT_DEPLOYMENT != "1") немедленно возвращает False без каких-либо действий.
-    На проде сравнивает build_number из таблицы environment с текущим BUILD.
-    При изменении — запускает проверку окружения и только после её успеха
-    обновляет значение build_number в БД.
-    Бросает исключение если проверка окружения не прошла.
+    _bootstrap() вызывается только если база совсем новая (build_number отсутствует).
+    run_migrations() и seed_db() вызываются только при обновлении (stored != BUILD).
+    На деве (REPLIT_DEPLOYMENT != "1") _bootstrap() всегда вызывается, апгрейд пропускается.
     """
     if os.environ.get('REPLIT_DEPLOYMENT') != '1':
+        stored = env_get(_BUILD_KEY, '')
+        if not stored:
+            _bootstrap()
+            run_migrations()
+            seed_db()
         return False
 
     stored = env_get(_BUILD_KEY, '')
+    if not stored:
+        _bootstrap()
+
     if stored == BUILD:
         return False
 
     print(f'[upgrade] Обновление: {stored or "первый запуск"} → {BUILD}')
     _run_env_checks()
+    run_migrations()
+    seed_db()
     env_set(_BUILD_KEY, BUILD)
     return True

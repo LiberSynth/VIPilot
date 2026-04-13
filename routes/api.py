@@ -3,8 +3,6 @@ import threading
 import time
 from flask import Blueprint, jsonify, request, Response
 
-from log import db_log_root
-
 from db import (
     db_get_schedule,
     db_add_schedule_slot,
@@ -283,7 +281,7 @@ def api_workflow_start():
         return jsonify({"error": "unauthorized"}), 401
     env_set("workflow_state", "running")
     wf_state.set_running()
-    db_log_root("Движок запущен вручную", status='info')
+    db_log_pipeline('root', "Движок запущен вручную", status='info')
     return jsonify({"ok": True, "state": "running"})
 
 
@@ -293,7 +291,7 @@ def api_workflow_pause():
         return jsonify({"error": "unauthorized"}), 401
     env_set("workflow_state", "pause")
     wf_state.set_paused()
-    db_log_root("Движок приостановлен вручную", status='info')
+    db_log_pipeline('root', "Движок приостановлен вручную", status='info')
     return jsonify({"ok": True, "state": "pause"})
 
 
@@ -305,7 +303,7 @@ def api_workflow_use_donor():
     val = "1" if body.get("enabled") == "1" else "0"
     env_set("use_donor", val)
     label = "включен" if val == "1" else "выключен"
-    db_log_root(f"Использовать донора {label}", status='info')
+    db_log_pipeline('root', f"Использовать донора {label}", status='info')
     return jsonify({"ok": True, "use_donor": val})
 
 
@@ -325,7 +323,7 @@ def api_workflow_emulation():
     val = "1" if body.get("enabled") == "1" else "0"
     env_set("emulation_mode", val)
     label = "включена" if val == "1" else "выключена"
-    db_log_root(f"Эмуляция {label}", status='info')
+    db_log_pipeline('root', f"Эмуляция {label}", status='info')
     return jsonify({"ok": True, "emulation_mode": val})
 
 
@@ -343,7 +341,7 @@ def api_reset_batch_pipeline(batch_id, pipeline):
 def api_workflow_restart():
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
-    db_log_root("Перезапуск приложения вручную", status='info')
+    db_log_pipeline('root', "Перезапуск приложения вручную", status='info')
     def _do_restart():
         import time as _time
         import sys as _sys
