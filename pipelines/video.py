@@ -34,7 +34,7 @@ from db import (
     db_get_movie_from_donor,
 )
 from log import db_log_pipeline, db_log_update
-from pipelines.base import check_cancelled, handle_critical_error, pipeline_log
+from pipelines.base import check_cancelled, handle_critical_error, pipeline_log, iterate_models
 from clients import falai
 from clients.falai import ProviderFatalError
 
@@ -162,145 +162,160 @@ def run(batch_id):
         pipeline_log(None, f"[video] Батч {batch_id[:8]}… ({target}) — "
                      f"{'возобновление' if resumed else 'начало'} генерации видео")
 
-        used_model    = None
-        used_model_id = None
+        if not falai.is_configured():
+            msg = 'FAL_API_KEY не задан — генерация невозможна'
+            db_log_pipeline('video', msg, status='error', batch_id=batch_id)
+            pipeline_log(None, f"[video] {msg}")
+            notify_failure(f"video: {msg}")
+            return
 
-        if resumed:
-            batch_data   = batch['data'] or {}
-            request_id   = batch_data['request_id']
-            status_url   = batch_data['status_url']
-            response_url = batch_data['response_url']
-            used_model   = batch_data.get('model_name')
-            log_id = db_log_pipeline(
-                'video', 'Генерация видео… (возобновление)',
-                status='running', batch_id=batch_id,
-            )
-            pipeline_log(log_id, f"Возобновление: request_id={request_id}")
+        try:
+            fails_to_next = max(1, int(db_get('video_fails_to_next', '3')))
+        except (ValueError, TypeError):
+            fails_to_next = 3
 
+        if pinned_model_id:
+            pinned_m = db_get_video_model_by_id(pinned_model_id)
+            if not pinned_m:
+                msg = f'Пробная модель {str(pinned_model_id)[:8]}… не найдена'
+                db_log_pipeline('video', msg, status='error', batch_id=batch_id)
+                pipeline_log(None, f"[video] {msg}")
+                return
+            models = [pinned_m]
         else:
-            if not falai.is_configured():
-                msg = 'FAL_API_KEY не задан — генерация невозможна'
+            models = db_get_active_video_models()
+            if not models:
+                msg = 'Нет активных video-моделей в ai_models (type=text-to-video)'
                 db_log_pipeline('video', msg, status='error', batch_id=batch_id)
                 pipeline_log(None, f"[video] {msg}")
                 notify_failure(f"video: {msg}")
                 return
 
-            try:
-                fails_to_next = max(1, int(db_get('video_fails_to_next', '3')))
-            except (ValueError, TypeError):
-                fails_to_next = 3
+        story_text = db_get_story_text(story_id)
+        if not story_text:
+            msg = f'Не найден сюжет story_id={story_id[:8]}…'
+            db_log_pipeline('video', msg, status='error', batch_id=batch_id)
+            pipeline_log(None, f"[video] {msg}")
+            notify_failure(f"video: {msg} (батч {batch_id[:8]})")
+            return
 
-            if pinned_model_id:
-                pinned_m = db_get_video_model_by_id(pinned_model_id)
-                if not pinned_m:
-                    msg = f'Пробная модель {str(pinned_model_id)[:8]}… не найдена'
-                    db_log_pipeline('video', msg, status='error', batch_id=batch_id)
-                    pipeline_log(None, f"[video] {msg}")
-                    return
-                models = [pinned_m]
+        video_post_prompt = db_get('video_post_prompt', '').strip()
+        if video_post_prompt:
+            video_post_prompt = video_post_prompt.replace('{продолжительность}', str(video_duration))
+            story_text = story_text + '\n\n' + video_post_prompt
+
+        log_id = db_log_pipeline(
+            'video', f"Генерация видео… {'(возобновление)' if resumed else ''}".strip(),
+            status='running', batch_id=batch_id,
+        )
+        pipeline_log(log_id, f"Соотношение сторон: {ar_x}:{ar_y}")
+        if is_probe:
+            pipeline_log(log_id, f"Пробная модель: {models[0]['name']}, попыток: {fails_to_next}")
+        else:
+            pipeline_log(log_id, f"Моделей: {len(models)}, попыток на модель: {fails_to_next}")
+
+        used_model    = None
+        used_model_id = None
+        attempt_counts = {}
+
+        def video_callback(m):
+            """Один шаг перебора: resume-поллинг или свежий submit → поллинг.
+
+            Читает request_id из актуального batch.data:
+            - Если не None — это возобновление (или уже сохранённый handshake),
+              передаёт управление существующей логике поллинга.
+            - Если None — обычный submit через falai.submit().
+
+            При любом неуспехе безусловно сбрасывает все четыре поля
+            (request_id, status_url, response_url, model_id) в batch.data,
+            чтобы следующая попытка шла через submit() заново.
+
+            Возвращает video_url при успехе или None при неудаче.
+            """
+            nonlocal used_model, used_model_id
+            model_name = m['name']
+            cnt = attempt_counts.get(model_name, 0)
+            attempt_counts[model_name] = cnt + 1
+
+            current_batch = db_get_batch_by_id(batch_id)
+            current_data  = (current_batch.get('data') or {}) if current_batch else {}
+            saved_request_id   = current_data.get('request_id')
+            saved_status_url   = current_data.get('status_url')
+            saved_response_url = current_data.get('response_url')
+            saved_model_id     = current_data.get('model_id')
+
+            if saved_request_id:
+                pipeline_log(log_id, f"Возобновление: request_id={saved_request_id}")
+                video_url, poll_err = falai.poll(log_id, saved_status_url, saved_response_url)
+                if video_url:
+                    used_model_id = saved_model_id
+                    return video_url
+                pipeline_log(log_id, f"Поллинг не дал результата, сброс handshake", level='warn')
+                db_set_batch_video_pending(batch_id, {
+                    'request_id':   None,
+                    'status_url':   None,
+                    'response_url': None,
+                    'model_id':     None,
+                })
+                return None
+
+            if cnt == 0:
+                pipeline_log(log_id, f"Модель: {model_name}")
+                pipeline_log(None, f"[video] Запрос к провайдеру: модель={model_name}, ar={ar_x}:{ar_y}")
             else:
-                models = db_get_active_video_models()
-                if not models:
-                    msg = 'Нет активных video-моделей в ai_models (type=text-to-video)'
-                    db_log_pipeline('video', msg, status='error', batch_id=batch_id)
-                    pipeline_log(None, f"[video] {msg}")
-                    notify_failure(f"video: {msg}")
-                    return
+                pipeline_log(log_id, f"[{model_name}] попытка {cnt + 1}/{fails_to_next}", level='warn')
 
-            story_text = db_get_story_text(story_id)
-            if not story_text:
-                msg = f'Не найден сюжет story_id={story_id[:8]}…'
-                db_log_pipeline('video', msg, status='error', batch_id=batch_id)
-                pipeline_log(None, f"[video] {msg}")
-                notify_failure(f"video: {msg} (батч {batch_id[:8]})")
-                return
-
-            video_post_prompt = db_get('video_post_prompt', '').strip()
-            if video_post_prompt:
-                video_post_prompt = video_post_prompt.replace('{продолжительность}', str(video_duration))
-                story_text = story_text + '\n\n' + video_post_prompt
-
-            log_id = db_log_pipeline(
-                'video', 'Генерация видео…',
-                status='running', batch_id=batch_id,
+            sr = falai.submit(
+                log_id, model_name, m['submit_url'], m['platform_url'],
+                m['body_tpl'], story_text, ar_x, ar_y, video_duration,
             )
-            pipeline_log(log_id, f"Соотношение сторон: {ar_x}:{ar_y}")
-            if is_probe:
-                pipeline_log(log_id, f"Пробная модель: {models[0]['name']}, попыток: {fails_to_next}")
-            else:
-                pipeline_log(log_id, f"Моделей: {len(models)}, попыток на модель: {fails_to_next}")
+            if not sr:
+                return None
 
-            request_id   = None
-            status_url   = None
-            response_url = None
-
-            max_passes = 5
-            for pass_num in range(max_passes):
-                for m in models:
-                    model_name   = m['name']
-                    submit_url   = m['submit_url']
-                    platform_url = m['platform_url']
-                    body_tpl     = m['body_tpl']
-
-                    pipeline_log(log_id, f"Модель: {model_name}")
-                    pipeline_log(None, f"[video] Запрос к провайдеру: модель={model_name}, ar={ar_x}:{ar_y}")
-
-                    submit_result = None
-                    for attempt in range(fails_to_next):
-                        submit_result = falai.submit(
-                            log_id, model_name, submit_url, platform_url,
-                            body_tpl, story_text, ar_x, ar_y, video_duration,
-                        )
-                        if submit_result:
-                            break
-                        pipeline_log(log_id, f"[{model_name}] неудачная попытка {attempt + 1}/{fails_to_next}", level='warn')
-
-                    if submit_result:
-                        request_id   = submit_result['request_id']
-                        status_url   = submit_result['status_url']
-                        response_url = submit_result['response_url']
-                        used_model    = model_name
-                        used_model_id = m['id']
-                        break
-
-                if request_id:
-                    break
-
-                if is_probe:
-                    msg = f'Пробная модель {models[0]["name"]} исчерпала все попытки ({fails_to_next})'
-                    db_log_update(log_id, msg, 'error')
-                    pipeline_log(log_id, msg, level='error')
-                    db_set_batch_video_error(batch_id)
-                    pipeline_log(None, f"[video] {msg}")
-                    return
-
-                if pass_num < max_passes - 1:
-                    msg = f'Все активные видео-модели не приняли запрос — повтор с первой модели (проход {pass_num + 1}/{max_passes})'
-                    db_log_update(log_id, msg, 'warn')
-                    pipeline_log(log_id, msg, level='warn')
-                    pipeline_log(None, f"[video] {msg}")
-                else:
-                    msg = f'Все активные видео-модели не приняли запрос после {max_passes} проходов'
-                    db_log_update(log_id, msg, 'error')
-                    pipeline_log(log_id, msg, level='error')
-                    pipeline_log(None, f"[video] {msg}")
-                    db_set_batch_video_error(batch_id)
-                    return
+            req_id = sr['request_id']
+            # status_url и response_url получены от провайдера в ответ на submit и могут
+            # отличаться от шаблонного паттерна (platform_url/requests/…), поэтому
+            # хранятся явно в batch.data, а не восстанавливаются из шаблона при возобновлении.
+            s_url  = sr['status_url']
+            r_url  = sr['response_url']
+            m_id   = str(m['id'])
 
             db_set_batch_video_pending(batch_id, {
-                'request_id':   request_id,
-                'status_url':   status_url,
-                'response_url': response_url,
-                'model_name':   used_model,
+                'request_id':   req_id,
+                'status_url':   s_url,
+                'response_url': r_url,
+                'model_id':     m_id,
             })
-            pipeline_log(log_id, f"Запрос принят ({used_model}): {request_id}")
-            pipeline_log(None, f"[video] Генерация запущена: request_id={request_id}")
+            pipeline_log(log_id, f"Запрос принят ({model_name}): {req_id}")
+            pipeline_log(None, f"[video] Генерация запущена: request_id={req_id}")
 
-        video_url, poll_err = falai.poll(log_id, status_url, response_url)
+            video_url, poll_err = falai.poll(log_id, s_url, r_url)
+            if video_url:
+                used_model    = model_name
+                used_model_id = m_id
+                return video_url
+
+            pipeline_log(log_id, f"Поллинг не дал результата, сброс handshake", level='warn')
+            db_set_batch_video_pending(batch_id, {
+                'request_id':   None,
+                'status_url':   None,
+                'response_url': None,
+                'model_id':     None,
+            })
+            return None
+
+        max_passes = 1 if is_probe else 5
+        video_url = iterate_models(models, fails_to_next, video_callback, max_passes=max_passes)
+
         if not video_url:
-            if poll_err:
-                db_log_update(log_id, poll_err, 'error')
-                notify_failure(f"video: {poll_err} (батч {batch_id[:8]})")
+            if is_probe:
+                msg = f'Пробная модель {models[0]["name"]} не дала результата ({fails_to_next} попыток)'
+            else:
+                msg = f'Все активные видео-модели не дали результата после {max_passes} проходов'
+            db_log_update(log_id, msg, 'error')
+            pipeline_log(log_id, msg, level='error')
+            pipeline_log(None, f"[video] {msg}")
+            notify_failure(f"video: {msg} (батч {batch_id[:8]})")
             if is_probe:
                 db_set_batch_video_error(batch_id)
             else:

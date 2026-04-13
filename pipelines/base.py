@@ -64,6 +64,30 @@ def check_cancelled(pipeline_name: str, batch_id: str, batch: dict) -> bool:
     return False
 
 
+def iterate_models(models, fails_per_model, callback, max_passes=5):
+    """Перебирает модели с повторными проходами до первого успешного результата.
+
+    Логика:
+    - Внешний цикл: до max_passes проходов по всему списку моделей.
+    - Средний цикл: перебор моделей.
+    - Внутренний цикл: до fails_per_model попыток на каждую модель.
+    - На каждой итерации вызывается callback(model).
+      Коллбек возвращает результат при успехе или None при неудаче.
+    - При успешном возврате — выход из всех циклов, возврат результата.
+    - При исчерпании всех попыток/проходов — возврат None.
+
+    Probe-режим (одна модель, без повторных проходов) задаётся снаружи:
+    передайте models с одним элементом и max_passes=1.
+    """
+    for _pass in range(max_passes):
+        for m in models:
+            for _attempt in range(fails_per_model):
+                result = callback(m)
+                if result is not None:
+                    return result
+    return None
+
+
 def handle_critical_error(pipeline_name: str, batch_id, log_id, e: Exception) -> None:
     """Обрабатывает непойманное исключение в пайплайне:
     переводит батч в fatal_error, записывает в лог и отправляет уведомление.

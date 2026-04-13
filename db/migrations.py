@@ -1518,6 +1518,20 @@ def _m047_log_status_cancelled(cur):
     """)
 
 
+def _m048_remove_model_name_from_batch_data(cur):
+    """
+    Удаляет ключ 'model_name' из поля data всех записей таблицы batches.
+    Поле model_name было устаревшим костылем: имя модели теперь получается
+    через JOIN с movies.model_id → ai_models.name.
+    Начиная с этой миграции код не пишет и не читает model_name из batch.data.
+    """
+    cur.execute("""
+        UPDATE batches
+           SET data = data - 'model_name'
+         WHERE data ? 'model_name'
+    """)
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -1566,6 +1580,7 @@ MIGRATIONS = [
     (45, _m045_add_indexes),
     (46, _m046_drop_ai_platform_id),
     (47, _m047_log_status_cancelled),
+    (48, _m048_remove_model_name_from_batch_data),
 ]
 
 

@@ -24,7 +24,7 @@ from db import (
     env_get,
 )
 from log import db_log_pipeline, db_log_update
-from pipelines.base import check_cancelled, handle_critical_error, pipeline_log
+from pipelines.base import check_cancelled, handle_critical_error, pipeline_log, iterate_models
 from clients import openrouter
 
 
@@ -190,57 +190,51 @@ def run(batch_id):
         used_model_name = None
         used_model_id   = None
 
-        max_passes = 5
-        for pass_num in range(max_passes):
-            for m in models:
-                model_name = m['name']
+        attempt_counters = {}
+
+        def story_callback(m):
+            nonlocal story_id, used_model_name, used_model_id
+            model_name = m['name']
+            cnt = attempt_counters.get(model_name, 0)
+            attempt_counters[model_name] = cnt + 1
+            if cnt == 0:
                 pipeline_log(log_id, f"Модель: {model_name}")
                 pipeline_log(None, f"[story] Запрос к OpenRouter: модель={model_name}")
+            raw = openrouter.generate(log_id, model_name, m, system_prompt, user_prompt)
+            if raw:
+                first_line = raw.split('\n')[0]
+                if '.' not in first_line:
+                    title  = ' '.join(first_line.split()[:4]).rstrip('.')
+                    text   = raw[len(first_line):].strip()
+                else:
+                    title  = ' '.join(raw.split()[:4]).rstrip('.')
+                    text   = raw
+                sid = db_create_story(m['id'], title, text)
+                if sid:
+                    story_id        = sid
+                    used_model_name = model_name
+                    used_model_id   = m['id']
+                    return (sid, title, text)
+                pipeline_log(log_id, f"[{model_name}] не удалось сохранить сюжет", level='warn')
+            else:
+                pipeline_log(log_id, f"[{model_name}] попытка {attempt_counters[model_name]}/{fails_to_next} не удалась", level='warn')
+            return None
 
-                for attempt in range(fails_to_next):
-                    result = openrouter.generate(log_id, model_name, m, system_prompt, user_prompt)
-                    if result:
-                        first_line = result.split('\n')[0]
-                        if '.' not in first_line:
-                            title = ' '.join(first_line.split()[:4]).rstrip('.')
-                            result = result[len(first_line):].strip()
-                        else:
-                            title = ' '.join(result.split()[:4]).rstrip('.')
-                        story_id = db_create_story(m['id'], title, result)
-                        if story_id:
-                            used_model_name = model_name
-                            used_model_id   = m['id']
-                            break
-                        pipeline_log(log_id, f"[{model_name}] не удалось сохранить сюжет", level='warn')
-                    else:
-                        pipeline_log(log_id, f"[{model_name}] попытка {attempt + 1}/{fails_to_next} не удалась", level='warn')
+        max_passes = 1 if is_story_probe else 5
+        iterate_result = iterate_models(models, fails_to_next, story_callback, max_passes=max_passes)
 
-                if story_id:
-                    break
-
-            if story_id:
-                break
-
+        if not iterate_result:
             if is_story_probe:
                 msg = f'Модель не ответила после {fails_to_next} попыток — пробный сюжет не получен'
-                db_log_update(log_id, msg, 'error')
-                pipeline_log(log_id, msg, level='error')
-                pipeline_log(None, f"[story] {msg}")
-                db_set_batch_status(batch_id, 'error')
-                return
-
-            if pass_num < max_passes - 1:
-                msg = f'Все активные модели не дали результата — повтор с первой модели (проход {pass_num + 1}/{max_passes})'
-                db_log_update(log_id, msg, 'warn')
-                pipeline_log(log_id, msg, level='warn')
-                pipeline_log(None, f"[story] {msg}")
             else:
                 msg = f'Все активные модели не дали результата после {max_passes} проходов'
-                db_log_update(log_id, msg, 'error')
-                pipeline_log(log_id, msg, level='error')
-                pipeline_log(None, f"[story] {msg}")
-                db_set_batch_status(batch_id, 'error')
-                return
+            db_log_update(log_id, msg, 'error')
+            pipeline_log(log_id, msg, level='error')
+            pipeline_log(None, f"[story] {msg}")
+            db_set_batch_status(batch_id, 'error')
+            return
+
+        story_id, title, result = iterate_result
 
         pipeline_log(None, f"[story] Сюжет получен: {result[:100]}{'…' if len(result) > 100 else ''}")
         pipeline_log(log_id, f"Название: {title}")
