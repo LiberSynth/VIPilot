@@ -59,7 +59,7 @@ def run(batch_id, log_id):
             if not db_set_batch_story(batch_id, preset_story_id):
                 msg = fmt_id_msg('Ошибка записи story_id={} в БД', preset_story_id)
                 pipeline_log(log_id, msg, level='error')
-                raise AppException(batch_id, 'story', msg)
+                raise AppException(batch_id, 'story', msg, log_id)
             return
 
         if not is_probe and check_cancelled('story', batch_id, batch, log_id):
@@ -85,7 +85,7 @@ def run(batch_id, log_id):
                     msg = fmt_id_msg('Не удалось записать donor_batch_id для батча {} — донор {}', batch_id, donor_batch_id)
                     db_log_update(log_id, msg, 'error')
                     pipeline_log(None, f"[story] {msg}")
-                    raise AppException(batch_id, 'story', msg)
+                    raise AppException(batch_id, 'story', msg, log_id)
                 donor_title = db_get_story_title(donor_story_id) if donor_story_id else None
                 if donor_title:
                     detail = f"Включен режим «Использовать донора». Контент будет заимствован от донора. Сюжет: «{donor_title}»"
@@ -123,7 +123,7 @@ def run(batch_id, log_id):
                     pipeline_log(log_id, msg, level='error')
                     db_log_update(log_id, msg, 'error')
                     pipeline_log(None, fmt_id_msg("[story] Батч {} — {}", batch_id, msg))
-                    raise AppException(batch_id, 'story', msg)
+                    raise AppException(batch_id, 'story', msg, log_id)
                 reason = (
                     f"Подходящий сюжет в пуле не найден (условие: {condition_label}). "
                     f"Переход к AI-генерации."
@@ -141,7 +141,7 @@ def run(batch_id, log_id):
             db_log_update(log_id, msg, 'error')
             pipeline_log(log_id, msg, level='error')
             pipeline_log(None, f"[story] {msg}")
-            raise AppException(batch_id, 'story', msg)
+            raise AppException(batch_id, 'story', msg, log_id)
 
         batch_data     = batch.get('data') or {}
         is_story_probe = batch['type'] == 'story_probe'
@@ -158,7 +158,7 @@ def run(batch_id, log_id):
             db_log_update(log_id, msg, 'error')
             pipeline_log(log_id, msg, level='error')
             pipeline_log(None, f"[story] {msg}")
-            raise AppException(batch_id, 'story', msg)
+            raise AppException(batch_id, 'story', msg, log_id)
 
         try:
             fails_to_next = max(1, int(db_get('story_fails_to_next', '3')))
@@ -215,7 +215,7 @@ def run(batch_id, log_id):
             db_log_update(log_id, msg, 'error')
             pipeline_log(log_id, msg, level='error')
             pipeline_log(None, f"[story] {msg}")
-            raise AppException(batch_id, 'story', msg)
+            raise AppException(batch_id, 'story', msg, log_id)
 
         story_id, title, result = iterate_result
 
@@ -236,7 +236,7 @@ def run(batch_id, log_id):
                 db_log_update(log_id, msg, 'error')
                 pipeline_log(log_id, msg, level='error')
                 pipeline_log(None, f"[story] {msg}")
-                raise AppException(batch_id, 'story', msg)
+                raise AppException(batch_id, 'story', msg, log_id)
             db_set_story_model(story_id, used_model_id)
             msg = f'Сюжет сгенерирован ({used_model_name})'
             db_log_update(log_id, msg, 'ok')

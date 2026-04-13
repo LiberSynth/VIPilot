@@ -117,7 +117,7 @@ def run(batch_id, log_id):
                         db_log_update(log_id, msg, 'error')
                         pipeline_log(log_id, msg, level='error')
                         pipeline_log(None, f"[video] {msg}")
-                        raise AppException(batch_id, 'video', msg)
+                        raise AppException(batch_id, 'video', msg, log_id)
                     return
 
         story_id        = batch.get('story_id')
@@ -143,7 +143,7 @@ def run(batch_id, log_id):
                 db_log_update(log_id, msg, 'error')
                 pipeline_log(log_id, msg, level='error')
                 pipeline_log(None, f"[video] {msg}")
-                raise AppException(batch_id, 'video', msg)
+                raise AppException(batch_id, 'video', msg, log_id)
             sample, donor_batch_id, donor_story_id = result
             pipeline_log(log_id, fmt_id_msg("Видео заимствовано из батча: {}", donor_batch_id), level='info')
             db_set_batch_original_video(batch_id, sample)
@@ -161,7 +161,7 @@ def run(batch_id, log_id):
             msg = 'FAL_API_KEY не задан — генерация невозможна'
             db_log_update(log_id, msg, 'error')
             pipeline_log(None, f"[video] {msg}")
-            raise AppException(batch_id, 'video', msg)
+            raise AppException(batch_id, 'video', msg, log_id)
 
         try:
             fails_to_next = max(1, int(db_get('video_fails_to_next', '3')))
@@ -174,7 +174,7 @@ def run(batch_id, log_id):
                 msg = fmt_id_msg('Пробная модель {} не найдена', pinned_model_id)
                 db_log_update(log_id, msg, 'error')
                 pipeline_log(None, f"[video] {msg}")
-                raise AppException(batch_id, 'video', msg)
+                raise AppException(batch_id, 'video', msg, log_id)
             models = [pinned_m]
         else:
             models = db_get_active_video_models()
@@ -182,14 +182,14 @@ def run(batch_id, log_id):
                 msg = 'Нет активных video-моделей в ai_models (type=text-to-video)'
                 db_log_update(log_id, msg, 'error')
                 pipeline_log(None, f"[video] {msg}")
-                raise AppException(batch_id, 'video', msg)
+                raise AppException(batch_id, 'video', msg, log_id)
 
         story_text = db_get_story_text(story_id)
         if not story_text:
             msg = fmt_id_msg('Не найден сюжет story_id={}', story_id)
             db_log_update(log_id, msg, 'error')
             pipeline_log(None, f"[video] {msg}")
-            raise AppException(batch_id, 'video', msg)
+            raise AppException(batch_id, 'video', msg, log_id)
 
         video_post_prompt = db_get('video_post_prompt', '').strip()
         if video_post_prompt:
@@ -307,7 +307,7 @@ def run(batch_id, log_id):
                 db_log_update(log_id, msg, 'error')
                 pipeline_log(log_id, msg, level='error')
                 pipeline_log(None, f"[video] {msg}")
-                raise AppException(batch_id, 'video', msg)
+                raise AppException(batch_id, 'video', msg, log_id)
             else:
                 msg = f'Все активные видео-модели не дали результата после {max_passes} проходов'
                 db_log_update(log_id, msg, 'error')
@@ -329,7 +329,7 @@ def run(batch_id, log_id):
             db_log_update(log_id, msg, 'error')
             pipeline_log(log_id, msg, level='error')
             pipeline_log(None, f"[video] {msg}")
-            raise AppException(batch_id, 'video', msg)
+            raise AppException(batch_id, 'video', msg, log_id)
 
         db_set_batch_video_ready(batch_id, video_url)
         if used_model_id:
@@ -345,9 +345,9 @@ def run(batch_id, log_id):
         msg = str(e)
         db_log_update(log_id, msg, 'error')
         pipeline_log(None, f"[video] {msg}")
-        raise AppException(batch_id, 'video', msg)
+        raise AppException(batch_id, 'video', msg, log_id)
     except ProviderFatalError as e:
         msg = f"Фатальная ошибка провайдера: {e}"
         db_log_update(log_id, msg, 'error')
         pipeline_log(None, f"[video] {msg}")
-        raise AppException(batch_id, 'video', msg)
+        raise AppException(batch_id, 'video', msg, log_id)

@@ -189,7 +189,7 @@ def run(batch_id, log_id):
                 msg = 'Нет активных таргетов — публикация невозможна'
                 db_log_update(log_id, msg, 'error')
                 pipeline_log(None, f"[publish] {msg}")
-                raise AppException(batch_id, 'publish', msg)
+                raise AppException(batch_id, 'publish', msg, log_id)
 
         steps = _build_steps(active_targets)
         if not steps:
@@ -203,7 +203,7 @@ def run(batch_id, log_id):
                 msg = 'Нет методов публикации в конфиге таргетов'
                 db_log_update(log_id, msg, 'error')
                 pipeline_log(None, f"[publish] {msg}")
-                raise AppException(batch_id, 'publish', msg)
+                raise AppException(batch_id, 'publish', msg, log_id)
 
         target_names = ', '.join(t['name'] for t in active_targets)
 
@@ -228,7 +228,7 @@ def run(batch_id, log_id):
                     pipeline_log(log_id, f'Шаг {cur_slug}.{cur_method} более не активен в конфиге — перевожу в ошибку', level='error')
                     pipeline_log(None, fmt_id_msg("[publish] Батч {} шаг {}.{} не найден в текущем конфиге", batch_id, cur_slug, cur_method))
                     db_log_update(log_id, msg, 'error')
-                    raise AppException(batch_id, 'publish', msg)
+                    raise AppException(batch_id, 'publish', msg, log_id)
             elif cur_phase in ('published', 'failed'):
                 found_idx = None
                 for i, (slug, method, _) in enumerate(steps):
@@ -241,7 +241,7 @@ def run(batch_id, log_id):
                     pipeline_log(log_id, msg, level='error')
                     pipeline_log(None, fmt_id_msg("[publish] Батч {} шаг {}.{} не найден в текущем конфиге", batch_id, cur_slug, cur_method))
                     db_log_update(log_id, msg, 'error')
-                    raise AppException(batch_id, 'publish', msg)
+                    raise AppException(batch_id, 'publish', msg, log_id)
                 elif found_idx + 1 < len(steps):
                     ns, nm, _ = steps[found_idx + 1]
                     resume_from = (ns, nm)
@@ -254,7 +254,7 @@ def run(batch_id, log_id):
                     else:
                         msg = 'Ошибка записи published в БД (возобновление)'
                         db_log_update(log_id, msg, 'error')
-                        raise AppException(batch_id, 'publish', msg)
+                        raise AppException(batch_id, 'publish', msg, log_id)
                     return
 
         any_ok = False
@@ -297,7 +297,7 @@ def run(batch_id, log_id):
                 if not step_saved:
                     abt_msg = f'Шаг {slug}.{method}: ошибка, не удалось сохранить статус — аварийная остановка'
                     db_log_update(log_id, abt_msg, 'error')
-                    raise AppException(batch_id, 'publish', abt_msg)
+                    raise AppException(batch_id, 'publish', abt_msg, log_id)
                 expected_from = failed_status
                 continue
 
@@ -307,7 +307,7 @@ def run(batch_id, log_id):
             if not step_saved:
                 abt_msg = f'Шаг {slug}.{method}: опубликовано, но ошибка записи статуса в БД'
                 db_log_update(log_id, abt_msg, 'error')
-                raise AppException(batch_id, 'publish', abt_msg)
+                raise AppException(batch_id, 'publish', abt_msg, log_id)
             pipeline_log(log_id, f'Шаг {slug}.{method}: опубликовано')
             expected_from = published_status
 
@@ -329,7 +329,7 @@ def run(batch_id, log_id):
                     abt_msg = 'Частично опубликовано, но ошибка записи статуса в БД'
                     db_log_update(log_id, abt_msg, 'error')
                     pipeline_log(None, fmt_id_msg("[publish] Батч {} ошибка записи published_partially в БД", batch_id))
-                    raise AppException(batch_id, 'publish', abt_msg)
+                    raise AppException(batch_id, 'publish', abt_msg, log_id)
             else:
                 saved = db_set_batch_published(batch_id)
                 if saved:
@@ -348,12 +348,12 @@ def run(batch_id, log_id):
                     abt_msg = 'Опубликовано, но ошибка записи статуса в БД'
                     db_log_update(log_id, abt_msg, 'error')
                     pipeline_log(None, fmt_id_msg("[publish] Батч {} ошибка записи published в БД", batch_id))
-                    raise AppException(batch_id, 'publish', abt_msg)
+                    raise AppException(batch_id, 'publish', abt_msg, log_id)
         else:
             abt_msg = f'Ошибка публикации батча в {target_names}'
             db_log_update(log_id, 'Ошибка публикации', 'error')
             pipeline_log(None, fmt_id_msg("[publish] Батч {} ошибка публикации", batch_id))
-            raise AppException(batch_id, 'publish', abt_msg)
+            raise AppException(batch_id, 'publish', abt_msg, log_id)
 
     except AppException:
         raise
