@@ -4,7 +4,9 @@ import threading
 from db import (
     db_get,
     db_get_actionable_batches,
+    db_set_batch_status,
 )
+from exceptions import AppException
 from startup import init_app, create_app
 from log import db_log_pipeline, log_entry
 from pipelines import publish, cleanup
@@ -49,6 +51,11 @@ def main_loop():
 
             cleanup.tick()
 
+        except AppException as e:
+            if e.batch_id:
+                db_set_batch_status(e.batch_id, 'error')
+            db_log_pipeline(e.pipeline, e.message, status='error', batch_id=e.batch_id)
+            log_entry(None, f"[main_loop] AppException ({e.pipeline}): {e.message}", level='silent')
         except Exception as e:
             db_log_pipeline('root', f"Ошибка главного цикла: {e}", status='error')
             log_entry(None, f"[main_loop] Ошибка: {e}", level='silent')

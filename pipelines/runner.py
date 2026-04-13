@@ -16,13 +16,11 @@ def _handle_batch_error(e, batch_id, pipeline_name):
         msg = f"Ошибка пайплайна {e.pipeline}: {e.message}"
         lid = db_log_pipeline(e.pipeline, msg, status='error', batch_id=batch_id)
         log_entry(lid, msg, level='error')
-        log_entry(None, fmt_id_msg("[{}] AppException батч {}: {}", pipeline_name, batch_id, e.message), level='silent')
     else:
         db_set_batch_status(batch_id, 'fatal_error')
         msg = f"Критическая ошибка: {e}"
         lid = db_log_pipeline(pipeline_name, msg, status='fatal_error', batch_id=batch_id)
         log_entry(lid, msg, level='fatal_error')
-        log_entry(None, fmt_id_msg("[{}] Критическая ошибка батч {}: {}", pipeline_name, batch_id, e), level='silent')
 
 
 def run_batch(batch_id, pipeline):
