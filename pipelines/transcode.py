@@ -29,7 +29,7 @@ from db import (
     db_set_batch_transcode_skip,
     db_set_batch_transcode_ready,
 )
-from log import db_log_pipeline, db_log_update
+from log import db_log_update
 from pipelines.base import check_cancelled, pipeline_log
 from exceptions import AppException
 from utils.utils import fmt_id_msg
@@ -83,8 +83,7 @@ def _ffmpeg(src, dst, log_id):
     return True
 
 
-def run(batch_id):
-    log_id = None
+def run(batch_id, log_id):
     try:
         batch = db_get_batch_by_id(batch_id)
         if not batch:
@@ -99,7 +98,7 @@ def run(batch_id):
 
         is_probe = batch['type'] == 'movie_probe'
 
-        if not is_probe and check_cancelled('transcode', batch_id, batch):
+        if not is_probe and check_cancelled('transcode', batch_id, batch, log_id):
             return
 
         if is_probe:
@@ -118,10 +117,7 @@ def run(batch_id):
 
         pipeline_log(None, fmt_id_msg("[transcode] Батч {} ({}) — начало транскодирования", batch_id, target))
 
-        log_id = db_log_pipeline(
-            'transcode', 'Транскодирование…',
-            status='running', batch_id=batch_id,
-        )
+        db_log_update(log_id, 'Транскодирование…', 'running')
 
         original_data = db_get_batch_original_video(batch_id)
         if original_data is None:

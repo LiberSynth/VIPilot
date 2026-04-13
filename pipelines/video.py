@@ -43,8 +43,7 @@ class AspectRatioConflictError(Exception):
     """Raised when active targets have different aspect ratios."""
 
 
-def run(batch_id):
-    log_id = None
+def run(batch_id, log_id):
     try:
         batch = db_get_batch_by_id(batch_id)
         if not batch:
@@ -93,12 +92,9 @@ def run(batch_id):
                 if batch.get('movie_id') is not None:
                     pipeline_log(None, fmt_id_msg("[video] Батч {} — донор, movie_id уже перенесён (возобновление)", batch_id))
                     return
-                if not check_cancelled('video', batch_id, batch):
+                if not check_cancelled('video', batch_id, batch, log_id):
                     pipeline_log(None, fmt_id_msg("[video] Батч {} — режим донора, переносим видео от {}", batch_id, donor_batch_id))
-                    log_id = db_log_pipeline(
-                        'video', 'Видео получено от донора',
-                        status='running', batch_id=batch_id,
-                    )
+                    db_log_update(log_id, 'Видео получено от донора', 'running')
                     result_donor_id = db_get_movie_from_donor(donor_batch_id, batch_id)
                     if result_donor_id:
                         updated = db_get_batch_by_id(batch_id)
@@ -107,6 +103,9 @@ def run(batch_id):
                         db_log_update(log_id, detail, 'ok')
                         pipeline_log(log_id, detail)
                         if new_status == 'transcode_ready':
+                            # Обоснованное исключение: транскод-пайплайн не будет запущен,
+                            # т.к. статус уже transcode_ready; запись создаётся здесь,
+                            # чтобы в мониторе отображался лог для пропущенного шага.
                             tr_log_id = db_log_pipeline(
                                 'transcode', 'Транскодирование пропущено — видео получено от донора',
                                 status='ok', batch_id=batch_id,
@@ -132,15 +131,12 @@ def run(batch_id):
         except (ValueError, TypeError):
             video_duration = 6
 
-        if not is_probe and check_cancelled('video', batch_id, batch):
+        if not is_probe and check_cancelled('video', batch_id, batch, log_id):
             return
 
         if env_get("emulation_mode", "0") == "1":
             pipeline_log(None, fmt_id_msg("[video] Батч {} — эмуляция генерации видео", batch_id))
-            log_id = db_log_pipeline(
-                'video', 'Видео [эмуляция]',
-                status='running', batch_id=batch_id,
-            )
+            db_log_update(log_id, 'Видео [эмуляция]', 'running')
             result = db_get_random_real_original_video()
             if result is None:
                 msg = '[эмуляция] Нет видео в пуле — невозможно скопировать оригинал'
@@ -163,7 +159,7 @@ def run(batch_id):
 
         if not falai.is_configured():
             msg = 'FAL_API_KEY не задан — генерация невозможна'
-            db_log_pipeline('video', msg, status='error', batch_id=batch_id)
+            db_log_update(log_id, msg, 'error')
             pipeline_log(None, f"[video] {msg}")
             raise AppException(batch_id, 'video', msg)
 
@@ -176,7 +172,7 @@ def run(batch_id):
             pinned_m = db_get_video_model_by_id(pinned_model_id)
             if not pinned_m:
                 msg = fmt_id_msg('Пробная модель {} не найдена', pinned_model_id)
-                db_log_pipeline('video', msg, status='error', batch_id=batch_id)
+                db_log_update(log_id, msg, 'error')
                 pipeline_log(None, f"[video] {msg}")
                 raise AppException(batch_id, 'video', msg)
             models = [pinned_m]
@@ -184,14 +180,14 @@ def run(batch_id):
             models = db_get_active_video_models()
             if not models:
                 msg = 'Нет активных video-моделей в ai_models (type=text-to-video)'
-                db_log_pipeline('video', msg, status='error', batch_id=batch_id)
+                db_log_update(log_id, msg, 'error')
                 pipeline_log(None, f"[video] {msg}")
                 raise AppException(batch_id, 'video', msg)
 
         story_text = db_get_story_text(story_id)
         if not story_text:
             msg = fmt_id_msg('Не найден сюжет story_id={}', story_id)
-            db_log_pipeline('video', msg, status='error', batch_id=batch_id)
+            db_log_update(log_id, msg, 'error')
             pipeline_log(None, f"[video] {msg}")
             raise AppException(batch_id, 'video', msg)
 
@@ -200,10 +196,7 @@ def run(batch_id):
             video_post_prompt = video_post_prompt.replace('{продолжительность}', str(video_duration))
             story_text = story_text + '\n\n' + video_post_prompt
 
-        log_id = db_log_pipeline(
-            'video', f"Генерация видео… {'(возобновление)' if resumed else ''}".strip(),
-            status='running', batch_id=batch_id,
-        )
+        db_log_update(log_id, f"Генерация видео… {'(возобновление)' if resumed else ''}".strip(), 'running')
         pipeline_log(log_id, f"Соотношение сторон: {ar_x}:{ar_y}")
         if is_probe:
             pipeline_log(log_id, f"Пробная модель: {models[0]['name']}, попыток: {fails_to_next}")
@@ -345,15 +338,11 @@ def run(batch_id):
         raise
     except AspectRatioConflictError as e:
         msg = str(e)
-        db_log_pipeline('video', msg, status='error', batch_id=batch_id)
-        if log_id:
-            db_log_update(log_id, msg, 'error')
+        db_log_update(log_id, msg, 'error')
         pipeline_log(None, f"[video] {msg}")
         raise AppException(batch_id, 'video', msg)
     except ProviderFatalError as e:
         msg = f"Фатальная ошибка провайдера: {e}"
-        db_log_pipeline('video', msg, status='error', batch_id=batch_id)
-        if log_id:
-            db_log_update(log_id, msg, 'error')
+        db_log_update(log_id, msg, 'error')
         pipeline_log(None, f"[video] {msg}")
         raise AppException(batch_id, 'video', msg)

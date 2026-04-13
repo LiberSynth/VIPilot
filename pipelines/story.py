@@ -23,16 +23,14 @@ from db import (
     db_get_story_title,
     env_get,
 )
-from log import db_log_pipeline, db_log_update
+from log import db_log_update
 from pipelines.base import check_cancelled, pipeline_log, iterate_models
 from exceptions import AppException
 from clients import openrouter
 from utils.utils import fmt_id_msg
 
 
-def run(batch_id):
-    log_id = None
-
+def run(batch_id, log_id):
     try:
         batch = db_get_batch_by_id(batch_id)
         if not batch:
@@ -55,10 +53,7 @@ def run(batch_id):
 
         if batch.get('story_id') is not None and batch['type'] == 'movie_probe':
             preset_story_id = str(batch['story_id'])
-            log_id = db_log_pipeline(
-                'story', 'Сюжет задан вручную — пропуск поиска и генерации',
-                status='ok', batch_id=batch_id,
-            )
+            db_log_update(log_id, 'Сюжет задан вручную — пропуск поиска и генерации', 'ok')
             pipeline_log(log_id, fmt_id_msg("Используется заданный сюжет id={}", preset_story_id))
             pipeline_log(None, fmt_id_msg("[story] Батч {} — story_id задан вручную ({}), батч → story_ready", batch_id, preset_story_id))
             if not db_set_batch_story(batch_id, preset_story_id):
@@ -67,7 +62,7 @@ def run(batch_id):
                 raise AppException(batch_id, 'story', msg)
             return
 
-        if not is_probe and check_cancelled('story', batch_id, batch):
+        if not is_probe and check_cancelled('story', batch_id, batch, log_id):
             return
 
         if not is_probe and env_get('emulation_mode', '0') != '1' and env_get('use_donor', '1') == '1' \
@@ -88,7 +83,7 @@ def run(batch_id):
                 donor_story_id = str(donor_batch['story_id']) if donor_batch and donor_batch.get('story_id') else None
                 if not db_set_batch_story_ready_from_donor(batch_id, donor_batch_id, donor_story_id):
                     msg = fmt_id_msg('Не удалось записать donor_batch_id для батча {} — донор {}', batch_id, donor_batch_id)
-                    db_log_pipeline('story', msg, status='error', batch_id=batch_id)
+                    db_log_update(log_id, msg, 'error')
                     pipeline_log(None, f"[story] {msg}")
                     raise AppException(batch_id, 'story', msg)
                 donor_title = db_get_story_title(donor_story_id) if donor_story_id else None
@@ -96,10 +91,7 @@ def run(batch_id):
                     detail = f"Включен режим «Использовать донора». Контент будет заимствован от донора. Сюжет: «{donor_title}»"
                 else:
                     detail = "Включен режим «Использовать донора». Контент будет заимствован от донора."
-                log_id = db_log_pipeline(
-                    'story', 'Найден донор, генерация сюжета не требуется',
-                    status='ok', batch_id=batch_id,
-                )
+                db_log_update(log_id, 'Найден донор, генерация сюжета не требуется', 'ok')
                 pipeline_log(log_id, detail)
                 pipeline_log(None, fmt_id_msg("[story] Батч {} — найден донор {}, батч → story_ready", batch_id, donor_batch_id))
                 return
@@ -108,12 +100,9 @@ def run(batch_id):
             approve_stories = db_get('approve_stories', '0') == '1'
             grade_required  = approve_stories
             condition_label = 'grade = good' if grade_required else 'любой grade (включая NULL)'
-            pool_log_id = db_log_pipeline(
-                'story', 'Поиск сюжета в пуле…',
-                status='running', batch_id=batch_id,
-            )
+            db_log_update(log_id, 'Поиск сюжета в пуле…', 'running')
             pipeline_log(
-                pool_log_id,
+                log_id,
                 f"Настройка «Утверждать сюжеты»: {'включена' if approve_stories else 'выключена'}. "
                 f"Условие выборки: {condition_label}.",
             )
@@ -122,33 +111,30 @@ def run(batch_id):
                 pool_story_id    = pool_story['id']
                 pool_story_title = pool_story['title']
                 pipeline_log(
-                    pool_log_id,
+                    log_id,
                     fmt_id_msg("Найден сюжет из пула: id={}, название=«{}». AI-генерация не запускается.", pool_story_id, pool_story_title),
                 )
-                db_log_update(pool_log_id, f'Сюжет из пула: «{pool_story_title}»', 'ok')
+                db_log_update(log_id, f'Сюжет из пула: «{pool_story_title}»', 'ok')
                 pipeline_log(None, fmt_id_msg("[story] Батч {} — сюжет из пула {}, батч → story_ready", batch_id, pool_story_id))
                 return
             else:
                 if approve_stories:
                     msg = 'Пул сюжетов пуст (grade = good) — AI-генерация запрещена (approve_stories включён)'
-                    pipeline_log(pool_log_id, msg, level='error')
-                    db_log_update(pool_log_id, msg, 'error')
+                    pipeline_log(log_id, msg, level='error')
+                    db_log_update(log_id, msg, 'error')
                     pipeline_log(None, fmt_id_msg("[story] Батч {} — {}", batch_id, msg))
                     raise AppException(batch_id, 'story', msg)
                 reason = (
                     f"Подходящий сюжет в пуле не найден (условие: {condition_label}). "
                     f"Переход к AI-генерации."
                 )
-                pipeline_log(pool_log_id, reason)
-                db_log_update(pool_log_id, 'Сюжет в пуле не найден — запускается AI-генерация', 'ok')
+                pipeline_log(log_id, reason)
+                db_log_update(log_id, 'Сюжет в пуле не найден — запускается AI-генерация', 'running')
                 pipeline_log(None, fmt_id_msg("[story] Батч {} — {}", batch_id, reason))
 
         pipeline_log(None, fmt_id_msg("[story] Батч {} ({}) — начало генерации сюжета", batch_id, target))
 
-        log_id = db_log_pipeline(
-            'story', 'Генерация сюжета…',
-            status='running', batch_id=batch_id,
-        )
+        db_log_update(log_id, 'Генерация сюжета…', 'running')
 
         if not openrouter.is_configured():
             msg = 'OPENROUTER_API_KEY не задан — генерация невозможна'

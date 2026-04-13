@@ -16,7 +16,7 @@ from db import (
     db_set_batch_status,
     db_is_batch_scheduled,
 )
-from log import db_log_pipeline, log_entry, db_log_update
+from log import log_entry, db_log_update
 from utils.utils import fmt_id_msg
 
 
@@ -48,21 +48,19 @@ def pipeline_log(log_id, msg: str, level: str = 'info') -> None:
     _builtins.print(msg)
 
 
-def check_cancelled(pipeline_name: str, batch_id: str, batch: dict) -> bool:
+def check_cancelled(pipeline_name: str, batch_id: str, batch: dict, log_id=None) -> bool:
     """Проверяет, не отменён ли батч (слот расписания удалён).
 
     Возвращает True, если батч отменён и пайплайн должен прерваться.
     Вызывать только для не-пробных батчей (is_probe проверяет сам вызывающий).
+    log_id — идентификатор текущей записи лога (для обновления статуса).
     """
     if not db_is_batch_scheduled(batch['scheduled_at'], batch.get('type', 'slot')):
         db_set_batch_status(batch_id, 'cancelled')
-        db_log_pipeline(
-            pipeline_name,
-            'Батч отменён — слот удалён из расписания',
-            status='cancelled',
-            batch_id=batch_id,
-        )
-        pipeline_log(None, fmt_id_msg("[{}] Батч {} отменён, пропускаю", pipeline_name, batch_id))
+        msg = 'Батч отменён — слот удалён из расписания'
+        if log_id:
+            db_log_update(log_id, msg, 'cancelled')
+        pipeline_log(log_id, fmt_id_msg("[{}] Батч {} отменён, пропускаю", pipeline_name, batch_id))
         return True
     return False
 
@@ -89,5 +87,3 @@ def iterate_models(models, fails_per_model, callback, max_passes=5):
                 if result is not None:
                     return result
     return None
-
-

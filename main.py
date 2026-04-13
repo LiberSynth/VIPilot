@@ -47,7 +47,8 @@ def main_loop():
                         continue
                     if not wf_state.claim_batch(bid):
                         continue
-                    start_batch_thread(bid, pipeline_module)
+                    pipeline_name = getattr(pipeline_module, '__name__', str(pipeline_module)).split('.')[-1]
+                    start_batch_thread(bid, pipeline_module, pipeline_name)
 
             cleanup.tick()
 

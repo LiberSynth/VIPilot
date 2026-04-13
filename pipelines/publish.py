@@ -26,7 +26,7 @@ from db import (
     db_set_batch_status,
     db_claim_batch_status,
 )
-from log import db_log_pipeline, db_log_update, db_get_log_entries
+from log import db_log_update, db_get_log_entries
 from pipelines.base import check_cancelled, pipeline_log
 from exceptions import AppException
 from utils.utils import fmt_id_msg
@@ -146,8 +146,7 @@ def _build_steps(active_targets):
     return steps
 
 
-def run(batch_id):
-    log_id = None
+def run(batch_id, log_id):
     try:
         batch = db_get_batch_by_id(batch_id)
         if not batch:
@@ -163,15 +162,14 @@ def run(batch_id):
 
         if parsed is None:
             if batch['type'] == 'movie_probe':
-                log_id = db_log_pipeline('publish', 'Публикация (пробный)…',
-                                         status='running', batch_id=batch_id)
+                db_log_update(log_id, 'Публикация (пробный)…', 'running')
                 pipeline_log(log_id, 'Пробный батч — публикация на платформу не выполняется')
                 db_set_batch_movie_probe(batch_id)
                 db_log_update(log_id, 'Без публикации (пробный батч)', 'ok')
                 pipeline_log(None, fmt_id_msg("[publish] Батч {} пробный — публикация пропущена", batch_id))
                 return
 
-            if check_cancelled('publish', batch_id, batch):
+            if check_cancelled('publish', batch_id, batch, log_id):
                 return
 
             now = datetime.now(timezone.utc)
@@ -184,12 +182,12 @@ def run(batch_id):
             if parsed is None:
                 msg = 'Батч отменён — нет активных таргетов'
                 db_set_batch_status(batch_id, 'cancelled')
-                db_log_pipeline('publish', msg, status='cancelled', batch_id=batch_id)
+                db_log_update(log_id, msg, 'cancelled')
                 pipeline_log(None, fmt_id_msg("[publish] {} (батч {})", msg, batch_id))
                 return
             else:
                 msg = 'Нет активных таргетов — публикация невозможна'
-                db_log_pipeline('publish', msg, status='error', batch_id=batch_id)
+                db_log_update(log_id, msg, 'error')
                 pipeline_log(None, f"[publish] {msg}")
                 raise AppException(batch_id, 'publish', msg)
 
@@ -198,12 +196,12 @@ def run(batch_id):
             if parsed is None:
                 msg = 'Батч отменён — нет методов публикации в конфиге таргетов'
                 db_set_batch_status(batch_id, 'cancelled')
-                db_log_pipeline('publish', msg, status='cancelled', batch_id=batch_id)
+                db_log_update(log_id, msg, 'cancelled')
                 pipeline_log(None, fmt_id_msg("[publish] {} (батч {})", msg, batch_id))
                 return
             else:
                 msg = 'Нет методов публикации в конфиге таргетов'
-                db_log_pipeline('publish', msg, status='error', batch_id=batch_id)
+                db_log_update(log_id, msg, 'error')
                 pipeline_log(None, f"[publish] {msg}")
                 raise AppException(batch_id, 'publish', msg)
 
@@ -215,7 +213,7 @@ def run(batch_id):
         else:
             log_label = f'Публикация ({target_names})…'
 
-        log_id = db_log_pipeline('publish', log_label, status='running', batch_id=batch_id)
+        db_log_update(log_id, log_label, 'running')
 
         resume_from = None
         if parsed is not None:
