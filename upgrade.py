@@ -113,6 +113,35 @@ def _check_chromium() -> tuple[bool, str]:
         return False, f'chromium: {e}'
 
 
+class FatalError(RuntimeError):
+    """Фатальная ошибка апгрейда — приложение не должно запускаться."""
+
+
+def _check_model_durations() -> tuple[bool, str]:
+    try:
+        from db.connection import get_db
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT m.name
+                    FROM ai_models m
+                    WHERE m.type = 'text-to-video'
+                      AND m.active = TRUE
+                      AND NOT EXISTS (
+                          SELECT 1 FROM model_durations md WHERE md.model_id = m.id
+                      )
+                """)
+                missing = [row[0] for row in cur.fetchall()]
+        if missing:
+            names = ', '.join(missing)
+            raise FatalError(f'model_durations: нет записей для активных видео-моделей: {names}')
+        return True, 'model_durations: все активные видео-модели имеют записи'
+    except FatalError:
+        raise
+    except Exception as e:
+        return False, f'model_durations: ошибка проверки — {e}'
+
+
 _CHECKS = [
     ('ffmpeg',     _check_ffmpeg),
     ('ffprobe',    _check_ffprobe),
@@ -123,16 +152,20 @@ _CHECKS = [
     ('chromium',   _check_chromium),
 ]
 
+_POST_MIGRATION_CHECKS = [
+    ('model_durations', _check_model_durations),
+]
 
-def _run_env_checks() -> None:
-    """
-    Проверяет серверное окружение. Бросает RuntimeError если хотя бы одна проверка не прошла.
-    """
-    print('[upgrade] Проверка серверного окружения...')
+
+def _run_checks(checks, label) -> None:
+    """Запускает список проверок. Бросает FatalError или RuntimeError при неудаче."""
+    print(f'[upgrade] {label}...')
     failed = []
-    for name, fn in _CHECKS:
+    for name, fn in checks:
         try:
             ok, msg = fn()
+        except FatalError:
+            raise
         except Exception as e:
             ok, msg = False, f'{name}: непредвиденная ошибка — {e}'
         tag = 'OK  ' if ok else 'FAIL'
@@ -141,8 +174,22 @@ def _run_env_checks() -> None:
             failed.append(msg)
     if failed:
         summary = '; '.join(failed)
-        raise RuntimeError(f'[upgrade] Проверка окружения не пройдена: {summary}')
-    print('[upgrade] Окружение: всё в порядке')
+        raise RuntimeError(f'[upgrade] Проверка не пройдена: {summary}')
+    print(f'[upgrade] {label}: всё в порядке')
+
+
+def _run_env_checks() -> None:
+    """
+    Проверяет серверное окружение. Бросает RuntimeError если хотя бы одна проверка не прошла.
+    """
+    _run_checks(_CHECKS, 'Проверка серверного окружения')
+
+
+def _run_post_migration_checks() -> None:
+    """
+    Проверки после применения миграций. Бросает FatalError если данные не соответствуют ожиданиям.
+    """
+    _run_checks(_POST_MIGRATION_CHECKS, 'Пост-миграционные проверки')
 
 
 def check_upgrade() -> bool:
@@ -172,5 +219,6 @@ def check_upgrade() -> bool:
     _run_env_checks()
     run_migrations()
     seed_db()
+    _run_post_migration_checks()
     env_set(_BUILD_KEY, BUILD)
     return True

@@ -164,6 +164,83 @@ window.createDirectorVideo = function(modelId, modelName, btn) {
     });
   }
 
+  function nearestAllowedDuration(value, allowed) {
+    if (!allowed || (allowed.length === 1 && allowed[0] === 0)) return value;
+    var best = null, bestDiff = null;
+    for (var i = 0; i < allowed.length; i++) {
+      var diff = Math.abs(allowed[i] - value);
+      if (bestDiff === null || diff < bestDiff || (diff === bestDiff && allowed[i] < best)) {
+        best = allowed[i];
+        bestDiff = diff;
+      }
+    }
+    return best;
+  }
+
+  function showFloatingTooltip(anchorEl, text) {
+    var existing = document.getElementById('_dur_tooltip');
+    if (existing) existing.parentNode.removeChild(existing);
+    var tip = document.createElement('div');
+    tip.id = '_dur_tooltip';
+    tip.textContent = text;
+    tip.style.cssText = 'position:fixed;z-index:9999;background:#333;color:#fff;font-size:12px;padding:5px 9px;border-radius:4px;max-width:280px;pointer-events:none;white-space:normal;line-height:1.4;box-shadow:0 2px 8px rgba(0,0,0,.3);';
+    document.body.appendChild(tip);
+    var rect = anchorEl.getBoundingClientRect();
+    var tw = tip.offsetWidth, th = tip.offsetHeight;
+    var left = Math.min(rect.left, window.innerWidth - tw - 8);
+    var top = rect.top - th - 6;
+    if (top < 4) top = rect.bottom + 6;
+    tip.style.left = Math.max(4, left) + 'px';
+    tip.style.top = top + 'px';
+    var hide = function() {
+      if (tip.parentNode) tip.parentNode.removeChild(tip);
+      document.removeEventListener('touchstart', hide);
+      document.removeEventListener('click', hide);
+    };
+    setTimeout(function() {
+      document.addEventListener('touchstart', hide, { once: true, passive: true });
+      document.addEventListener('click', hide, { once: true });
+    }, 10);
+    setTimeout(hide, 3000);
+  }
+
+  function makeDurationIndicator(m, videoDuration) {
+    var allowed = m.allowed_durations;
+    if (!allowed || !allowed.length) return '';
+    var isUnlimited = allowed.length === 1 && allowed[0] === 0;
+    var supported, nearest, tipText;
+    if (isUnlimited) {
+      supported = true;
+      tipText = 'Указанная длительность (' + videoDuration + ' сек) поддерживается моделью';
+    } else {
+      nearest = nearestAllowedDuration(videoDuration, allowed);
+      supported = nearest === videoDuration;
+      tipText = supported
+        ? 'Указанная длительность (' + videoDuration + ' сек) поддерживается моделью'
+        : 'Указанная длительность (' + videoDuration + ' сек) не поддерживается моделью и будет скорректирована до ' + nearest + ' сек';
+    }
+    var icon = supported ? '✓' : '⚠';
+    var color = supported ? '#4a8' : '#c80';
+    var span = document.createElement('span');
+    span.textContent = icon;
+    span.title = tipText;
+    span.style.cssText = 'font-size:13px;color:' + color + ';margin-left:auto;margin-right:4px;cursor:default;user-select:none;flex-shrink:0;';
+    var touchTimer = null;
+    span.addEventListener('touchstart', function() {
+      touchTimer = setTimeout(function() {
+        touchTimer = null;
+        showFloatingTooltip(span, tipText);
+      }, 500);
+    }, { passive: true });
+    span.addEventListener('touchend', function() {
+      if (touchTimer) { clearTimeout(touchTimer); touchTimer = null; }
+    });
+    span.addEventListener('touchmove', function() {
+      if (touchTimer) { clearTimeout(touchTimer); touchTimer = null; }
+    });
+    return span;
+  }
+
   window.renderModelList = function(containerId, list, opts) {
     opts = opts || {};
     var gradeFn     = opts.gradeFn     || 'cycleVideoGrade';
@@ -171,6 +248,7 @@ window.createDirectorVideo = function(modelId, modelName, btn) {
     var activateFn  = opts.activateFn  || 'activateModel';
     var actionTitle = opts.actionTitle || 'Пробный запрос';
     var actionFn    = opts.actionFn    || 'createProbeVideo';
+    var videoDuration = opts.videoDuration || 6;
 
     const container = document.getElementById(containerId);
     if (!container) return;
@@ -187,15 +265,33 @@ window.createDirectorVideo = function(modelId, modelName, btn) {
       var caption = m.platform_name ? escHtml(m.platform_name) + ': ' + escHtml(m.name) : escHtml(m.name);
       var grade = m.grade || 'good';
       var gradeHtml = '<span data-grade-id="' + m.id + '" data-grade="' + grade + '" onclick="event.stopPropagation();' + gradeFn + '(this)" title="Нажмите для смены" style="cursor:pointer;font-size:10px;padding:1px 6px;border-radius:3px;background:' + (_gradeColors[grade]||'#555') + ';color:#fff;margin-left:6px;opacity:.85">' + (_gradeLabels[grade]||grade) + '</span>';
-      var priceHtml = m.price ? '<span style="font-size:11px;color:#888;margin-left:auto;padding-right:6px;white-space:nowrap">' + escHtml(m.price) + '</span>' : '';
       item.innerHTML =
         '<div class="model-radio" onclick="' + activateFn + '(\'' + m.id + '\')">' +
           '<div class="model-radio-dot"></div>' +
         '</div>' +
         '<div class="model-name">' + caption + gradeHtml + '</div>' +
-        priceHtml +
         '<button class="model-probe-btn" title="' + escHtml(actionTitle) + '" onclick="event.stopPropagation();' + actionFn + '(\'' + m.id + '\',\'' + escHtml(m.name) + '\',this)"><svg viewBox="0 0 16 16" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="4,2 13,8 4,14"/></svg></button>' +
         '<div class="model-drag-handle" title="Перетащить">⠿</div>';
+      var probeBtn = item.querySelector('.model-probe-btn');
+      if (probeBtn) {
+        var durationIndicator = makeDurationIndicator(m, videoDuration);
+        if (durationIndicator) {
+          var insertBefore = probeBtn;
+          if (m.price) {
+            var priceSpan = document.createElement('span');
+            priceSpan.style.cssText = 'font-size:11px;color:#888;padding-right:6px;white-space:nowrap';
+            priceSpan.textContent = m.price;
+            item.insertBefore(priceSpan, probeBtn);
+            insertBefore = priceSpan;
+          }
+          item.insertBefore(durationIndicator, insertBefore);
+        } else if (m.price) {
+          var priceSpan2 = document.createElement('span');
+          priceSpan2.style.cssText = 'font-size:11px;color:#888;margin-left:auto;padding-right:6px;white-space:nowrap';
+          priceSpan2.textContent = m.price;
+          item.insertBefore(priceSpan2, probeBtn);
+        }
+      }
       makeDragHandlers(item, containerId, m, saveOrderFn);
       container.appendChild(item);
     });
@@ -237,6 +333,12 @@ window.createDirectorVideo = function(modelId, modelName, btn) {
       .catch(function(e) { console.error('activate error', e); loadDirectorModels(); });
   };
 
+  function getVideoDuration() {
+    var el = document.getElementById('video_duration');
+    var v = el ? parseInt(el.value, 10) : NaN;
+    return isNaN(v) ? 6 : v;
+  }
+
   function loadModels() {
     fetch('/api/models')
       .then(function(r) { return r.json(); })
@@ -246,7 +348,8 @@ window.createDirectorVideo = function(modelId, modelName, btn) {
           saveOrderFn: saveVideoOrder,
           activateFn: 'activateModel',
           actionTitle: 'Пробный запрос',
-          actionFn: 'createProbeVideo'
+          actionFn: 'createProbeVideo',
+          videoDuration: getVideoDuration()
         });
       })
       .catch(function() {
@@ -266,7 +369,8 @@ window.createDirectorVideo = function(modelId, modelName, btn) {
           saveOrderFn: saveDirectorOrder,
           activateFn: 'activateDirectorModel',
           actionTitle: 'Создать',
-          actionFn: 'createDirectorVideo'
+          actionFn: 'createDirectorVideo',
+          videoDuration: getVideoDuration()
         });
       })
       .catch(function() {

@@ -36,7 +36,7 @@ from pipelines.base import check_cancelled, pipeline_log, iterate_models
 from exceptions import AppException
 from clients import falai
 from clients.falai import ProviderFatalError
-from utils.utils import fmt_id_msg
+from utils.utils import fmt_id_msg, nearest_allowed_duration
 
 
 class AspectRatioConflictError(Exception):
@@ -254,9 +254,14 @@ def run(batch_id, log_id):
             else:
                 pipeline_log(log_id, f"[{model_name}] попытка {cnt + 1}/{fails_to_next}", level='warn')
 
+            allowed = m.get('allowed_durations') or [0]
+            actual_duration = nearest_allowed_duration(video_duration, allowed)
+            if actual_duration != video_duration:
+                pipeline_log(log_id, f"Длительность скорректирована: {video_duration}с → {actual_duration}с (модель поддерживает: {allowed})", level='warn')
+
             sr = falai.submit(
                 log_id, model_name, m['submit_url'], m['platform_url'],
-                m['body_tpl'], story_text, ar_x, ar_y, video_duration,
+                m['body_tpl'], story_text, ar_x, ar_y, actual_duration,
             )
             if not sr:
                 return None

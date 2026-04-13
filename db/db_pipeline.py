@@ -733,6 +733,20 @@ def db_get_text_model_by_id(model_id: str):
         return None
 
 
+def _fetch_allowed_durations(cur, model_ids):
+    """Вспомогательная функция: возвращает dict {model_id_str: [int, ...]}."""
+    if not model_ids:
+        return {}
+    ids_str = [str(mid) for mid in model_ids]
+    cur.execute("""
+        SELECT model_id::text, ARRAY_AGG(duration ORDER BY duration ASC) AS durations
+        FROM model_durations
+        WHERE model_id::text = ANY(%s)
+        GROUP BY model_id
+    """, (ids_str,))
+    return {row['model_id']: list(row['durations']) for row in cur.fetchall()}
+
+
 def db_get_active_video_models():
     try:
         with get_db() as conn:
@@ -746,15 +760,19 @@ def db_get_active_video_models():
                     ORDER BY m."order"
                 """)
                 rows = cur.fetchall()
+                model_ids = [row['id'] for row in rows]
+                durations_map = _fetch_allowed_durations(cur, model_ids)
         result = []
         for row in rows:
+            mid = str(row['id'])
             result.append({
-                'platform_url': row['platform_url'],
-                'model_url':    row['model_url'],
-                'body_tpl':     row['body'] if isinstance(row['body'], dict) else {},
-                'name':         row['name'],
-                'id':           str(row['id']),
-                'submit_url':   f"{row['platform_url']}/{row['model_url']}",
+                'platform_url':     row['platform_url'],
+                'model_url':        row['model_url'],
+                'body_tpl':         row['body'] if isinstance(row['body'], dict) else {},
+                'name':             row['name'],
+                'id':               mid,
+                'submit_url':       f"{row['platform_url']}/{row['model_url']}",
+                'allowed_durations': durations_map.get(mid, [0]),
             })
         return result
     except Exception as e:
@@ -774,17 +792,20 @@ def db_get_video_model_by_id(model_id: str):
                     WHERE m.id = %s AND m.type = 'text-to-video'
                 """, (model_id,))
                 row = cur.fetchone()
-        if not row:
-            return None
+                if not row:
+                    return None
+                durations_map = _fetch_allowed_durations(cur, [row['id']])
         platform_url = row['platform_url']
         model_url = row['model_url']
+        mid = str(row['id'])
         return {
-            'platform_url': platform_url,
-            'model_url':    model_url,
-            'body_tpl':     row['body'] if isinstance(row['body'], dict) else {},
-            'name':         row['name'],
-            'id':           str(row['id']),
-            'submit_url':   f"{platform_url}/{model_url}",
+            'platform_url':     platform_url,
+            'model_url':        model_url,
+            'body_tpl':         row['body'] if isinstance(row['body'], dict) else {},
+            'name':             row['name'],
+            'id':               mid,
+            'submit_url':       f"{platform_url}/{model_url}",
+            'allowed_durations': durations_map.get(mid, [0]),
         }
     except Exception as e:
         print(f"[DB] Ошибка db_get_video_model_by_id: {e}")

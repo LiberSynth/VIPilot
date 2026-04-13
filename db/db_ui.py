@@ -163,7 +163,24 @@ def db_get_models(model_type: str):
                     ORDER BY m."order" ASC
                 """, (model_type,))
                 rows = cur.fetchall()
-        return [dict(r) for r in rows]
+                models = [dict(r) for r in rows]
+
+                if model_type == 'text-to-video' and models:
+                    model_ids = [str(m['id']) for m in models]
+                    cur.execute("""
+                        SELECT model_id::text, ARRAY_AGG(duration ORDER BY duration ASC) AS durations
+                        FROM model_durations
+                        WHERE model_id::text = ANY(%s)
+                        GROUP BY model_id
+                    """, (model_ids,))
+                    durations_map = {row['model_id']: list(row['durations']) for row in cur.fetchall()}
+                    for m in models:
+                        m['allowed_durations'] = durations_map.get(str(m['id']), [0])
+                else:
+                    for m in models:
+                        m['allowed_durations'] = [0]
+
+        return models
     except Exception as e:
         print(f"[DB] Ошибка db_get_models({model_type}): {e}")
         return []

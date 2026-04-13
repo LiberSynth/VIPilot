@@ -51,3 +51,21 @@ def to_msk(h, m):
 def to_utc_from_msk(h, m):
     total = (h * 60 + m - 180) % 1440
     return total // 60, total % 60
+
+
+def nearest_allowed_duration(value: int, allowed: list[int]) -> int:
+    """
+    Возвращает ближайшее значение из allowed к value.
+    Если allowed == [0] — возвращает value без изменений.
+    При равноудалённости двух значений — берёт меньшее.
+    """
+    if allowed == [0]:
+        return value
+    best = None
+    best_diff = None
+    for a in allowed:
+        diff = abs(a - value)
+        if best_diff is None or diff < best_diff or (diff == best_diff and a < best):
+            best = a
+            best_diff = diff
+    return best

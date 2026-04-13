@@ -1567,6 +1567,50 @@ def _m051_remove_obsolete_settings(cur):
     cur.execute("DELETE FROM settings WHERE key IN ('vk_transcode', 'history_days')")
 
 
+def _m052_model_durations(cur):
+    """
+    Создаёт таблицу model_durations и заполняет её допустимыми значениями duration
+    для всех 8 видео-моделей.
+    Значение 0 означает, что модель не принимает параметр duration (без ограничений).
+    """
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS model_durations (
+            id        UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
+            model_id  UUID    NOT NULL,
+            duration  INTEGER NOT NULL,
+            UNIQUE (model_id, duration)
+        )
+    """)
+    cur.execute("""
+        CREATE INDEX IF NOT EXISTS idx_model_durations_model_id
+            ON model_durations (model_id)
+    """)
+
+    model_durations = {
+        'seedance/v1.5/pro':         [4, 5, 6, 7, 8, 9, 10, 11, 12],
+        'ltx-2.3':                   [6, 8, 10],
+        'sora-2':                    [4, 8, 12, 16, 20],
+        'kling-video/v1.6/standard': [5, 10],
+        'veo2':                      [5, 6, 7, 8],
+        'minimax/video-01':          [0],
+        'ltx-video':                 [0],
+        'wan-2.6':                   [5, 10, 15],
+    }
+
+    for model_name, durations in model_durations.items():
+        cur.execute("SELECT id FROM ai_models WHERE name = %s", (model_name,))
+        row = cur.fetchone()
+        if not row:
+            continue
+        model_id = row[0]
+        for d in durations:
+            cur.execute("""
+                INSERT INTO model_durations (model_id, duration)
+                VALUES (%s, %s)
+                ON CONFLICT (model_id, duration) DO NOTHING
+            """, (model_id, d))
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -1619,6 +1663,7 @@ MIGRATIONS = [
     (49, _m049_widen_log_entries_level),
     (50, _m050_remove_story_probe_and_model_name_from_batch_data),
     (51, _m051_remove_obsolete_settings),
+    (52, _m052_model_durations),
 ]
 
 
