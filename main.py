@@ -119,11 +119,7 @@ def main_loop():
                                 pipeline_name, msg,
                                 status='fatal_error', batch_id=batch_id,
                             )
-                            if lid is None:
-                                db_log_root(msg, status='fatal_error')
-                            else:
-                                log_entry(lid, msg, level='fatal_error')
-                            log_entry(None, fmt_id_msg("[{}] Критическая ошибка батч {}: {}", pipeline_name, batch_id, e), level='silent')
+                            log_entry(lid, msg, level='fatal_error')
                         finally:
                             wf_state.release_batch(batch_id)
                             wf_state.wakeup_loop()
