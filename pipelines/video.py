@@ -12,8 +12,6 @@ Pipeline 3 — Генерация видео.
 
 import time
 
-from utils.notify import notify_failure
-
 from db import (
     db_set_batch_video_model,
     db_get,
@@ -26,7 +24,7 @@ from db import (
     db_get_video_model_by_id,
     db_set_batch_video_pending,
     db_set_batch_video_ready,
-    db_set_batch_video_error,
+    db_set_batch_status,
     db_set_batch_story_ready_from_error,
     db_set_batch_original_video,
     db_get_random_real_original_video,
@@ -34,7 +32,8 @@ from db import (
     db_get_movie_from_donor,
 )
 from log import db_log_pipeline, db_log_update
-from pipelines.base import check_cancelled, handle_critical_error, pipeline_log, iterate_models
+from pipelines.base import check_cancelled, pipeline_log, iterate_models
+from exceptions import AppException
 from clients import falai
 from clients.falai import ProviderFatalError
 
@@ -117,9 +116,9 @@ def run(batch_id):
                         msg = f"Не удалось перенести видео от донора {donor_batch_id[:8]}…"
                         db_log_update(log_id, msg, 'error')
                         pipeline_log(log_id, msg, level='error')
-                        db_set_batch_video_error(batch_id)
                         pipeline_log(None, f"[video] {msg}")
-                return
+                        raise AppException(batch_id, 'video', msg)
+                    return
 
         story_id        = batch.get('story_id')
         if story_id is None:
@@ -146,9 +145,8 @@ def run(batch_id):
                 msg = '[эмуляция] Нет видео в пуле — невозможно скопировать оригинал'
                 db_log_update(log_id, msg, 'error')
                 pipeline_log(log_id, msg, level='error')
-                db_set_batch_video_error(batch_id)
                 pipeline_log(None, f"[video] {msg}")
-                return
+                raise AppException(batch_id, 'video', msg)
             sample, donor_batch_id, donor_story_id = result
             pipeline_log(log_id, f"Видео заимствовано из батча: {donor_batch_id}", level='info')
             db_set_batch_original_video(batch_id, sample)
@@ -166,8 +164,7 @@ def run(batch_id):
             msg = 'FAL_API_KEY не задан — генерация невозможна'
             db_log_pipeline('video', msg, status='error', batch_id=batch_id)
             pipeline_log(None, f"[video] {msg}")
-            notify_failure(f"video: {msg}")
-            return
+            raise AppException(batch_id, 'video', msg)
 
         try:
             fails_to_next = max(1, int(db_get('video_fails_to_next', '3')))
@@ -180,7 +177,7 @@ def run(batch_id):
                 msg = f'Пробная модель {str(pinned_model_id)[:8]}… не найдена'
                 db_log_pipeline('video', msg, status='error', batch_id=batch_id)
                 pipeline_log(None, f"[video] {msg}")
-                return
+                raise AppException(batch_id, 'video', msg)
             models = [pinned_m]
         else:
             models = db_get_active_video_models()
@@ -188,16 +185,14 @@ def run(batch_id):
                 msg = 'Нет активных video-моделей в ai_models (type=text-to-video)'
                 db_log_pipeline('video', msg, status='error', batch_id=batch_id)
                 pipeline_log(None, f"[video] {msg}")
-                notify_failure(f"video: {msg}")
-                return
+                raise AppException(batch_id, 'video', msg)
 
         story_text = db_get_story_text(story_id)
         if not story_text:
             msg = f'Не найден сюжет story_id={story_id[:8]}…'
             db_log_pipeline('video', msg, status='error', batch_id=batch_id)
             pipeline_log(None, f"[video] {msg}")
-            notify_failure(f"video: {msg} (батч {batch_id[:8]})")
-            return
+            raise AppException(batch_id, 'video', msg)
 
         video_post_prompt = db_get('video_post_prompt', '').strip()
         if video_post_prompt:
@@ -310,17 +305,17 @@ def run(batch_id):
         if not video_url:
             if is_probe:
                 msg = f'Пробная модель {models[0]["name"]} не дала результата ({fails_to_next} попыток)'
+                db_log_update(log_id, msg, 'error')
+                pipeline_log(log_id, msg, level='error')
+                pipeline_log(None, f"[video] {msg}")
+                raise AppException(batch_id, 'video', msg)
             else:
                 msg = f'Все активные видео-модели не дали результата после {max_passes} проходов'
-            db_log_update(log_id, msg, 'error')
-            pipeline_log(log_id, msg, level='error')
-            pipeline_log(None, f"[video] {msg}")
-            notify_failure(f"video: {msg} (батч {batch_id[:8]})")
-            if is_probe:
-                db_set_batch_video_error(batch_id)
-            else:
+                db_log_update(log_id, msg, 'error')
+                pipeline_log(log_id, msg, level='error')
+                pipeline_log(None, f"[video] {msg}")
                 db_set_batch_story_ready_from_error(batch_id)
-            return
+                return
 
         pipeline_log(log_id, f"Скачиваю оригинал: {video_url}")
         pipeline_log(None, f"[video] Скачиваю оригинал от провайдера…")
@@ -334,10 +329,8 @@ def run(batch_id):
             msg = f"Ошибка скачивания оригинала: {e}"
             db_log_update(log_id, msg, 'error')
             pipeline_log(log_id, msg, level='error')
-            db_set_batch_video_error(batch_id)
             pipeline_log(None, f"[video] {msg}")
-            notify_failure(f"video: {msg} (батч {batch_id[:8]})")
-            return
+            raise AppException(batch_id, 'video', msg)
 
         db_set_batch_video_ready(batch_id, video_url)
         if used_model_id:
@@ -347,23 +340,19 @@ def run(batch_id):
         pipeline_log(log_id, f"URL: {video_url}")
         pipeline_log(None, f"[video] Готово: batch → video_ready, url={video_url[:60]}…")
 
+    except AppException:
+        raise
     except AspectRatioConflictError as e:
         msg = str(e)
         db_log_pipeline('video', msg, status='error', batch_id=batch_id)
         if log_id:
             db_log_update(log_id, msg, 'error')
-        if batch_id:
-            db_set_batch_video_error(batch_id)
         pipeline_log(None, f"[video] {msg}")
-        notify_failure(f"video: {msg}")
+        raise AppException(batch_id, 'video', msg)
     except ProviderFatalError as e:
-        msg = str(e)
+        msg = f"Фатальная ошибка провайдера: {e}"
         db_log_pipeline('video', msg, status='error', batch_id=batch_id)
         if log_id:
             db_log_update(log_id, msg, 'error')
-        if batch_id:
-            db_set_batch_video_error(batch_id)
-        pipeline_log(None, f"[video] Фатальная ошибка провайдера: {msg}")
-        notify_failure(f"video: фатальная ошибка провайдера — {msg}")
-    except Exception as e:
-        handle_critical_error('video', batch_id, log_id, e)
+        pipeline_log(None, f"[video] {msg}")
+        raise AppException(batch_id, 'video', msg)

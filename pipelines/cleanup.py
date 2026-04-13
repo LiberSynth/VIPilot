@@ -19,7 +19,7 @@ from db import (
 )
 from log import db_log_pipeline
 from utils.utils import parse_entries_lifetime, parse_log_lifetime, parse_batch_lifetime, parse_file_lifetime
-from pipelines.base import pipeline_log, handle_critical_error
+from pipelines.base import pipeline_log
 
 
 def run():
@@ -59,5 +59,5 @@ def run():
             db_log_pipeline("cleanup", "Очистка: " + ", ".join(summary), status="ok")
 
     except Exception as e:
-        # notify_failure не импортируется напрямую — он вызывается внутри handle_critical_error (см. base.py)
-        handle_critical_error('cleanup', None, None, e)
+        pipeline_log(None, f"[cleanup] Необработанная ошибка: {e}")
+        raise

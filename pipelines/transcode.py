@@ -28,10 +28,10 @@ from db import (
     db_get_batch_original_video,
     db_set_batch_transcode_skip,
     db_set_batch_transcode_ready,
-    db_set_batch_transcode_error,
 )
 from log import db_log_pipeline, db_log_update
-from pipelines.base import check_cancelled, handle_critical_error, pipeline_log
+from pipelines.base import check_cancelled, pipeline_log
+from exceptions import AppException
 
 
 def _ffmpeg(src, dst, log_id):
@@ -174,5 +174,5 @@ def run(batch_id):
         db_set_batch_transcode_ready(batch_id, video_data)
         pipeline_log(None, f"[transcode] Готово: {out_mb} МБ → БД")
 
-    except Exception as e:
-        handle_critical_error('transcode', batch_id, log_id, e)
+    except AppException:
+        raise

@@ -24,7 +24,8 @@ from db import (
     env_get,
 )
 from log import db_log_pipeline, db_log_update
-from pipelines.base import check_cancelled, handle_critical_error, pipeline_log, iterate_models
+from pipelines.base import check_cancelled, pipeline_log, iterate_models
+from exceptions import AppException
 from clients import openrouter
 
 
@@ -60,7 +61,9 @@ def run(batch_id):
             pipeline_log(log_id, f"Используется заданный сюжет id={preset_story_id[:8]}…")
             pipeline_log(None, f"[story] Батч {batch_id[:8]}… — story_id задан вручную ({preset_story_id[:8]}…), батч → story_ready")
             if not db_set_batch_story(batch_id, preset_story_id):
-                db_set_batch_status(batch_id, 'error')
+                msg = f'Ошибка записи story_id={preset_story_id[:8]}… в БД'
+                pipeline_log(log_id, msg, level='error')
+                raise AppException(batch_id, 'story', msg)
             return
 
         if not is_probe and check_cancelled('story', batch_id, batch):
@@ -84,13 +87,9 @@ def run(batch_id):
                 donor_story_id = str(donor_batch['story_id']) if donor_batch and donor_batch.get('story_id') else None
                 if not db_set_batch_story_ready_from_donor(batch_id, donor_batch_id, donor_story_id):
                     msg = f'Не удалось записать donor_batch_id для батча {batch_id[:8]}… — донор {donor_batch_id[:8]}…'
-                    log_id = db_log_pipeline(
-                        'story', msg,
-                        status='error', batch_id=batch_id,
-                    )
-                    db_set_batch_status(batch_id, 'error')
+                    db_log_pipeline('story', msg, status='error', batch_id=batch_id)
                     pipeline_log(None, f"[story] {msg}")
-                    return
+                    raise AppException(batch_id, 'story', msg)
                 donor_title = db_get_story_title(donor_story_id) if donor_story_id else None
                 if donor_title:
                     detail = f"Включен режим «Использовать донора». Контент будет заимствован от донора. Сюжет: «{donor_title}»"
@@ -134,9 +133,8 @@ def run(batch_id):
                     msg = 'Пул сюжетов пуст (grade = good) — AI-генерация запрещена (approve_stories включён)'
                     pipeline_log(pool_log_id, msg, level='error')
                     db_log_update(pool_log_id, msg, 'error')
-                    db_set_batch_status(batch_id, 'error')
                     pipeline_log(None, f"[story] Батч {batch_id[:8]}… — {msg}")
-                    return
+                    raise AppException(batch_id, 'story', msg)
                 reason = (
                     f"Подходящий сюжет в пуле не найден (условие: {condition_label}). "
                     f"Переход к AI-генерации."
@@ -157,7 +155,7 @@ def run(batch_id):
             db_log_update(log_id, msg, 'error')
             pipeline_log(log_id, msg, level='error')
             pipeline_log(None, f"[story] {msg}")
-            return
+            raise AppException(batch_id, 'story', msg)
 
         batch_data     = batch.get('data') or {}
         is_story_probe = batch['type'] == 'story_probe'
@@ -174,7 +172,7 @@ def run(batch_id):
             db_log_update(log_id, msg, 'error')
             pipeline_log(log_id, msg, level='error')
             pipeline_log(None, f"[story] {msg}")
-            return
+            raise AppException(batch_id, 'story', msg)
 
         try:
             fails_to_next = max(1, int(db_get('story_fails_to_next', '3')))
@@ -231,8 +229,7 @@ def run(batch_id):
             db_log_update(log_id, msg, 'error')
             pipeline_log(log_id, msg, level='error')
             pipeline_log(None, f"[story] {msg}")
-            db_set_batch_status(batch_id, 'error')
-            return
+            raise AppException(batch_id, 'story', msg)
 
         story_id, title, result = iterate_result
 
@@ -253,12 +250,12 @@ def run(batch_id):
                 db_log_update(log_id, msg, 'error')
                 pipeline_log(log_id, msg, level='error')
                 pipeline_log(None, f"[story] {msg}")
-                return
+                raise AppException(batch_id, 'story', msg)
             db_set_story_model(story_id, used_model_id)
             msg = f'Сюжет сгенерирован ({used_model_name})'
             db_log_update(log_id, msg, 'ok')
             pipeline_log(log_id, f"Сохранён как story {story_id}, батч → story_ready")
             pipeline_log(None, f"[story] Готово: story_id={story_id[:8]}…, batch → story_ready")
 
-    except Exception as e:
-        handle_critical_error('story', batch_id, log_id, e)
+    except AppException:
+        raise

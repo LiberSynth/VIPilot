@@ -28,16 +28,29 @@ def db_log_pipeline(pipeline, message, status='info', batch_id=None):
         return None
 
 
+def _notify_on_error(log_id, message, level):
+    """Вызывает notify_failure при уровнях 'error' и 'fatal_error'.
+    Импорт отложен, чтобы избежать циклических зависимостей."""
+    if level not in ('error', 'fatal_error'):
+        return
+    try:
+        from utils.notify import notify_failure
+        notify_failure(f"log#{log_id}: {message}")
+    except Exception as e:
+        _builtins.print(f"[log] Ошибка вызова notify_failure: {e}")
+
+
 def log_entry(log_id, message, level='info'):
     """Добавляет субзапись к существующей записи лога.
 
     Если log_id равен None — no-op (запись не производится).
+    При уровнях 'error' и 'fatal_error' вызывает notify_failure.
     """
     if not log_id:
         return
-    assert level in ('info', 'warn', 'error'), (
+    assert level in ('info', 'warn', 'error', 'fatal_error'), (
         f"log_entry: недопустимый уровень {level!r}. "
-        "Допустимые значения: 'info', 'warn', 'error'."
+        "Допустимые значения: 'info', 'warn', 'error', 'fatal_error'."
     )
     try:
         with get_db() as conn:
@@ -49,6 +62,7 @@ def log_entry(log_id, message, level='info'):
             conn.commit()
     except Exception as e:
         _builtins.print(f"[DB] Ошибка log_entry: {e}")
+    _notify_on_error(log_id, message, level)
 
 
 def db_log_interrupt_running(pipeline):

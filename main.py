@@ -6,16 +6,18 @@ from db import (
     init_db, run_upgrades, db_get,
     db_get_actionable_batches,
     db_cancel_waiting_batches,
+    db_set_batch_status,
     env_get,
 )
 from startup import init_app, create_app
-from log import db_log_root, db_log_pipeline, db_log_interrupt_running, db_log_fix_orphaned_running
+from log import db_log_root, db_log_pipeline, db_log_interrupt_running, db_log_fix_orphaned_running, log_entry
 from pipelines import story, video, transcode, publish, cleanup
 import pipelines.planning as planning
 from statuses import PUBLISH_ROUTING_SUFFIXES
 import utils.workflow_state as wf_state
 import utils.keepalive as keepalive
 from utils.middleware import register_middleware
+from exceptions import AppException
 
 flask_app = create_app()
 register_middleware(flask_app)
@@ -93,10 +95,33 @@ def main_loop():
                         continue
 
                     def _batch_thread(batch_id=bid, pipeline=pipeline_module):
+                        pipeline_name = getattr(pipeline, '__name__', str(pipeline)).split('.')[-1]
                         try:
                             pipeline.run(batch_id)
+                        except AppException as exc:
+                            db_set_batch_status(batch_id, 'error')
+                            msg = f"Ошибка пайплайна {exc.pipeline}: {exc.message}"
+                            lid = db_log_pipeline(
+                                exc.pipeline, msg,
+                                status='error', batch_id=batch_id,
+                            )
+                            if lid is None:
+                                db_log_root(msg, status='error')
+                            else:
+                                log_entry(lid, msg, level='error')
+                            print(f"[{pipeline_name}] AppException батч {batch_id[:8]}…: {exc.message}")
                         except Exception as e:
-                            print(f"[main_loop] Необработанная ошибка потока {batch_id[:8]}…: {e}")
+                            db_set_batch_status(batch_id, 'fatal_error')
+                            msg = f"Критическая ошибка: {e}"
+                            lid = db_log_pipeline(
+                                pipeline_name, msg,
+                                status='fatal_error', batch_id=batch_id,
+                            )
+                            if lid is None:
+                                db_log_root(msg, status='fatal_error')
+                            else:
+                                log_entry(lid, msg, level='fatal_error')
+                            print(f"[{pipeline_name}] Критическая ошибка батч {batch_id[:8]}…: {e}")
                         finally:
                             wf_state.release_batch(batch_id)
                             wf_state.wakeup_loop()

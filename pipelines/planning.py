@@ -7,7 +7,7 @@ from db import (
 from log import db_log_pipeline
 from utils.consts import MSK
 from utils.utils import parse_hhmm
-from pipelines.base import pipeline_log, handle_critical_error
+from pipelines.base import pipeline_log
 
 
 def run(loop_interval: int):
@@ -67,5 +67,5 @@ def run(loop_interval: int):
                         pipeline_log(None, f"[planning] Создан батч: {dt.strftime('%d.%m %H:%M')} UTC")
 
     except Exception as e:
-        # notify_failure не импортируется напрямую — он вызывается внутри handle_critical_error (см. base.py)
-        handle_critical_error('planning', None, None, e)
+        pipeline_log(None, f"[planning] Необработанная ошибка: {e}")
+        raise

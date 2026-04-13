@@ -204,21 +204,6 @@ def db_claim_batch_status(batch_id: str, from_status: str, to_status: str) -> bo
         return False
 
 
-def db_set_batch_fatal_error(batch_id: str) -> bool:
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "UPDATE batches SET status = 'fatal_error' WHERE id = %s",
-                    (batch_id,),
-                )
-            conn.commit()
-        return True
-    except Exception as e:
-        print(f"[DB] Ошибка db_set_batch_fatal_error: {e}")
-        return False
-
-
 def db_set_batch_story_generating_by_id(batch_id):
     _assert_known_status('story_generating')
     try:
@@ -270,10 +255,6 @@ def db_set_batch_transcoding_by_id(batch_id):
         return False
 
 
-def db_set_batch_cancelled(batch_id):
-    return db_set_batch_status(batch_id, 'cancelled')
-
-
 def db_cancel_waiting_batches():
     try:
         with get_db() as conn:
@@ -302,10 +283,6 @@ def db_cancel_waiting_batches():
     except Exception as e:
         print(f"[DB] Ошибка db_cancel_waiting_batches: {e}")
         return []
-
-
-def db_set_batch_video_error(batch_id):
-    return db_set_batch_status(batch_id, 'video_error')
 
 
 def db_set_batch_story_ready_from_error(batch_id):
@@ -341,10 +318,6 @@ def db_set_batch_pending(batch_id):
     except Exception as e:
         print(f"[DB] Ошибка db_set_batch_pending: {e}")
         return False
-
-
-def db_set_batch_transcode_error(batch_id):
-    return db_set_batch_status(batch_id, 'transcode_error')
 
 
 def db_set_batch_movie_probe(batch_id):
@@ -393,10 +366,6 @@ def db_set_batch_published_partially(batch_id):
     except Exception as e:
         print(f"[DB] Ошибка db_set_batch_published_partially: {e}")
         return False
-
-
-def db_set_batch_publish_error(batch_id):
-    return db_set_batch_status(batch_id, 'publish_error')
 
 
 def db_claim_unused_story_for_batch(batch_id: str, grade_required: bool) -> dict | None:

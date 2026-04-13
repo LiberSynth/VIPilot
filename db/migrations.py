@@ -1532,6 +1532,16 @@ def _m048_remove_model_name_from_batch_data(cur):
     """)
 
 
+def _m049_widen_log_entries_level(cur):
+    """
+    Расширяет log_entries.level с VARCHAR(10) до VARCHAR(20).
+    Необходимо для поддержки уровня 'fatal_error' (11 символов),
+    введённого как часть унификации обработки ошибок через AppException.
+    Deployed: -
+    """
+    cur.execute("ALTER TABLE log_entries ALTER COLUMN level TYPE VARCHAR(20)")
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -1581,6 +1591,7 @@ MIGRATIONS = [
     (46, _m046_drop_ai_platform_id),
     (47, _m047_log_status_cancelled),
     (48, _m048_remove_model_name_from_batch_data),
+    (49, _m049_widen_log_entries_level),
 ]
 
 
