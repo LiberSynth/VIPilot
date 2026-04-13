@@ -196,16 +196,17 @@ def check_upgrade() -> bool:
     """
     Инициализирует БД и возвращает True если приложение обновилось с последнего запуска.
 
-    _bootstrap() вызывается только если база совсем новая (build_number отсутствует).
-    run_migrations() и seed_db() вызываются только при обновлении (stored != BUILD).
-    На деве (REPLIT_DEPLOYMENT != "1") _bootstrap() всегда вызывается, апгрейд пропускается.
+    _bootstrap() и seed_db() вызываются только если база совсем новая (build_number отсутствует).
+    run_migrations() вызывается при каждом старте — и на деве, и на проде.
+    На проде дополнительно: проверка окружения, пост-миграционные проверки, запись build_number.
     """
     if os.environ.get('REPLIT_DEPLOYMENT') != '1':
         stored = env_get(_BUILD_KEY, '')
         if not stored:
             _bootstrap()
-            run_migrations()
             seed_db()
+        run_migrations()
+        _run_post_migration_checks()
         return False
 
     stored = env_get(_BUILD_KEY, '')
