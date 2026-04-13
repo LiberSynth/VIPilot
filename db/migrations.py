@@ -66,8 +66,8 @@ def _m001_baseline_schema(cur):
             body           JSONB        NOT NULL DEFAULT '{}',
             "order"        INTEGER      NOT NULL DEFAULT 0,
             active         BOOLEAN      NOT NULL DEFAULT FALSE,
-            ai_platform_id UUID         REFERENCES ai_platforms(id),
-            platform_id    UUID         REFERENCES ai_platforms(id),
+            ai_platform_id UUID,
+            platform_id    UUID,
             type           VARCHAR(50)  NOT NULL,
             created_at     TIMESTAMPTZ  NOT NULL DEFAULT now()
         )
@@ -86,16 +86,16 @@ def _m001_baseline_schema(cur):
             id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
             created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
             result     TEXT        NOT NULL,
-            model_id   UUID        REFERENCES ai_models(id)
+            model_id   UUID
         )
     """)
     cur.execute("""
         CREATE TABLE IF NOT EXISTS batches (
             id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
             scheduled_at TIMESTAMPTZ,
-            target_id    UUID        NOT NULL REFERENCES targets(id),
+            target_id    UUID        NOT NULL,
             status       VARCHAR(30) NOT NULL DEFAULT 'pending',
-            story_id     UUID        REFERENCES stories(id),
+            story_id     UUID,
             video_url    TEXT,
             video_file   TEXT,
             video_data_transcoded BYTEA,
@@ -107,7 +107,7 @@ def _m001_baseline_schema(cur):
     cur.execute("""
         CREATE TABLE IF NOT EXISTS log (
             id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-            batch_id   UUID        REFERENCES batches(id),
+            batch_id   UUID,
             pipeline   VARCHAR(30) NOT NULL,
             message    TEXT,
             status     VARCHAR(20),
@@ -117,7 +117,7 @@ def _m001_baseline_schema(cur):
     cur.execute("""
         CREATE TABLE IF NOT EXISTS log_entries (
             id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-            log_id     UUID        NOT NULL REFERENCES log(id),
+            log_id     UUID        NOT NULL,
             message    TEXT        NOT NULL,
             level      VARCHAR(10) NOT NULL DEFAULT 'info',
             created_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -141,11 +141,11 @@ def _m002_model_grades_and_batch_models(cur):
     """)
     cur.execute("""
         ALTER TABLE batches
-            ADD COLUMN IF NOT EXISTS text_model_id UUID REFERENCES ai_models(id)
+            ADD COLUMN IF NOT EXISTS text_model_id UUID
     """)
     cur.execute("""
         ALTER TABLE batches
-            ADD COLUMN IF NOT EXISTS video_model_id UUID REFERENCES ai_models(id)
+            ADD COLUMN IF NOT EXISTS video_model_id UUID
     """)
     cur.execute("""
         DO $$ BEGIN
@@ -1622,6 +1622,30 @@ def _m053_log_entries_log_id_nullable(cur):
     """)
 
 
+def _m054_drop_remaining_foreign_keys(cur):
+    """
+    Удаляет batches_target_id_fkey и другие FK, которые могли пережить m025
+    на старых базах. Использует IF EXISTS для безопасного выполнения.
+    """
+    cur.execute("""
+        DO $$ DECLARE
+            rec RECORD;
+        BEGIN
+            FOR rec IN
+                SELECT tc.table_name, tc.constraint_name
+                FROM information_schema.table_constraints tc
+                WHERE tc.constraint_type = 'FOREIGN KEY'
+                  AND tc.table_schema = 'public'
+            LOOP
+                EXECUTE format(
+                    'ALTER TABLE %I DROP CONSTRAINT IF EXISTS %I',
+                    rec.table_name, rec.constraint_name
+                );
+            END LOOP;
+        END $$
+    """)
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -1676,6 +1700,7 @@ MIGRATIONS = [
     (51, _m051_remove_obsolete_settings),
     (52, _m052_model_durations),
     (53, _m053_log_entries_log_id_nullable),
+    (54, _m054_drop_remaining_foreign_keys),
 ]
 
 
