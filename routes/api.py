@@ -52,8 +52,11 @@ def api_run_now():
     batch_id = db_create_adhoc_batch()
     if not batch_id:
         return jsonify({"error": "Не удалось создать батч"}), 500
+    try:
+        log_batch_planned(batch_id, 'Оперативный запуск', "Запуск по запросу пользователя (внеплановый)")
+    except Exception as e:
+        print(f"[api_run_now] log_batch_planned failed for batch_id={batch_id}: {e}")
     wf_state.wakeup_loop()
-    log_batch_planned(batch_id, 'Оперативный запуск', "Запуск по запросу пользователя (внеплановый)")
     return jsonify({"ok": True, "batch_id": batch_id})
 
 
@@ -192,8 +195,11 @@ def api_text_model_probe(model_id):
     batch_id = db_create_story_probe_batch(model_id)
     if not batch_id:
         return jsonify({"error": "Не удалось создать батч"}), 500
+    try:
+        log_batch_planned(batch_id, 'Пробный запуск текстовой модели', f"Модель: {m['name']}")
+    except Exception as e:
+        print(f"[api_text_model_probe] log_batch_planned failed for batch_id={batch_id}: {e}")
     wf_state.wakeup_loop()
-    log_batch_planned(batch_id, 'Пробный запуск текстовой модели', f"Модель: {m['name']}")
     return jsonify({"batch_id": batch_id})
 
 
@@ -225,8 +231,11 @@ def api_video_model_probe(model_id):
     batch_id = db_create_probe_batch(model_id, story_id=story_id)
     if not batch_id:
         return jsonify({"error": "Не удалось создать батч"}), 500
+    try:
+        log_batch_planned(batch_id, 'Пробный запуск видеомодели', f"Модель: {m['name']}")
+    except Exception as e:
+        print(f"[api_video_model_probe] log_batch_planned failed for batch_id={batch_id}: {e}")
     wf_state.wakeup_loop()
-    log_batch_planned(batch_id, 'Пробный запуск видеомодели', f"Модель: {m['name']}")
     return jsonify({"batch_id": batch_id})
 
 
