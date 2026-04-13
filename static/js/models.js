@@ -226,18 +226,24 @@ window.createDirectorVideo = function(modelId, modelName, btn) {
     span.textContent = icon;
     span.title = tipText;
     span.style.cssText = 'font-size:13px;color:' + color + ';margin-left:auto;margin-right:4px;cursor:default;user-select:none;flex-shrink:0;';
+    span.draggable = false;
     var touchTimer = null;
-    span.addEventListener('touchstart', function() {
+    span.addEventListener('touchstart', function(e) {
+      e.stopPropagation();
       touchTimer = setTimeout(function() {
         touchTimer = null;
         showFloatingTooltip(span, tipText);
       }, 500);
-    }, { passive: true });
+    });
     span.addEventListener('touchend', function() {
       if (touchTimer) { clearTimeout(touchTimer); touchTimer = null; }
     });
     span.addEventListener('touchmove', function() {
       if (touchTimer) { clearTimeout(touchTimer); touchTimer = null; }
+    });
+    span.addEventListener('dragstart', function(e) {
+      e.stopPropagation();
+      e.preventDefault();
     });
     return span;
   }
