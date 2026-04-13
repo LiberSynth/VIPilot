@@ -5,7 +5,7 @@ from db import (
     db_cancel_waiting_batches,
     db_get_schedule, db_get_active_targets, db_ensure_batch, db_get_last_pipeline_run,
 )
-from log import db_log_pipeline
+from log import db_log_pipeline, log_batch_planned
 from utils.consts import MSK
 from utils.utils import parse_hhmm, fmt_id_msg
 from pipelines.base import pipeline_log
@@ -65,18 +65,15 @@ def run():
                 if in_future_window or is_catchup:
                     batch_id = db_ensure_batch(dt)
                     if batch_id:
-                        log_id = db_log_pipeline(
-                            'planning',
+                        dt_msk = dt.astimezone(MSK)
+                        target_names = ', '.join(t['name'] for t in targets)
+                        log_batch_planned(
+                            batch_id,
                             'Батч запланирован',
-                            status='ok',
-                            batch_id=batch_id,
+                            f"Запланирована публикация: {dt_msk.strftime('%d.%m.%Y %H:%M')} МСК",
+                            f"Таргеты: {target_names}",
+                            f"Горизонт планирования: {buffer_hours} ч",
                         )
-                        if log_id:
-                            dt_msk = dt.astimezone(MSK)
-                            pipeline_log(log_id, f"Запланирована публикация: {dt_msk.strftime('%d.%m.%Y %H:%M')} МСК")
-                            target_names = ', '.join(t['name'] for t in targets)
-                            pipeline_log(log_id, f"Таргеты: {target_names}")
-                            pipeline_log(log_id, f"Горизонт планирования: {buffer_hours} ч")
                         pipeline_log(None, f"[planning] Создан батч: {dt.strftime('%d.%m %H:%M')} UTC")
 
     except Exception as e:

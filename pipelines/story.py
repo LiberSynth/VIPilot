@@ -53,9 +53,10 @@ def run(batch_id, log_id):
 
         if batch.get('story_id') is not None and batch['type'] == 'movie_probe':
             preset_story_id = str(batch['story_id'])
-            db_log_update(log_id, 'Сюжет задан вручную — пропуск поиска и генерации', 'ok')
-            pipeline_log(log_id, fmt_id_msg("Используется заданный сюжет id={}", preset_story_id))
-            pipeline_log(None, fmt_id_msg("[story] Батч {} — story_id задан вручную ({}), батч → story_ready", batch_id, preset_story_id))
+            db_log_update(log_id, 'Сюжет назначен пользователем — пропуск поиска и генерации', 'ok')
+            _story_title = db_get_story_title(preset_story_id) or preset_story_id
+            pipeline_log(log_id, fmt_id_msg('Используется заданный сюжет "{}"', _story_title))
+            pipeline_log(None, fmt_id_msg("[story] Батч {} — story_id назначен пользователем ({}), батч → story_ready", batch_id, preset_story_id))
             if not db_set_batch_story(batch_id, preset_story_id):
                 msg = fmt_id_msg('Ошибка записи story_id={} в БД', preset_story_id)
                 pipeline_log(log_id, msg, level='error')

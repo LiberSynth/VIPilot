@@ -82,6 +82,22 @@ def log_entry(log_id, message, level="info"):
     _notify_on_error(log_id, message, level)
 
 
+def log_batch_planned(batch_id, message, *entries):
+    """Создаёт запись pipeline='planning' в log и добавляет субзаписи в log_entries.
+
+    Используется при любом создании батча пользователем или планировщиком.
+    batch_id — идентификатор батча.
+    message  — короткий заголовок (будет записан в log.message).
+    entries  — список строк, каждая добавляется как отдельная субзапись.
+    Возвращает log_id или None.
+    """
+    log_id = db_log_pipeline('planning', message, status='ok', batch_id=batch_id)
+    if log_id:
+        for entry_msg in entries:
+            log_entry(log_id, entry_msg)
+    return log_id
+
+
 def db_log_update(log_id, message, status):
     """Обновляет message и status существующей записи лога."""
     try:
