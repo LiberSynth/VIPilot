@@ -5,7 +5,6 @@ from .log import (
 )
 from db.db_service import (
     db_log_update,
-    db_get_log,
     db_get_log_entries,
     db_get_monitor,
 )

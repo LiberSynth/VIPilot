@@ -28,52 +28,6 @@ def db_get_log_entries(log_id):
     ]
 
 
-def db_get_log(limit=200):
-    """Плоский список записей лога (устаревший формат, для обратной совместимости)."""
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT
-                    l.id,
-                    l.batch_id,
-                    l.pipeline,
-                    l.message,
-                    l.status,
-                    l.created_at,
-                    COALESCE(
-                        json_agg(
-                            json_build_object(
-                                'message',    le.message,
-                                'level',      le.level,
-                                'created_at', le.created_at
-                            ) ORDER BY le.created_at
-                        ) FILTER (WHERE le.id IS NOT NULL),
-                        '[]'
-                    ) AS entries
-                FROM log l
-                LEFT JOIN log_entries le ON le.log_id = l.id
-                GROUP BY l.id
-                ORDER BY l.created_at DESC
-                LIMIT %s
-                """,
-                (limit,),
-            )
-            rows = cur.fetchall()
-    return [
-        {
-            "id": str(row[0]),
-            "batch_id": str(row[1]) if row[1] else None,
-            "pipeline": row[2],
-            "message": row[3],
-            "status": row[4],
-            "created_at": row[5].isoformat() if row[5] else None,
-            "entries": row[6],
-        }
-        for row in rows
-    ]
-
-
 def db_get_monitor(batch_limit=50):
     """
     Возвращает структурированные данные для монитора.

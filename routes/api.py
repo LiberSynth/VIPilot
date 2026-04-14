@@ -32,7 +32,7 @@ from db import (
     db_upsert_story_draft,
     db_create_story_generate_batch,
 )
-from log import db_get_log, db_get_monitor, write_log, log_batch_planned
+from log import db_get_monitor, write_log, log_batch_planned
 from utils.auth import is_authenticated
 from utils.utils import parse_hhmm, to_msk, to_utc_from_msk
 import common.environment as wf_state
@@ -58,13 +58,6 @@ def api_run_now():
         print(f"[api_run_now] log_batch_planned failed for batch_id={batch_id}: {e}")
     wf_state.wakeup_loop()
     return jsonify({"ok": True, "batch_id": batch_id})
-
-
-@bp.route("/log")
-def api_log():
-    if not is_authenticated():
-        return jsonify({"error": "unauthorized"}), 401
-    return jsonify(db_get_log())
 
 
 @bp.route("/monitor")
