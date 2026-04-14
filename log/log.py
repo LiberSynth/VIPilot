@@ -2,17 +2,25 @@
 Все функции логирования приложения.
 """
 
-
 _ALLOWED_PIPELINES = {
+    "root",
+    "planning",
     "story",
     "video",
     "transcode",
     "publish",
-    "planning",
     "cleanup",
-    "root",
 }
 
+_ALLOWED_LOG_LEVELS = {
+    "root",
+    "planning",
+    "story",
+    "video",
+    "transcode",
+    "publish",
+    "cleanup",
+}
 
 def write_log(pipeline, message, status="info", batch_id=None):
     """Записывает событие пайплайна в таблицу log. Возвращает log_id или None."""
@@ -35,7 +43,7 @@ def write_log_entry(log_id, message, level="info"):
     import common.environment as wf_state
     from db.db_simple import db_insert_log_entry
 
-    assert level in ("info", "warn", "error", "fatal_error", "silent"), (
+    assert level in _ALLOWED_LOG_LEVELS, (
         f"write_log_entry: недопустимый уровень {level!r}. "
         "Допустимые значения: 'info', 'warn', 'error', 'fatal_error', 'silent'."
     )

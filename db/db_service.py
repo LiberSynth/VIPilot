@@ -1,5 +1,6 @@
 from .connection import get_db
 from common.statuses import FINAL_BATCH_STATUSES
+from log.log import write_log_entry
 
 
 def db_log_update(log_id, message, status):
@@ -193,7 +194,7 @@ def db_clear_all_history():
             cur.execute("DELETE FROM batches")
             bl = cur.rowcount
         conn.commit()
-    print(f"[DB] Очистка истории: log_entries={le}, log={ll}, batches={bl}")
+    write_log_entry(None, f"[DB] Очистка истории: log_entries={le}, log={ll}, batches={bl}", level='silent')
     return {"log_entries": le, "logs": ll, "batches": bl}
 
 

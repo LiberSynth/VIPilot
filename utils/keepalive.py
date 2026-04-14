@@ -1,6 +1,8 @@
 import os
 import time
 
+from log.log import write_log_entry
+
 
 def loop():
     import requests as req
@@ -8,10 +10,10 @@ def loop():
     if not domain:
         return
     url = f"https://{domain}/healthz"
-    print(f"[keepalive] Запущен → {url}")
+    write_log_entry(None, f"[keepalive] Запущен → {url}", level='silent')
     while True:
         time.sleep(4 * 60)
         try:
             req.get(url, timeout=10)
         except Exception as e:
-            print(f"[keepalive] Ошибка: {e}")
+            write_log_entry(None, f"[keepalive] Ошибка: {e}", level='silent')

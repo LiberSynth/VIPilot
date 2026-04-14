@@ -32,7 +32,7 @@ from db import (
     db_upsert_story_draft,
     db_create_story_generate_batch,
 )
-from log import db_get_monitor, write_log, log_batch_planned
+from log import db_get_monitor, write_log, log_batch_planned, write_log_entry
 from utils.auth import is_authenticated
 from utils.utils import parse_hhmm, to_msk, to_utc_from_msk
 import common.environment as wf_state
@@ -55,7 +55,7 @@ def api_run_now():
     try:
         log_batch_planned(batch_id, 'Оперативный запуск', "Запуск по запросу пользователя (внеплановый)")
     except Exception as e:
-        print(f"[api_run_now] log_batch_planned failed for batch_id={batch_id}: {e}")
+        write_log_entry(None, f"[api_run_now] log_batch_planned failed for batch_id={batch_id}: {e}", level='silent')
     wf_state.wakeup_loop()
     return jsonify({"ok": True, "batch_id": batch_id})
 
@@ -191,7 +191,7 @@ def api_text_model_probe(model_id):
     try:
         log_batch_planned(batch_id, 'Пробный запуск текстовой модели', f"Модель: {m['name']}")
     except Exception as e:
-        print(f"[api_text_model_probe] log_batch_planned failed for batch_id={batch_id}: {e}")
+        write_log_entry(None, f"[api_text_model_probe] log_batch_planned failed for batch_id={batch_id}: {e}", level='silent')
     wf_state.wakeup_loop()
     return jsonify({"batch_id": batch_id})
 
@@ -227,7 +227,7 @@ def api_video_model_probe(model_id):
     try:
         log_batch_planned(batch_id, 'Пробный запуск видеомодели', f"Модель: {m['name']}")
     except Exception as e:
-        print(f"[api_video_model_probe] log_batch_planned failed for batch_id={batch_id}: {e}")
+        write_log_entry(None, f"[api_video_model_probe] log_batch_planned failed for batch_id={batch_id}: {e}", level='silent')
     wf_state.wakeup_loop()
     return jsonify({"batch_id": batch_id})
 

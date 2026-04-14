@@ -18,6 +18,7 @@ import subprocess
 from utils._build import BUILD
 from db import env_get, env_set
 from db.init import _bootstrap, run_migrations, seed_db
+from log.log import write_log_entry
 
 _BUILD_KEY = 'build_number'
 
@@ -88,7 +89,7 @@ def _install_chromium() -> bool:
         )
         return result.returncode == 0
     except Exception as e:
-        print(f'[upgrade] Ошибка установки Chromium: {e}')
+        write_log_entry(None, f'[upgrade] Ошибка установки Chromium: {e}', level='silent')
         return False
 
 
@@ -105,7 +106,7 @@ def _check_chromium() -> tuple[bool, str]:
         p.stop()
         if pathlib.Path(exe).exists():
             return True, f'chromium (playwright): {exe}'
-        print('[upgrade] Chromium не найден — устанавливаю через playwright...')
+        write_log_entry(None, '[upgrade] Chromium не найден — устанавливаю через playwright...', level='silent')
         if _install_chromium():
             return True, 'chromium: установлен через playwright install chromium'
         return False, 'chromium: не удалось установить через playwright install chromium'
@@ -159,7 +160,7 @@ _POST_MIGRATION_CHECKS = [
 
 def _run_checks(checks, label) -> None:
     """Запускает список проверок. Бросает FatalError или RuntimeError при неудаче."""
-    print(f'[upgrade] {label}...')
+    write_log_entry(None, f'[upgrade] {label}...', level='silent')
     failed = []
     for name, fn in checks:
         try:
@@ -169,13 +170,13 @@ def _run_checks(checks, label) -> None:
         except Exception as e:
             ok, msg = False, f'{name}: непредвиденная ошибка — {e}'
         tag = 'OK  ' if ok else 'FAIL'
-        print(f'[upgrade]   [{tag}] {msg}')
+        write_log_entry(None, f'[upgrade]   [{tag}] {msg}', level='silent')
         if not ok:
             failed.append(msg)
     if failed:
         summary = '; '.join(failed)
         raise RuntimeError(f'[upgrade] Проверка не пройдена: {summary}')
-    print(f'[upgrade] {label}: всё в порядке')
+    write_log_entry(None, f'[upgrade] {label}: всё в порядке', level='silent')
 
 
 def _run_env_checks() -> None:
@@ -216,7 +217,7 @@ def check_upgrade() -> bool:
     if stored == BUILD:
         return False
 
-    print(f'[upgrade] Обновление: {stored or "первый запуск"} → {BUILD}')
+    write_log_entry(None, f'[upgrade] Обновление: {stored or "первый запуск"} → {BUILD}', level='silent')
     _run_env_checks()
     run_migrations()
     seed_db()

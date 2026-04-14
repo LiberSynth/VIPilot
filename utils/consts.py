@@ -16,7 +16,8 @@ def _get_flask_secret():
         return generated
     except Exception:
         generated = os.urandom(24).hex()
-        print("[WARN] FLASK_SECRET: не удалось загрузить из БД, сгенерирован случайный ключ — сессии будут сброшены при перезапуске")
+        from log.log import write_log_entry
+        write_log_entry(None, "[WARN] FLASK_SECRET: не удалось загрузить из БД, сгенерирован случайный ключ — сессии будут сброшены при перезапуске", level='silent')
         return generated
 
 

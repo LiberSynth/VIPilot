@@ -1,4 +1,5 @@
 from flask import request
+from log.log import write_log_entry
 
 
 def log_request():
@@ -15,7 +16,7 @@ def log_request():
     msg = f"[HTTP] {method} {path} | IP: {remote} | Headers: {headers}"
     if body:
         msg += f" | Body: {body}"
-    print(msg)
+    write_log_entry(None, msg, level='silent')
 
 
 def register_middleware(app):

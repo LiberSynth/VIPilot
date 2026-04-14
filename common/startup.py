@@ -64,9 +64,9 @@ def _interrupt_running_pipelines():
                     count = cur.rowcount
                 conn.commit()
             if count:
-                print(f"[startup] {pipeline}: {count} незавершённых записей → cancelled")
+                write_log_entry(None, f"[startup] {pipeline}: {count} незавершённых записей → cancelled", level='silent')
         except Exception as e:
-            print(f"[DB] Ошибка прерывания running для {pipeline}: {e}")
+            write_log_entry(None, f"[DB] Ошибка прерывания running для {pipeline}: {e}", level='silent')
 
 
 def _fix_orphaned_running():
@@ -88,12 +88,14 @@ def _fix_orphaned_running():
                 if rows:
                     for row in rows:
                         log_id, pipeline, batch_id, batch_status = row
-                        print(
+                        write_log_entry(
+                            log_id,
                             fmt_id_msg(
                                 "[startup] WARN: лог #{} (pipeline={}, batch={}) завис в 'running', "
                                 "батч уже в статусе '{}'",
                                 log_id, pipeline, batch_id, batch_status
-                            )
+                            ),
+                            level='silent',
                         )
                     ids = [r[0] for r in rows]
                     cur.execute(
@@ -101,9 +103,9 @@ def _fix_orphaned_running():
                         (ids,),
                     )
                     conn.commit()
-                    print(f"[startup] {len(ids)} зависших 'running' записей → cancelled")
+                    write_log_entry(None, f"[startup] {len(ids)} зависших 'running' записей → cancelled", level='silent')
     except Exception as e:
-        print(f"[DB] Ошибка _fix_orphaned_running: {e}")
+        write_log_entry(None, f"[DB] Ошибка _fix_orphaned_running: {e}", level='silent')
 
 
 def _validate_batch_statuses():

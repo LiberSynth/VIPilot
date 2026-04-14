@@ -22,6 +22,7 @@
 """
 
 from .connection import get_db
+from log.log import write_log_entry
 
 
 # ---------------------------------------------------------------------------
@@ -1730,10 +1731,10 @@ def run_migrations():
                         (str(version),),
                     )
                 conn.commit()
-                print(f"[DB] Миграция {version} применена")
+                write_log_entry(None, f"[DB] Миграция {version} применена", level='silent')
             except Exception as e:
                 conn.rollback()
-                print(f"[DB] Ошибка миграции {version}: {e}")
+                write_log_entry(None, f"[DB] Ошибка миграции {version}: {e}", level='silent')
                 raise
     finally:
         conn.close()

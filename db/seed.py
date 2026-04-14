@@ -8,6 +8,7 @@ import logging
 import traceback
 
 from .connection import get_db
+from log.log import write_log_entry
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +102,7 @@ def seed_db():
                 """)
 
             conn.commit()
-        print("[DB] Данные инициализированы")
+        write_log_entry(None, "[DB] Данные инициализированы", level='silent')
     except Exception as e:
         logger.error("[DB] Ошибка seed_db:\n%s", traceback.format_exc())
         raise
