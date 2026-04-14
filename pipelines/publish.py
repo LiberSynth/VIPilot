@@ -26,8 +26,8 @@ from db import (
     db_set_batch_status,
     db_claim_batch_status,
 )
-from log import db_log_update, db_get_log_entries
-from pipelines.base import check_cancelled, pipeline_log
+from log import db_log_update, db_get_log_entries, write_log_entry
+from pipelines.base import check_cancelled
 from common.exceptions import AppException
 from utils.utils import fmt_id_msg
 from clients import vk
@@ -50,11 +50,11 @@ def _get_video(batch_id, log_id):
     Бросает RuntimeError если оба поля NULL."""
     video_data = db_get_batch_video_data(batch_id)
     if video_data is None:
-        pipeline_log(log_id, 'movies.transcoded_data отсутствует — использую оригинал (movies.raw_data)')
+        write_log_entry(log_id, 'movies.transcoded_data отсутствует — использую оригинал (movies.raw_data)')
         video_data = db_get_batch_original_video(batch_id)
         if video_data is None:
             msg = 'Ни movies.transcoded_data, ни movies.raw_data не найдены в БД — ошибка логики'
-            pipeline_log(log_id, msg, level='error')
+            write_log_entry(log_id, msg, level='error')
             raise RuntimeError(msg)
     return video_data
 
@@ -69,26 +69,26 @@ def _resolve_title(batch_id, log_id):
             if title:
                 return title
         except Exception as e:
-            pipeline_log(log_id, f"Не удалось получить заголовок сюжета: {e}", level='warn')
+            write_log_entry(log_id, f"Не удалось получить заголовок сюжета: {e}", level='warn')
     return 'Видео'
 
 
 def _call_vk(slug, method, batch_id, log_id, target):
     cfg = target.get('config') or {}
     if not vk.is_configured():
-        pipeline_log(log_id, 'VK_USER_TOKEN не задан', level='error')
+        write_log_entry(log_id, 'VK_USER_TOKEN не задан', level='error')
         return False
     video_data = _get_video(batch_id, log_id)
     group_id = int(cfg.get('group_id', 236929597))
     title = _resolve_title(batch_id, log_id)
     if method == 'story':
-        pipeline_log(log_id, 'Публикую историю…')
+        write_log_entry(log_id, 'Публикую историю…')
         return vk.publish_story(video_data, group_id, log_id, title=title) is not None
     elif method == 'wall':
-        pipeline_log(log_id, 'Публикую на стену…')
+        write_log_entry(log_id, 'Публикую на стену…')
         return vk.publish_wall(video_data, group_id, log_id, title=title) is not None
     else:
-        pipeline_log(log_id, f'VK: неизвестный метод «{method}» — пропуск', level='warn')
+        write_log_entry(log_id, f'VK: неизвестный метод «{method}» — пропуск', level='warn')
         return False
 
 
@@ -97,9 +97,9 @@ def _call_dzen(slug, method, batch_id, log_id, target):
     target_id = target.get('id')
     if not dzen_client.is_configured(cfg, target_id):
         if not cfg.get('publisher_id'):
-            pipeline_log(log_id, 'Дзен не настроен: publisher_id отсутствует', level='error')
+            write_log_entry(log_id, 'Дзен не настроен: publisher_id отсутствует', level='error')
         else:
-            pipeline_log(log_id, 'Дзен: браузерная сессия не сохранена — авторизуйтесь на вкладке «Публикация»', level='error')
+            write_log_entry(log_id, 'Дзен: браузерная сессия не сохранена — авторизуйтесь на вкладке «Публикация»', level='error')
         return False
 
     video_data = _get_video(batch_id, log_id)
@@ -118,7 +118,7 @@ def _call_client(slug, method, batch_id, log_id, target):
     """Диспетчеризует вызов клиента по реестру _CLIENTS. Возвращает True при успехе."""
     handler = _CLIENTS.get(slug)
     if handler is None:
-        pipeline_log(log_id, f'Платформа «{slug}» не поддерживается', level='warn')
+        write_log_entry(log_id, f'Платформа «{slug}» не поддерживается', level='warn')
         return False
     return handler(slug, method, batch_id, log_id, target)
 
@@ -163,10 +163,10 @@ def run(batch_id, log_id):
         if parsed is None:
             if batch['type'] == 'movie_probe':
                 db_log_update(log_id, 'Публикация (пробный)…', 'running')
-                pipeline_log(log_id, 'Пробный батч — публикация на платформу не выполняется')
+                write_log_entry(log_id, 'Пробный батч — публикация на платформу не выполняется')
                 db_set_batch_movie_probe(batch_id)
                 db_log_update(log_id, 'Без публикации (пробный батч)', 'ok')
-                pipeline_log(None, fmt_id_msg("[publish] Батч {} пробный — публикация пропущена", batch_id))
+                write_log_entry(None, fmt_id_msg("[publish] Батч {} пробный — публикация пропущена", batch_id))
                 return
 
             if check_cancelled('publish', batch_id, batch, log_id):
@@ -175,7 +175,7 @@ def run(batch_id, log_id):
             now = datetime.now(timezone.utc)
             if batch['scheduled_at'] is not None and now < batch['scheduled_at']:
                 remaining = int((batch['scheduled_at'] - now).total_seconds() / 60)
-                pipeline_log(None, fmt_id_msg("[publish] Батч {} ещё не время ({} мин до публикации)", batch_id, remaining))
+                write_log_entry(None, fmt_id_msg("[publish] Батч {} ещё не время ({} мин до публикации)", batch_id, remaining))
                 return
 
         if not active_targets:
@@ -183,12 +183,12 @@ def run(batch_id, log_id):
                 msg = 'Батч отменён — нет активных таргетов'
                 db_set_batch_status(batch_id, 'cancelled')
                 db_log_update(log_id, msg, 'cancelled')
-                pipeline_log(None, fmt_id_msg("[publish] {} (батч {})", msg, batch_id))
+                write_log_entry(None, fmt_id_msg("[publish] {} (батч {})", msg, batch_id))
                 return
             else:
                 msg = 'Нет активных таргетов — публикация невозможна'
                 db_log_update(log_id, msg, 'error')
-                pipeline_log(None, f"[publish] {msg}")
+                write_log_entry(None, f"[publish] {msg}")
                 raise AppException(batch_id, 'publish', msg, log_id)
 
         steps = _build_steps(active_targets)
@@ -197,12 +197,12 @@ def run(batch_id, log_id):
                 msg = 'Батч отменён — нет методов публикации в конфиге таргетов'
                 db_set_batch_status(batch_id, 'cancelled')
                 db_log_update(log_id, msg, 'cancelled')
-                pipeline_log(None, fmt_id_msg("[publish] {} (батч {})", msg, batch_id))
+                write_log_entry(None, fmt_id_msg("[publish] {} (батч {})", msg, batch_id))
                 return
             else:
                 msg = 'Нет методов публикации в конфиге таргетов'
                 db_log_update(log_id, msg, 'error')
-                pipeline_log(None, f"[publish] {msg}")
+                write_log_entry(None, f"[publish] {msg}")
                 raise AppException(batch_id, 'publish', msg, log_id)
 
         target_names = ', '.join(t['name'] for t in active_targets)
@@ -222,11 +222,11 @@ def run(batch_id, log_id):
                 step_found = any(slug == cur_slug and method == cur_method for slug, method, _ in steps)
                 if step_found:
                     resume_from = (cur_slug, cur_method)
-                    pipeline_log(None, fmt_id_msg("[publish] Батч {} resume с шага {}.{}", batch_id, cur_slug, cur_method))
+                    write_log_entry(None, fmt_id_msg("[publish] Батч {} resume с шага {}.{}", batch_id, cur_slug, cur_method))
                 else:
                     msg = f'Шаг {cur_slug}.{cur_method} удалён из конфига — батч требует ручной проверки'
-                    pipeline_log(log_id, f'Шаг {cur_slug}.{cur_method} более не активен в конфиге — перевожу в ошибку', level='error')
-                    pipeline_log(None, fmt_id_msg("[publish] Батч {} шаг {}.{} не найден в текущем конфиге", batch_id, cur_slug, cur_method))
+                    write_log_entry(log_id, f'Шаг {cur_slug}.{cur_method} более не активен в конфиге — перевожу в ошибку', level='error')
+                    write_log_entry(None, fmt_id_msg("[publish] Батч {} шаг {}.{} не найден в текущем конфиге", batch_id, cur_slug, cur_method))
                     db_log_update(log_id, msg, 'error')
                     raise AppException(batch_id, 'publish', msg, log_id)
             elif cur_phase in ('published', 'failed'):
@@ -238,19 +238,19 @@ def run(batch_id, log_id):
 
                 if found_idx is None:
                     msg = f'Шаг {cur_slug}.{cur_method} удалён из конфига — батч требует ручной проверки'
-                    pipeline_log(log_id, msg, level='error')
-                    pipeline_log(None, fmt_id_msg("[publish] Батч {} шаг {}.{} не найден в текущем конфиге", batch_id, cur_slug, cur_method))
+                    write_log_entry(log_id, msg, level='error')
+                    write_log_entry(None, fmt_id_msg("[publish] Батч {} шаг {}.{} не найден в текущем конфиге", batch_id, cur_slug, cur_method))
                     db_log_update(log_id, msg, 'error')
                     raise AppException(batch_id, 'publish', msg, log_id)
                 elif found_idx + 1 < len(steps):
                     ns, nm, _ = steps[found_idx + 1]
                     resume_from = (ns, nm)
-                    pipeline_log(None, fmt_id_msg("[publish] Батч {} resume с шага {}.{}", batch_id, ns, nm))
+                    write_log_entry(None, fmt_id_msg("[publish] Батч {} resume с шага {}.{}", batch_id, ns, nm))
                 else:
                     saved = db_set_batch_published(batch_id)
                     if saved:
                         db_log_update(log_id, 'Опубликовано (возобновление — все шаги завершены)', 'ok')
-                        pipeline_log(None, fmt_id_msg("[publish] Батч {} опубликован (возобновление)", batch_id))
+                        write_log_entry(None, fmt_id_msg("[publish] Батч {} опубликован (возобновление)", batch_id))
                     else:
                         msg = 'Ошибка записи published в БД (возобновление)'
                         db_log_update(log_id, msg, 'error')
@@ -271,11 +271,11 @@ def run(batch_id, log_id):
             failed_status = f"{slug}.{method}.failed"
 
             if not db_claim_batch_status(batch_id, expected_from, posting_status):
-                pipeline_log(None, fmt_id_msg("[publish] Батч {} уже захвачен другим процессом для {} — пропуск", batch_id, posting_status))
+                write_log_entry(None, fmt_id_msg("[publish] Батч {} уже захвачен другим процессом для {} — пропуск", batch_id, posting_status))
                 db_log_update(log_id, f'Захват {posting_status} не удался — пропуск', 'ok')
                 return
 
-            pipeline_log(log_id, f'Шаг {slug}.{method}: выполняю…')
+            write_log_entry(log_id, f'Шаг {slug}.{method}: выполняю…')
 
             step_error = None
             try:
@@ -283,16 +283,16 @@ def run(batch_id, log_id):
             except (DzenSessionMissing, DzenCsrfExpired) as e:
                 ok = False
                 step_error = str(e)
-                pipeline_log(log_id, f'{slug}.{method}: {e}', level='error')
+                write_log_entry(log_id, f'{slug}.{method}: {e}', level='error')
             except Exception as e:
                 ok = False
                 step_error = str(e)
-                pipeline_log(log_id, f'{slug}.{method}: неожиданная ошибка: {e}', level='error')
+                write_log_entry(log_id, f'{slug}.{method}: неожиданная ошибка: {e}', level='error')
 
             if not ok:
                 failed_steps.append(f"{slug}.{method}")
                 err_msg = step_error or 'ошибка публикации'
-                pipeline_log(None, fmt_id_msg("[publish] Батч {} ошибка {}.{}: {}", batch_id, slug, method, err_msg))
+                write_log_entry(None, fmt_id_msg("[publish] Батч {} ошибка {}.{}: {}", batch_id, slug, method, err_msg))
                 step_saved = db_set_batch_status(batch_id, failed_status)
                 if not step_saved:
                     abt_msg = f'Шаг {slug}.{method}: ошибка, не удалось сохранить статус — аварийная остановка'
@@ -308,7 +308,7 @@ def run(batch_id, log_id):
                 abt_msg = f'Шаг {slug}.{method}: опубликовано, но ошибка записи статуса в БД'
                 db_log_update(log_id, abt_msg, 'error')
                 raise AppException(batch_id, 'publish', abt_msg, log_id)
-            pipeline_log(log_id, f'Шаг {slug}.{method}: опубликовано')
+            write_log_entry(log_id, f'Шаг {slug}.{method}: опубликовано')
             expected_from = published_status
 
         if any_ok:
@@ -317,7 +317,7 @@ def run(batch_id, log_id):
                 saved = db_set_batch_published_partially(batch_id)
                 if saved:
                     db_log_update(log_id, f'Частично опубликовано ({target_names}); ошибки: {fail_list}', 'ok')
-                    pipeline_log(None, fmt_id_msg("[publish] Батч {} частично опубликован (ошибки: {})", batch_id, fail_list))
+                    write_log_entry(None, fmt_id_msg("[publish] Батч {} частично опубликован (ошибки: {})", batch_id, fail_list))
                     entries = db_get_log_entries(log_id) if log_id else []
                     err_entries = [e for e in entries if e['level'] in ('warn', 'error')]
                     notify_failure(
@@ -328,13 +328,13 @@ def run(batch_id, log_id):
                 else:
                     abt_msg = 'Частично опубликовано, но ошибка записи статуса в БД'
                     db_log_update(log_id, abt_msg, 'error')
-                    pipeline_log(None, fmt_id_msg("[publish] Батч {} ошибка записи published_partially в БД", batch_id))
+                    write_log_entry(None, fmt_id_msg("[publish] Батч {} ошибка записи published_partially в БД", batch_id))
                     raise AppException(batch_id, 'publish', abt_msg, log_id)
             else:
                 saved = db_set_batch_published(batch_id)
                 if saved:
                     db_log_update(log_id, f'Опубликовано ({target_names})', 'ok')
-                    pipeline_log(None, fmt_id_msg("[publish] Батч {} опубликован", batch_id))
+                    write_log_entry(None, fmt_id_msg("[publish] Батч {} опубликован", batch_id))
                     if log_id:
                         entries = db_get_log_entries(log_id)
                         warn_entries = [e for e in entries if e['level'] in ('warn', 'error')]
@@ -347,12 +347,12 @@ def run(batch_id, log_id):
                 else:
                     abt_msg = 'Опубликовано, но ошибка записи статуса в БД'
                     db_log_update(log_id, abt_msg, 'error')
-                    pipeline_log(None, fmt_id_msg("[publish] Батч {} ошибка записи published в БД", batch_id))
+                    write_log_entry(None, fmt_id_msg("[publish] Батч {} ошибка записи published в БД", batch_id))
                     raise AppException(batch_id, 'publish', abt_msg, log_id)
         else:
             abt_msg = f'Ошибка публикации батча в {target_names}'
             db_log_update(log_id, 'Ошибка публикации', 'error')
-            pipeline_log(None, fmt_id_msg("[publish] Батч {} ошибка публикации", batch_id))
+            write_log_entry(None, fmt_id_msg("[publish] Батч {} ошибка публикации", batch_id))
             raise AppException(batch_id, 'publish', abt_msg, log_id)
 
     except AppException:

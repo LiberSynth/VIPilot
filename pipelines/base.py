@@ -4,13 +4,10 @@
 Содержит повторяющиеся блоки, которые иначе копировались бы
 в каждый пайплайн дословно.
 
-Правило логирования: внутри файлов pipelines/ разрешён только pipeline_log.
-Прямые вызовы print запрещены — используйте guard-обёртку _forbidden_print,
-которая автоматически подставляется в пространство имён каждого модуля пакета
-через pipelines/__init__.py.
+Правило логирования: внутри файлов pipelines/ разрешён только write_log_entry.
+Прямые вызовы print запрещены — guard-обёртка _forbidden_print автоматически
+подставляется в пространство имён каждого модуля пакета через pipelines/__init__.py.
 """
-
-import builtins as _builtins
 
 from db import (
     db_set_batch_status,
@@ -22,30 +19,12 @@ from utils.utils import fmt_id_msg
 
 def _forbidden_print(*args, **kwargs):
     """Guard: прямой вызов print в файлах pipelines/ запрещён.
-    Используйте pipeline_log вместо этого.
+    Используйте write_log_entry вместо этого.
     """
     raise AssertionError(
         "Прямой вызов print в pipelines/ запрещён. "
-        "Используйте pipeline_log(log_id, msg, level) из pipelines.base."
+        "Используйте write_log_entry(log_id, msg, level) из log."
     )
-
-
-def pipeline_log(log_id, msg: str, level: str = 'info') -> None:
-    """Тонкая обёртка над log_entry: пишет в БД (если log_id задан) и делает print.
-
-    Это реэкспорт-обёртка единой функции логирования из log/.
-    level: 'info' | 'warn' | 'error' | 'silent'
-    При уровне 'silent' — только print(), без записи в БД.
-    """
-    assert level in ('info', 'warn', 'error', 'silent'), (
-        f"pipeline_log: недопустимый уровень {level!r}. "
-        "Допустимые значения: 'info', 'warn', 'error', 'silent'."
-    )
-    if level == 'silent':
-        _builtins.print(msg)
-        return
-    write_log_entry(log_id, msg, level=level)
-    _builtins.print(msg)
 
 
 def check_cancelled(pipeline_name: str, batch_id: str, batch: dict, log_id=None) -> bool:
@@ -60,7 +39,7 @@ def check_cancelled(pipeline_name: str, batch_id: str, batch: dict, log_id=None)
         msg = 'Батч отменён — слот удалён из расписания'
         if log_id:
             db_log_update(log_id, msg, 'cancelled')
-        pipeline_log(log_id, fmt_id_msg("[{}] Батч {} отменён, пропускаю", pipeline_name, batch_id))
+        write_log_entry(log_id, fmt_id_msg("[{}] Батч {} отменён, пропускаю", pipeline_name, batch_id))
         return True
     return False
 

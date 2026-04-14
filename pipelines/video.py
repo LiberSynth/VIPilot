@@ -31,8 +31,8 @@ from db import (
     db_set_batch_story_id,
     db_get_movie_from_donor,
 )
-from log import write_log, db_log_update
-from pipelines.base import check_cancelled, pipeline_log, iterate_models
+from log import write_log, db_log_update, write_log_entry
+from pipelines.base import check_cancelled, iterate_models
 from common.exceptions import AppException
 from clients import falai
 from clients.falai import ProviderFatalError
@@ -90,10 +90,10 @@ def run(batch_id, log_id):
             donor_batch_id = batch_data.get('donor_batch_id') if isinstance(batch_data, dict) else None
             if donor_batch_id:
                 if batch.get('movie_id') is not None:
-                    pipeline_log(None, fmt_id_msg("[video] Батч {} — донор, movie_id уже перенесён (возобновление)", batch_id))
+                    write_log_entry(None, fmt_id_msg("[video] Батч {} — донор, movie_id уже перенесён (возобновление)", batch_id))
                     return
                 if not check_cancelled('video', batch_id, batch, log_id):
-                    pipeline_log(None, fmt_id_msg("[video] Батч {} — режим донора, переносим видео от {}", batch_id, donor_batch_id))
+                    write_log_entry(None, fmt_id_msg("[video] Батч {} — режим донора, переносим видео от {}", batch_id, donor_batch_id))
                     db_log_update(log_id, 'Видео получено от донора', 'running')
                     result_donor_id = db_get_movie_from_donor(donor_batch_id, batch_id)
                     if result_donor_id:
@@ -101,7 +101,7 @@ def run(batch_id, log_id):
                         new_status = updated['status'] if updated else None
                         detail = fmt_id_msg("Видео перенесено от донора {}", donor_batch_id)
                         db_log_update(log_id, detail, 'ok')
-                        pipeline_log(log_id, detail)
+                        write_log_entry(log_id, detail)
                         if new_status == 'transcode_ready':
                             # Обоснованное исключение: транскод-пайплайн не будет запущен,
                             # т.к. статус уже transcode_ready; запись создаётся здесь,
@@ -110,13 +110,13 @@ def run(batch_id, log_id):
                                 'transcode', 'Транскодирование пропущено — видео получено от донора',
                                 status='ok', batch_id=batch_id,
                             )
-                            pipeline_log(tr_log_id, detail)
-                        pipeline_log(None, fmt_id_msg("[video] Батч {} — видео от донора, новый статус: {}", batch_id, new_status))
+                            write_log_entry(tr_log_id, detail)
+                        write_log_entry(None, fmt_id_msg("[video] Батч {} — видео от донора, новый статус: {}", batch_id, new_status))
                     else:
                         msg = fmt_id_msg("Не удалось перенести видео от донора {}", donor_batch_id)
                         db_log_update(log_id, msg, 'error')
-                        pipeline_log(log_id, msg, level='error')
-                        pipeline_log(None, f"[video] {msg}")
+                        write_log_entry(log_id, msg, level='error')
+                        write_log_entry(None, f"[video] {msg}")
                         raise AppException(batch_id, 'video', msg, log_id)
                     return
 
@@ -135,32 +135,32 @@ def run(batch_id, log_id):
             return
 
         if env_get("emulation_mode", "0") == "1":
-            pipeline_log(None, fmt_id_msg("[video] Батч {} — эмуляция генерации видео", batch_id))
+            write_log_entry(None, fmt_id_msg("[video] Батч {} — эмуляция генерации видео", batch_id))
             db_log_update(log_id, 'Видео [эмуляция]', 'running')
             result = db_get_random_real_original_video()
             if result is None:
                 msg = '[эмуляция] Нет видео в пуле — невозможно скопировать оригинал'
                 db_log_update(log_id, msg, 'error')
-                pipeline_log(log_id, msg, level='error')
-                pipeline_log(None, f"[video] {msg}")
+                write_log_entry(log_id, msg, level='error')
+                write_log_entry(None, f"[video] {msg}")
                 raise AppException(batch_id, 'video', msg, log_id)
             sample, donor_batch_id, donor_story_id = result
-            pipeline_log(log_id, fmt_id_msg("Видео заимствовано из батча: {}", donor_batch_id), level='info')
+            write_log_entry(log_id, fmt_id_msg("Видео заимствовано из батча: {}", donor_batch_id), level='info')
             db_set_batch_original_video(batch_id, sample)
             if donor_story_id:
                 db_set_batch_story_id(batch_id, donor_story_id)
-                pipeline_log(log_id, fmt_id_msg("story_id подменён: {} → {}", story_id, donor_story_id), level='info')
+                write_log_entry(log_id, fmt_id_msg("story_id подменён: {} → {}", story_id, donor_story_id), level='info')
             db_set_batch_video_ready(batch_id, 'emulation://skipped')
             db_log_update(log_id, 'Видео [эмуляция]', 'ok')
             return
 
-        pipeline_log(None, fmt_id_msg("[video] Батч {} ({}) — {} генерации видео",
+        write_log_entry(None, fmt_id_msg("[video] Батч {} ({}) — {} генерации видео",
                                       batch_id, target, 'возобновление' if resumed else 'начало'))
 
         if not falai.is_configured():
             msg = 'FAL_API_KEY не задан — генерация невозможна'
             db_log_update(log_id, msg, 'error')
-            pipeline_log(None, f"[video] {msg}")
+            write_log_entry(None, f"[video] {msg}")
             raise AppException(batch_id, 'video', msg, log_id)
 
         try:
@@ -173,7 +173,7 @@ def run(batch_id, log_id):
             if not pinned_m:
                 msg = fmt_id_msg('Пробная модель {} не найдена', pinned_model_id)
                 db_log_update(log_id, msg, 'error')
-                pipeline_log(None, f"[video] {msg}")
+                write_log_entry(None, f"[video] {msg}")
                 raise AppException(batch_id, 'video', msg, log_id)
             models = [pinned_m]
         else:
@@ -181,14 +181,14 @@ def run(batch_id, log_id):
             if not models:
                 msg = 'Нет активных video-моделей в ai_models (type=text-to-video)'
                 db_log_update(log_id, msg, 'error')
-                pipeline_log(None, f"[video] {msg}")
+                write_log_entry(None, f"[video] {msg}")
                 raise AppException(batch_id, 'video', msg, log_id)
 
         story_text = db_get_story_text(story_id)
         if not story_text:
             msg = fmt_id_msg('Не найден сюжет story_id={}', story_id)
             db_log_update(log_id, msg, 'error')
-            pipeline_log(None, f"[video] {msg}")
+            write_log_entry(None, f"[video] {msg}")
             raise AppException(batch_id, 'video', msg, log_id)
 
         video_post_prompt = db_get('video_post_prompt', '').strip()
@@ -197,11 +197,11 @@ def run(batch_id, log_id):
             story_text = story_text + '\n\n' + video_post_prompt
 
         db_log_update(log_id, f"Генерация видео… {'(возобновление)' if resumed else ''}".strip(), 'running')
-        pipeline_log(log_id, f"Соотношение сторон: {ar_x}:{ar_y}")
+        write_log_entry(log_id, f"Соотношение сторон: {ar_x}:{ar_y}")
         if is_probe:
-            pipeline_log(log_id, f"Пробная модель: {models[0]['name']}, попыток: {fails_to_next}")
+            write_log_entry(log_id, f"Пробная модель: {models[0]['name']}, попыток: {fails_to_next}")
         else:
-            pipeline_log(log_id, f"Моделей: {len(models)}, попыток на модель: {fails_to_next}")
+            write_log_entry(log_id, f"Моделей: {len(models)}, попыток на модель: {fails_to_next}")
 
         used_model    = None
         used_model_id = None
@@ -234,12 +234,12 @@ def run(batch_id, log_id):
             saved_model_id     = current_data.get('model_id')
 
             if saved_request_id:
-                pipeline_log(log_id, fmt_id_msg("Возобновление: request_id={}", saved_request_id))
+                write_log_entry(log_id, fmt_id_msg("Возобновление: request_id={}", saved_request_id))
                 video_url, poll_err = falai.poll(log_id, saved_status_url, saved_response_url)
                 if video_url:
                     used_model_id = saved_model_id
                     return video_url
-                pipeline_log(log_id, f"Поллинг не дал результата, сброс handshake", level='warn')
+                write_log_entry(log_id, f"Поллинг не дал результата, сброс handshake", level='warn')
                 db_set_batch_video_pending(batch_id, {
                     'request_id':   None,
                     'status_url':   None,
@@ -249,15 +249,15 @@ def run(batch_id, log_id):
                 return None
 
             if cnt == 0:
-                pipeline_log(log_id, f"Модель: {model_name}")
-                pipeline_log(None, f"[video] Запрос к провайдеру: модель={model_name}, ar={ar_x}:{ar_y}")
+                write_log_entry(log_id, f"Модель: {model_name}")
+                write_log_entry(None, f"[video] Запрос к провайдеру: модель={model_name}, ar={ar_x}:{ar_y}")
             else:
-                pipeline_log(log_id, f"[{model_name}] попытка {cnt + 1}/{fails_to_next}", level='warn')
+                write_log_entry(log_id, f"[{model_name}] попытка {cnt + 1}/{fails_to_next}", level='warn')
 
             allowed = m.get('allowed_durations') or [0]
             actual_duration = nearest_allowed_duration(video_duration, allowed)
             if actual_duration != video_duration:
-                pipeline_log(log_id, f"Длительность скорректирована: {video_duration}с → {actual_duration}с (модель поддерживает: {allowed})", level='warn')
+                write_log_entry(log_id, f"Длительность скорректирована: {video_duration}с → {actual_duration}с (модель поддерживает: {allowed})", level='warn')
 
             sr = falai.submit(
                 log_id, model_name, m['submit_url'], m['platform_url'],
@@ -280,8 +280,8 @@ def run(batch_id, log_id):
                 'response_url': r_url,
                 'model_id':     m_id,
             })
-            pipeline_log(log_id, fmt_id_msg("Запрос принят ({}): {}", model_name, req_id))
-            pipeline_log(None, fmt_id_msg("[video] Генерация запущена: request_id={}", req_id))
+            write_log_entry(log_id, fmt_id_msg("Запрос принят ({}): {}", model_name, req_id))
+            write_log_entry(None, fmt_id_msg("[video] Генерация запущена: request_id={}", req_id))
 
             video_url, poll_err = falai.poll(log_id, s_url, r_url)
             if video_url:
@@ -289,7 +289,7 @@ def run(batch_id, log_id):
                 used_model_id = m_id
                 return video_url
 
-            pipeline_log(log_id, f"Поллинг не дал результата, сброс handshake", level='warn')
+            write_log_entry(log_id, f"Поллинг не дал результата, сброс handshake", level='warn')
             db_set_batch_video_pending(batch_id, {
                 'request_id':   None,
                 'status_url':   None,
@@ -305,30 +305,30 @@ def run(batch_id, log_id):
             if is_probe:
                 msg = f'Пробная модель {models[0]["name"]} не дала результата ({fails_to_next} попыток)'
                 db_log_update(log_id, msg, 'error')
-                pipeline_log(log_id, msg, level='error')
-                pipeline_log(None, f"[video] {msg}")
+                write_log_entry(log_id, msg, level='error')
+                write_log_entry(None, f"[video] {msg}")
                 raise AppException(batch_id, 'video', msg, log_id)
             else:
                 msg = f'Все активные видео-модели не дали результата после {max_passes} проходов'
                 db_log_update(log_id, msg, 'error')
-                pipeline_log(log_id, msg, level='error')
-                pipeline_log(None, f"[video] {msg}")
+                write_log_entry(log_id, msg, level='error')
+                write_log_entry(None, f"[video] {msg}")
                 db_set_batch_story_ready_from_error(batch_id)
                 return
 
-        pipeline_log(log_id, f"Скачиваю оригинал: {video_url}")
-        pipeline_log(None, f"[video] Скачиваю оригинал от провайдера…")
+        write_log_entry(log_id, f"Скачиваю оригинал: {video_url}")
+        write_log_entry(None, f"[video] Скачиваю оригинал от провайдера…")
         try:
             original_data = falai.download_video(log_id, video_url)
             orig_mb = round(len(original_data) / 1024 / 1024, 1)
             db_set_batch_original_video(batch_id, original_data)
-            pipeline_log(log_id, f"Оригинал сохранён ({orig_mb} МБ)")
-            pipeline_log(None, f"[video] Оригинал сохранён в БД ({orig_mb} МБ)")
+            write_log_entry(log_id, f"Оригинал сохранён ({orig_mb} МБ)")
+            write_log_entry(None, f"[video] Оригинал сохранён в БД ({orig_mb} МБ)")
         except Exception as e:
             msg = f"Ошибка скачивания оригинала: {e}"
             db_log_update(log_id, msg, 'error')
-            pipeline_log(log_id, msg, level='error')
-            pipeline_log(None, f"[video] {msg}")
+            write_log_entry(log_id, msg, level='error')
+            write_log_entry(None, f"[video] {msg}")
             raise AppException(batch_id, 'video', msg, log_id)
 
         db_set_batch_video_ready(batch_id, video_url)
@@ -336,18 +336,18 @@ def run(batch_id, log_id):
             db_set_batch_video_model(batch_id, used_model_id)
         msg = f'Видео сгенерировано ({used_model})' if used_model else 'Видео сгенерировано'
         db_log_update(log_id, msg, 'ok')
-        pipeline_log(log_id, f"URL: {video_url}")
-        pipeline_log(None, f"[video] Готово: batch → video_ready, url={video_url[:60]}…")
+        write_log_entry(log_id, f"URL: {video_url}")
+        write_log_entry(None, f"[video] Готово: batch → video_ready, url={video_url[:60]}…")
 
     except AppException:
         raise
     except AspectRatioConflictError as e:
         msg = str(e)
         db_log_update(log_id, msg, 'error')
-        pipeline_log(None, f"[video] {msg}")
+        write_log_entry(None, f"[video] {msg}")
         raise AppException(batch_id, 'video', msg, log_id)
     except ProviderFatalError as e:
         msg = f"Фатальная ошибка провайдера: {e}"
         db_log_update(log_id, msg, 'error')
-        pipeline_log(None, f"[video] {msg}")
+        write_log_entry(None, f"[video] {msg}")
         raise AppException(batch_id, 'video', msg, log_id)

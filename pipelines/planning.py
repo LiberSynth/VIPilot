@@ -5,10 +5,9 @@ from db import (
     db_cancel_waiting_batches,
     db_get_schedule, db_get_active_targets, db_ensure_batch, db_get_last_pipeline_run,
 )
-from log import write_log, log_batch_planned
+from log import write_log, log_batch_planned, write_log_entry
 from utils.consts import MSK
 from utils.utils import parse_hhmm, fmt_id_msg
-from pipelines.base import pipeline_log
 
 
 def run():
@@ -24,7 +23,7 @@ def run():
                 status='cancelled',
                 batch_id=bid,
             )
-            pipeline_log(None, fmt_id_msg("[planning] Батч {} отменён (слот расписания исчез)", bid), level='silent')
+            write_log_entry(None, fmt_id_msg("[planning] Батч {} отменён (слот расписания исчез)", bid), level='silent')
 
         schedule = db_get_schedule()
         targets  = db_get_active_targets()
@@ -74,8 +73,8 @@ def run():
                             f"Таргеты: {target_names}",
                             f"Горизонт планирования: {buffer_hours} ч",
                         )
-                        pipeline_log(None, f"[planning] Создан батч: {dt.strftime('%d.%m %H:%M')} UTC")
+                        write_log_entry(None, f"[planning] Создан батч: {dt.strftime('%d.%m %H:%M')} UTC")
 
     except Exception as e:
-        pipeline_log(None, f"[planning] Необработанная ошибка: {e}")
+        write_log_entry(None, f"[planning] Необработанная ошибка: {e}")
         raise
