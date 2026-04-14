@@ -22,6 +22,7 @@ from db import (
     db_update_target_publish_method_by_slug,
     db_get_user_by_login,
 )
+import common.environment as environment
 from utils.auth import is_authenticated
 from utils.limiter import limiter
 from utils.utils import (
@@ -121,8 +122,8 @@ def root_page():
     log_lifetime       = parse_log_lifetime(db_get("log_lifetime", "365"))
     entries_lifetime   = parse_entries_lifetime(db_get("entries_lifetime", "30"))
     file_lifetime      = parse_file_lifetime(db_get("file_lifetime", "7"))
-    emulation_mode     = env_get("emulation_mode", "0") == "1"
-    use_donor          = env_get("use_donor", "1") == "1"
+    emulation_mode     = environment.emulation_mode
+    use_donor          = environment.use_donor
     notify_email       = db_get("notify_email", "")
     notify_phone       = db_get("notify_phone", "")
     vk_target  = db_get_target_by_name("VKontakte")
@@ -133,12 +134,12 @@ def root_page():
     video_duration     = max(1, min(60, int(db_get("video_duration", "6"))))
     video_post_prompt  = db_get("video_post_prompt", "")
     buffer_hours       = max(1, min(720, int(db_get("buffer_hours", "24"))))
-    loop_interval       = max(1, min(3600, int(db_get("loop_interval", "15"))))
-    max_batch_threads   = max(1, min(32,   int(db_get("max_batch_threads", "5"))))
+    loop_interval       = environment.loop_interval
+    max_batch_threads   = environment.max_threads
     story_fails_to_next = max(1, int(db_get("story_fails_to_next", "3")))
     video_fails_to_next = max(1, int(db_get("video_fails_to_next", "3")))
     approve_stories     = db_get("approve_stories", "0") == "1"
-    deep_debugging      = db_get("deep_debugging",  "0") == "1"
+    deep_debugging      = environment.deep_logging
 
     workflow_state = env_get("workflow_state", "running")
 
