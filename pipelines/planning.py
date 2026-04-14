@@ -1,5 +1,6 @@
 from datetime import datetime, timezone, timedelta
 
+import common.environment as environment
 from db import (
     db_get,
     db_cancel_waiting_batches,
@@ -13,8 +14,6 @@ from utils.utils import parse_hhmm, fmt_id_msg
 def run():
     """Планирование: проверяет расписание и создаёт недостающие батчи."""
     try:
-        loop_interval = int(db_get('loop_interval'))
-
         cancelled = db_cancel_waiting_batches()
         for bid in cancelled:
             write_log(
@@ -37,7 +36,7 @@ def run():
             buffer_hours = 24
 
         now           = datetime.now(timezone.utc)
-        effective_now = now + timedelta(seconds=loop_interval)
+        effective_now = now + timedelta(seconds=environment.loop_interval)
         window_end    = effective_now + timedelta(hours=buffer_hours)
         A             = db_get_last_pipeline_run('planning')
 

@@ -55,7 +55,7 @@ def main_loop():
         except Exception as e:
             write_log_entry(None, f"[main_loop] Ошибка: {e}", level='error')
 
-        environment.wait_for_wakeup(environment.interval)
+        environment.wait_for_wakeup(environment.loop_interval)
 
 
 _main_loop_started = False

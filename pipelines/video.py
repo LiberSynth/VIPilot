@@ -12,10 +12,10 @@ Pipeline 3 — Генерация видео.
 
 import time
 
+import common.environment as environment
 from db import (
     db_set_batch_video_model,
     db_get,
-    env_get,
     db_get_batch_by_id,
     db_get_active_targets,
     db_set_batch_video_generating_by_id,
@@ -134,7 +134,7 @@ def run(batch_id, log_id):
         if not is_probe and check_cancelled('video', batch_id, batch, log_id):
             return
 
-        if env_get("emulation_mode", "0") == "1":
+        if environment.emulation_mode:
             write_log_entry(None, fmt_id_msg("[video] Батч {} — эмуляция генерации видео", batch_id))
             db_log_update(log_id, 'Видео [эмуляция]', 'running')
             result = db_get_random_real_original_video()

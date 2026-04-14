@@ -5,6 +5,7 @@ Pipeline 2 — Генерация сюжета.
 генерирует текст через OpenRouter и сохраняет результат.
 """
 
+import common.environment as environment
 from db import (
     db_set_story_model,
     db_get,
@@ -66,7 +67,7 @@ def run(batch_id, log_id):
         if not is_probe and check_cancelled('story', batch_id, batch, log_id):
             return
 
-        if not is_probe and env_get('emulation_mode', '0') != '1' and env_get('use_donor', '1') == '1' \
+        if not is_probe and not environment.emulation_mode and env_get('use_donor', '1') == '1' \
                 and batch.get('story_id') is None:
             batch_data = batch.get('data') or {}
             donor_batch_id = batch_data.get('donor_batch_id') if isinstance(batch_data, dict) else None
