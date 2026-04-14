@@ -31,6 +31,7 @@ from utils.utils import fmt_id_msg
 
 
 def run(batch_id, log_id):
+    snap = environment.snapshot()
     try:
         batch = db_get_batch_by_id(batch_id)
         if not batch:
@@ -66,7 +67,7 @@ def run(batch_id, log_id):
         if not is_probe and check_cancelled('story', batch_id, batch, log_id):
             return
 
-        if not is_probe and not environment.emulation_mode and environment.use_donor \
+        if not is_probe and not snap.emulation_mode and snap.use_donor \
                 and batch.get('story_id') is None:
             batch_data = batch.get('data') or {}
             donor_batch_id = batch_data.get('donor_batch_id') if isinstance(batch_data, dict) else None

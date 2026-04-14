@@ -1,5 +1,6 @@
 import threading
 from contextvars import ContextVar
+from typing import NamedTuple
 
 from db import env_get, db_get
 
@@ -79,21 +80,52 @@ def get_active_batch_ids() -> set:
         return set(_active_batch_ids)
 
 
-deep_logging: bool = False
-emulation_mode: bool = False
-use_donor: bool = True
-loop_interval: int = 15
-max_threads: int = 5
+class EnvSnapshot(NamedTuple):
+    deep_logging:   bool
+    emulation_mode: bool
+    use_donor:      bool
+    loop_interval:  int
+    max_threads:    int
 
 
-def refresh_environment():
-    """Читает актуальные параметры окружения из БД."""
-    global deep_logging, emulation_mode, use_donor, loop_interval, max_threads
-    deep_logging   = db_get('deep_debugging',    '0') == '1'
-    emulation_mode = env_get('emulation_mode',   '0') == '1'
-    use_donor      = env_get('use_donor',        '1') == '1'
-    loop_interval  = max(1, min(3600, int(db_get('loop_interval',     '15'))))
-    max_threads    = max(1, min(32,   int(db_get('max_batch_threads', '5'))))
+_current: EnvSnapshot = EnvSnapshot(
+    deep_logging=False,
+    emulation_mode=False,
+    use_donor=True,
+    loop_interval=15,
+    max_threads=5,
+)
+
+deep_logging:   bool = _current.deep_logging
+emulation_mode: bool = _current.emulation_mode
+use_donor:      bool = _current.use_donor
+loop_interval:  int  = _current.loop_interval
+max_threads:    int  = _current.max_threads
+
+
+def snapshot() -> EnvSnapshot:
+    """Возвращает неизменяемый снимок текущего окружения.
+    Потоки вызывают один раз в начале работы и используют локально."""
+    return _current
+
+
+def refresh_environment() -> EnvSnapshot:
+    """Читает актуальные параметры окружения из БД и обновляет снимок."""
+    global deep_logging, emulation_mode, use_donor, loop_interval, max_threads, _current
+    snap = EnvSnapshot(
+        deep_logging   = db_get('deep_debugging',    '0') == '1',
+        emulation_mode = env_get('emulation_mode',   '0') == '1',
+        use_donor      = env_get('use_donor',        '1') == '1',
+        loop_interval  = max(1, min(3600, int(db_get('loop_interval',     '15')))),
+        max_threads    = max(1, min(32,   int(db_get('max_batch_threads', '5')))),
+    )
+    _current       = snap
+    deep_logging   = snap.deep_logging
+    emulation_mode = snap.emulation_mode
+    use_donor      = snap.use_donor
+    loop_interval  = snap.loop_interval
+    max_threads    = snap.max_threads
+    return snap
 
 
 def init_from_db():

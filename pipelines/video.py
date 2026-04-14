@@ -44,6 +44,7 @@ class AspectRatioConflictError(Exception):
 
 
 def run(batch_id, log_id):
+    snap = environment.snapshot()
     try:
         batch = db_get_batch_by_id(batch_id)
         if not batch:
@@ -134,7 +135,7 @@ def run(batch_id, log_id):
         if not is_probe and check_cancelled('video', batch_id, batch, log_id):
             return
 
-        if environment.emulation_mode:
+        if snap.emulation_mode:
             write_log_entry(None, fmt_id_msg("[video] Батч {} — эмуляция генерации видео", batch_id))
             db_log_update(log_id, 'Видео [эмуляция]', 'running')
             result = db_get_random_real_original_video()
