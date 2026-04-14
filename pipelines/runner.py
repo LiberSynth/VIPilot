@@ -10,6 +10,7 @@ import utils.workflow_state as wf_state
 
 
 def _handle_batch_error(e, batch_id, pipeline_name, log_id):
+    from utils.notify import notify_failure
     if isinstance(e, AppException):
         db_set_batch_status(batch_id, 'error')
         msg = f"Ошибка пайплайна {e.pipeline}: {e.message}"
@@ -18,6 +19,7 @@ def _handle_batch_error(e, batch_id, pipeline_name, log_id):
         db_set_batch_status(batch_id, 'fatal_error')
         msg = f"Критическая ошибка: {e}"
         db_log_update(log_id, msg, 'fatal_error')
+    notify_failure(f"batch#{batch_id} [{pipeline_name}]: {msg}")
 
 
 def run_batch(batch_id, pipeline, log_id):
