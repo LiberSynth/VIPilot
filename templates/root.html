@@ -205,7 +205,8 @@
       <div class="wf-row" style="margin-top:4px">
         <div style="flex:1">
           <div class="toggle-label">Утверждать сюжеты</div>
-          <div class="hint" style="margin-top:2px">Из пула берутся только сюжеты с оценкой «хорошо». Если подходящего нет — запускается AI-генерация.</div>
+          {% from "common/macros.html" import approve_stories_hint %}
+          {{ approve_stories_hint() }}
         </div>
         <span id="approve-stories-badge" class="emulation-badge" {% if not approve_stories %}style="display:none"{% endif %}>ВКЛ</span>
         <label class="toggle-wrap" style="margin-left:8px">

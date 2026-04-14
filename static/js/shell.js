@@ -88,6 +88,19 @@ function monitorClockStart() {
   });
 }
 
+function loadGoodPoolCount() {
+  var els = document.querySelectorAll('.pool-count-value');
+  if (!els.length) return;
+  fetch('/producer/stories/good_pool_count')
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(d) {
+      if (d && d.count !== undefined) {
+        els.forEach(function(el) { el.textContent = d.count; });
+      }
+    })
+    .catch(function() {});
+}
+
 (function() {
   monitorClockStart();
   const tab = new URLSearchParams(window.location.search).get('tab');
@@ -95,4 +108,5 @@ function monitorClockStart() {
     switchPanel(tab);
     history.replaceState(null, '', window.location.pathname);
   }
+  loadGoodPoolCount();
 })();

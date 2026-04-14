@@ -377,26 +377,16 @@ var getDraftStoryId;
     });
   }
 
-  function loadGoodPoolCount() {
-    var el = document.getElementById('good-pool-count');
-    if (!el) return;
-    fetch('/producer/stories/good_pool_count')
-      .then(function(r) { return r.ok ? r.json() : null; })
-      .then(function(d) { if (d && d.count !== undefined) el.textContent = d.count; })
-      .catch(function() {});
-  }
-
   var _origLoadStoriesList = window.loadStoriesList;
   window.loadStoriesList = function() {
     if (_origLoadStoriesList) _origLoadStoriesList();
-    loadGoodPoolCount();
+    if (typeof loadGoodPoolCount === 'function') loadGoodPoolCount();
   };
 
   function initAll() {
     initNewStoryButton();
     initReturnButton();
     initFilterCheckboxes();
-    loadGoodPoolCount();
   }
 
   if (document.readyState === 'loading') {

@@ -88,8 +88,8 @@
   <div id="panel-director" class="tab-panel">
     <div class="card" style="margin-top:12px">
       <div class="card-title">Утверждение сюжета</div>
-      <div class="hint">Если включено, пайплайн берёт из пула только сюжеты с оценкой «хорошо». Если выключено — любой неиспользованный сюжет. Если подходящего нет — запускается AI-генерация.</div>
-      <div class="hint" style="margin-top:4px">Текущий пул сюжетов: <span id="good-pool-count">—</span>.</div>
+      {% from "common/macros.html" import approve_stories_hint %}
+      {{ approve_stories_hint() }}
       <div class="wf-row" style="margin-top:8px">
         <div style="flex:1">
           <div class="toggle-label">Утверждать сюжеты</div>
