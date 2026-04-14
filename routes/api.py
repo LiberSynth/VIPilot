@@ -474,7 +474,7 @@ def api_producer_env_set():
     data = request.get_json(silent=True) or {}
     key = data.get("key", "")
     value = data.get("value", "")
-    allowed_keys = {"screenwriter_show_used", "screenwriter_show_bad"}
+    allowed_keys = {"screenwriter_show_used", "screenwriter_only_good"}
     if key not in allowed_keys:
         return jsonify({"error": "invalid key"}), 400
     env_set(key, str(value))

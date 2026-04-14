@@ -220,7 +220,7 @@ def producer_page():
     video_fails_to_next = max(1, int(db_get("video_fails_to_next", "3")))
     approve_stories_prod = db_get("approve_stories", "0") == "1"
     screenwriter_show_used = env_get("screenwriter_show_used", "0") == "1"
-    screenwriter_show_bad = env_get("screenwriter_show_bad", "1") != "0"
+    screenwriter_only_good = env_get("screenwriter_only_good", "0") == "1"
     resp = make_response(render_template(
         "producer.html",
         system_prompt=system_prompt,
@@ -233,7 +233,7 @@ def producer_page():
         app_version=APP_VERSION,
         nav_modules=_nav_modules("producer"),
         screenwriter_show_used=screenwriter_show_used,
-        screenwriter_show_bad=screenwriter_show_bad,
+        screenwriter_only_good=screenwriter_only_good,
     ))
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     resp.headers["Pragma"] = "no-cache"

@@ -227,13 +227,13 @@ var setDraftStoryFromRecord;
         btn.textContent = GRADE_LABELS[gk] || gk;
         btn.title = 'Оценка: ' + (GRADE_LABELS[gk] || gk) + '. Нажмите для смены';
 
-        var showBadCb = document.getElementById('filter-show-bad');
-        var showBad = showBadCb ? showBadCb.checked : true;
+        var onlyGoodCb = document.getElementById('filter-only-good');
+        var onlyGood = onlyGoodCb ? onlyGoodCb.checked : false;
         var showUsedCb = document.getElementById('filter-show-used');
         var showUsed = showUsedCb ? showUsedCb.checked : true;
         var storyRow = document.querySelector('.story-row[data-id="' + storyId + '"]');
         var isUsed = storyRow ? storyRow.getAttribute('data-used') === '1' : false;
-        var shouldHide = (!showBad && grade === 'bad') || (!showUsed && isUsed);
+        var shouldHide = (onlyGood && grade === 'bad') || (!showUsed && isUsed);
         if (shouldHide && storyRow) {
           storyRow.parentNode.removeChild(storyRow);
           var storiesList = document.getElementById('stories-list');
@@ -250,10 +250,10 @@ var setDraftStoryFromRecord;
 
   function getFilterParams() {
     var showUsed = document.getElementById('filter-show-used');
-    var showBad = document.getElementById('filter-show-bad');
+    var onlyGood = document.getElementById('filter-only-good');
     var params = new URLSearchParams();
     params.set('show_used', (showUsed && showUsed.checked) ? '1' : '0');
-    params.set('show_bad', (showBad && showBad.checked) ? '1' : '0');
+    params.set('show_bad', (onlyGood && onlyGood.checked) ? '0' : '1');
     return params.toString();
   }
 
@@ -276,7 +276,7 @@ var setDraftStoryFromRecord;
 
   function initFilterCheckboxes() {
     var showUsed = document.getElementById('filter-show-used');
-    var showBad = document.getElementById('filter-show-bad');
+    var onlyGood = document.getElementById('filter-only-good');
     function onFilterChange(key, checkbox) {
       var value = checkbox.checked ? '1' : '0';
       fetch('/producer/env', {
@@ -292,9 +292,9 @@ var setDraftStoryFromRecord;
         onFilterChange('screenwriter_show_used', showUsed);
       });
     }
-    if (showBad) {
-      showBad.addEventListener('change', function() {
-        onFilterChange('screenwriter_show_bad', showBad);
+    if (onlyGood) {
+      onlyGood.addEventListener('change', function() {
+        onFilterChange('screenwriter_only_good', onlyGood);
       });
     }
   }
