@@ -218,7 +218,8 @@ var getDraftStoryId;
     var storyId = typeof getDraftStoryId === 'function' ? getDraftStoryId() : null;
     if (!storyId) { btn.hidden = true; return; }
     var container = document.getElementById('stories-list');
-    var inList = container && container.querySelector('.story-row[data-id="' + storyId + '"]');
+    if (!container) { btn.hidden = true; return; }
+    var inList = container.querySelector('.story-row[data-id="' + storyId + '"]');
     btn.hidden = !!inList;
   }
   window.updateReturnButton = updateReturnButton;
