@@ -2,8 +2,6 @@
 Все функции логирования приложения.
 """
 
-import builtins as _builtins
-
 from db.connection import get_db
 
 
@@ -38,7 +36,7 @@ def _notify_on_error(log_id, message, level):
 
         notify_failure(f"log#{log_id}: {message}")
     except Exception as e:
-        _builtins.print(f"[log] Ошибка вызова notify_failure: {e}")
+        print(f"[log] Ошибка вызова notify_failure: {e}")
 
 
 def write_log_entry(log_id, message, level="info"):
@@ -56,7 +54,7 @@ def write_log_entry(log_id, message, level="info"):
         f"write_log_entry: недопустимый уровень {level!r}. "
         "Допустимые значения: 'info', 'warn', 'error', 'fatal_error', 'silent'."
     )
-    _builtins.print(message)
+    print(message)
     if level == "silent":
         return
     token = wf_state.asserted_log_entry.set(True)
