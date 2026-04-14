@@ -18,29 +18,14 @@ _ALLOWED_PIPELINES = {
 }
 
 
-def db_log_pipeline(pipeline, message, status="info", batch_id=None):
+def write_log(pipeline, message, status="info", batch_id=None):
     """Записывает событие пайплайна в таблицу log. Возвращает log_id или None."""
     assert pipeline in _ALLOWED_PIPELINES, (
-        f"db_log_pipeline: недопустимое имя пайплайна {pipeline!r}. "
+        f"write_log: недопустимое имя пайплайна {pipeline!r}. "
         f"Допустимые: {sorted(_ALLOWED_PIPELINES)}"
     )
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    INSERT INTO log (batch_id, pipeline, message, status)
-                    VALUES (%s, %s, %s, %s)
-                    RETURNING id
-                    """,
-                    (batch_id, pipeline, message, status),
-                )
-                log_id = cur.fetchone()[0]
-            conn.commit()
-        return str(log_id)
-    except Exception as e:
-        print(f"[DB] Ошибка db_log_pipeline: {e}")
-        return None
+    from db.db_simple import db_insert_log
+    return db_insert_log(pipeline, message, status=status, batch_id=batch_id)
 
 
 def _notify_on_error(log_id, message, level):
@@ -56,7 +41,7 @@ def _notify_on_error(log_id, message, level):
         _builtins.print(f"[log] Ошибка вызова notify_failure: {e}")
 
 
-def log_entry(log_id, message, level="info"):
+def write_log_entry(log_id, message, level="info"):
     """Добавляет субзапись к существующей записи лога.
 
     Всегда выводит сообщение в консоль.
@@ -68,7 +53,7 @@ def log_entry(log_id, message, level="info"):
     from db.db_simple import db_insert_log_entry
 
     assert level in ("info", "warn", "error", "fatal_error", "silent"), (
-        f"log_entry: недопустимый уровень {level!r}. "
+        f"write_log_entry: недопустимый уровень {level!r}. "
         "Допустимые значения: 'info', 'warn', 'error', 'fatal_error', 'silent'."
     )
     _builtins.print(message)
@@ -91,10 +76,10 @@ def log_batch_planned(batch_id, message, *entries):
     entries  — список строк, каждая добавляется как отдельная субзапись.
     Возвращает log_id или None.
     """
-    log_id = db_log_pipeline('planning', message, status='ok', batch_id=batch_id)
+    log_id = write_log('planning', message, status='ok', batch_id=batch_id)
     if log_id:
         for entry_msg in entries:
-            log_entry(log_id, entry_msg)
+            write_log_entry(log_id, entry_msg)
     return log_id
 
 

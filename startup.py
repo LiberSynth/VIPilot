@@ -8,7 +8,7 @@ from db import (
 )
 from db.connection import get_db
 from statuses import FINAL_BATCH_STATUSES, _assert_known_status
-from log.log import db_log_pipeline, log_entry
+from log.log import write_log, write_log_entry
 from utils.consts import FLASK_SECRET
 from utils.limiter import limiter
 from utils.utils import fmt_id_msg
@@ -41,15 +41,15 @@ def init_app(app: Flask):
 def _reset_stalled_batches():
     affected = db_reset_stalled_batches()
     if not affected:
-        log_entry(None, "[startup] Незавершённых батчей не обнаружено.", level='silent')
+        write_log_entry(None, "[startup] Незавершённых батчей не обнаружено.", level='silent')
         return
     for item in affected:
         bid = item["id"]
         old = item["old_status"]
         new = item["new_status"]
         msg = f"Батч сброшен при рестарте: {old} → {new}"
-        db_log_pipeline('planning', msg, status='warn', batch_id=bid)
-        log_entry(None, fmt_id_msg("[startup] Батч {} сброшен: {} → {}", bid, old, new), level='silent')
+        write_log('planning', msg, status='warn', batch_id=bid)
+        write_log_entry(None, fmt_id_msg("[startup] Батч {} сброшен: {} → {}", bid, old, new), level='silent')
 
 
 def _interrupt_running_pipelines():
@@ -109,4 +109,4 @@ def _fix_orphaned_running():
 def _validate_batch_statuses():
     for status in db_get_distinct_batch_statuses():
         _assert_known_status(status)
-    log_entry(None, "[startup] Все статусы батчей известны.", level='silent')
+    write_log_entry(None, "[startup] Все статусы батчей известны.", level='silent')

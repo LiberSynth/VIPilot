@@ -32,7 +32,7 @@ from db import (
     db_upsert_story_draft,
     db_create_story_generate_batch,
 )
-from log import db_get_log, db_get_monitor, db_log_pipeline, log_batch_planned
+from log import db_get_log, db_get_monitor, write_log, log_batch_planned
 from utils.auth import is_authenticated
 from utils.utils import parse_hhmm, to_msk, to_utc_from_msk
 import utils.workflow_state as wf_state
@@ -285,7 +285,7 @@ def api_workflow_start():
         return jsonify({"error": "unauthorized"}), 401
     env_set("workflow_state", "running")
     wf_state.set_running()
-    db_log_pipeline('root', "Движок запущен вручную", status='info')
+    write_log('root', "Движок запущен вручную", status='info')
     return jsonify({"ok": True, "state": "running"})
 
 
@@ -295,7 +295,7 @@ def api_workflow_pause():
         return jsonify({"error": "unauthorized"}), 401
     env_set("workflow_state", "pause")
     wf_state.set_paused()
-    db_log_pipeline('root', "Движок приостановлен вручную", status='info')
+    write_log('root', "Движок приостановлен вручную", status='info')
     return jsonify({"ok": True, "state": "pause"})
 
 
@@ -307,7 +307,7 @@ def api_workflow_use_donor():
     val = "1" if body.get("enabled") == "1" else "0"
     env_set("use_donor", val)
     label = "включен" if val == "1" else "выключен"
-    db_log_pipeline('root', f"Использовать донора {label}", status='info')
+    write_log('root', f"Использовать донора {label}", status='info')
     return jsonify({"ok": True, "use_donor": val})
 
 
@@ -327,7 +327,7 @@ def api_workflow_emulation():
     val = "1" if body.get("enabled") == "1" else "0"
     env_set("emulation_mode", val)
     label = "включена" if val == "1" else "выключена"
-    db_log_pipeline('root', f"Эмуляция {label}", status='info')
+    write_log('root', f"Эмуляция {label}", status='info')
     return jsonify({"ok": True, "emulation_mode": val})
 
 
@@ -346,7 +346,7 @@ def api_reset_batch_pipeline(batch_id, pipeline):
 def api_workflow_restart():
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
-    db_log_pipeline('root', "Перезапуск приложения вручную", status='info')
+    write_log('root', "Перезапуск приложения вручную", status='info')
     def _do_restart():
         import time as _time
         import sys as _sys

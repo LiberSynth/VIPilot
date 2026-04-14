@@ -7,7 +7,7 @@ OpenRouter API client.
 import os
 import requests
 
-from log import log_entry
+from log import write_log_entry
 
 _API_KEY = os.environ.get('OPENROUTER_API_KEY', '')
 
@@ -61,33 +61,33 @@ def generate(log_id, model_name: str, model: dict, system_prompt: str, user_prom
         body = _build_body(model['body_tpl'], model['model_url'], system_prompt, user_prompt)
         resp = requests.post(model['platform_url'], headers=_headers(), json=body, timeout=60)
     except requests.exceptions.Timeout:
-        log_entry(log_id, f"[{model_name}] таймаут (60 с)", level='warn')
+        write_log_entry(log_id, f"[{model_name}] таймаут (60 с)", level='warn')
         return None
     except requests.exceptions.RequestException as e:
-        log_entry(log_id, f"[{model_name}] ошибка соединения: {e}", level='warn')
+        write_log_entry(log_id, f"[{model_name}] ошибка соединения: {e}", level='warn')
         return None
 
     try:
         data = resp.json()
     except ValueError:
-        log_entry(log_id, f"[{model_name}] не-JSON (HTTP {resp.status_code}): {resp.text}", level='warn')
+        write_log_entry(log_id, f"[{model_name}] не-JSON (HTTP {resp.status_code}): {resp.text}", level='warn')
         return None
 
     if resp.status_code >= 400:
         err = data.get('error', {})
         if isinstance(err, dict):
             err = err.get('message', data)
-        log_entry(log_id, f"[{model_name}] HTTP {resp.status_code}: {err}", level='warn')
+        write_log_entry(log_id, f"[{model_name}] HTTP {resp.status_code}: {err}", level='warn')
         return None
 
     choices = data.get('choices')
     if not choices:
-        log_entry(log_id, f"[{model_name}] нет поля choices в ответе", level='warn')
+        write_log_entry(log_id, f"[{model_name}] нет поля choices в ответе", level='warn')
         return None
 
     result = ((choices[0].get('message') or {}).get('content') or '').strip()
     if not result:
-        log_entry(log_id, f"[{model_name}] пустой текст", level='warn')
+        write_log_entry(log_id, f"[{model_name}] пустой текст", level='warn')
         return None
 
     return result

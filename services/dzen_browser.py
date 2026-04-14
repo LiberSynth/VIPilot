@@ -28,7 +28,7 @@ import time
 from datetime import datetime, timezone
 from typing import Optional
 
-from log import log_entry
+from log import write_log_entry
 
 # ---------------------------------------------------------------------------
 # Путь к персистентному профилю Chrome
@@ -126,7 +126,7 @@ def _process_event(page, ev: dict):
             if url:
                 page.goto(url, wait_until="domcontentloaded", timeout=30_000)
     except Exception as e:
-        log_entry(None, f"[dzen_browser] Ошибка события {ev_type!r}: {e}", level='silent')
+        write_log_entry(None, f"[dzen_browser] Ошибка события {ev_type!r}: {e}", level='silent')
 
 
 # ---------------------------------------------------------------------------
@@ -140,7 +140,7 @@ def _browser_loop(target_id: str):
 
     _set_status("starting", "Запуск браузера…")
     os.makedirs(DZEN_PROFILE_DIR, exist_ok=True)
-    log_entry(None, f"[dzen_browser] Профиль Chrome: {DZEN_PROFILE_DIR}", level='silent')
+    write_log_entry(None, f"[dzen_browser] Профиль Chrome: {DZEN_PROFILE_DIR}", level='silent')
 
     try:
         with sync_playwright() as pw:
@@ -169,7 +169,7 @@ def _browser_loop(target_id: str):
                     timeout=30_000,
                 )
             except Exception as e:
-                log_entry(None, f"[dzen_browser] Ошибка навигации: {e}", level='silent')
+                write_log_entry(None, f"[dzen_browser] Ошибка навигации: {e}", level='silent')
 
             _set_status("running")
 
@@ -185,7 +185,7 @@ def _browser_loop(target_id: str):
                         ok = db_set_target_session_context(_current_target_id, state)
                         if ok:
                             _save_result = {"ok": True, "error": None}
-                            log_entry(None, f"[dzen_browser] Сессия сохранена в БД: {len(cookies)} куков, target={_current_target_id}", level='silent')
+                            write_log_entry(None, f"[dzen_browser] Сессия сохранена в БД: {len(cookies)} куков, target={_current_target_id}", level='silent')
                         else:
                             _save_result = {"ok": False, "error": "Ошибка записи в БД"}
                     except Exception as e:
@@ -210,7 +210,7 @@ def _browser_loop(target_id: str):
                         _frame_counter += 1
                     _new_frame_event.set()
                 except Exception as e:
-                    log_entry(None, f"[dzen_browser] Ошибка скриншота: {e}", level='silent')
+                    write_log_entry(None, f"[dzen_browser] Ошибка скриншота: {e}", level='silent')
 
                 time.sleep(0.2)
 
@@ -218,7 +218,7 @@ def _browser_loop(target_id: str):
 
     except Exception as e:
         _set_status("error", str(e))
-        log_entry(None, f"[dzen_browser] Критическая ошибка: {e}", level='silent')
+        write_log_entry(None, f"[dzen_browser] Критическая ошибка: {e}", level='silent')
         return
 
     if not _pipeline_taking_over:
@@ -373,9 +373,9 @@ def run_pipeline_browser(fn, cookies: list) -> dict:
             if cookies:
                 try:
                     ctx.add_cookies(cookies)
-                    log_entry(None, f"[dzen_pipeline] Загружено {len(cookies)} куков", level='silent')
+                    write_log_entry(None, f"[dzen_pipeline] Загружено {len(cookies)} куков", level='silent')
                 except Exception as e:
-                    log_entry(None, f"[dzen_pipeline] Ошибка куков: {e}", level='silent')
+                    write_log_entry(None, f"[dzen_pipeline] Ошибка куков: {e}", level='silent')
 
             page = ctx.new_page()
 

@@ -31,7 +31,7 @@ from db import (
     db_set_batch_story_id,
     db_get_movie_from_donor,
 )
-from log import db_log_pipeline, db_log_update
+from log import write_log, db_log_update
 from pipelines.base import check_cancelled, pipeline_log, iterate_models
 from exceptions import AppException
 from clients import falai
@@ -106,7 +106,7 @@ def run(batch_id, log_id):
                             # Обоснованное исключение: транскод-пайплайн не будет запущен,
                             # т.к. статус уже transcode_ready; запись создаётся здесь,
                             # чтобы в мониторе отображался лог для пропущенного шага.
-                            tr_log_id = db_log_pipeline(
+                            tr_log_id = write_log(
                                 'transcode', 'Транскодирование пропущено — видео получено от донора',
                                 status='ok', batch_id=batch_id,
                             )

@@ -11,7 +11,7 @@ import time
 
 import requests
 
-from log import log_entry
+from log import write_log_entry
 
 _VK_TOKEN = os.environ.get('VK_USER_TOKEN', '')
 _VK_API   = 'https://api.vk.com/method'
@@ -35,7 +35,7 @@ def publish_story(video_data: bytes, group_id: int, log_id, title: str = '') -> 
 
     if 'error' in r:
         if log_id:
-            log_entry(log_id, f"getVideoUploadServer: {r['error']}", level='error')
+            write_log_entry(log_id, f"getVideoUploadServer: {r['error']}", level='error')
         return None
 
     upload_url = r['response']['upload_url']
@@ -51,23 +51,23 @@ def publish_story(video_data: bytes, group_id: int, log_id, title: str = '') -> 
             up.raise_for_status()
             if not up.text.strip():
                 if log_id:
-                    log_entry(log_id, f'Пустой ответ CDN (попытка {attempt+1}/3)', level='warn')
+                    write_log_entry(log_id, f'Пустой ответ CDN (попытка {attempt+1}/3)', level='warn')
                 time.sleep(5)
                 continue
             up_data = up.json()
             if 'response' not in up_data:
                 if log_id:
-                    log_entry(log_id, f'Неожиданный ответ CDN: {up.text[:200]}', level='error')
+                    write_log_entry(log_id, f'Неожиданный ответ CDN: {up.text[:200]}', level='error')
                 return None
             upload_result = up_data['response']['upload_result']
             break
         except Exception as e:
             if log_id:
-                log_entry(log_id, f'Ошибка загрузки (попытка {attempt+1}/3): {e}', level='warn')
+                write_log_entry(log_id, f'Ошибка загрузки (попытка {attempt+1}/3): {e}', level='warn')
             time.sleep(5)
     else:
         if log_id:
-            log_entry(log_id, 'Все попытки загрузки истории провалились', level='error')
+            write_log_entry(log_id, 'Все попытки загрузки истории провалились', level='error')
         return None
 
     save = requests.post(f'{_VK_API}/stories.save', data={
@@ -79,11 +79,11 @@ def publish_story(video_data: bytes, group_id: int, log_id, title: str = '') -> 
     if 'response' in save:
         story_id = save['response']['items'][0]['id']
         if log_id:
-            log_entry(log_id, f'История опубликована: id={story_id}')
+            write_log_entry(log_id, f'История опубликована: id={story_id}')
         return story_id
 
     if log_id:
-        log_entry(log_id, f"stories.save: {save.get('error', save)}", level='error')
+        write_log_entry(log_id, f"stories.save: {save.get('error', save)}", level='error')
     return None
 
 
@@ -100,7 +100,7 @@ def publish_wall(video_data: bytes, group_id: int, log_id, title: str = '') -> i
 
     if 'error' in save_resp:
         if log_id:
-            log_entry(log_id, f"video.save: {save_resp['error']}", level='error')
+            write_log_entry(log_id, f"video.save: {save_resp['error']}", level='error')
         return None
 
     upload_url = save_resp['response']['upload_url']
@@ -126,11 +126,11 @@ def publish_wall(video_data: bytes, group_id: int, log_id, title: str = '') -> i
     if 'response' in post_resp:
         post_id = post_resp['response']['post_id']
         if log_id:
-            log_entry(log_id, f'Пост на стене: post_id={post_id}')
+            write_log_entry(log_id, f'Пост на стене: post_id={post_id}')
         return post_id
 
     if log_id:
-        log_entry(log_id, f"wall.post: {post_resp.get('error', post_resp)}", level='error')
+        write_log_entry(log_id, f"wall.post: {post_resp.get('error', post_resp)}", level='error')
     return None
 
 

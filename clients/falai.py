@@ -8,7 +8,7 @@ import os
 import time
 import requests
 
-from log import log_entry
+from log import write_log_entry
 
 
 _FAL_KEY = os.environ.get('FAL_API_KEY', '')
@@ -84,7 +84,7 @@ def build_body(body_tpl, prompt, ar_x, ar_y, video_duration, log_id=None):
                     body[field] = val.format(video_duration)
                 except (IndexError, KeyError) as e:
                     if log_id:
-                        log_entry(
+                        write_log_entry(
                             log_id,
                             f"Поле «{field}» шаблона не поддерживает подстановку video_duration — оставляем как есть ({e})",
                             level='warn',
@@ -108,10 +108,10 @@ def submit(log_id, model_name: str, submit_url: str, platform_url: str,
         body = build_body(body_tpl, prompt, ar_x, ar_y, video_duration, log_id)
         resp = requests.post(submit_url, headers=_headers(), json=body, timeout=30)
     except requests.exceptions.Timeout:
-        log_entry(log_id, f"[{model_name}] таймаут (30 с)", level='warn')
+        write_log_entry(log_id, f"[{model_name}] таймаут (30 с)", level='warn')
         return None
     except requests.exceptions.RequestException as e:
-        log_entry(log_id, f"[{model_name}] ошибка соединения: {e}", level='warn')
+        write_log_entry(log_id, f"[{model_name}] ошибка соединения: {e}", level='warn')
         return None
 
     try:
@@ -119,22 +119,22 @@ def submit(log_id, model_name: str, submit_url: str, platform_url: str,
     except ValueError:
         if _is_provider_fatal(resp.status_code, resp.text):
             msg = f"[{model_name}] Фатальная ошибка провайдера (HTTP {resp.status_code}): {resp.text}"
-            log_entry(log_id, msg, level='error')
+            write_log_entry(log_id, msg, level='error')
             raise ProviderFatalError(msg)
-        log_entry(log_id, f"[{model_name}] не-JSON (HTTP {resp.status_code}): {resp.text}", level='warn')
+        write_log_entry(log_id, f"[{model_name}] не-JSON (HTTP {resp.status_code}): {resp.text}", level='warn')
         return None
 
     if resp.status_code >= 400:
         err = data.get('error', data)
         if _is_provider_fatal(resp.status_code, err):
             msg = f"[{model_name}] Фатальная ошибка провайдера (HTTP {resp.status_code}): {err}"
-            log_entry(log_id, msg, level='error')
+            write_log_entry(log_id, msg, level='error')
             raise ProviderFatalError(msg)
-        log_entry(log_id, f"[{model_name}] HTTP {resp.status_code}: {err}", level='warn')
+        write_log_entry(log_id, f"[{model_name}] HTTP {resp.status_code}: {err}", level='warn')
         return None
 
     if 'request_id' not in data:
-        log_entry(log_id, f"[{model_name}] нет request_id: {str(data)}", level='warn')
+        write_log_entry(log_id, f"[{model_name}] нет request_id: {str(data)}", level='warn')
         return None
 
     request_id   = data['request_id']
@@ -163,7 +163,7 @@ def poll(log_id, status_url: str, response_url: str):
                 timeout=15,
             ).json()
             status = s.get('status')
-            log_entry(log_id, f"Статус [{attempt + 1}]: {status}")
+            write_log_entry(log_id, f"Статус [{attempt + 1}]: {status}")
 
             if status == 'COMPLETED':
                 result = requests.get(
@@ -176,25 +176,25 @@ def poll(log_id, status_url: str, response_url: str):
                     types = [d.get('type', '') for d in detail] if isinstance(detail, list) else []
                     if any('content_policy' in t for t in types):
                         msg = 'fal.ai отклонил промпт: нарушение политики контента'
-                        log_entry(log_id, msg, level='error')
+                        write_log_entry(log_id, msg, level='error')
                         return None, msg
                 video_url = result.get('video', {}).get('url')
                 if not video_url:
                     msg = f'Нет URL видео в ответе fal.ai: {str(result)}'
-                    log_entry(log_id, msg, level='error')
+                    write_log_entry(log_id, msg, level='error')
                     return None, msg
                 return video_url, None
 
             elif status == 'FAILED':
                 msg = f'fal.ai: генерация провалилась: {str(s)}'
-                log_entry(log_id, msg, level='error')
+                write_log_entry(log_id, msg, level='error')
                 return None, msg
 
         except Exception as e:
-            log_entry(log_id, f"Ошибка опроса статуса: {e}", level='warn')
+            write_log_entry(log_id, f"Ошибка опроса статуса: {e}", level='warn')
 
     msg = 'Таймаут генерации видео (2 часа)'
-    log_entry(log_id, msg, level='error')
+    write_log_entry(log_id, msg, level='error')
     return None, msg
 
 

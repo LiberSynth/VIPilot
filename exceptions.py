@@ -33,7 +33,7 @@ class AppException(Exception):
         batch_id  — идентификатор батча (может быть None для системных ошибок)
         pipeline  — имя пайплайна ('story', 'video', 'transcode', 'publish', ...)
         message   — человекочитаемое описание ошибки
-        log_id    — идентификатор записи лога (из db_log_pipeline), созданной до броска
+        log_id    — идентификатор записи лога (из write_log), созданной до броска
     """
 
     def __init__(self, batch_id, pipeline: str, message: str, log_id=None):

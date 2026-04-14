@@ -1,6 +1,6 @@
 from .log import (
-    db_log_pipeline,
-    log_entry,
+    write_log,
+    write_log_entry,
     log_batch_planned,
     db_log_update,
     db_get_log,

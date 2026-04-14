@@ -16,7 +16,7 @@ from db import (
     db_set_batch_status,
     db_is_batch_scheduled,
 )
-from log import log_entry, db_log_update
+from log import write_log_entry, db_log_update
 from utils.utils import fmt_id_msg
 
 
@@ -44,7 +44,7 @@ def pipeline_log(log_id, msg: str, level: str = 'info') -> None:
     if level == 'silent':
         _builtins.print(msg)
         return
-    log_entry(log_id, msg, level=level)
+    write_log_entry(log_id, msg, level=level)
     _builtins.print(msg)
 
 

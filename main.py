@@ -8,7 +8,7 @@ from db import (
 )
 from exceptions import AppException
 from startup import init_app, create_app
-from log import db_log_pipeline, log_entry
+from log import write_log, write_log_entry
 from pipelines import publish, cleanup
 import pipelines.planning as planning
 from pipelines.routing import get_pipeline
@@ -55,9 +55,9 @@ def main_loop():
         except AppException as e:
             if e.batch_id:
                 db_set_batch_status(e.batch_id, 'error')
-            log_entry(e.log_id, f"[main_loop] AppException ({e.pipeline}): {e.message}", level='error')
+            write_log_entry(e.log_id, f"[main_loop] AppException ({e.pipeline}): {e.message}", level='error')
         except Exception as e:
-            log_entry(None, f"[main_loop] Ошибка: {e}", level='error')
+            write_log_entry(None, f"[main_loop] Ошибка: {e}", level='error')
 
         wf_state.wait_for_wakeup(interval)
 
@@ -66,8 +66,8 @@ _main_loop_started = False
 
 
 def _on_exit():
-    log_id = db_log_pipeline('root', "Приложение остановлено", status='info')
-    log_entry(log_id, "[main] Приложение остановлено", level='info')
+    log_id = write_log('root', "Приложение остановлено", status='info')
+    write_log_entry(log_id, "[main] Приложение остановлено", level='info')
 
 
 def start_main_loop():
@@ -77,7 +77,7 @@ def start_main_loop():
         check_upgrade()
         init_app(flask_app)
         wf_state.init_from_db()
-        db_log_pipeline('root', "Приложение запущено", status='info')
+        write_log('root', "Приложение запущено", status='info')
         atexit.register(_on_exit)
         t = threading.Thread(target=main_loop, daemon=True)
         t.start()

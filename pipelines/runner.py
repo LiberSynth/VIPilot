@@ -4,7 +4,7 @@
 import threading
 
 from db import db_set_batch_status
-from log import db_log_pipeline, db_log_update, log_entry
+from log import write_log, db_log_update, write_log_entry
 from exceptions import AppException
 import utils.workflow_state as wf_state
 
@@ -14,12 +14,12 @@ def _handle_batch_error(e, batch_id, pipeline_name, log_id):
         db_set_batch_status(batch_id, 'error')
         msg = f"Ошибка пайплайна {e.pipeline}: {e.message}"
         db_log_update(log_id, msg, 'error')
-        log_entry(log_id, msg, level='error')
+        write_log_entry(log_id, msg, level='error')
     else:
         db_set_batch_status(batch_id, 'fatal_error')
         msg = f"Критическая ошибка: {e}"
         db_log_update(log_id, msg, 'fatal_error')
-        log_entry(log_id, msg, level='fatal_error')
+        write_log_entry(log_id, msg, level='fatal_error')
 
 
 def run_batch(batch_id, pipeline, log_id):
@@ -36,6 +36,6 @@ def run_batch(batch_id, pipeline, log_id):
 
 def start_batch_thread(batch_id, pipeline, pipeline_name):
     """Создаёт log_id, запускает поток для обработки батча."""
-    log_id = db_log_pipeline(pipeline_name, f'Запуск пайплайна {pipeline_name}…', status='running', batch_id=batch_id)
+    log_id = write_log(pipeline_name, f'Запуск пайплайна {pipeline_name}…', status='running', batch_id=batch_id)
     t = threading.Thread(target=run_batch, args=(batch_id, pipeline, log_id), daemon=True)
     t.start()

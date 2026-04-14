@@ -5,7 +5,7 @@ from db import (
     db_cancel_waiting_batches,
     db_get_schedule, db_get_active_targets, db_ensure_batch, db_get_last_pipeline_run,
 )
-from log import db_log_pipeline, log_batch_planned
+from log import write_log, log_batch_planned
 from utils.consts import MSK
 from utils.utils import parse_hhmm, fmt_id_msg
 from pipelines.base import pipeline_log
@@ -18,7 +18,7 @@ def run():
 
         cancelled = db_cancel_waiting_batches()
         for bid in cancelled:
-            db_log_pipeline(
+            write_log(
                 'publish',
                 'Батч отменён — слот удалён из расписания',
                 status='cancelled',

@@ -6,6 +6,28 @@ from .connection import get_db
 from exceptions import FatalError
 
 
+def db_insert_log(pipeline, message, status="info", batch_id=None):
+    """Вставляет запись в таблицу log. Возвращает log_id (str) или None."""
+    from .connection import get_db as _get_db
+    try:
+        with _get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO log (batch_id, pipeline, message, status)
+                    VALUES (%s, %s, %s, %s)
+                    RETURNING id
+                    """,
+                    (batch_id, pipeline, message, status),
+                )
+                log_id = cur.fetchone()[0]
+            conn.commit()
+        return str(log_id)
+    except Exception as e:
+        print(f"[DB] Ошибка db_insert_log: {e}")
+        return None
+
+
 def db_insert_log_entry(log_id, message, level):
     import utils.workflow_state as wf_state
     if not wf_state.asserted_log_entry.get():

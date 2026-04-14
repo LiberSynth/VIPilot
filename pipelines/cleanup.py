@@ -19,7 +19,7 @@ from db import (
     db_cleanup_batches,
     db_cleanup_video_data,
 )
-from log import db_log_pipeline
+from log import write_log
 from utils.utils import parse_entries_lifetime, parse_log_lifetime, parse_batch_lifetime, parse_file_lifetime
 from pipelines.base import pipeline_log
 
@@ -68,7 +68,7 @@ def run():
                 pipeline_log(None, f"[cleanup] Обнулено movies.raw_data/transcoded_data: {n}")
 
         if summary:
-            db_log_pipeline("cleanup", "Очистка: " + ", ".join(summary), status="ok")
+            write_log("cleanup", "Очистка: " + ", ".join(summary), status="ok")
 
     except Exception as e:
         pipeline_log(None, f"[cleanup] Необработанная ошибка: {e}")
