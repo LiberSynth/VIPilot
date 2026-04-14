@@ -5,7 +5,7 @@ import threading
 
 from db import db_set_batch_status
 from log import write_log, db_log_update, write_log_entry
-from exceptions import AppException
+from common.exceptions import AppException
 import utils.workflow_state as wf_state
 
 

@@ -31,7 +31,7 @@ from db import (
 )
 from log import db_log_update
 from pipelines.base import check_cancelled, pipeline_log
-from exceptions import AppException
+from common.exceptions import AppException
 from utils.utils import fmt_id_msg
 
 

@@ -28,7 +28,7 @@ from db import (
 )
 from log import db_log_update, db_get_log_entries
 from pipelines.base import check_cancelled, pipeline_log
-from exceptions import AppException
+from common.exceptions import AppException
 from utils.utils import fmt_id_msg
 from clients import vk
 from clients import dzen as dzen_client

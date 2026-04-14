@@ -7,7 +7,7 @@ from db import (
     db_get_distinct_batch_statuses,
 )
 from db.connection import get_db
-from statuses import FINAL_BATCH_STATUSES, _assert_known_status
+from common.statuses import FINAL_BATCH_STATUSES, _assert_known_status
 from log.log import write_log, write_log_entry
 from utils.consts import FLASK_SECRET
 from utils.limiter import limiter

@@ -3,7 +3,7 @@ import psycopg2
 import psycopg2.extras
 
 from .connection import get_db
-from statuses import _assert_known_status, PIPELINE_RESET_STATUS
+from common.statuses import _assert_known_status, PIPELINE_RESET_STATUS
 
 
 def db_ensure_batch(scheduled_at):

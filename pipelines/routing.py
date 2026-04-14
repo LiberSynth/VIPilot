@@ -1,5 +1,5 @@
 from pipelines import story, video, transcode, publish
-from statuses import PUBLISH_ROUTING_SUFFIXES
+from common.statuses import PUBLISH_ROUTING_SUFFIXES
 
 _STATUS_TO_PIPELINE = {
     'pending':          story,

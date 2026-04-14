@@ -6,8 +6,8 @@ from db import (
     db_get_actionable_batches,
     db_set_batch_status,
 )
-from exceptions import AppException
-from startup import init_app, create_app
+from common.exceptions import AppException
+from common.startup import init_app, create_app
 from log import write_log, write_log_entry
 from pipelines import publish, cleanup
 import pipelines.planning as planning
@@ -16,7 +16,7 @@ from pipelines.runner import start_batch_thread
 import utils.workflow_state as wf_state
 import utils.keepalive as keepalive
 from utils.middleware import register_middleware
-from upgrade import check_upgrade
+from db.upgrade import check_upgrade
 
 flask_app = create_app()
 register_middleware(flask_app)

@@ -33,7 +33,7 @@ from db import (
 )
 from log import write_log, db_log_update
 from pipelines.base import check_cancelled, pipeline_log, iterate_models
-from exceptions import AppException
+from common.exceptions import AppException
 from clients import falai
 from clients.falai import ProviderFatalError
 from utils.utils import fmt_id_msg, nearest_allowed_duration

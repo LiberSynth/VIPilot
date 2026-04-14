@@ -1,7 +1,7 @@
 import psycopg2
 
 from .connection import get_db
-from statuses import _assert_known_status
+from common.statuses import _assert_known_status
 
 # АРХИТЕКТУРНОЕ РЕШЕНИЕ: хранение видеофайлов в PostgreSQL (BYTEA)
 #

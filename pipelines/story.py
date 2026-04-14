@@ -25,7 +25,7 @@ from db import (
 )
 from log import db_log_update
 from pipelines.base import check_cancelled, pipeline_log, iterate_models
-from exceptions import AppException
+from common.exceptions import AppException
 from clients import openrouter
 from utils.utils import fmt_id_msg
 

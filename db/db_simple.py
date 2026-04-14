@@ -3,7 +3,7 @@ import psycopg2
 import psycopg2.extras
 
 from .connection import get_db
-from exceptions import FatalError
+from common.exceptions import FatalError
 
 
 def db_insert_log(pipeline, message, status="info", batch_id=None):

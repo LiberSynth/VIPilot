@@ -36,7 +36,7 @@ def _assert_known_status(status: str) -> None:
     # и проверяются на этапе его внедрения.
     if any(status.endswith(sfx) for sfx in COMPOSITE_BATCH_STATUS_SUFFIXES):
         return
-    from exceptions import FatalError
+    from common.exceptions import FatalError
     raise FatalError(
         f"[DB] Неизвестный статус '{status}' — добавь его в KNOWN_BATCH_STATUSES или проверь конфиг таргета"
     )

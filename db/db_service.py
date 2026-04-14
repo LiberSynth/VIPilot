@@ -1,5 +1,5 @@
 from .connection import get_db
-from statuses import FINAL_BATCH_STATUSES
+from common.statuses import FINAL_BATCH_STATUSES
 
 
 def db_cleanup_log_entries(log_lifetime_days: int) -> int:
