@@ -1647,6 +1647,12 @@ def _m054_drop_remaining_foreign_keys(cur):
     """)
 
 
+def _m055_delete_vk_publish_settings(cur):
+    """Удаляет устаревшие ключи vk_publish_story и vk_publish_wall из таблицы settings.
+    Источником правды теперь служат targets.config.publish_method.story/wall."""
+    cur.execute("DELETE FROM settings WHERE key IN ('vk_publish_story', 'vk_publish_wall')")
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -1702,6 +1708,7 @@ MIGRATIONS = [
     (52, _m052_model_durations),
     (53, _m053_log_entries_log_id_nullable),
     (54, _m054_drop_remaining_foreign_keys),
+    (55, _m055_delete_vk_publish_settings),
 ]
 
 

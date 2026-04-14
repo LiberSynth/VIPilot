@@ -125,8 +125,11 @@ def root_page():
     use_donor          = env_get("use_donor", "1") == "1"
     notify_email       = db_get("notify_email", "")
     notify_phone       = db_get("notify_phone", "")
-    vk_publish_story   = db_get("vk_publish_story", "1") == "1"
-    vk_publish_wall    = db_get("vk_publish_wall",  "1") == "1"
+    vk_target  = db_get_target_by_name("VKontakte")
+    vk_active  = bool(vk_target.get("active")) if vk_target else False
+    _vk_pm     = (vk_target.get("config") or {}).get("publish_method", {}) if vk_target else {}
+    vk_publish_story   = bool(_vk_pm.get("story", 1))
+    vk_publish_wall    = bool(_vk_pm.get("wall",  1))
     video_duration     = max(1, min(60, int(db_get("video_duration", "6"))))
     video_post_prompt  = db_get("video_post_prompt", "")
     buffer_hours       = max(1, min(720, int(db_get("buffer_hours", "24"))))
@@ -146,9 +149,6 @@ def root_page():
     dzen_active    = bool(dzen_target.get("active")) if dzen_target else False
     from services.dzen_browser import get_session_saved_at as _dzen_saved_at
     dzen_session_saved_at = _dzen_saved_at()
-
-    vk_target  = db_get_target_by_name("VKontakte")
-    vk_active  = bool(vk_target.get("active")) if vk_target else False
 
     active_targets  = db_get_active_targets()
     target          = active_targets[0] if active_targets else None
@@ -287,8 +287,6 @@ def save():
         vk_wall_raw  = request.form.get("vk_publish_wall",  "0")
         if vk_story_raw != "1" and vk_wall_raw != "1":
             vk_story_raw = "1"
-        db_set("vk_publish_story", "1" if vk_story_raw == "1" else "0")
-        db_set("vk_publish_wall",  "1" if vk_wall_raw  == "1" else "0")
         db_update_target_publish_method_by_slug("vk", {
             "story": 1 if vk_story_raw == "1" else 0,
             "wall":  1 if vk_wall_raw  == "1" else 0,

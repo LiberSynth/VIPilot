@@ -29,8 +29,6 @@ def seed_db():
                         ('system_prompt',     ''),
                         ('notify_email',      ''),
                         ('notify_phone',      ''),
-                        ('vk_publish_story',  '1'),
-                        ('vk_publish_wall',   '1'),
                         ('video_duration',    '6'),
                         ('buffer_hours',      '24'),
                         ('loop_interval',     '15'),
