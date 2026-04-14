@@ -1,6 +1,7 @@
 /* ── Автосохранение черновика сюжета ── */
 var resetDraftStoryId;
 var setDraftStoryFromRecord;
+var getDraftStoryId;
 (function() {
   var _draftStoryId = null;
   var _draftTimer = null;
@@ -15,12 +16,15 @@ var setDraftStoryFromRecord;
     else if (state === 'existing') card.classList.add('card--editing-existing');
   }
 
+  getDraftStoryId = function() { return _draftStoryId; };
+
   resetDraftStoryId = function() {
     _draftStoryId = null;
     _draftSaving = false;
     _draftPendingRetry = false;
     clearTimeout(_draftTimer);
     setDraftCardState(null);
+    if (typeof window.updateReturnButton === 'function') window.updateReturnButton();
   };
 
   setDraftStoryFromRecord = function(story) {
@@ -33,6 +37,7 @@ var setDraftStoryFromRecord;
     _draftPendingRetry = false;
     clearTimeout(_draftTimer);
     setDraftCardState('existing');
+    if (typeof window.updateReturnButton === 'function') window.updateReturnButton();
   };
 
   function saveDraft() {
@@ -140,6 +145,7 @@ var setDraftStoryFromRecord;
     if (!stories || stories.length === 0) {
       updateStoriesCount(0);
       container.innerHTML = '<div class="stories-empty">Нет сюжетов</div>';
+      updateReturnButton();
       return;
     }
     updateStoriesCount(stories.length);
@@ -201,7 +207,21 @@ var setDraftStoryFromRecord;
         if (typeof setDraftStoryFromRecord === 'function') setDraftStoryFromRecord(storyObj);
       });
     });
+    updateReturnButton();
   }
+
+  function updateReturnButton() {
+    var btn = document.getElementById('btn-story-return');
+    if (!btn) return;
+    var forApproval = document.getElementById('filter-for-approval');
+    if (!forApproval || !forApproval.checked) { btn.hidden = true; return; }
+    var storyId = typeof getDraftStoryId === 'function' ? getDraftStoryId() : null;
+    if (!storyId) { btn.hidden = true; return; }
+    var container = document.getElementById('stories-list');
+    var inList = container && container.querySelector('.story-row[data-id="' + storyId + '"]');
+    btn.hidden = !!inList;
+  }
+  window.updateReturnButton = updateReturnButton;
 
   function cycleGrade(btn) {
     var storyId = btn.getAttribute('data-id');
@@ -286,6 +306,7 @@ var setDraftStoryFromRecord;
           fetch('/producer/env', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'screenwriter_only_good', value: '0' }) });
           fetch('/producer/env', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'screenwriter_show_used', value: '0' }) });
         }
+        updateReturnButton();
         onFilterChange('screenwriter_for_approval', forApproval);
       });
     }
@@ -322,8 +343,32 @@ var setDraftStoryFromRecord;
     });
   }
 
+  function initReturnButton() {
+    var btn = document.getElementById('btn-story-return');
+    if (!btn) return;
+    btn.addEventListener('click', function() {
+      var storyId = typeof getDraftStoryId === 'function' ? getDraftStoryId() : null;
+      if (!storyId) return;
+      btn.disabled = true;
+      fetch('/producer/story/' + storyId + '/grade', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ grade: null }),
+      })
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(d) {
+        btn.disabled = false;
+        if (d && d.ok) {
+          if (typeof window.loadStoriesList === 'function') window.loadStoriesList();
+        }
+      })
+      .catch(function() { btn.disabled = false; });
+    });
+  }
+
   function initAll() {
     initNewStoryButton();
+    initReturnButton();
     initFilterCheckboxes();
   }
 

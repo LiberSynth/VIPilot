@@ -998,6 +998,20 @@
   .story-icon-ai-manual svg { opacity: 1; }
   .story-icon-used      svg { stroke: #3ecf8e; opacity: .8; }
 
+  .btn-story-return {
+    position: absolute; top: 12px; right: 12px;
+    width: 28px; height: 28px;
+    background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.13);
+    border-radius: 7px; cursor: pointer; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+    transition: background .15s, border-color .15s;
+  }
+  .btn-story-return:hover { background: rgba(255,255,255,.13); border-color: rgba(255,255,255,.25); }
+  .btn-story-return:active { background: rgba(255,255,255,.2); }
+  .btn-story-return:disabled { opacity: .4; cursor: default; }
+  .btn-story-return svg { width: 14px; height: 14px; stroke: #a0a0cc; }
+  .btn-story-return:hover svg { stroke: #e0e0f0; }
+
   /* ── Тултип долгого нажатия (мобильный) ── */
   #touch-tooltip {
     position: fixed;

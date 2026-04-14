@@ -38,7 +38,6 @@ def db_insert_log_entry(log_id, message, level):
 
 
 def env_get(key, default=""):
-    print("Вызван метод env_get")
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute("SELECT value FROM environment WHERE key = %s", (key,))
