@@ -29,9 +29,9 @@ def db_insert_log(pipeline, message, status="info", batch_id=None):
 
 
 def db_insert_log_entry(log_id, message, level):
-    import utils.workflow_state as wf_state
+    import common.environment as wf_state
     if not wf_state.asserted_log_entry.get():
-        raise FatalError("db_insert_log_entry вызвана без guard-флага asserted_log_entry")
+        raise FatalError("Нарушение конвенции логирования")
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(

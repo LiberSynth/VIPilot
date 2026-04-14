@@ -13,7 +13,7 @@ from pipelines import publish, cleanup
 import pipelines.planning as planning
 from pipelines.routing import get_pipeline
 from pipelines.runner import start_batch_thread
-import utils.workflow_state as wf_state
+import common.environment as wf_state
 import utils.keepalive as keepalive
 from utils.middleware import register_middleware
 from db.upgrade import check_upgrade

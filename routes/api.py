@@ -35,7 +35,7 @@ from db import (
 from log import db_get_log, db_get_monitor, write_log, log_batch_planned
 from utils.auth import is_authenticated
 from utils.utils import parse_hhmm, to_msk, to_utc_from_msk
-import utils.workflow_state as wf_state
+import common.environment as wf_state
 
 bp = Blueprint("api", __name__, url_prefix="/api")
 

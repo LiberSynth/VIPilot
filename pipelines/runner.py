@@ -6,7 +6,7 @@ import threading
 from db import db_set_batch_status
 from log import write_log, db_log_update, write_log_entry
 from common.exceptions import AppException
-import utils.workflow_state as wf_state
+import common.environment as wf_state
 
 
 def _handle_batch_error(e, batch_id, pipeline_name, log_id):
