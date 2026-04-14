@@ -6,7 +6,7 @@ import threading
 from db import db_set_batch_status
 from log import write_log, db_log_update, write_log_entry
 from common.exceptions import AppException
-import common.environment as wf_state
+import common.environment as environment
 
 
 def _handle_batch_error(e, batch_id, pipeline_name, log_id):
@@ -30,8 +30,8 @@ def run_batch(batch_id, pipeline, log_id):
     except Exception as e:
         _handle_batch_error(e, batch_id, pipeline_name, log_id)
     finally:
-        wf_state.release_batch(batch_id)
-        wf_state.wakeup_loop()
+        environment.release_batch(batch_id)
+        environment.wakeup_loop()
 
 
 def start_batch_thread(batch_id, pipeline, pipeline_name):

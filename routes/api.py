@@ -36,7 +36,7 @@ from db import (
 from log import db_get_monitor, write_log, log_batch_planned, write_log_entry
 from utils.auth import is_authenticated
 from utils.utils import parse_hhmm, to_msk, to_utc_from_msk
-import common.environment as wf_state
+import common.environment as environment
 
 bp = Blueprint("api", __name__, url_prefix="/api")
 
@@ -57,7 +57,7 @@ def api_run_now():
         log_batch_planned(batch_id, 'Оперативный запуск', "Запуск по запросу пользователя (внеплановый)")
     except Exception as e:
         write_log_entry(None, f"[api_run_now] log_batch_planned failed for batch_id={batch_id}: {e}", level='silent')
-    wf_state.wakeup_loop()
+    environment.wakeup_loop()
     return jsonify({"ok": True, "batch_id": batch_id})
 
 
@@ -66,7 +66,7 @@ def api_monitor():
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
     data = db_get_monitor()
-    data['active_batch_ids'] = list(wf_state.get_active_batch_ids())
+    data['active_batch_ids'] = list(environment.get_active_batch_ids())
     return jsonify(data)
 
 
@@ -97,7 +97,7 @@ def api_add_schedule_slot():
     new_id = db_add_schedule_slot(time_utc)
     if new_id is None:
         return jsonify({"error": "db error"}), 500
-    wf_state.wakeup_loop()
+    environment.wakeup_loop()
     return jsonify({"id": new_id, "time_msk": f"{h_msk:02d}:{m_msk:02d}"})
 
 
@@ -106,7 +106,7 @@ def api_delete_schedule_slot(slot_id):
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
     ok = db_delete_schedule_slot(slot_id)
-    wf_state.wakeup_loop()
+    environment.wakeup_loop()
     return jsonify({"ok": ok})
 
 
@@ -193,7 +193,7 @@ def api_text_model_probe(model_id):
         log_batch_planned(batch_id, 'Пробный запуск текстовой модели', f"Модель: {m['name']}")
     except Exception as e:
         write_log_entry(None, f"[api_text_model_probe] log_batch_planned failed for batch_id={batch_id}: {e}", level='silent')
-    wf_state.wakeup_loop()
+    environment.wakeup_loop()
     return jsonify({"batch_id": batch_id})
 
 
@@ -229,7 +229,7 @@ def api_video_model_probe(model_id):
         log_batch_planned(batch_id, 'Пробный запуск видеомодели', f"Модель: {m['name']}")
     except Exception as e:
         write_log_entry(None, f"[api_video_model_probe] log_batch_planned failed for batch_id={batch_id}: {e}", level='silent')
-    wf_state.wakeup_loop()
+    environment.wakeup_loop()
     return jsonify({"batch_id": batch_id})
 
 
@@ -270,7 +270,7 @@ def api_workflow_state():
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
     state = env_get("workflow_state", "running")
-    return jsonify({"state": state, "active_threads": wf_state.get_active_threads()})
+    return jsonify({"state": state, "active_threads": environment.get_active_threads()})
 
 
 @bp.route("/workflow/start", methods=["POST"])
@@ -278,7 +278,7 @@ def api_workflow_start():
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
     env_set("workflow_state", "running")
-    wf_state.set_running()
+    environment.set_running()
     write_log('root', "Движок запущен вручную", status='info')
     return jsonify({"ok": True, "state": "running"})
 
@@ -288,7 +288,7 @@ def api_workflow_pause():
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
     env_set("workflow_state", "pause")
-    wf_state.set_paused()
+    environment.set_paused()
     write_log('root', "Движок приостановлен вручную", status='info')
     return jsonify({"ok": True, "state": "pause"})
 
@@ -344,7 +344,7 @@ def api_reset_batch_pipeline(batch_id, pipeline):
     ok = db_reset_batch_pipeline(batch_id, pipeline)
     if not ok:
         return jsonify({"error": "Неизвестный пайплайн или батч не найден"}), 400
-    wf_state.wakeup_loop()
+    environment.wakeup_loop()
     return jsonify({"ok": True})
 
 
@@ -522,7 +522,7 @@ def api_producer_story_generate():
     batch_id = db_create_story_generate_batch()
     if not batch_id:
         return jsonify({"error": "db_error"}), 500
-    wf_state.wakeup_loop()
+    environment.wakeup_loop()
     log_batch_planned(batch_id, 'Генерация сюжета вручную', "Запуск по запросу пользователя")
     return jsonify({"batch_id": batch_id})
 

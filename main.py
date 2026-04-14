@@ -12,7 +12,7 @@ from pipelines import publish, cleanup
 import pipelines.planning as planning
 from pipelines.routing import get_pipeline
 from pipelines.runner import start_batch_thread
-import common.environment as wf_state
+import common.environment as environment
 import utils.keepalive as keepalive
 from utils.middleware import register_middleware
 from db.upgrade import check_upgrade
@@ -24,15 +24,15 @@ register_middleware(flask_app)
 def main_loop():
     while True:
         try:
-            wf_state.wait_if_paused()
-            wf_state.refresh_environment()
+            environment.wait_if_paused()
+            environment.refresh_environment()
 
             planning.run()
 
-            if wf_state.get_active_threads() < wf_state.max_threads:
+            if environment.get_active_threads() < environment.max_threads:
                 batches = db_get_actionable_batches()
                 for b in batches:
-                    if wf_state.get_active_threads() >= wf_state.max_threads:
+                    if environment.get_active_threads() >= environment.max_threads:
                         break
                     bid    = str(b['id'])
                     status = b['status']
@@ -41,7 +41,7 @@ def main_loop():
                         continue
                     if pipeline_module is publish and publish.is_scheduled(b):
                         continue
-                    if not wf_state.claim_batch(bid):
+                    if not environment.claim_batch(bid):
                         continue
                     pipeline_name = getattr(pipeline_module, '__name__', str(pipeline_module)).split('.')[-1]
                     start_batch_thread(bid, pipeline_module, pipeline_name)
@@ -55,7 +55,7 @@ def main_loop():
         except Exception as e:
             write_log_entry(None, f"[main_loop] Ошибка: {e}", level='error')
 
-        wf_state.wait_for_wakeup(wf_state.interval)
+        environment.wait_for_wakeup(environment.interval)
 
 
 _main_loop_started = False
@@ -72,7 +72,7 @@ def start_main_loop():
         _main_loop_started = True
         check_upgrade()
         init_app(flask_app)
-        wf_state.init_from_db()
+        environment.init_from_db()
         write_log('root', "Приложение запущено", status='info')
         atexit.register(_on_exit)
         t = threading.Thread(target=main_loop, daemon=True)

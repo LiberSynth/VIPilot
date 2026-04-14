@@ -38,7 +38,7 @@ def write_log_entry(log_id, message, level="info"):
     Если log_id равен None — запись в log_entries вставляется с log_id=NULL.
     При уровнях 'error' и 'fatal_error' вызывает notify_failure.
     """
-    import common.environment as wf_state
+    import common.environment as environment
     from db.db_simple import db_insert_log_entry
 
     assert level in _ALLOWED_LOG_LEVELS, (
@@ -48,11 +48,11 @@ def write_log_entry(log_id, message, level="info"):
     print(message)
     if level == "silent":
         return
-    token = wf_state.asserted_log_entry.set(True)
+    token = environment.asserted_log_entry.set(True)
     try:
         db_insert_log_entry(log_id, message, level)
     finally:
-        wf_state.asserted_log_entry.reset(token)
+        environment.asserted_log_entry.reset(token)
     if level in ("error", "fatal_error"):
         from utils.notify import notify_failure
         notify_failure(f"log#{log_id}: {message}")
