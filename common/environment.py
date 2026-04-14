@@ -1,7 +1,7 @@
 import threading
 from contextvars import ContextVar
 
-from db import env_get
+from db import env_get, db_get
 
 _resume_event = threading.Event()
 
@@ -77,6 +77,19 @@ def is_batch_active(batch_id: str) -> bool:
 def get_active_batch_ids() -> set:
     with _threads_lock:
         return set(_active_batch_ids)
+
+
+deep_debugging: bool = False
+interval: int = 5
+max_threads: int = 2
+
+
+def refresh_environment():
+    """Читает актуальные параметры окружения из БД."""
+    global deep_debugging, interval, max_threads
+    deep_debugging = db_get('deep_debugging', '0') == '1'
+    interval       = max(1, min(3600, int(db_get('loop_interval', '5'))))
+    max_threads    = max(1, min(32,   int(db_get('max_batch_threads', '2'))))
 
 
 def init_from_db():

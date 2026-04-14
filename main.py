@@ -2,7 +2,6 @@ import atexit
 import threading
 
 from db import (
-    db_get,
     db_get_actionable_batches,
     db_set_batch_status,
 )
@@ -24,19 +23,16 @@ register_middleware(flask_app)
 
 def main_loop():
     while True:
-        interval = 5
         try:
             wf_state.wait_if_paused()
-
-            interval = int(db_get('loop_interval'))
-            max_threads = max(1, min(32, int(db_get('max_batch_threads'))))
+            wf_state.refresh_environment()
 
             planning.run()
 
-            if wf_state.get_active_threads() < max_threads:
+            if wf_state.get_active_threads() < wf_state.max_threads:
                 batches = db_get_actionable_batches()
                 for b in batches:
-                    if wf_state.get_active_threads() >= max_threads:
+                    if wf_state.get_active_threads() >= wf_state.max_threads:
                         break
                     bid    = str(b['id'])
                     status = b['status']
@@ -59,7 +55,7 @@ def main_loop():
         except Exception as e:
             write_log_entry(None, f"[main_loop] Ошибка: {e}", level='error')
 
-        wf_state.wait_for_wakeup(interval)
+        wf_state.wait_for_wakeup(wf_state.interval)
 
 
 _main_loop_started = False
