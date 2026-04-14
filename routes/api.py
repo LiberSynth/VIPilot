@@ -338,6 +338,7 @@ def api_reset_batch_pipeline(batch_id, pipeline):
     ok = db_reset_batch_pipeline(batch_id, pipeline)
     if not ok:
         return jsonify({"error": "Неизвестный пайплайн или батч не найден"}), 400
+    wf_state.wakeup_loop()
     return jsonify({"ok": True})
 
 

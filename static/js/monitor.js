@@ -684,22 +684,27 @@
     const pipeline = btn.dataset.pip;
     if (!batchId || !pipeline) return;
     btn.disabled = true;
+    btn.classList.add('pending');
     fetch('/api/batch/' + encodeURIComponent(batchId) + '/reset/' + encodeURIComponent(pipeline), { method: 'POST' })
       .then(function(r) { return r.json(); })
       .then(function(data) {
+        btn.classList.remove('pending');
         if (data.ok) {
           btn.classList.add('copied');
           setTimeout(function() {
             btn.classList.remove('copied');
             btn.disabled = false;
             refreshMonitor();
-          }, 1500);
+          }, 1200);
         } else {
           btn.disabled = false;
           alert(data.error || 'Ошибка');
         }
       })
-      .catch(function() { btn.disabled = false; });
+      .catch(function() {
+        btn.classList.remove('pending');
+        btn.disabled = false;
+      });
   };
 
   window.monitorToggleLog = function(e, el) {

@@ -617,6 +617,9 @@
   .cycle-float-btn:hover svg * { stroke: #c8c8e8; }
   .cycle-float-btn.copied { border-color: rgba(62,207,142,.5); }
   .cycle-float-btn.copied svg * { stroke: #3ecf8e; }
+  .cycle-float-btn.pending { border-color: rgba(255,180,0,.5); animation: btn-pending-pulse 1s ease-in-out infinite; }
+  .cycle-float-btn.pending svg * { stroke: #ffb400; }
+  @keyframes btn-pending-pulse { 0%,100% { opacity:1; } 50% { opacity:.4; } }
 
   .monitor-log-list {
     border-top: 1px solid #111118;
