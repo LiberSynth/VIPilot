@@ -693,7 +693,6 @@
           btn.classList.add('copied');
           setTimeout(function() {
             btn.classList.remove('copied');
-            btn.disabled = false;
             refreshMonitor();
           }, 1200);
         } else {
