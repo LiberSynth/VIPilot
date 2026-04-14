@@ -24,7 +24,8 @@ var getDraftStoryId;
     _draftPendingRetry = false;
     clearTimeout(_draftTimer);
     setDraftCardState(null);
-    if (typeof window.updateReturnButton === 'function') window.updateReturnButton();
+    if (typeof window.resetGradedAwayFlag === 'function') window.resetGradedAwayFlag();
+    else if (typeof window.updateReturnButton === 'function') window.updateReturnButton();
   };
 
   setDraftStoryFromRecord = function(story) {
@@ -37,7 +38,8 @@ var getDraftStoryId;
     _draftPendingRetry = false;
     clearTimeout(_draftTimer);
     setDraftCardState('existing');
-    if (typeof window.updateReturnButton === 'function') window.updateReturnButton();
+    if (typeof window.resetGradedAwayFlag === 'function') window.resetGradedAwayFlag();
+    else if (typeof window.updateReturnButton === 'function') window.updateReturnButton();
   };
 
   function saveDraft() {
@@ -104,6 +106,8 @@ var getDraftStoryId;
 
 /* ── Список сюжетов в панели Сценариста ── */
 (function() {
+  var _storyGradedAway = false;
+
   var GRADE_CYCLE = ['good', 'bad', null];
   var GRADE_LABELS = { good: 'хорошо', bad: 'плохо', 'null': 'не указано' };
   var GRADE_COLORS = {
@@ -215,6 +219,7 @@ var getDraftStoryId;
     if (!btn) return;
     var forApproval = document.getElementById('filter-for-approval');
     if (!forApproval || !forApproval.checked) { btn.hidden = true; return; }
+    if (!_storyGradedAway) { btn.hidden = true; return; }
     var storyId = typeof getDraftStoryId === 'function' ? getDraftStoryId() : null;
     if (!storyId) { btn.hidden = true; return; }
     var container = document.getElementById('stories-list');
@@ -223,6 +228,10 @@ var getDraftStoryId;
     btn.hidden = !!inList;
   }
   window.updateReturnButton = updateReturnButton;
+  window.resetGradedAwayFlag = function() {
+    _storyGradedAway = false;
+    updateReturnButton();
+  };
 
   function cycleGrade(btn) {
     var storyId = btn.getAttribute('data-id');
@@ -248,6 +257,7 @@ var getDraftStoryId;
         btn.textContent = GRADE_LABELS[gk] || gk;
         btn.title = 'Оценка: ' + (GRADE_LABELS[gk] || gk) + '. Нажмите для смены';
 
+        if (grade !== null) { _storyGradedAway = true; }
         window.loadStoriesList();
       }
     })
