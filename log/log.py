@@ -13,20 +13,18 @@ _ALLOWED_PIPELINES = {
 }
 
 _ALLOWED_LOG_LEVELS = {
-    "root",
-    "planning",
-    "story",
-    "video",
-    "transcode",
-    "publish",
-    "cleanup",
+    "silent",
+    "info",
+    "warn",
+    "error",
+    "fatal_error",
 }
 
 def write_log(pipeline, message, status="info", batch_id=None):
     """Записывает событие пайплайна в таблицу log. Возвращает log_id или None."""
     assert pipeline in _ALLOWED_PIPELINES, (
         f"write_log: недопустимое имя пайплайна {pipeline!r}. "
-        f"Допустимые: {sorted(_ALLOWED_PIPELINES)}"
+        f"Допустимые: {_ALLOWED_PIPELINES}."
     )
     from db.db_simple import db_insert_log
     return db_insert_log(pipeline, message, status=status, batch_id=batch_id)
@@ -45,7 +43,7 @@ def write_log_entry(log_id, message, level="info"):
 
     assert level in _ALLOWED_LOG_LEVELS, (
         f"write_log_entry: недопустимый уровень {level!r}. "
-        "Допустимые значения: 'info', 'warn', 'error', 'fatal_error', 'silent'."
+        f"Допустимые: {_ALLOWED_LOG_LEVELS}."
     )
     print(message)
     if level == "silent":
