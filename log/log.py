@@ -50,11 +50,8 @@ def write_log_entry(log_id, message, level="info"):
     finally:
         wf_state.asserted_log_entry.reset(token)
     if level in ("error", "fatal_error"):
-        try:
-            from utils.notify import notify_failure
-            notify_failure(f"log#{log_id}: {message}")
-        except Exception as e:
-            write_log_entry(log_id, f"[log] Ошибка вызова notify_failure: {e}", level="warn")
+        from utils.notify import notify_failure
+        notify_failure(f"log#{log_id}: {message}")
 
 
 def log_batch_planned(batch_id, message, *entries):

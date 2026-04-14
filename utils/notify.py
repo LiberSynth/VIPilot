@@ -79,8 +79,11 @@ def send_failure_sms(message: str):
 
 
 def notify_failure(reason: str, log_entries=None, partial: bool = False):
-    prefix = "Частично" if partial else "Сбой"
-    msg = f"{prefix} {_msk_ts()}: {reason}"
-    write_log_entry(None, f"[УВЕДОМЛЕНИЕ] Отправляю уведомление [{prefix}]: {reason}", level='silent')
-    send_failure_email(msg, log_entries=log_entries or [], partial=partial)
-    send_failure_sms(msg)
+    try:
+        prefix = "Частично" if partial else "Сбой"
+        msg = f"{prefix} {_msk_ts()}: {reason}"
+        write_log_entry(None, f"[УВЕДОМЛЕНИЕ] Отправляю уведомление [{prefix}]: {reason}", level='silent')
+        send_failure_email(msg, log_entries=log_entries or [], partial=partial)
+        send_failure_sms(msg)
+    except Exception as e:
+        write_log_entry(None, f"[УВЕДОМЛЕНИЕ] Ошибка notify_failure: {e}", level='warn')
