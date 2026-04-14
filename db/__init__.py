@@ -82,6 +82,7 @@ from .db_ui import (
     db_get_batch_logs,
     db_get_stories_list,
     db_get_stories_pool,
+    db_count_good_pool,
     db_get_models,
     db_get_user_by_login,
 )

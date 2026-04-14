@@ -28,6 +28,7 @@ from db import (
     db_get,
     db_get_stories_list,
     db_get_stories_pool,
+    db_count_good_pool,
     db_set_story_grade,
     db_upsert_story_draft,
     db_create_story_generate_batch,
@@ -456,6 +457,14 @@ def api_producer_stories_pool():
     approve_stories = db_get("approve_stories", "0") == "1"
     stories = db_get_stories_pool(grade_required=approve_stories)
     return jsonify(stories)
+
+
+@producer_bp.route("/producer/stories/good_pool_count", methods=["GET"])
+def api_producer_good_pool_count():
+    err = _producer_auth_check()
+    if err:
+        return err
+    return jsonify({"count": db_count_good_pool()})
 
 
 @producer_bp.route("/producer/env", methods=["POST"])

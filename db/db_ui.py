@@ -142,6 +142,21 @@ def db_get_stories_pool(grade_required: bool = True) -> list:
     return [{"id": row[0], "title": row[1] or "", "content": row[2] or ""} for row in rows]
 
 
+def db_count_good_pool() -> int:
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT COUNT(*) FROM stories
+                WHERE grade = 'good'
+                  AND NOT EXISTS (
+                      SELECT 1 FROM batches b
+                      WHERE b.story_id = stories.id AND b.movie_id IS NOT NULL
+                  )
+            """)
+            row = cur.fetchone()
+    return row[0] if row else 0
+
+
 def db_get_models(model_type: str):
     with get_db() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
