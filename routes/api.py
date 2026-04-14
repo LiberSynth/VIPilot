@@ -31,6 +31,7 @@ from db import (
     db_set_story_grade,
     db_upsert_story_draft,
     db_create_story_generate_batch,
+    db_set,
 )
 from log import db_get_monitor, write_log, log_batch_planned, write_log_entry
 from utils.auth import is_authenticated
@@ -290,6 +291,18 @@ def api_workflow_pause():
     wf_state.set_paused()
     write_log('root', "Движок приостановлен вручную", status='info')
     return jsonify({"ok": True, "state": "pause"})
+
+
+@bp.route("/workflow/deep_debugging", methods=["POST"])
+def api_workflow_deep_debugging():
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    body = request.get_json(silent=True) or {}
+    val = "1" if body.get("enabled") == "1" else "0"
+    db_set("deep_debugging", val)
+    label = "включена" if val == "1" else "выключена"
+    write_log('root', f"Глубокая отладка {label}", status='info')
+    return jsonify({"ok": True, "deep_debugging": val})
 
 
 @bp.route("/workflow/use_donor", methods=["POST"])

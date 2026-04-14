@@ -66,6 +66,22 @@ function wfPause() {
     .catch(function() { btn.disabled = false; showToast('Ошибка соединения', 'error'); });
 }
 
+function wfDeepDebugging(checked) {
+  fetch('/api/workflow/deep_debugging', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled: checked ? '1' : '0' }),
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var badge = document.getElementById('deep-debugging-badge');
+      var on    = d.deep_debugging === '1';
+      if (badge) badge.style.display = on ? '' : 'none';
+      showToast(on ? 'Глубокая отладка: включена' : 'Глубокая отладка: выключена', 'success');
+    })
+    .catch(function() { showToast('Ошибка соединения', 'error'); });
+}
+
 function wfUseDonor(checked) {
   fetch('/api/workflow/use_donor', {
     method: 'POST',

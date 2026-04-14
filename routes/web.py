@@ -135,6 +135,7 @@ def root_page():
     story_fails_to_next = max(1, int(db_get("story_fails_to_next", "3")))
     video_fails_to_next = max(1, int(db_get("video_fails_to_next", "3")))
     approve_stories     = db_get("approve_stories", "0") == "1"
+    deep_debugging      = db_get("deep_debugging",  "0") == "1"
 
     workflow_state = env_get("workflow_state", "running")
 
@@ -178,6 +179,7 @@ def root_page():
         story_fails_to_next=story_fails_to_next,
         video_fails_to_next=video_fails_to_next,
         approve_stories=approve_stories,
+        deep_debugging=deep_debugging,
         workflow_state=workflow_state,
         target_id=target_id,
         aspect_ratio_x=aspect_ratio_x,

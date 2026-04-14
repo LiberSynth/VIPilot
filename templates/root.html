@@ -187,6 +187,17 @@
           <button class="wf-btn wf-restart" id="wf-btn-restart" onclick="openRestartDialog()">Перезапустить</button>
         </div>
       </div>
+      <div class="wf-row" style="margin-top:12px;padding-top:10px;border-top:1px solid #1e1e2e">
+        <div style="flex:1">
+          <div class="toggle-label">Глубокая отладка</div>
+        </div>
+        <span id="deep-debugging-badge" class="emulation-badge" {% if not deep_debugging %}style="display:none"{% endif %}>ВКЛ</span>
+        <label class="toggle-wrap" style="margin-left:8px">
+          <input type="checkbox" id="deep_debugging_check" {% if deep_debugging %}checked{% endif %}
+                 onchange="wfDeepDebugging(this.checked)">
+          <span class="toggle-track"></span>
+        </label>
+      </div>
     </div>
 
     <div class="card" style="margin-top:12px">
