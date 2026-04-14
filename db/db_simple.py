@@ -1,3 +1,4 @@
+from log.log import write_log, write_log_entry
 import json
 import psycopg2
 import psycopg2.extras
@@ -25,6 +26,7 @@ def db_insert_log(pipeline, message, status="info", batch_id=None):
 
 def db_insert_log_entry(log_id, message, level):
     import common.environment as environment
+
     if not environment.asserted_log_entry.get():
         raise FatalError("Нарушение конвенции логирования")
     with get_db() as conn:
@@ -66,24 +68,31 @@ def db_get(key, default=""):
 
 
 def db_set(key, value):
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                INSERT INTO settings (key, value) VALUES (%s, %s)
-                ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
-                """,
-                (key, value),
-            )
-        conn.commit()
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO settings (key, value) VALUES (%s, %s)
+                    ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+                    """,
+                    (key, value),
+                )
+            conn.commit()
+    except:
+        write_log_entry(None, "Ошибка при записи в БД", level="error")
 
 
 def db_get_schedule():
     with get_db() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT id, time_utc, created_at FROM schedule ORDER BY time_utc")
+            cur.execute(
+                "SELECT id, time_utc, created_at FROM schedule ORDER BY time_utc"
+            )
             rows = cur.fetchall()
-    return [{"id": str(row[0]), "time_utc": row[1], "created_at": row[2]} for row in rows]
+    return [
+        {"id": str(row[0]), "time_utc": row[1], "created_at": row[2]} for row in rows
+    ]
 
 
 def db_add_schedule_slot(time_utc):
@@ -114,7 +123,15 @@ def db_get_active_targets():
             )
             rows = cur.fetchall()
     return [
-        {"id": str(row[0]), "name": row[1], "aspect_ratio_x": row[2], "aspect_ratio_y": row[3], "transcode": bool(row[4]), "config": row[5] or {}, "slug": row[6] or ""}
+        {
+            "id": str(row[0]),
+            "name": row[1],
+            "aspect_ratio_x": row[2],
+            "aspect_ratio_y": row[3],
+            "transcode": bool(row[4]),
+            "config": row[5] or {},
+            "slug": row[6] or "",
+        }
         for row in rows
     ]
 
@@ -135,7 +152,7 @@ def db_update_target_aspect_ratio(target_id, x, y):
         with conn.cursor() as cur:
             cur.execute(
                 "UPDATE targets SET aspect_ratio_x = %s, aspect_ratio_y = %s WHERE id = %s",
-                (x, y, target_id)
+                (x, y, target_id),
             )
         conn.commit()
     return True
@@ -294,8 +311,12 @@ def db_upsert_story_draft(story_id, title, content):
 def db_activate_model(model_id: str, model_type: str):
     with get_db() as conn:
         with conn.cursor() as cur:
-            cur.execute("UPDATE ai_models SET active = FALSE WHERE type = %s", (model_type,))
-            cur.execute("UPDATE ai_models SET active = TRUE  WHERE id = %s", (model_id,))
+            cur.execute(
+                "UPDATE ai_models SET active = FALSE WHERE type = %s", (model_type,)
+            )
+            cur.execute(
+                "UPDATE ai_models SET active = TRUE  WHERE id = %s", (model_id,)
+            )
         conn.commit()
     return True
 
@@ -315,7 +336,9 @@ def db_reorder_models(ids: list):
     with get_db() as conn:
         with conn.cursor() as cur:
             for idx, model_id in enumerate(ids, start=1):
-                cur.execute('UPDATE ai_models SET "order" = %s WHERE id = %s', (idx, model_id))
+                cur.execute(
+                    'UPDATE ai_models SET "order" = %s WHERE id = %s', (idx, model_id)
+                )
         conn.commit()
     return True
 
