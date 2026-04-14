@@ -12,6 +12,7 @@ import time
 import requests
 
 from log import write_log_entry
+from utils.utils import fmt_id_msg
 
 _VK_TOKEN = os.environ.get('VK_USER_TOKEN', '')
 _VK_API   = 'https://api.vk.com/method'
@@ -79,7 +80,7 @@ def publish_story(video_data: bytes, group_id: int, log_id, title: str = '') -> 
     if 'response' in save:
         story_id = save['response']['items'][0]['id']
         if log_id:
-            write_log_entry(log_id, f'История опубликована: id={story_id}')
+            write_log_entry(log_id, fmt_id_msg('История опубликована: id={}', story_id))
         return story_id
 
     if log_id:

@@ -39,6 +39,15 @@ FOUND=$(grep -rn --include="*.py" \
     | grep -v "^routes/api\.py:")
 [ -n "$FOUND" ] && fail "Конвенция 3: прямое env_get() для ключей окружения вне environment.py" "$FOUND"
 
+# ── Конвенция 6: UUID/GUID в логах — только через fmt_id_msg ─────────────────
+# Ищем строки в log/write_log-вызовах, где batch_id или story_id вставлены
+# напрямую в f-строку без fmt_id_msg.
+FOUND=$(grep -rn --include="*.py" \
+    -E "(write_log_entry|write_log|db_log_update)\b.*f['\"].*\{(batch_id|story_id|donor_id|publisher_id)\}" \
+    $PROJECT_DIRS \
+    | grep -v "fmt_id_msg")
+[ -n "$FOUND" ] && fail "Конвенция 6: UUID вставлен напрямую в лог (использовать fmt_id_msg)" "$FOUND"
+
 # ── Конвенция 7: защищённые переменные не читать напрямую в потоках ───────────
 # Только пайплайны-потоки (не planning.py — он в главном потоке)
 THREAD_PIPELINES="pipelines/story.py pipelines/video.py pipelines/transcode.py pipelines/publish.py"

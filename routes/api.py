@@ -35,7 +35,7 @@ from db import (
 )
 from log import db_get_monitor, write_log, log_batch_planned, write_log_entry
 from utils.auth import is_authenticated
-from utils.utils import parse_hhmm, to_msk, to_utc_from_msk
+from utils.utils import fmt_id_msg, parse_hhmm, to_msk, to_utc_from_msk
 import common.environment as environment
 
 bp = Blueprint("api", __name__, url_prefix="/api")
@@ -56,7 +56,7 @@ def api_run_now():
     try:
         log_batch_planned(batch_id, 'Оперативный запуск', "Запуск по запросу пользователя (внеплановый)")
     except Exception as e:
-        write_log_entry(None, f"[api_run_now] log_batch_planned failed for batch_id={batch_id}: {e}", level='silent')
+        write_log_entry(None, fmt_id_msg("[api_run_now] log_batch_planned failed — батч {}", batch_id) + f": {e}", level='silent')
     environment.wakeup_loop()
     return jsonify({"ok": True, "batch_id": batch_id})
 
@@ -192,7 +192,7 @@ def api_text_model_probe(model_id):
     try:
         log_batch_planned(batch_id, 'Пробный запуск текстовой модели', f"Модель: {m['name']}")
     except Exception as e:
-        write_log_entry(None, f"[api_text_model_probe] log_batch_planned failed for batch_id={batch_id}: {e}", level='silent')
+        write_log_entry(None, fmt_id_msg("[api_text_model_probe] log_batch_planned failed — батч {}", batch_id) + f": {e}", level='silent')
     environment.wakeup_loop()
     return jsonify({"batch_id": batch_id})
 
@@ -228,7 +228,7 @@ def api_video_model_probe(model_id):
     try:
         log_batch_planned(batch_id, 'Пробный запуск видеомодели', f"Модель: {m['name']}")
     except Exception as e:
-        write_log_entry(None, f"[api_video_model_probe] log_batch_planned failed for batch_id={batch_id}: {e}", level='silent')
+        write_log_entry(None, fmt_id_msg("[api_video_model_probe] log_batch_planned failed — батч {}", batch_id) + f": {e}", level='silent')
     environment.wakeup_loop()
     return jsonify({"batch_id": batch_id})
 
