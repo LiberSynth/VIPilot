@@ -4,7 +4,7 @@
 import threading
 
 from db import db_set_batch_status
-from log import db_log_pipeline, db_log_update, log_entry
+from log import db_log_pipeline, log_entry
 from exceptions import AppException
 import utils.workflow_state as wf_state
 
@@ -12,14 +12,10 @@ import utils.workflow_state as wf_state
 def _handle_batch_error(e, batch_id, pipeline_name, log_id):
     if isinstance(e, AppException):
         db_set_batch_status(batch_id, 'error')
-        msg = f"Ошибка пайплайна {e.pipeline}: {e.message}"
-        db_log_update(log_id, msg, 'error')
-        log_entry(log_id, msg, level='error')
+        log_entry(log_id, f"Ошибка пайплайна {e.pipeline}: {e.message}", level='error')
     else:
         db_set_batch_status(batch_id, 'fatal_error')
-        msg = f"Критическая ошибка: {e}"
-        db_log_update(log_id, msg, 'fatal_error')
-        log_entry(log_id, msg, level='fatal_error')
+        log_entry(log_id, f"Критическая ошибка: {e}", level='fatal_error')
 
 
 def run_batch(batch_id, pipeline, log_id):
