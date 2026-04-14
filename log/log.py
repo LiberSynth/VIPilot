@@ -26,19 +26,6 @@ def write_log(pipeline, message, status="info", batch_id=None):
     return db_insert_log(pipeline, message, status=status, batch_id=batch_id)
 
 
-def _notify_on_error(log_id, message, level):
-    """Вызывает notify_failure при уровнях 'error' и 'fatal_error'.
-    Импорт отложен, чтобы избежать циклических зависимостей."""
-    if level not in ("error", "fatal_error"):
-        return
-    try:
-        from utils.notify import notify_failure
-
-        notify_failure(f"log#{log_id}: {message}")
-    except Exception as e:
-        print(f"[log] Ошибка вызова notify_failure: {e}")
-
-
 def write_log_entry(log_id, message, level="info"):
     """Добавляет субзапись к существующей записи лога.
 
@@ -62,7 +49,12 @@ def write_log_entry(log_id, message, level="info"):
         db_insert_log_entry(log_id, message, level)
     finally:
         wf_state.asserted_log_entry.reset(token)
-    _notify_on_error(log_id, message, level)
+    if level in ("error", "fatal_error"):
+        try:
+            from utils.notify import notify_failure
+            notify_failure(f"log#{log_id}: {message}")
+        except Exception as e:
+            write_log_entry(log_id, f"[log] Ошибка вызова notify_failure: {e}", level="warn")
 
 
 def log_batch_planned(batch_id, message, *entries):
