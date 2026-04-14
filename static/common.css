@@ -1006,6 +1006,7 @@
     display: flex; align-items: center; justify-content: center;
     transition: background .15s, border-color .15s;
   }
+  .btn-story-return[hidden] { display: none; }
   .btn-story-return:hover { background: rgba(255,255,255,.13); border-color: rgba(255,255,255,.25); }
   .btn-story-return:active { background: rgba(255,255,255,.2); }
   .btn-story-return:disabled { opacity: .4; cursor: default; }
