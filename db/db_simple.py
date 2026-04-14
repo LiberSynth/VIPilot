@@ -1,4 +1,3 @@
-from log.log import write_log, write_log_entry
 import json
 import psycopg2
 import psycopg2.extras
@@ -68,19 +67,16 @@ def db_get(key, default=""):
 
 
 def db_set(key, value):
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    INSERT INTO settings (key, value) VALUES (%s, %s)
-                    ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
-                    """,
-                    (key, value),
-                )
-            conn.commit()
-    except:
-        write_log_entry(None, "Ошибка при записи в БД", level="error")
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO settings (key, value) VALUES (%s, %s)
+                ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+                """,
+                (key, value),
+            )
+        conn.commit()
 
 
 def db_get_schedule():
