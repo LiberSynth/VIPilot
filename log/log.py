@@ -46,13 +46,15 @@ def write_log_entry(log_id, message, level="info"):
         f"Допустимые: {_ALLOWED_LOG_LEVELS}."
     )
     print(message)
-    if level == "silent":
+    if level == "silent" and not environment.deep_logging:
         return
     token = environment.asserted_log_entry.set(True)
     try:
         db_insert_log_entry(log_id, message, level)
     finally:
         environment.asserted_log_entry.reset(token)
+    if level == "silent":
+        return
     if level in ("error", "fatal_error"):
         from utils.notify import notify_failure
         notify_failure(f"log#{log_id}: {message}")
