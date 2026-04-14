@@ -19,6 +19,7 @@ import os
 import subprocess
 import tempfile
 
+import common.environment as environment
 from utils.notify import notify_failure
 from db import (
     db_get,
@@ -84,6 +85,7 @@ def _ffmpeg(src, dst, log_id):
 
 
 def run(batch_id, log_id):
+    snap = environment.snapshot()
     try:
         batch = db_get_batch_by_id(batch_id)
         if not batch:

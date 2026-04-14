@@ -12,6 +12,7 @@ Pipeline 5 — Публикация.
 
 from datetime import datetime, timezone
 
+import common.environment as environment
 from utils.notify import notify_failure
 from db import (
     db_get,
@@ -147,6 +148,7 @@ def _build_steps(active_targets):
 
 
 def run(batch_id, log_id):
+    snap = environment.snapshot()
     try:
         batch = db_get_batch_by_id(batch_id)
         if not batch:
