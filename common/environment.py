@@ -81,15 +81,17 @@ def get_active_batch_ids() -> set:
 
 deep_logging: bool = False
 emulation_mode: bool = False
+use_donor: bool = True
 loop_interval: int = 15
 max_threads: int = 5
 
 
 def refresh_environment():
     """Читает актуальные параметры окружения из БД."""
-    global deep_logging, emulation_mode, loop_interval, max_threads
+    global deep_logging, emulation_mode, use_donor, loop_interval, max_threads
     deep_logging   = db_get('deep_debugging',    '0') == '1'
     emulation_mode = env_get('emulation_mode',   '0') == '1'
+    use_donor      = env_get('use_donor',        '1') == '1'
     loop_interval  = max(1, min(3600, int(db_get('loop_interval',     '15'))))
     max_threads    = max(1, min(32,   int(db_get('max_batch_threads', '5'))))
 

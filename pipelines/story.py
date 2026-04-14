@@ -22,7 +22,6 @@ from db import (
     db_set_batch_story_ready_from_donor,
     db_claim_unused_story_for_batch,
     db_get_story_title,
-    env_get,
 )
 from log import db_log_update, write_log_entry
 from pipelines.base import check_cancelled, iterate_models
@@ -67,7 +66,7 @@ def run(batch_id, log_id):
         if not is_probe and check_cancelled('story', batch_id, batch, log_id):
             return
 
-        if not is_probe and not environment.emulation_mode and env_get('use_donor', '1') == '1' \
+        if not is_probe and not environment.emulation_mode and environment.use_donor \
                 and batch.get('story_id') is None:
             batch_data = batch.get('data') or {}
             donor_batch_id = batch_data.get('donor_batch_id') if isinstance(batch_data, dict) else None
