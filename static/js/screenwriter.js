@@ -227,22 +227,7 @@ var setDraftStoryFromRecord;
         btn.textContent = GRADE_LABELS[gk] || gk;
         btn.title = 'Оценка: ' + (GRADE_LABELS[gk] || gk) + '. Нажмите для смены';
 
-        var onlyGoodCb = document.getElementById('filter-only-good');
-        var onlyGood = onlyGoodCb ? onlyGoodCb.checked : false;
-        var showUsedCb = document.getElementById('filter-show-used');
-        var showUsed = showUsedCb ? showUsedCb.checked : true;
-        var storyRow = document.querySelector('.story-row[data-id="' + storyId + '"]');
-        var isUsed = storyRow ? storyRow.getAttribute('data-used') === '1' : false;
-        var shouldHide = (onlyGood && grade === 'bad') || (!showUsed && isUsed);
-        if (shouldHide && storyRow) {
-          storyRow.parentNode.removeChild(storyRow);
-          var storiesList = document.getElementById('stories-list');
-          var remaining = storiesList ? storiesList.querySelectorAll('.story-row').length : 0;
-          updateStoriesCount(remaining);
-          if (storiesList && remaining === 0) {
-            storiesList.innerHTML = '<div class="stories-empty">Нет сюжетов</div>';
-          }
-        }
+        window.loadStoriesList();
       }
     })
     .catch(function() { btn.disabled = false; });
