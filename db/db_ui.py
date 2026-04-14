@@ -74,12 +74,16 @@ def db_get_batch_logs(batch_id):
     }
 
 
-def db_get_stories_list(show_used=True, show_bad=True):
+def db_get_stories_list(show_used=True, show_bad=True, for_approval=False):
     conditions = []
-    if not show_used:
+    if for_approval:
+        conditions.append("s.grade IS NULL")
         conditions.append("NOT EXISTS (SELECT 1 FROM batches b WHERE b.story_id = s.id AND b.movie_id IS NOT NULL)")
-    if not show_bad:
-        conditions.append("s.grade = 'good'")
+    else:
+        if not show_used:
+            conditions.append("NOT EXISTS (SELECT 1 FROM batches b WHERE b.story_id = s.id AND b.movie_id IS NOT NULL)")
+        if not show_bad:
+            conditions.append("s.grade = 'good'")
     where_clause = ("WHERE " + " AND ".join(conditions)) if conditions else ""
     with get_db() as conn:
         with conn.cursor() as cur:

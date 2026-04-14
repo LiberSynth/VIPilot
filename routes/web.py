@@ -221,6 +221,7 @@ def producer_page():
     approve_stories_prod = db_get("approve_stories", "0") == "1"
     screenwriter_show_used = env_get("screenwriter_show_used", "0") == "1"
     screenwriter_only_good = env_get("screenwriter_only_good", "0") == "1"
+    screenwriter_for_approval = env_get("screenwriter_for_approval", "0") == "1"
     resp = make_response(render_template(
         "producer.html",
         system_prompt=system_prompt,
@@ -234,6 +235,7 @@ def producer_page():
         nav_modules=_nav_modules("producer"),
         screenwriter_show_used=screenwriter_show_used,
         screenwriter_only_good=screenwriter_only_good,
+        screenwriter_for_approval=screenwriter_for_approval,
     ))
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     resp.headers["Pragma"] = "no-cache"

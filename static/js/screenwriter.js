@@ -251,9 +251,14 @@ var setDraftStoryFromRecord;
   function getFilterParams() {
     var showUsed = document.getElementById('filter-show-used');
     var onlyGood = document.getElementById('filter-only-good');
+    var forApproval = document.getElementById('filter-for-approval');
     var params = new URLSearchParams();
-    params.set('show_used', (showUsed && showUsed.checked) ? '1' : '0');
-    params.set('show_bad', (onlyGood && onlyGood.checked) ? '0' : '1');
+    if (forApproval && forApproval.checked) {
+      params.set('for_approval', '1');
+    } else {
+      params.set('show_used', (showUsed && showUsed.checked) ? '1' : '0');
+      params.set('show_bad', (onlyGood && onlyGood.checked) ? '0' : '1');
+    }
     return params.toString();
   }
 
@@ -277,6 +282,7 @@ var setDraftStoryFromRecord;
   function initFilterCheckboxes() {
     var showUsed = document.getElementById('filter-show-used');
     var onlyGood = document.getElementById('filter-only-good');
+    var forApproval = document.getElementById('filter-for-approval');
     function onFilterChange(key, checkbox) {
       var value = checkbox.checked ? '1' : '0';
       fetch('/producer/env', {
@@ -287,13 +293,32 @@ var setDraftStoryFromRecord;
         window.loadStoriesList();
       });
     }
+    if (forApproval) {
+      forApproval.addEventListener('change', function() {
+        if (forApproval.checked) {
+          if (onlyGood) onlyGood.checked = false;
+          if (showUsed) showUsed.checked = false;
+          fetch('/producer/env', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'screenwriter_only_good', value: '0' }) });
+          fetch('/producer/env', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'screenwriter_show_used', value: '0' }) });
+        }
+        onFilterChange('screenwriter_for_approval', forApproval);
+      });
+    }
     if (showUsed) {
       showUsed.addEventListener('change', function() {
+        if (showUsed.checked && forApproval && forApproval.checked) {
+          forApproval.checked = false;
+          fetch('/producer/env', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'screenwriter_for_approval', value: '0' }) });
+        }
         onFilterChange('screenwriter_show_used', showUsed);
       });
     }
     if (onlyGood) {
       onlyGood.addEventListener('change', function() {
+        if (onlyGood.checked && forApproval && forApproval.checked) {
+          forApproval.checked = false;
+          fetch('/producer/env', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'screenwriter_for_approval', value: '0' }) });
+        }
         onFilterChange('screenwriter_only_good', onlyGood);
       });
     }
