@@ -200,6 +200,18 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
     """Управляет браузером для публикации видео через UI Дзена."""
 
     studio_url = f"https://dzen.ru/profile/editor/id/{publisher_id}/"
+    safe_name = re.sub(r'[^\w\s\-]', '', title, flags=re.UNICODE).strip()[:80] or "video"
+
+    def _check_title_in_list():
+        """Проверяет наличие элемента с названием видео в списке публикаций."""
+        try:
+            el = page.get_by_text(safe_name, exact=False).first
+            if el.is_visible(timeout=5_000):
+                write_log_entry(None, f"[dzen] Элемент «{safe_name}» найден в списке публикаций.", level='silent')
+                if log_id:
+                    write_log_entry(log_id, f"Дзен: Видео «{safe_name}» появилось в списке публикаций.")
+        except Exception:
+            pass
 
     # ── Шаг 1: Переходим в студию ────────────────────────────────────────
     write_log_entry(None, f"[dzen] Переход в студию: {studio_url}", level='silent')
@@ -625,12 +637,14 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
         # 3. Проверка URL
         url_now = page.url
         if url_now != url_before:
-            # state=published — Дзен подтвердил публикацию
-            if "state=published" in url_now:
+            # state=published / state=pending — Дзен подтвердил публикацию
+            if "state=published" in url_now or "state=pending" in url_now:
+                state_label = "state=published" if "state=published" in url_now else "state=pending"
                 confirmed = True
-                write_log_entry(None, f"[dzen] URL → state=published — публикация подтверждена.", level='silent')
+                write_log_entry(None, f"[dzen] URL → {state_label} — публикация подтверждена.", level='silent')
                 if log_id:
-                    write_log_entry(log_id, f"Дзен: URL → state=published — публикация подтверждена.")
+                    write_log_entry(log_id, f"Дзен: URL → {state_label} — публикация подтверждена.")
+                _check_title_in_list()
                 break
             video_match = re.search(r"/video/|/shorts/|/watch\?", url_now)
             if video_match or "editor" not in url_now:
@@ -649,11 +663,13 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
         url_after = page.url
         write_log_entry(None, f"[dzen] URL до публикации: {url_before}", level='silent')
         write_log_entry(None, f"[dzen] URL после публикации: {url_after}", level='silent')
-        if "state=published" in url_after:
+        if "state=published" in url_after or "state=pending" in url_after:
+            state_label = "state=published" if "state=published" in url_after else "state=pending"
             confirmed = True
-            write_log_entry(None, f"[dzen] URL → state=published — публикация подтверждена (финал).", level='silent')
+            write_log_entry(None, f"[dzen] URL → {state_label} — публикация подтверждена (финал).", level='silent')
             if log_id:
-                write_log_entry(log_id, f"Дзен: URL → state=published — публикация подтверждена (финал).")
+                write_log_entry(log_id, f"Дзен: URL → {state_label} — публикация подтверждена (финал).")
+            _check_title_in_list()
         else:
             video_url_pattern = re.search(r"/video/|/shorts/|/watch\?", url_after)
             if video_url_pattern and url_after != url_before:
