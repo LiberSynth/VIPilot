@@ -199,6 +199,8 @@
 
   setInterval(function () {
     if (active) return;
+    var panel = document.getElementById('panel-publish');
+    if (!panel || !panel.classList.contains('active')) return;
     var tid = getTargetId();
     if (!tid) return;
     var url = '/api/dzen-browser/status?target_id=' + encodeURIComponent(tid);
