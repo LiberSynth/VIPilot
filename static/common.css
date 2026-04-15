@@ -369,17 +369,14 @@
     min-height: 18px;
     line-height: 1.5;
   }
-  .story-generate-count {
-    width: 52px; min-width: 0; flex-shrink: 0;
+  input[type="number"].story-generate-count {
+    flex: none; width: 52px; min-width: 0;
     padding: 12px 8px; box-sizing: border-box;
-    background: #0f0f13; border: 1px solid #2a2a38;
-    border-radius: 11px; color: #fff;
-    font-size: 14px; font-family: inherit;
-    text-align: center; outline: none;
-    -moz-appearance: textfield;
+    font-size: 14px; text-align: center;
+    align-self: center;
   }
-  .story-generate-count::-webkit-inner-spin-button,
-  .story-generate-count::-webkit-outer-spin-button { -webkit-appearance: none; }
+  input[type="number"].story-generate-count::-webkit-inner-spin-button,
+  input[type="number"].story-generate-count::-webkit-outer-spin-button { -webkit-appearance: none; }
   .story-generate-count-label {
     font-size: 13px; color: #8888b0; align-self: center;
   }
