@@ -107,6 +107,7 @@ var getDraftStoryId;
 /* ── Список сюжетов в панели Сценариста ── */
 (function() {
   var _storyGradedAway = false;
+  var _gradeListReloadTimer = null;
 
   var GRADE_CYCLE = ['good', 'bad', null];
   var GRADE_LABELS = { good: 'хорошо', bad: 'плохо', 'null': 'не указано' };
