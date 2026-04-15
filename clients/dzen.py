@@ -571,6 +571,15 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
     url_before = page.url
     confirmed = False
 
+    # Быстрая проверка: браузер уже на странице подтверждения ещё до цикла
+    if "state=published" in url_before or "state=pending" in url_before:
+        state_label = "state=published" if "state=published" in url_before else "state=pending"
+        confirmed = True
+        write_log_entry(None, f"[dzen] URL уже содержит {state_label} до старта цикла — публикация подтверждена.", level='silent')
+        if log_id:
+            write_log_entry(log_id, f"Дзен: URL → {state_label} — публикация подтверждена.")
+        _check_title_in_list()
+
     # CSS-селекторы (только чистый CSS, без text= — они несовместимы с wait_for_selector)
     css_success_selector = (
         "[class*='toast']:has-text('опубликован'), "
@@ -633,6 +642,18 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
 
         # 2b. Проверка тост-ошибок Дзена — завершаем сразу, не ждём таймаута
         _check_error_toast()
+
+        # 2c. Элемент с названием видео в списке публикаций
+        try:
+            el = page.get_by_text(safe_name, exact=False).first
+            if el.is_visible(timeout=500):
+                confirmed = True
+                write_log_entry(None, f"[dzen] Элемент «{safe_name}» виден на странице — публикация подтверждена.", level='silent')
+                if log_id:
+                    write_log_entry(log_id, f"Дзен: Видео «{safe_name}» появилось в списке публикаций.")
+                break
+        except Exception:
+            pass
 
         # 3. Проверка URL
         url_now = page.url
