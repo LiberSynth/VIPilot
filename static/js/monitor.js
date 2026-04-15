@@ -245,7 +245,7 @@
   }
 
   function renderSysGroup(items) {
-    const key      = items[0] ? items[0].created_at : '';
+    const key      = items.length ? items[items.length - 1].created_at : '';
     const headTime = items.length ? items[items.length - 1].created_at : null;
     const n        = items.length;
     const sub      = n + ' ' + (n === 1 ? 'событие' : n < 5 ? 'события' : 'событий');
@@ -431,7 +431,7 @@
   function _groupKey(g) {
     if (g.type === 'batch') return 'batch:' + g.data.batch_id;
     var items = g.items || [];
-    return 'sys:' + (items[0] ? items[0].created_at : '');
+    return 'sys:' + (items.length ? items[items.length - 1].created_at : '');
   }
 
   function renderTimeline(data) {
