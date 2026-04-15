@@ -244,6 +244,12 @@ def run(batch_id, log_id):
         system_prompt = db_get("system_prompt", "")
         user_prompt = db_get("metaprompt", "")
 
+        try:
+            video_duration = max(1, min(60, int(db_get('video_duration', '6'))))
+        except (ValueError, TypeError):
+            video_duration = 6
+        user_prompt = user_prompt.replace('{количество_слов}', str(video_duration * 4))
+
         write_log_entry(
             log_id, f"Моделей: {len(models)}, попыток на модель: {fails_to_next}"
         )
