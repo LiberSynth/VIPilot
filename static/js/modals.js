@@ -96,10 +96,10 @@
       .then(function(d) {
         if (!d.text) return;
         var parts = [];
+        var modelLabel = (d.platform_name || '') + ': ' + (d.model_name || '');
+        parts.push('/* Текстовая модель: ' + modelLabel + ' */');
         parts.push('/* Системный промпт НАЧАЛО */\n' + (d.system_prompt || '') + '\n/* Системный промпт КОНЕЦ */');
         parts.push('/* Промпт НАЧАЛО */\n' + (d.user_prompt || '') + '\n/* Промпт КОНЕЦ */');
-        var modelLabel = (d.platform_name || '') + ': ' + (d.model_name || '');
-        parts.push('/* Имя текстовой модели: ' + modelLabel + ' */');
         var answer = d.title ? d.title + '\n\n' + d.text : d.text;
         parts.push('/* Ответ текстовой модели НАЧАЛО */\n' + answer + '\n/* Ответ текстовой модели КОНЕЦ */');
         navigator.clipboard.writeText(parts.join('\n\n')).then(function() { _flashCopied(btn); }).catch(function() {});
