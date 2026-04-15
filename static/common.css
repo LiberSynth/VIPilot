@@ -370,13 +370,13 @@
     line-height: 1.5;
   }
   .story-generate-count {
-    width: 58px; min-width: 0; flex-shrink: 0;
-    padding: 9px 6px; height: 36px;
-    background: #1a1a2e; border: 1px solid #2e2e4e;
-    border-radius: 6px; color: #c8c8e0;
-    font-size: 14px; font-weight: 600;
-    text-align: center;
-    -moz-appearance: textfield; box-sizing: border-box;
+    width: 52px; min-width: 0; flex-shrink: 0;
+    padding: 12px 8px; box-sizing: border-box;
+    background: #0f0f13; border: 1px solid #2a2a38;
+    border-radius: 11px; color: #fff;
+    font-size: 14px; font-family: inherit;
+    text-align: center; outline: none;
+    -moz-appearance: textfield;
   }
   .story-generate-count::-webkit-inner-spin-button,
   .story-generate-count::-webkit-outer-spin-button { -webkit-appearance: none; }
