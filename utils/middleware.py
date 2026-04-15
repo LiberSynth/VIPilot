@@ -6,10 +6,12 @@ _SILENT_GET_PATHS = {
     '/api/workflow/state',
     '/api/donors/count',
     '/healthz',
+    '/favicon.ico',
 }
 
 _SILENT_GET_PREFIXES = (
     '/api/batch/',
+    '/static/',
 )
 
 
