@@ -965,6 +965,10 @@
     background: #0f0f13; border: 1px solid #1e1e2e;
     border-radius: 10px; padding: 9px 12px;
   }
+  .story-row--selected {
+    border-color: #4a4a7a;
+    background: #14142a;
+  }
   .story-title {
     flex: 1; font-size: 13px; color: #c8c8e0;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;

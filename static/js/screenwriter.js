@@ -107,7 +107,6 @@ var getDraftStoryId;
 /* ── Список сюжетов в панели Сценариста ── */
 (function() {
   var _storyGradedAway = false;
-  var _gradeListReloadTimer = null;
 
   var GRADE_CYCLE = ['good', 'bad', null];
   var GRADE_LABELS = { good: 'хорошо', bad: 'плохо', 'null': 'не указано' };
@@ -198,6 +197,15 @@ var getDraftStoryId;
     container.querySelectorAll('.story-grade-badge').forEach(function(btn) {
       btn.addEventListener('click', function(e) {
         e.stopPropagation();
+        var storyId = btn.getAttribute('data-id');
+        var storyObj = null;
+        for (var j = 0; j < stories.length; j++) {
+          if (String(stories[j].id) === String(storyId)) { storyObj = stories[j]; break; }
+        }
+        if (storyObj && typeof setDraftStoryFromRecord === 'function') {
+          setDraftStoryFromRecord(storyObj);
+        }
+        _updateSelectedRow();
         cycleGrade(btn);
       });
     });
@@ -210,8 +218,10 @@ var getDraftStoryId;
       if (!storyObj) return;
       row.addEventListener('click', function() {
         if (typeof setDraftStoryFromRecord === 'function') setDraftStoryFromRecord(storyObj);
+        _updateSelectedRow();
       });
     });
+    _updateSelectedRow();
     updateReturnButton();
   }
 
@@ -233,6 +243,19 @@ var getDraftStoryId;
     _storyGradedAway = false;
     updateReturnButton();
   };
+
+  function _updateSelectedRow() {
+    var currentId = typeof getDraftStoryId === 'function' ? getDraftStoryId() : null;
+    var container = document.getElementById('stories-list');
+    if (!container) return;
+    container.querySelectorAll('.story-row--selected').forEach(function(r) {
+      r.classList.remove('story-row--selected');
+    });
+    if (currentId) {
+      var sel = container.querySelector('.story-row[data-id="' + currentId + '"]');
+      if (sel) sel.classList.add('story-row--selected');
+    }
+  }
 
   function cycleGrade(btn) {
     var storyId = btn.getAttribute('data-id');
@@ -276,6 +299,8 @@ var getDraftStoryId;
       params.set('show_used', (showUsed && showUsed.checked) ? '1' : '0');
       params.set('show_bad', (onlyGood && onlyGood.checked) ? '0' : '1');
     }
+    var pinId = typeof getDraftStoryId === 'function' ? getDraftStoryId() : null;
+    if (pinId) params.set('pin_id', pinId);
     return params.toString();
   }
 

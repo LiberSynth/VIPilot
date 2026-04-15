@@ -74,17 +74,25 @@ def db_get_batch_logs(batch_id):
     }
 
 
-def db_get_stories_list(show_used=True, show_bad=True, for_approval=False):
-    conditions = []
+def db_get_stories_list(show_used=True, show_bad=True, for_approval=False, pin_id=None):
+    filter_conditions = []
     if for_approval:
-        conditions.append("s.grade IS NULL")
-        conditions.append("NOT EXISTS (SELECT 1 FROM batches b WHERE b.story_id = s.id AND b.movie_id IS NOT NULL)")
+        filter_conditions.append("s.grade IS NULL")
+        filter_conditions.append("NOT EXISTS (SELECT 1 FROM batches b WHERE b.story_id = s.id AND b.movie_id IS NOT NULL)")
     else:
         if not show_used:
-            conditions.append("NOT EXISTS (SELECT 1 FROM batches b WHERE b.story_id = s.id AND b.movie_id IS NOT NULL)")
+            filter_conditions.append("NOT EXISTS (SELECT 1 FROM batches b WHERE b.story_id = s.id AND b.movie_id IS NOT NULL)")
         if not show_bad:
-            conditions.append("s.grade = 'good'")
-    where_clause = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+            filter_conditions.append("s.grade = 'good'")
+    params = []
+    if pin_id and filter_conditions:
+        base_cond = " AND ".join(filter_conditions)
+        where_clause = f"WHERE (s.id::text = %s) OR ({base_cond})"
+        params = [str(pin_id)]
+    elif filter_conditions:
+        where_clause = "WHERE " + " AND ".join(filter_conditions)
+    else:
+        where_clause = ""
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(f"""
@@ -104,7 +112,7 @@ def db_get_stories_list(show_used=True, show_bad=True, for_approval=False):
                 LEFT JOIN ai_models am ON am.id = s.model_id
                 {where_clause}
                 ORDER BY used ASC, s.created_at DESC
-            """)
+            """, params or None)
             rows = cur.fetchall()
     return [
         {
