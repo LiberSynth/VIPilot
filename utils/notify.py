@@ -43,7 +43,6 @@ def send_failure_email(message: str, log_entries=None, partial: bool = False):
             s.login(smtp_user, smtp_pass)
             s.send_message(msg)
 
-        write_log_entry(None, f"[УВЕДОМЛЕНИЕ] Email отправлен на {to_addr}", level='silent')
     except Exception as e:
         write_log_entry(None, f"[УВЕДОМЛЕНИЕ] Ошибка отправки email: {e}", level='silent')
 
