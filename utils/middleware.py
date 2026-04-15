@@ -8,11 +8,18 @@ _SILENT_GET_PATHS = {
     '/healthz',
 }
 
+_SILENT_GET_PREFIXES = (
+    '/api/batch/',
+)
+
 
 def log_request():
     method = request.method
     path = request.path
-    if method == 'GET' and path in _SILENT_GET_PATHS:
+    if method == 'GET' and (
+        path in _SILENT_GET_PATHS or
+        path.startswith(_SILENT_GET_PREFIXES)
+    ):
         return
     full_path = request.full_path if request.query_string else path
     remote = request.remote_addr
