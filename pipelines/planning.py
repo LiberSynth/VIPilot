@@ -16,13 +16,13 @@ def run():
     try:
         cancelled = db_cancel_waiting_batches()
         for bid in cancelled:
-            write_log(
+            log_id = write_log(
                 'publish',
                 'Батч отменён — слот удалён из расписания',
                 status='cancelled',
                 batch_id=bid,
             )
-            write_log_entry(None, fmt_id_msg("[planning] Батч {} отменён (слот расписания исчез)", bid), level='silent')
+            write_log_entry(log_id, fmt_id_msg("[planning] Батч {} отменён (слот расписания исчез)", bid), level='silent')
 
         schedule = db_get_schedule()
         targets  = db_get_active_targets()
@@ -65,14 +65,14 @@ def run():
                     if batch_id:
                         dt_msk = dt.astimezone(MSK)
                         target_names = ', '.join(t['name'] for t in targets)
-                        log_batch_planned(
+                        log_id = log_batch_planned(
                             batch_id,
                             'Батч запланирован',
                             f"Запланирована публикация: {dt_msk.strftime('%d.%m.%Y %H:%M')} МСК",
                             f"Таргеты: {target_names}",
                             f"Горизонт планирования: {buffer_hours} ч",
                         )
-                        write_log_entry(None, f"[planning] Создан батч: {dt.strftime('%d.%m %H:%M')} UTC")
+                        write_log_entry(log_id, f"[planning] Создан батч: {dt.strftime('%d.%m %H:%M')} UTC")
 
     except Exception as e:
         write_log_entry(None, f"[planning] Необработанная ошибка: {e}")

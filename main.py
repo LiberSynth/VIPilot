@@ -7,7 +7,7 @@ from db import (
 )
 from common.exceptions import AppException
 from common.startup import init_app, create_app
-from log import write_log, write_log_entry
+from log import write_log_entry
 from pipelines import publish, cleanup
 import pipelines.planning as planning
 from pipelines.routing import get_pipeline
@@ -62,8 +62,7 @@ _main_loop_started = False
 
 
 def _on_exit():
-    log_id = write_log('root', "Приложение остановлено", status='info')
-    write_log_entry(log_id, "[main] Приложение остановлено", level='info')
+    write_log_entry(None, "[main] Приложение остановлено", level='info')
 
 
 def start_main_loop():
@@ -73,7 +72,7 @@ def start_main_loop():
         check_upgrade()
         init_app(flask_app)
         environment.init_from_db()
-        write_log('root', "Приложение запущено", status='info')
+        write_log_entry(None, "[main] Приложение запущено", level='info')
         atexit.register(_on_exit)
         t = threading.Thread(target=main_loop, daemon=True)
         t.start()

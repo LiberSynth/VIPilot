@@ -3,13 +3,11 @@
 """
 
 _ALLOWED_PIPELINES = {
-    "root",
     "planning",
     "story",
     "video",
     "transcode",
     "publish",
-    "cleanup",
 }
 
 _ALLOWED_LOG_LEVELS = {

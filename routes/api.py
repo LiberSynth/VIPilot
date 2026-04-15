@@ -34,7 +34,7 @@ from db import (
     db_create_story_generate_batch,
     db_set,
 )
-from log import db_get_monitor, write_log, log_batch_planned, write_log_entry
+from log import db_get_monitor, log_batch_planned, write_log_entry
 from utils.auth import is_authenticated
 from utils.utils import parse_hhmm, to_msk, to_utc_from_msk
 import common.environment as environment
@@ -271,7 +271,7 @@ def api_workflow_start():
         return jsonify({"error": "unauthorized"}), 401
     env_set("workflow_state", "running")
     environment.set_running()
-    write_log('root', "Движок запущен вручную", status='info')
+    write_log_entry(None, "[api] Движок запущен вручную")
     return jsonify({"ok": True, "state": "running"})
 
 
@@ -281,7 +281,7 @@ def api_workflow_pause():
         return jsonify({"error": "unauthorized"}), 401
     env_set("workflow_state", "pause")
     environment.set_paused()
-    write_log('root', "Движок приостановлен вручную", status='info')
+    write_log_entry(None, "[api] Движок приостановлен вручную")
     return jsonify({"ok": True, "state": "pause"})
 
 
@@ -293,7 +293,7 @@ def api_workflow_deep_debugging():
     val = "1" if body.get("enabled") == "1" else "0"
     db_set("deep_debugging", val)
     label = "включена" if val == "1" else "выключена"
-    write_log('root', f"Глубокая отладка {label}", status='info')
+    write_log_entry(None, f"[api] Глубокая отладка {label}")
     return jsonify({"ok": True, "deep_debugging": val})
 
 
@@ -305,7 +305,7 @@ def api_workflow_use_donor():
     val = "1" if body.get("enabled") == "1" else "0"
     env_set("use_donor", val)
     label = "включен" if val == "1" else "выключен"
-    write_log('root', f"Использовать донора {label}", status='info')
+    write_log_entry(None, f"[api] Использовать донора {label}")
     return jsonify({"ok": True, "use_donor": val})
 
 
@@ -325,7 +325,7 @@ def api_workflow_emulation():
     val = "1" if body.get("enabled") == "1" else "0"
     env_set("emulation_mode", val)
     label = "включена" if val == "1" else "выключена"
-    write_log('root', f"Эмуляция {label}", status='info')
+    write_log_entry(None, f"[api] Эмуляция {label}")
     return jsonify({"ok": True, "emulation_mode": val})
 
 
@@ -344,7 +344,7 @@ def api_reset_batch_pipeline(batch_id, pipeline):
 def api_workflow_restart():
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
-    write_log('root', "Перезапуск приложения вручную", status='info')
+    write_log_entry(None, "[api] Перезапуск приложения вручную")
     def _do_restart():
         import time as _time
         import sys as _sys

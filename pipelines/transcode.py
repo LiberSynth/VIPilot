@@ -114,10 +114,10 @@ def run(batch_id, log_id):
 
         if not do_transcode:
             db_set_batch_transcode_skip(batch_id)
-            write_log_entry(None, fmt_id_msg("[transcode] Батч {} ({}) — транскод отключен, пропускаю", batch_id, target))
+            write_log_entry(log_id, fmt_id_msg("[transcode] Батч {} ({}) — транскод отключен, пропускаю", batch_id, target))
             return
 
-        write_log_entry(None, fmt_id_msg("[transcode] Батч {} ({}) — начало транскодирования", batch_id, target))
+        write_log_entry(log_id, fmt_id_msg("[transcode] Батч {} ({}) — начало транскодирования", batch_id, target))
 
         db_log_update(log_id, 'Транскодирование…', 'running')
 
@@ -129,7 +129,7 @@ def run(batch_id, log_id):
 
         src_mb = round(len(original_data) / 1024 / 1024, 1)
         write_log_entry(log_id, f'Оригинал получен из БД ({src_mb} МБ), запускаю ffmpeg…')
-        write_log_entry(None, f"[transcode] Оригинал {src_mb} МБ, запускаю ffmpeg…")
+        write_log_entry(log_id, f"[transcode] Оригинал {src_mb} МБ, запускаю ffmpeg…")
 
         tmp_src_path = None
         tmp_out_path = None
@@ -158,7 +158,7 @@ def run(batch_id, log_id):
             db_log_update(log_id, msg, 'warn')
             write_log_entry(log_id, msg, level='warn')
             db_set_batch_transcode_skip(batch_id)
-            write_log_entry(None, f"[transcode] {msg}")
+            write_log_entry(log_id, f"[transcode] {msg}")
             notify_failure(fmt_id_msg("transcode: ffmpeg сбой (некритично) — батч {}", batch_id), partial=True)
             return
 
@@ -171,7 +171,7 @@ def run(batch_id, log_id):
         db_log_update(log_id, msg, 'ok')
         write_log_entry(log_id, msg)
         db_set_batch_transcode_ready(batch_id, video_data)
-        write_log_entry(None, f"[transcode] Готово: {out_mb} МБ → БД")
+        write_log_entry(log_id, f"[transcode] Готово: {out_mb} МБ → БД")
 
     except AppException:
         raise
