@@ -306,6 +306,7 @@ def run(batch_id, log_id):
                 msg = f"Модель не ответила после {fails_to_next} попыток — пробный сюжет не получен"
                 db_log_update(log_id, msg, "warn")
                 write_log_entry(log_id, msg, level='warn')
+                db_set_batch_status(batch_id, 'error')
                 return
             msg = f"Все активные модели не дали результата после {max_passes} проходов"
             db_log_update(log_id, msg, "error")
