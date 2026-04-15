@@ -535,8 +535,10 @@
   .monitor-sysgroup-item:last-child { border-bottom: none; }
   .monitor-sysgroup-ts  { color: #6868a0; flex-shrink: 0; font-variant-numeric: tabular-nums; }
   .monitor-sysgroup-pip { color: #8080a8; flex-shrink: 0; }
+  .monitor-sysgroup-pip.orphan-pip { color: #404058; }
   .monitor-sysgroup-msg { color: #b0b0c8; flex: 1; word-break: break-word; }
   .monitor-sysgroup-msg.error { color: #ff7070; }
+  .monitor-sysgroup-msg.warn  { color: #f5a623; }
   .monitor-sysgroup-msg.ok    { color: #3ecf8e; }
   .monitor-batch {
     background: #1a1a24;

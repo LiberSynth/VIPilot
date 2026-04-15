@@ -120,6 +120,17 @@ def db_get_monitor(batch_limit=50):
             )
             sys_rows = cur.fetchall()
 
+            cur.execute(
+                """
+                SELECT message, level, created_at
+                FROM log_entries
+                WHERE log_id IS NULL
+                ORDER BY created_at DESC
+                LIMIT 500
+                """
+            )
+            orphan_rows = cur.fetchall()
+
     batches = [
         {
             "batch_id": str(r[0]),
@@ -147,7 +158,15 @@ def db_get_monitor(batch_limit=50):
         }
         for r in sys_rows
     ]
-    return {"batches": batches, "system": system}
+    orphan_entries = [
+        {
+            "message":    r[0],
+            "level":      r[1],
+            "created_at": r[2].isoformat() if r[2] else None,
+        }
+        for r in orphan_rows
+    ]
+    return {"batches": batches, "system": system, "orphan_entries": orphan_entries}
 
 
 def db_cleanup_log_entries(log_lifetime_days: int) -> int:

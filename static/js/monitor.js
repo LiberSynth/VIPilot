@@ -251,6 +251,14 @@
     const sub      = n + ' ' + (n === 1 ? 'событие' : n < 5 ? 'события' : 'событий');
 
     const rows = items.map(function(e) {
+      if (e._orphan) {
+        const lvl = e.level || 'info';
+        return '<div class="monitor-sysgroup-item">' +
+          '<span class="monitor-sysgroup-ts">'  + fmtMsk(e.created_at)         + '</span>' +
+          '<span class="monitor-sysgroup-pip orphan-pip">—</span>'              +
+          '<span class="monitor-sysgroup-msg '  + esc(lvl) + '">' + esc(e.message || '') + '</span>' +
+        '</div>';
+      }
       const st = e.status || 'info';
       return '<div class="monitor-sysgroup-item">' +
         '<span class="monitor-sysgroup-ts">'  + fmtMsk(e.created_at)                          + '</span>' +
@@ -278,10 +286,11 @@
     '</div>';
   }
 
-  function buildTimeline(batches, system) {
+  function buildTimeline(batches, system, orphan) {
     var items = [];
     (batches || []).forEach(function(b) { items.push({ type: 'batch', time: b.created_at, data: b }); });
     (system  || []).forEach(function(s) { items.push({ type: 'sys',   time: s.created_at, data: s }); });
+    (orphan  || []).forEach(function(e) { items.push({ type: 'sys',   time: e.created_at, data: Object.assign({}, e, { _orphan: true }) }); });
     items.sort(function(a, b) { return new Date(b.time) - new Date(a.time); });
 
     var groups = [], sysAccum = null;
@@ -430,7 +439,7 @@
     if (!el) return;
     _activeBatchIds = Array.isArray(data.active_batch_ids) ? data.active_batch_ids : [];
     var prev   = getOpenState();
-    var groups = buildTimeline(data.batches, data.system);
+    var groups = buildTimeline(data.batches, data.system, data.orphan_entries);
     if (groups.length === 0) {
       el.innerHTML = '<div style="font-size:12px;color:#444;padding:4px 0">Нет данных</div>';
       _firstRender = false;
