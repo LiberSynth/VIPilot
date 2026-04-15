@@ -111,8 +111,7 @@
         '</div>'
       : '';
 
-    const autoOpen = (st === 'error' && hasEntries) ? ' open' : '';
-    return '<div class="monitor-log-item' + autoOpen + '" data-lid="' + esc(log.id) + '" data-status="' + esc(st) + '" onclick="monitorToggleLog(event,this)">' +
+    return '<div class="monitor-log-item" data-lid="' + esc(log.id) + '" data-status="' + esc(st) + '" onclick="monitorToggleLog(event,this)">' +
       '<div class="monitor-log-header">' +
         '<div class="monitor-log-header-top">' +
           '<span class="monitor-log-dot ls-' + esc(st) + '"></span>' +
@@ -477,7 +476,7 @@
           tmp.innerHTML = newHtml;
           var newNode = tmp.firstChild;
           el.replaceChild(newNode, existing);
-          if (isOpen || (newNode.dataset.status === 'error' && newNode.querySelector('.monitor-entries'))) newNode.classList.add('open');
+          if (isOpen) newNode.classList.add('open');
           _lastRenderedHtml[key] = newHtml;
           return newNode;
         }
