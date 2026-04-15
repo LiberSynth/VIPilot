@@ -404,7 +404,14 @@ def api_get_story(story_id):
     if text is None:
         return jsonify({"error": "not found"}), 404
     title = db_get_story_title(story_id) or ''
-    return jsonify({"text": text, "title": title})
+    system_prompt = db_get("system_prompt", "") or ""
+    user_prompt = db_get("metaprompt", "") or ""
+    try:
+        video_duration = max(1, min(60, int(db_get('video_duration', '6'))))
+    except (ValueError, TypeError):
+        video_duration = 6
+    user_prompt = user_prompt.replace('{количество_слов}', str(video_duration * 4))
+    return jsonify({"text": text, "title": title, "system_prompt": system_prompt, "user_prompt": user_prompt})
 
 
 @bp.route("/batch/<batch_id>/publish-frame")
