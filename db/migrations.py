@@ -1653,6 +1653,54 @@ def _m055_delete_vk_publish_settings(cur):
     cur.execute("DELETE FROM settings WHERE key IN ('vk_publish_story', 'vk_publish_wall')")
 
 
+def _m056_deepseek_platform(cur):
+    """
+    Добавляет поддержку DeepSeek API как самостоятельной текстовой платформы.
+
+    1. Добавляет колонку key_env (VARCHAR) в ai_platforms — имя переменной окружения с ключом API.
+    2. Устанавливает key_env для существующих платформ: OpenRouter и fal.
+    3. Вставляет платформу DeepSeek с url https://api.deepseek.com/chat/completions.
+    4. Вставляет модель deepseek-chat (тип text, grade good, active).
+    """
+    cur.execute("""
+        ALTER TABLE ai_platforms
+            ADD COLUMN IF NOT EXISTS key_env VARCHAR(100)
+    """)
+    cur.execute("""
+        UPDATE ai_platforms SET key_env = 'OPENROUTER_API_KEY' WHERE name = 'OpenRouter'
+    """)
+    cur.execute("""
+        UPDATE ai_platforms SET key_env = 'FAL_API_KEY' WHERE name = 'fal'
+    """)
+    cur.execute("""
+        INSERT INTO ai_platforms (name, url, key_env)
+        SELECT 'DeepSeek', 'https://api.deepseek.com/chat/completions', 'DEEPSEEK_API_KEY'
+        WHERE NOT EXISTS (SELECT 1 FROM ai_platforms WHERE name = 'DeepSeek')
+    """)
+
+    TEXT_BODY = (
+        '{"messages": [{"role": "system", "content": "{}"},'
+        ' {"role": "user", "content": "{}"}],'
+        ' "max_tokens": 300, "temperature": 0.9}'
+    )
+    cur.execute("""
+        INSERT INTO ai_models
+            (name, url, body, "order", active, platform_id, type, grade)
+        SELECT
+            'deepseek-chat',
+            'deepseek-chat',
+            %s::jsonb,
+            1,
+            TRUE,
+            p.id,
+            'text',
+            'good'
+        FROM ai_platforms p
+        WHERE p.name = 'DeepSeek'
+          AND NOT EXISTS (SELECT 1 FROM ai_models WHERE name = 'deepseek-chat')
+    """, (TEXT_BODY,))
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -1709,6 +1757,7 @@ MIGRATIONS = [
     (53, _m053_log_entries_log_id_nullable),
     (54, _m054_drop_remaining_foreign_keys),
     (55, _m055_delete_vk_publish_settings),
+    (56, _m056_deepseek_platform),
 ]
 
 

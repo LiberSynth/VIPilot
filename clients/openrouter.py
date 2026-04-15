@@ -1,6 +1,7 @@
 """
 OpenRouter API client.
-Отвечает за HTTP-взаимодействие с OpenRouter — отправку промптов и получение текста.
+Отвечает за HTTP-взаимодействие с OpenRouter/DeepSeek и совместимыми API —
+отправку промптов и получение текста.
 Пайплайн импортирует только этот клиент, не зная об OpenRouter напрямую.
 """
 
@@ -9,17 +10,18 @@ import requests
 
 from log import write_log_entry
 
-_API_KEY = os.environ.get('OPENROUTER_API_KEY', '')
-
 
 def is_configured() -> bool:
-    """Возвращает True если API-ключ задан."""
-    return bool(_API_KEY)
+    """Возвращает True если хотя бы один известный API-ключ задан."""
+    return bool(
+        os.environ.get('OPENROUTER_API_KEY') or os.environ.get('DEEPSEEK_API_KEY')
+    )
 
 
-def _headers():
+def _headers(key_env: str | None):
+    api_key = os.environ.get(key_env or '', '') if key_env else ''
     return {
-        'Authorization': f'Bearer {_API_KEY}',
+        'Authorization': f'Bearer {api_key}',
         'Content-Type': 'application/json',
     }
 
@@ -48,18 +50,23 @@ def _build_body(body_tpl, model_url, system_prompt, user_prompt):
 
 def generate(log_id, model_name: str, model: dict, system_prompt: str, user_prompt: str):
     """
-    Выполняет один запрос к OpenRouter.
+    Выполняет один запрос к платформе (OpenRouter, DeepSeek или совместимой).
     Возвращает строку с текстом или None при любой ошибке.
 
     :param log_id: идентификатор записи лога
     :param model_name: отображаемое имя модели для логов
-    :param model: словарь с ключами body_tpl, model_url, platform_url
+    :param model: словарь с ключами body_tpl, model_url, platform_url, key_env
     :param system_prompt: системный промпт
     :param user_prompt: пользовательский промпт
     """
     try:
         body = _build_body(model['body_tpl'], model['model_url'], system_prompt, user_prompt)
-        resp = requests.post(model['platform_url'], headers=_headers(), json=body, timeout=60)
+        resp = requests.post(
+            model['platform_url'],
+            headers=_headers(model.get('key_env')),
+            json=body,
+            timeout=60,
+        )
     except requests.exceptions.Timeout:
         write_log_entry(log_id, f"[{model_name}] таймаут (60 с)", level='warn')
         return None

@@ -612,7 +612,7 @@ def db_get_active_text_models():
     with get_db() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("""
-                SELECT p.url AS platform_url, m.url AS model_url,
+                SELECT p.url AS platform_url, p.key_env, m.url AS model_url,
                        m.body, m.name, m.id
                 FROM ai_models m
                 JOIN ai_platforms p ON p.id = m.platform_id
@@ -626,6 +626,7 @@ def db_get_active_text_models():
         result.append(
             {
                 "platform_url": row["platform_url"],
+                "key_env": row["key_env"],
                 "model_url": row["model_url"],
                 "body_tpl": row["body"] if isinstance(row["body"], dict) else {},
                 "name": row["name"],
@@ -640,7 +641,7 @@ def db_get_text_model_by_id(model_id: str):
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
                 """
-                SELECT p.url AS platform_url, m.url AS model_url,
+                SELECT p.url AS platform_url, p.key_env, m.url AS model_url,
                        m.body, m.name, m.id
                 FROM ai_models m
                 JOIN ai_platforms p ON p.id = m.platform_id
@@ -653,6 +654,7 @@ def db_get_text_model_by_id(model_id: str):
         return None
     return {
         "platform_url": row["platform_url"],
+        "key_env": row["key_env"],
         "model_url": row["model_url"],
         "body_tpl": row["body"] if isinstance(row["body"], dict) else {},
         "name": row["name"],

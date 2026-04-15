@@ -211,7 +211,7 @@ def run(batch_id, log_id):
         db_log_update(log_id, "Генерация сюжета…", "running")
 
         if not openrouter.is_configured():
-            msg = "OPENROUTER_API_KEY не задан — генерация невозможна"
+            msg = "API-ключ текстовой платформы не задан — генерация невозможна"
             db_log_update(log_id, msg, "error")
             write_log_entry(log_id, msg, level="error")
             write_log_entry(None, f"[story] {msg}")
@@ -262,7 +262,7 @@ def run(batch_id, log_id):
             if cnt == 0:
                 write_log_entry(log_id, f"Модель: {model_name}")
                 write_log_entry(
-                    None, f"[story] Запрос к OpenRouter: модель={model_name}"
+                    None, f"[story] Запрос к текстовой платформе: модель={model_name}"
                 )
             raw = openrouter.generate(log_id, model_name, m, system_prompt, user_prompt)
             if raw:
