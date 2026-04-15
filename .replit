@@ -38,7 +38,7 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "python main.py"
+args = "fuser -k 5000/tcp 2>/dev/null; python main.py"
 waitForPort = 5000
 
 [[ports]]
