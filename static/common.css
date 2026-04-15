@@ -370,7 +370,8 @@
     line-height: 1.5;
   }
   .story-generate-count {
-    width: 52px; padding: 7px 6px;
+    width: 58px; min-width: 0; flex-shrink: 0;
+    padding: 0 6px; height: 36px; line-height: 36px;
     background: #1a1a2e; border: 1px solid #2e2e4e;
     border-radius: 6px; color: #c8c8e0;
     font-size: 14px; font-weight: 600;
