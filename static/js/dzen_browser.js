@@ -200,7 +200,8 @@
   setInterval(function () {
     if (active) return;
     var tid = getTargetId();
-    var url = '/api/dzen-browser/status' + (tid ? '?target_id=' + encodeURIComponent(tid) : '');
+    if (!tid) return;
+    var url = '/api/dzen-browser/status?target_id=' + encodeURIComponent(tid);
     fetch(url)
       .then(function (r) { return r.json(); })
       .then(function (data) {
