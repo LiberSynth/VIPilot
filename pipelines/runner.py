@@ -14,7 +14,7 @@ def _handle_batch_error(e, batch_id, pipeline_name, log_id):
         db_set_batch_status(batch_id, 'error')
         msg = f"Ошибка пайплайна {e.pipeline}: {e.message}"
         db_log_update(log_id, msg, 'error')
-        write_log_entry(log_id, msg, level='error')
+        write_log_entry(log_id, msg, level='info')
     else:
         db_set_batch_status(batch_id, 'fatal_error')
         msg = f"Критическая ошибка: {e}"
