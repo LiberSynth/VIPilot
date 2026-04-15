@@ -94,7 +94,7 @@ def db_create_story_probe_batch(text_model_id):
                 VALUES ('pending', 'story_probe', %s)
                 RETURNING id
             """,
-                (json.dumps({"probe_model_id": str(text_model_id)}),),
+                (json.dumps({"story_model_id": str(text_model_id)}),),
             )
             row = cur.fetchone()
         conn.commit()

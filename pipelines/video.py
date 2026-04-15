@@ -217,7 +217,7 @@ def run(batch_id, log_id):
             - Если None — обычный submit через falai.submit().
 
             При любом неуспехе безусловно сбрасывает все четыре поля
-            (request_id, status_url, response_url, model_id) в batch.data,
+            (request_id, status_url, response_url, movie_model_id) в batch.data,
             чтобы следующая попытка шла через submit() заново.
 
             Возвращает video_url при успехе или None при неудаче.
@@ -232,7 +232,7 @@ def run(batch_id, log_id):
             saved_request_id   = current_data.get('request_id')
             saved_status_url   = current_data.get('status_url')
             saved_response_url = current_data.get('response_url')
-            saved_model_id     = current_data.get('model_id')
+            saved_model_id     = current_data.get('movie_model_id')
 
             if saved_request_id:
                 write_log_entry(log_id, fmt_id_msg("Возобновление: request_id={}", saved_request_id))
@@ -245,7 +245,7 @@ def run(batch_id, log_id):
                     'request_id':   None,
                     'status_url':   None,
                     'response_url': None,
-                    'model_id':     None,
+                    'movie_model_id': None,
                 })
                 return None
 
@@ -279,7 +279,7 @@ def run(batch_id, log_id):
                 'request_id':   req_id,
                 'status_url':   s_url,
                 'response_url': r_url,
-                'model_id':     m_id,
+                'movie_model_id': m_id,
             })
             write_log_entry(log_id, fmt_id_msg("Запрос принят ({}): {}", model_name, req_id))
             write_log_entry(None, fmt_id_msg("[video] Генерация запущена: request_id={}", req_id))
@@ -295,7 +295,7 @@ def run(batch_id, log_id):
                 'request_id':   None,
                 'status_url':   None,
                 'response_url': None,
-                'model_id':     None,
+                'movie_model_id': None,
             })
             return None
 

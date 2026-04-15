@@ -1701,6 +1701,26 @@ def _m056_deepseek_platform(cur):
     """, (TEXT_BODY,))
 
 
+def _m057_rename_model_id_keys_in_batches_data(cur):
+    """
+    Переименовывает устаревшие ключи в поле batches.data для устранения неоднозначности:
+    - 'model_id'       → 'movie_model_id'  (видео-пайплайн)
+    - 'probe_model_id' → 'story_model_id'  (story-probe пайплайн)
+
+    Применяется к уже существующим строкам (in-flight и архивным батчам).
+    """
+    cur.execute("""
+        UPDATE batches
+           SET data = (data - 'model_id') || jsonb_build_object('movie_model_id', data->>'model_id')
+         WHERE data ? 'model_id'
+    """)
+    cur.execute("""
+        UPDATE batches
+           SET data = (data - 'probe_model_id') || jsonb_build_object('story_model_id', data->>'probe_model_id')
+         WHERE data ? 'probe_model_id'
+    """)
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -1758,6 +1778,7 @@ MIGRATIONS = [
     (54, _m054_drop_remaining_foreign_keys),
     (55, _m055_delete_vk_publish_settings),
     (56, _m056_deepseek_platform),
+    (57, _m057_rename_model_id_keys_in_batches_data),
 ]
 
 
