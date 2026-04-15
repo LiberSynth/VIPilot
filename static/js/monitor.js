@@ -244,8 +244,8 @@
     '</div>';
   }
 
-  function renderSysGroup(items) {
-    const key      = items.length ? items[items.length - 1].created_at : '';
+  function renderSysGroup(items, posKey) {
+    const key      = posKey || '';
     const headTime = items.length ? items[items.length - 1].created_at : null;
     const n        = items.length;
     const sub      = n + ' ' + (n === 1 ? 'событие' : n < 5 ? 'события' : 'событий');
@@ -303,6 +303,19 @@
         groups.push({ type: 'batch', data: item.data });
       }
     });
+
+    for (var i = 0; i < groups.length; i++) {
+      if (groups[i].type !== 'sysgroup') continue;
+      var prev = null, next = null;
+      for (var j = i - 1; j >= 0; j--) {
+        if (groups[j].type === 'batch') { prev = groups[j].data.batch_id; break; }
+      }
+      for (var k = i + 1; k < groups.length; k++) {
+        if (groups[k].type === 'batch') { next = groups[k].data.batch_id; break; }
+      }
+      groups[i]._posKey = (prev || 'top') + ':' + (next || 'bottom');
+    }
+
     return groups;
   }
 
@@ -430,8 +443,7 @@
 
   function _groupKey(g) {
     if (g.type === 'batch') return 'batch:' + g.data.batch_id;
-    var items = g.items || [];
-    return 'sys:' + (items.length ? items[items.length - 1].created_at : '');
+    return 'sys:' + (g._posKey || '');
   }
 
   function renderTimeline(data) {
@@ -451,7 +463,7 @@
     groups.forEach(function(g) {
       var key = _groupKey(g);
       newKeys.push(key);
-      newHtmlMap[key] = g.type === 'batch' ? renderBatch(g.data) : renderSysGroup(g.items);
+      newHtmlMap[key] = g.type === 'batch' ? renderBatch(g.data) : renderSysGroup(g.items, g._posKey);
     });
 
     var oldEls = {};
