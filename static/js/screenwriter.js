@@ -425,54 +425,57 @@ var getDraftStoryId;
 /* ── Кнопка «Сгенерировать» в панели Сценариста ── */
 (function() {
   var _DEFAULT_HINT = 'Вы можете сгенерировать сюжет при помощи AI-модели';
-  var _pollTimer = null;
+  var _pollTimer    = null;
   var _hintResetTimer = null;
+  var _batchQueue   = [];
+  var _batchTotal   = 0;
+  var _batchDone    = 0;
 
   function setHint(text) {
     var el = document.getElementById('story-generate-hint');
     if (el) el.textContent = text || _DEFAULT_HINT;
   }
-
   function resetHint() { setHint(_DEFAULT_HINT); }
-
   function scheduleResetHint() {
-    if (_hintResetTimer) { clearTimeout(_hintResetTimer); }
+    if (_hintResetTimer) clearTimeout(_hintResetTimer);
     _hintResetTimer = setTimeout(function() { _hintResetTimer = null; resetHint(); }, 2000);
   }
 
-  function startPoll(batchId) {
+  function pollNext() {
     if (_pollTimer) { clearTimeout(_pollTimer); _pollTimer = null; }
-    if (_hintResetTimer) { clearTimeout(_hintResetTimer); _hintResetTimer = null; }
+    if (_batchQueue.length === 0) {
+      var btn = document.getElementById('btn-story-generate');
+      if (btn) btn.disabled = false;
+      setHint(_batchTotal > 1
+        ? 'Готово: сгенерировано ' + _batchDone + ' из ' + _batchTotal
+        : 'Сюжет сгенерирован');
+      scheduleResetHint();
+      return;
+    }
+    var batchId = _batchQueue.shift();
+    var batchIndex = _batchTotal - _batchQueue.length;
     function poll() {
       fetch('/api/batch/' + batchId + '/logs')
         .then(function(r) { return r.json(); })
         .then(function(d) {
           if (d.error) { _pollTimer = setTimeout(poll, 700); return; }
+          var prefix = _batchTotal > 1 ? '[' + batchIndex + '/' + _batchTotal + '] ' : '';
           var entries = [];
           if (d.logs && d.logs.length) {
             var lastLog = d.logs[d.logs.length - 1];
-            if (lastLog.entries && lastLog.entries.length) {
-              entries = lastLog.entries;
-            }
+            if (lastLog.entries && lastLog.entries.length) entries = lastLog.entries;
           }
-          if (entries.length) {
-            setHint(entries[entries.length - 1].message);
-          }
+          if (entries.length) setHint(prefix + entries[entries.length - 1].message);
           var status = d.batch_status;
           if (status === 'story_probe') {
+            _batchDone++;
             var storyId = d.story_id;
-            var btn = document.getElementById('btn-story-generate');
-            if (btn) btn.disabled = false;
             if (storyId) {
               fetch('/api/story/' + encodeURIComponent(storyId))
                 .then(function(r) { return r.json(); })
                 .then(function(s) {
                   if (typeof setDraftStoryFromRecord === 'function') {
-                    setDraftStoryFromRecord({
-                      id:      storyId,
-                      title:   s.title || '',
-                      content: s.text  || '',
-                    });
+                    setDraftStoryFromRecord({ id: storyId, title: s.title || '', content: s.text || '' });
                   }
                   if (typeof loadStoriesList === 'function') {
                     loadStoriesList();
@@ -484,18 +487,20 @@ var getDraftStoryId;
                       }
                     }, 400);
                   }
-                  setHint('Сюжет сгенерирован');
-                  scheduleResetHint();
+                  pollNext();
                 })
-                .catch(function() { scheduleResetHint(); });
+                .catch(function() {
+                  if (typeof loadStoriesList === 'function') loadStoriesList();
+                  pollNext();
+                });
             } else {
-              setHint('Сюжет сгенерирован');
-              scheduleResetHint();
+              if (typeof loadStoriesList === 'function') loadStoriesList();
+              pollNext();
             }
           } else if (status === 'error' || status === 'cancelled' || status === 'fatal_error') {
-            var btn = document.getElementById('btn-story-generate');
-            if (btn) btn.disabled = false;
-            scheduleResetHint();
+            _batchDone++;
+            if (typeof loadStoriesList === 'function') loadStoriesList();
+            pollNext();
           } else {
             _pollTimer = setTimeout(poll, 700);
           }
@@ -510,24 +515,45 @@ var getDraftStoryId;
     if (!btn) return;
     btn.addEventListener('click', function() {
       if (btn.disabled) return;
+      var countInput = document.getElementById('story-generate-count');
+      var count = Math.max(1, Math.min(50, parseInt((countInput && countInput.value) || '1') || 1));
       btn.disabled = true;
-      setHint('Запускаю генерацию…');
-      fetch('/producer/story/generate', { method: 'POST' })
-        .then(function(r) { return r.json(); })
-        .then(function(d) {
-          if (d.error) {
-            btn.disabled = false;
-            setHint('Ошибка: ' + d.error);
-            setTimeout(resetHint, 4000);
-            return;
-          }
-          startPoll(d.batch_id);
-        })
-        .catch(function() {
-          btn.disabled = false;
-          setHint('Ошибка запроса');
-          setTimeout(resetHint, 4000);
-        });
+      _batchQueue = [];
+      _batchTotal = count;
+      _batchDone  = 0;
+      setHint(count > 1 ? 'Создаю ' + count + ' батчей…' : 'Запускаю генерацию…');
+      var remaining = count;
+      for (var i = 0; i < count; i++) {
+        fetch('/producer/story/generate', { method: 'POST' })
+          .then(function(r) { return r.json(); })
+          .then(function(d) {
+            if (d.batch_id) _batchQueue.push(d.batch_id);
+            remaining--;
+            if (remaining === 0) {
+              _batchTotal = _batchQueue.length;
+              if (_batchQueue.length === 0) {
+                btn.disabled = false;
+                setHint('Не удалось создать батчи');
+                setTimeout(resetHint, 3000);
+              } else {
+                pollNext();
+              }
+            }
+          })
+          .catch(function() {
+            remaining--;
+            if (remaining === 0) {
+              _batchTotal = _batchQueue.length;
+              if (_batchQueue.length === 0) {
+                btn.disabled = false;
+                setHint('Ошибка запроса');
+                setTimeout(resetHint, 4000);
+              } else {
+                pollNext();
+              }
+            }
+          });
+      }
     });
   }
 

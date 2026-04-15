@@ -369,6 +369,18 @@
     min-height: 18px;
     line-height: 1.5;
   }
+  .story-generate-count {
+    width: 46px; padding: 4px 6px;
+    background: #1a1a2e; border: 1px solid #2e2e4e;
+    border-radius: 6px; color: #c8c8e0;
+    font-size: 13px; text-align: center;
+    -moz-appearance: textfield;
+  }
+  .story-generate-count::-webkit-inner-spin-button,
+  .story-generate-count::-webkit-outer-spin-button { -webkit-appearance: none; }
+  .story-generate-count-label {
+    font-size: 13px; color: #8888b0; align-self: center;
+  }
   /* ── Aspect ratio control ── */
   .ar-wrap { display: flex; align-items: center; gap: 16px; margin-top: 14px; }
   .ar-preview-box {
