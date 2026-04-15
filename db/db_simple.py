@@ -264,6 +264,25 @@ def db_get_story_title(story_id):
     return row[0] if row else None
 
 
+def db_get_story_model_info(story_id):
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT p.name AS platform_name, m.name AS model_name
+                FROM stories s
+                JOIN ai_models m ON m.id = s.model_id
+                JOIN ai_platforms p ON p.id = m.platform_id
+                WHERE s.id = %s
+                """,
+                (story_id,),
+            )
+            row = cur.fetchone()
+    if not row:
+        return None
+    return {"platform_name": row[0], "model_name": row[1]}
+
+
 def db_set_story_model(story_id, model_id):
     with get_db() as conn:
         with conn.cursor() as cur:

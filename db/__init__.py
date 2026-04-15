@@ -21,6 +21,7 @@ from .db_simple import (
     db_set_story_grade,
     db_get_story_text,
     db_get_story_title,
+    db_get_story_model_info,
     db_set_story_model,
     db_upsert_story_draft,
     db_activate_model,

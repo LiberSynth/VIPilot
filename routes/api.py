@@ -19,6 +19,7 @@ from db import (
     db_reset_batch_pipeline,
     db_get_story_text,
     db_get_story_title,
+    db_get_story_model_info,
     db_get_batch_video_data,
     db_get_text_model_by_id,
     db_get_video_model_by_id,
@@ -411,7 +412,10 @@ def api_get_story(story_id):
     except (ValueError, TypeError):
         video_duration = 6
     user_prompt = user_prompt.replace('{количество_слов}', str(video_duration * 4))
-    return jsonify({"text": text, "title": title, "system_prompt": system_prompt, "user_prompt": user_prompt})
+    model_info = db_get_story_model_info(story_id)
+    platform_name = model_info["platform_name"] if model_info else ""
+    model_name = model_info["model_name"] if model_info else ""
+    return jsonify({"text": text, "title": title, "system_prompt": system_prompt, "user_prompt": user_prompt, "platform_name": platform_name, "model_name": model_name})
 
 
 @bp.route("/batch/<batch_id>/publish-frame")
