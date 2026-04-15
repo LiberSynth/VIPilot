@@ -521,13 +521,16 @@
 
   function _batchInfoLines(batchEl) {
     if (!batchEl) return [];
-    return [
-      'batch_id: '    + (batchEl.dataset.bid       || ''),
-      'scheduled: '   + (batchEl.dataset.scheduled  || ''),
-      'status: '      + (batchEl.dataset.bstatus    || ''),
-      'text_model: '  + (batchEl.dataset.textModel  || ''),
-      'video_model: ' + (batchEl.dataset.videoModel || ''),
+    var lines = [
+      'batch_id: '  + (batchEl.dataset.bid      || ''),
+      'scheduled: ' + (batchEl.dataset.scheduled || ''),
+      'status: '    + (batchEl.dataset.bstatus   || ''),
     ];
+    var tm = batchEl.dataset.textModel  || '';
+    var vm = batchEl.dataset.videoModel || '';
+    if (tm) lines.push('text_model: '  + tm);
+    if (vm) lines.push('video_model: ' + vm);
+    return lines;
   }
 
   window.monitorToggleBatch = function(e, el) {
