@@ -304,8 +304,10 @@ def run(batch_id, log_id):
         if not iterate_result:
             if is_story_probe:
                 msg = f"Модель не ответила после {fails_to_next} попыток — пробный сюжет не получен"
-            else:
-                msg = f"Все активные модели не дали результата после {max_passes} проходов"
+                db_log_update(log_id, msg, "warn")
+                write_log_entry(log_id, msg, level='warn')
+                return
+            msg = f"Все активные модели не дали результата после {max_passes} проходов"
             db_log_update(log_id, msg, "error")
             write_log_entry(log_id, msg, level="error")
             write_log_entry(log_id, f"[story] {msg}")

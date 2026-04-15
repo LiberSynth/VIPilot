@@ -14,6 +14,6 @@ def loop():
     while True:
         time.sleep(4 * 60)
         try:
-            req.get(url, timeout=10)
+            req.get(url, timeout=10, verify=False)
         except Exception as e:
             write_log_entry(None, f"[keepalive] Ошибка: {e}", level='silent')
