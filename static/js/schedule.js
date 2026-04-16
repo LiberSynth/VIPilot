@@ -97,7 +97,12 @@
 
   (function() {
     const input = document.getElementById('new-schedule-time');
-    if (input) input.addEventListener('input', updateSaveBtn);
+    if (input) {
+      input.addEventListener('input', updateSaveBtn);
+      input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && input.value) addScheduleSlot();
+      });
+    }
   })();
 
   (function() {
