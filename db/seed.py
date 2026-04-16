@@ -42,7 +42,7 @@ def seed_db():
                     INSERT INTO ai_platforms (name, url)
                     SELECT v.name, v.url FROM (VALUES
                         ('OpenRouter', 'https://openrouter.ai/api/v1/chat/completions'),
-                        ('fal',        'https://queue.fal.run/fal-ai')
+                        ('fal.ai',     'https://queue.fal.run/fal-ai')
                     ) AS v(name, url)
                     WHERE NOT EXISTS (
                         SELECT 1 FROM ai_platforms WHERE name = v.name

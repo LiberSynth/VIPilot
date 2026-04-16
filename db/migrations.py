@@ -1743,6 +1743,45 @@ def _m060_stories_top_quality(cur):
     """)
 
 
+def _m061_fix_model_names(cur):
+    """
+    Приводит поля name в ai_platforms и ai_models к официальным названиям.
+
+    ai_platforms:
+      fal → fal.ai
+
+    ai_models (текстовые):
+      dolphin-mistral-24b-venice  → dolphin-mistral-24b-venice-edition
+      mistral-7b-instruct         → mistral-7b-instruct-v0.1
+      nemotron-3-nano-30b         → nemotron-3-nano-30b-a3b
+      nemotron-3-super-120b       → nemotron-3-super-120b-a12b
+      qwen3-coder                 → qwen3-coder-480b-a35b
+      qwen3-next-80b              → qwen3-next-80b-a3b-instruct
+
+    ai_models (видео):
+      sora-2 → Sora 2
+      veo2   → Veo 2
+    """
+    cur.execute("""
+        UPDATE ai_platforms SET name = 'fal.ai' WHERE name = 'fal'
+    """)
+
+    renames = [
+        ('dolphin-mistral-24b-venice',  'dolphin-mistral-24b-venice-edition'),
+        ('mistral-7b-instruct',         'mistral-7b-instruct-v0.1'),
+        ('nemotron-3-nano-30b',         'nemotron-3-nano-30b-a3b'),
+        ('nemotron-3-super-120b',       'nemotron-3-super-120b-a12b'),
+        ('qwen3-coder',                 'qwen3-coder-480b-a35b'),
+        ('qwen3-next-80b',              'qwen3-next-80b-a3b-instruct'),
+        ('sora-2',                      'Sora 2'),
+        ('veo2',                        'Veo 2'),
+    ]
+    for old_name, new_name in renames:
+        cur.execute("""
+            UPDATE ai_models SET name = %s WHERE name = %s
+        """, (new_name, old_name))
+
+
 def _m057_rename_model_id_keys_in_batches_data(cur):
     """
     Переименовывает устаревшие ключи в поле batches.data для устранения неоднозначности:
@@ -1824,6 +1863,7 @@ MIGRATIONS = [
     (58, _m058_deepseek_chat_api_params),
     (59, _m059_rename_prompt_settings_keys),
     (60, _m060_stories_top_quality),
+    (61, _m061_fix_model_names),
 ]
 
 
