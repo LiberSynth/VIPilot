@@ -1071,6 +1071,7 @@
     transition: background .15s, border-color .15s;
     flex-shrink: 0;
   }
+  .btn-story-top-quality[hidden] { display: none; }
   .btn-story-top-quality:hover { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.2); }
   .btn-story-top-quality:active { background: rgba(255,255,255,.14); }
   .btn-story-top-quality svg { width: 13px; height: 13px; }
