@@ -108,7 +108,7 @@
           '</div>' +
           '<button class="probe-modal-close" onclick="closeProbeModal()">&times;</button>' +
         '</div>' +
-        '<div class="probe-modal-body" id="probe-modal-body"><span style="color:#888">Создаю батч…</span></div>' +
+        '<div class="probe-modal-body" id="probe-modal-body" data-memo-scroll><span style="color:#888">Создаю батч…</span></div>' +
       '</div>';
     return el;
   }
@@ -343,7 +343,7 @@
           '</button>' +
           '<button class="story-modal-close" onclick="closeStoryModal()">&times;</button>' +
         '</div>' +
-        '<div class="story-modal-body" id="story-modal-body"><span class="story-modal-loading">Загрузка…</span></div>' +
+        '<div class="story-modal-body" id="story-modal-body" data-memo-scroll><span class="story-modal-loading">Загрузка…</span></div>' +
       '</div>';
     var titleEl = el.querySelector('#story-modal-title');
     if (titleEl) titleEl.textContent = modelName ? 'Сюжет · ' + modelName : 'Сюжет';
