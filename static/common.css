@@ -1055,13 +1055,13 @@
   }
   #touch-tooltip.hidden { opacity: 0; }
 
-  /* ── Card top-actions (top_quality + return buttons) ── */
-  .card-top-actions {
-    position: absolute; top: 10px; right: 10px;
-    display: flex; gap: 4px; align-items: center;
+  /* ── Card draft header with inline action buttons ── */
+  .card-draft-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px;
   }
-  .card-top-actions .btn-story-return {
-    position: static;
+  .card-top-actions {
+    display: flex; gap: 4px; align-items: center; flex-shrink: 0;
   }
 
   .btn-story-top-quality {
