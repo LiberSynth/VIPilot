@@ -93,7 +93,7 @@ function wfUseDonor(checked) {
       var badge = document.getElementById('use-donor-badge');
       var on    = d.use_donor === '1';
       if (badge) badge.style.display = on ? '' : 'none';
-      showToast(on ? 'Использовать донора: включено' : 'Использовать донора: выключено', 'success');
+      showToast(on ? 'Подбирать видео из пула: включено' : 'Подбирать видео из пула: выключено', 'success');
     })
     .catch(function() { showToast('Ошибка соединения', 'error'); });
 }
