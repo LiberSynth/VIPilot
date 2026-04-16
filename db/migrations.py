@@ -1701,6 +1701,22 @@ def _m056_deepseek_platform(cur):
     """, (TEXT_BODY,))
 
 
+def _m058_deepseek_chat_api_params(cur):
+    """
+    Фиксирует параметры API для модели deepseek-chat:
+    temperature=0.2, top_p=0.9, presence_penalty=0.3, frequency_penalty=0.5.
+    """
+    TEXT_BODY = (
+        '{"messages": [{"role": "system", "content": "{}"},'
+        ' {"role": "user", "content": "{}"}],'
+        ' "max_tokens": 300, "temperature": 0.2, "top_p": 0.9,'
+        ' "presence_penalty": 0.3, "frequency_penalty": 0.5}'
+    )
+    cur.execute("""
+        UPDATE ai_models SET body = %s::jsonb WHERE name = 'deepseek-chat'
+    """, (TEXT_BODY,))
+
+
 def _m057_rename_model_id_keys_in_batches_data(cur):
     """
     Переименовывает устаревшие ключи в поле batches.data для устранения неоднозначности:
@@ -1779,6 +1795,7 @@ MIGRATIONS = [
     (55, _m055_delete_vk_publish_settings),
     (56, _m056_deepseek_platform),
     (57, _m057_rename_model_id_keys_in_batches_data),
+    (58, _m058_deepseek_chat_api_params),
 ]
 
 
