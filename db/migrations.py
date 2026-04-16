@@ -1782,6 +1782,83 @@ def _m061_fix_model_names(cur):
         """, (new_name, old_name))
 
 
+def _m062_official_display_names(cur):
+    """
+    Приводит поля name в ai_models к официальным отображаемым названиям.
+    API-идентификаторы хранятся в поле url и не затрагиваются.
+
+    Текстовые модели:
+      deepseek-r1-distill-llama-70b      → DeepSeek R1 Distill Llama 70B
+      dolphin-mistral-24b-venice-edition → Venice: Uncensored
+      gemma-3-12b-it                     → Gemma 3 12B IT
+      gemma-3-27b-it                     → Gemma 3 27B IT
+      gemma-3-4b-it                      → Gemma 3 4B IT
+      gemma-3n-e2b-it                    → Gemma 3n E2B IT
+      gemma-3n-e4b-it                    → Gemma 3n E4B IT
+      glm-4.5-air                        → GLM 4.5 Air
+      hermes-3-llama-3.1-405b            → Hermes 3 405B Instruct
+      lfm-2.5-1.2b-instruct              → LFM2.5-1.2B-Instruct
+      lfm-2.5-1.2b-thinking              → LFM2.5-1.2B-Thinking
+      llama-3.1-8b-instruct              → Llama 3.1 8B Instruct
+      llama-3.2-3b-instruct              → Llama 3.2 3B Instruct
+      llama-3.3-70b-instruct             → Llama 3.3 70B Instruct
+      minimax-m2.5                       → MiniMax M2.5
+      mistral-7b-instruct-v0.1           → Mistral 7B Instruct v0.1
+      nemotron-3-nano-30b-a3b            → Nemotron 3 Nano 30B A3B
+      nemotron-3-super-120b-a12b         → Nemotron 3 Super 120B A12B
+      phi-4                              → Phi-4
+      qwen3-coder-480b-a35b              → Qwen3 Coder 480B A35B
+      qwen3-next-80b-a3b-instruct        → Qwen3 Next 80B A3B Instruct
+      qwen3.6-plus                       → Qwen3.6 Plus
+      step-3.5-flash                     → Step 3.5 Flash
+      trinity-large-preview              → Trinity Large Preview
+      trinity-mini                       → Trinity Mini
+
+    Видеомодели:
+      kling-video/v1.6/standard → Kling Video v1.6 Standard
+      ltx-2.3                   → LTX Video 2.3
+      ltx-video                 → LTX Video
+      minimax/video-01          → MiniMax Video-01
+      seedance/v1.5/pro         → Seedance v1.5 Pro
+      wan-2.6                   → Wan 2.6
+    """
+    renames = [
+        ('deepseek-r1-distill-llama-70b',      'DeepSeek R1 Distill Llama 70B'),
+        ('dolphin-mistral-24b-venice-edition',  'Venice: Uncensored'),
+        ('gemma-3-12b-it',                      'Gemma 3 12B IT'),
+        ('gemma-3-27b-it',                      'Gemma 3 27B IT'),
+        ('gemma-3-4b-it',                       'Gemma 3 4B IT'),
+        ('gemma-3n-e2b-it',                     'Gemma 3n E2B IT'),
+        ('gemma-3n-e4b-it',                     'Gemma 3n E4B IT'),
+        ('glm-4.5-air',                         'GLM 4.5 Air'),
+        ('hermes-3-llama-3.1-405b',             'Hermes 3 405B Instruct'),
+        ('lfm-2.5-1.2b-instruct',               'LFM2.5-1.2B-Instruct'),
+        ('lfm-2.5-1.2b-thinking',               'LFM2.5-1.2B-Thinking'),
+        ('llama-3.1-8b-instruct',               'Llama 3.1 8B Instruct'),
+        ('llama-3.2-3b-instruct',               'Llama 3.2 3B Instruct'),
+        ('llama-3.3-70b-instruct',              'Llama 3.3 70B Instruct'),
+        ('minimax-m2.5',                        'MiniMax M2.5'),
+        ('mistral-7b-instruct-v0.1',            'Mistral 7B Instruct v0.1'),
+        ('nemotron-3-nano-30b-a3b',             'Nemotron 3 Nano 30B A3B'),
+        ('nemotron-3-super-120b-a12b',          'Nemotron 3 Super 120B A12B'),
+        ('phi-4',                               'Phi-4'),
+        ('qwen3-coder-480b-a35b',               'Qwen3 Coder 480B A35B'),
+        ('qwen3-next-80b-a3b-instruct',         'Qwen3 Next 80B A3B Instruct'),
+        ('qwen3.6-plus',                        'Qwen3.6 Plus'),
+        ('step-3.5-flash',                      'Step 3.5 Flash'),
+        ('trinity-large-preview',               'Trinity Large Preview'),
+        ('trinity-mini',                        'Trinity Mini'),
+        ('kling-video/v1.6/standard',           'Kling Video v1.6 Standard'),
+        ('ltx-2.3',                             'LTX Video 2.3'),
+        ('ltx-video',                           'LTX Video'),
+        ('minimax/video-01',                    'MiniMax Video-01'),
+        ('seedance/v1.5/pro',                   'Seedance v1.5 Pro'),
+        ('wan-2.6',                             'Wan 2.6'),
+    ]
+    for old_name, new_name in renames:
+        cur.execute("UPDATE ai_models SET name = %s WHERE name = %s", (new_name, old_name))
+
+
 def _m057_rename_model_id_keys_in_batches_data(cur):
     """
     Переименовывает устаревшие ключи в поле batches.data для устранения неоднозначности:
@@ -1864,6 +1941,7 @@ MIGRATIONS = [
     (59, _m059_rename_prompt_settings_keys),
     (60, _m060_stories_top_quality),
     (61, _m061_fix_model_names),
+    (62, _m062_official_display_names),
 ]
 
 
