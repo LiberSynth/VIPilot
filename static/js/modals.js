@@ -108,7 +108,7 @@
   };
 
   function _buildProbeModalHTML(modelName, isVideo) {
-    var exportBtn = isVideo ? '' : '<button class="cycle-float-btn" title="Выгрузка" onclick="exportProbeModal(this)">' + _SVG_EXPORT + '</button>';
+    var exportBtn = isVideo ? '' : '<button id="probe-export-btn" class="cycle-float-btn" title="Выгрузка" onclick="exportProbeModal(this)" style="display:none">' + _SVG_EXPORT + '</button>';
     var el = document.createElement('div');
     el.id = 'probe-modal-overlay';
     el.className = 'probe-modal-overlay open';
@@ -173,6 +173,8 @@
   function _showStoryResult(storyId, body) {
     var overlay = document.getElementById('probe-modal-overlay');
     if (overlay && overlay.dataset) overlay.dataset.storyId = storyId;
+    var exportBtn = document.getElementById('probe-export-btn');
+    if (exportBtn) exportBtn.style.display = '';
     fetch('/api/story/' + encodeURIComponent(storyId))
       .then(function(r) { return r.json(); })
       .then(function(d) {
