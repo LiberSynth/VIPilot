@@ -231,29 +231,9 @@ var getDraftStoryId;
         var currentTq = btn.getAttribute('data-tq') === '1';
         var newTq = !currentTq;
         btn.disabled = true;
-        fetch('/producer/story/' + storyId + '/top_quality', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ value: newTq }),
-        })
-        .then(function(r) { return r.ok ? r.json() : null; })
-        .then(function(d) {
-          if (d && d.ok) {
-            var val = d.top_quality;
-            var currentCardId = typeof getDraftStoryId === 'function' ? getDraftStoryId() : null;
-            if (currentCardId && String(currentCardId) === String(storyId)) {
-              var cardBtn = document.getElementById('btn-story-top-quality');
-              if (cardBtn) {
-                cardBtn.classList.toggle('active', !!val);
-                cardBtn.title = val ? 'Образцовое качество: да. Нажмите для снятия' : 'Образцовое качество: нет. Нажмите для пометки';
-              }
-            }
-            if (typeof window.loadStoriesList === 'function') window.loadStoriesList();
-          } else {
-            btn.disabled = false;
-          }
-        })
-        .catch(function() { btn.disabled = false; });
+        window.applyTopQuality(storyId, newTq).then(function(ok) {
+          if (!ok) btn.disabled = false;
+        }).catch(function() { btn.disabled = false; });
       });
     });
     container.querySelectorAll('.story-row').forEach(function(row) {
@@ -634,6 +614,47 @@ var getDraftStoryId;
     }
   }
 
+  function showTQValidationBanner() {
+    var existing = document.getElementById('tq-validation-banner');
+    if (existing) { clearTimeout(existing._hideTimer); existing.remove(); }
+    var banner = document.createElement('div');
+    banner.id = 'tq-validation-banner';
+    banner.textContent = 'Плохой сюжет не может быть образцовым';
+    banner.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);background:#c0392b;color:#fff;padding:10px 24px;border-radius:6px;z-index:9999;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,.3);';
+    document.body.appendChild(banner);
+    banner._hideTimer = setTimeout(function() { banner.remove(); }, 3500);
+  }
+
+  function applyTopQuality(storyId, newValue) {
+    if (newValue === true) {
+      var gradeBadge = document.querySelector('.story-grade-badge[data-id="' + storyId + '"]');
+      var grade = gradeBadge ? gradeBadge.getAttribute('data-grade') : null;
+      if (grade !== 'good') {
+        showTQValidationBanner();
+        return Promise.resolve(false);
+      }
+    }
+    return fetch('/producer/story/' + storyId + '/top_quality', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value: newValue }),
+    })
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(d) {
+      if (d && d.ok) {
+        var currentCardId = typeof getDraftStoryId === 'function' ? getDraftStoryId() : null;
+        if (currentCardId && String(currentCardId) === String(storyId)) {
+          setCardTQState(d.top_quality, false);
+        }
+        if (typeof window.loadStoriesList === 'function') window.loadStoriesList();
+        return true;
+      }
+      return false;
+    });
+  }
+
+  window.applyTopQuality = applyTopQuality;
+
   window.onDraftStoryFirstSaved = function() {
     setCardTQState(false, false);
   };
@@ -659,20 +680,9 @@ var getDraftStoryId;
       if (!storyId || btn.disabled) return;
       var newValue = !btn.classList.contains('active');
       btn.disabled = true;
-      fetch('/producer/story/' + storyId + '/top_quality', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ value: newValue }),
-      })
-      .then(function(r) { return r.ok ? r.json() : null; })
-      .then(function(d) {
-        btn.disabled = false;
-        if (d && d.ok) {
-          setCardTQState(d.top_quality, false);
-          if (typeof window.loadStoriesList === 'function') window.loadStoriesList();
-        }
-      })
-      .catch(function() { btn.disabled = false; });
+      applyTopQuality(storyId, newValue).then(function(ok) {
+        if (!ok) btn.disabled = false;
+      }).catch(function() { btn.disabled = false; });
     });
 
   }
