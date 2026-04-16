@@ -27,7 +27,13 @@ function closeSidebar() {
   if (el) el.remove();
 }
 
+var _MONITOR_SCROLL_KEY = 'memo_pageScroll_panel-log';
+
 function switchPanel(name) {
+  var activePanel = document.querySelector('.tab-panel.active');
+  if (activePanel && activePanel.id === 'panel-log') {
+    localStorage.setItem(_MONITOR_SCROLL_KEY, String(window.scrollY || 0));
+  }
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.sidebar-item').forEach(b => b.classList.remove('active'));
   const panel = document.getElementById('panel-' + name);
@@ -37,6 +43,13 @@ function switchPanel(name) {
   const titleEl = document.getElementById('page-title');
   if (titleEl) titleEl.textContent = PANEL_TITLES[name] || name;
   closeSidebar();
+  if (name === 'log') {
+    var _rawScroll = localStorage.getItem(_MONITOR_SCROLL_KEY);
+    if (_rawScroll !== null) {
+      var savedScroll = parseInt(_rawScroll, 10) || 0;
+      requestAnimationFrame(function() { window.scrollTo(0, savedScroll); });
+    }
+  }
   if (name === 'request') {
     if (typeof loadModels === 'function') loadModels();
   }
