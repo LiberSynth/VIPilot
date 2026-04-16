@@ -3,6 +3,15 @@
 
   window.EXPORT_STORY_SVG = SVG;
 
+  var _clipBuffer = null;
+  var _clipTimer = null;
+  var ACCUMULATE_MS = 10000;
+
+  function _resetBuffer() {
+    _clipBuffer = null;
+    _clipTimer = null;
+  }
+
   window.flashCopied = function(btn) {
     btn.classList.add('copied');
     setTimeout(function() { btn.classList.remove('copied'); }, 2000);
@@ -27,7 +36,12 @@
         parts.push('/* Промпт НАЧАЛО */\n' + (d.user_prompt || '') + '\n/* Промпт КОНЕЦ */');
         var answer = d.title ? d.title + '\n\n' + d.text : d.text;
         parts.push('/* Ответ текстовой модели НАЧАЛО */\n' + answer + '\n/* Ответ текстовой модели КОНЕЦ */');
-        navigator.clipboard.writeText(parts.join('\n\n')).then(function() { window.flashCopied(btn); }).catch(function() {});
+        var current = parts.join('\n\n');
+        var toWrite = _clipBuffer ? _clipBuffer + '\n\n' + current : current;
+        _clipBuffer = toWrite;
+        clearTimeout(_clipTimer);
+        _clipTimer = setTimeout(_resetBuffer, ACCUMULATE_MS);
+        navigator.clipboard.writeText(toWrite).then(function() { window.flashCopied(btn); }).catch(function() {});
       })
       .catch(function() {});
   };
