@@ -346,6 +346,8 @@ var getDraftStoryId;
       params.set('show_used', (showUsed && showUsed.checked) ? '1' : '0');
       params.set('show_bad', (onlyGood && onlyGood.checked) ? '0' : '1');
     }
+    var pinId = typeof getDraftStoryId === 'function' ? getDraftStoryId() : null;
+    if (pinId) params.set('pin_id', pinId);
     return params.toString();
   }
 
