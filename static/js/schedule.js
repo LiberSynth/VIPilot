@@ -4,7 +4,7 @@
     if (!list) return;
     list.innerHTML = '';
     if (!Array.isArray(times) || times.length === 0) {
-      list.innerHTML = '<div style="font-size:13px;color:#555;padding:4px 0;">Нет добавленных времён</div>';
+      list.innerHTML = '<div style="font-size:13px;color:#555;padding:4px 0;">Список слотов пуст.</div>';
       return;
     }
     times.slice().sort(function(a, b) {
