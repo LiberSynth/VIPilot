@@ -193,7 +193,7 @@ var getDraftStoryId;
       var tqBtn = '<button class="story-top-quality-btn' + (tqActive ? ' active' : '') + '" ' +
         'data-id="' + s.id + '" data-tq="' + (tqActive ? '1' : '0') + '" ' +
         'title="' + (tqActive ? 'Образцовое качество: да' : 'Образцовое качество: нет') + '">' +
-        '<svg viewBox="0 0 16 16" fill="currentColor" stroke="none"><path d="M8 1.5l1.6 4.9H15l-4.2 3 1.6 4.9L8 11.6l-4.4 2.8 1.6-4.9L1 6.4h5.4z"/></svg></button>';
+        '<svg viewBox="0 0 16 16" fill="currentColor" stroke="none"><path d="M1 8h3v7H1V8z"/><path d="M5 15V8l3-8 1.2.6-2.2 6H13a1 1 0 0 1 1 1l-1.5 7a1 1 0 0 1-1 .9H5z"/></svg></button>';
       var exportBtn = '<button class="story-icon story-export-btn" data-id="' + s.id + '" title="Выгрузить">' +
         (window.EXPORT_STORY_SVG || '') + '</button>';
       html += '<div class="story-row" data-id="' + s.id + '" data-used="' + (s.used ? '1' : '0') + '">' +
@@ -238,18 +238,19 @@ var getDraftStoryId;
         })
         .then(function(r) { return r.ok ? r.json() : null; })
         .then(function(d) {
-          btn.disabled = false;
           if (d && d.ok) {
             var val = d.top_quality;
-            btn.setAttribute('data-tq', val ? '1' : '0');
-            btn.classList.toggle('active', !!val);
-            btn.title = val ? 'Образцовое качество: да' : 'Образцовое качество: нет';
-            var cardBtn = document.getElementById('btn-story-top-quality');
             var currentCardId = typeof getDraftStoryId === 'function' ? getDraftStoryId() : null;
-            if (cardBtn && currentCardId && String(currentCardId) === String(storyId)) {
-              cardBtn.classList.toggle('active', !!val);
-              cardBtn.title = val ? 'Образцовое качество: да. Нажмите для снятия' : 'Образцовое качество: нет. Нажмите для пометки';
+            if (currentCardId && String(currentCardId) === String(storyId)) {
+              var cardBtn = document.getElementById('btn-story-top-quality');
+              if (cardBtn) {
+                cardBtn.classList.toggle('active', !!val);
+                cardBtn.title = val ? 'Образцовое качество: да. Нажмите для снятия' : 'Образцовое качество: нет. Нажмите для пометки';
+              }
             }
+            if (typeof window.loadStoriesList === 'function') window.loadStoriesList();
+          } else {
+            btn.disabled = false;
           }
         })
         .catch(function() { btn.disabled = false; });
@@ -619,11 +620,14 @@ var getDraftStoryId;
   function setCardTQState(value, disabled) {
     var btn = document.getElementById('btn-story-top-quality');
     if (!btn) return;
-    btn.disabled = !!disabled;
     if (disabled) {
+      btn.hidden = true;
+      btn.disabled = true;
       btn.classList.remove('active');
       btn.title = TQ_TITLE_DIS;
     } else {
+      btn.hidden = false;
+      btn.disabled = false;
       btn.classList.toggle('active', !!value);
       btn.title = value ? TQ_TITLE_ON : TQ_TITLE_OFF;
     }
@@ -664,15 +668,7 @@ var getDraftStoryId;
         btn.disabled = false;
         if (d && d.ok) {
           setCardTQState(d.top_quality, false);
-          var container = document.getElementById('stories-list');
-          if (container) {
-            var listBtn = container.querySelector('.story-top-quality-btn[data-id="' + storyId + '"]');
-            if (listBtn) {
-              listBtn.setAttribute('data-tq', d.top_quality ? '1' : '0');
-              listBtn.classList.toggle('active', !!d.top_quality);
-              listBtn.title = d.top_quality ? 'Образцовое качество: да' : 'Образцовое качество: нет';
-            }
-          }
+          if (typeof window.loadStoriesList === 'function') window.loadStoriesList();
         }
       })
       .catch(function() { btn.disabled = false; });
