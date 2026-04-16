@@ -83,12 +83,16 @@
         <span class="sw-filter-label">На утверждение</span>
         <input class="sw-filter-check" type="checkbox" id="filter-for-approval" {% if screenwriter_for_approval %}checked{% endif %}>
       </label>
+      <label class="sw-filter-row" style="margin-bottom:6px" for="filter-top-quality">
+        <span class="sw-filter-label">Образцовое качество</span>
+        <input class="sw-filter-check" type="checkbox" id="filter-top-quality" {% if screenwriter_top_quality %}checked{% endif %}>
+      </label>
       <label class="sw-filter-row" style="margin-bottom:6px" for="filter-only-good">
         <span class="sw-filter-label">Только хорошие</span>
         <input class="sw-filter-check" type="checkbox" id="filter-only-good" {% if screenwriter_only_good %}checked{% endif %}>
       </label>
       <label class="sw-filter-row" style="margin-bottom:10px" for="filter-show-used">
-        <span class="sw-filter-label">Показывать использованные</span>
+        <span class="sw-filter-label">Использованные</span>
         <input class="sw-filter-check" type="checkbox" id="filter-show-used" {% if screenwriter_show_used %}checked{% endif %}>
       </label>
       <div id="stories-list" class="stories-list">

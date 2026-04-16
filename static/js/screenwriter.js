@@ -320,12 +320,14 @@ var getDraftStoryId;
     var showUsed = document.getElementById('filter-show-used');
     var onlyGood = document.getElementById('filter-only-good');
     var forApproval = document.getElementById('filter-for-approval');
+    var topQuality = document.getElementById('filter-top-quality');
     var params = new URLSearchParams();
     if (forApproval && forApproval.checked) {
       params.set('for_approval', '1');
     } else {
       params.set('show_used', (showUsed && showUsed.checked) ? '1' : '0');
       params.set('show_bad', (onlyGood && onlyGood.checked) ? '0' : '1');
+      if (topQuality && topQuality.checked) params.set('top_quality', '1');
     }
     var pinId = typeof getDraftStoryId === 'function' ? getDraftStoryId() : null;
     if (pinId) params.set('pin_id', pinId);
@@ -353,6 +355,10 @@ var getDraftStoryId;
     var showUsed = document.getElementById('filter-show-used');
     var onlyGood = document.getElementById('filter-only-good');
     var forApproval = document.getElementById('filter-for-approval');
+    var topQuality = document.getElementById('filter-top-quality');
+    function envPost(key, value) {
+      fetch('/producer/env', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: key, value: value }) });
+    }
     function onFilterChange(key, checkbox) {
       var value = checkbox.checked ? '1' : '0';
       fetch('/producer/env', {
@@ -368,18 +374,31 @@ var getDraftStoryId;
         if (forApproval.checked) {
           if (onlyGood) onlyGood.checked = false;
           if (showUsed) showUsed.checked = false;
-          fetch('/producer/env', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'screenwriter_only_good', value: '0' }) });
-          fetch('/producer/env', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'screenwriter_show_used', value: '0' }) });
+          if (topQuality) topQuality.checked = false;
+          envPost('screenwriter_only_good', '0');
+          envPost('screenwriter_show_used', '0');
+          envPost('screenwriter_top_quality', '0');
         }
         updateReturnButton();
         onFilterChange('screenwriter_for_approval', forApproval);
+      });
+    }
+    if (topQuality) {
+      topQuality.addEventListener('change', function() {
+        if (topQuality.checked) {
+          if (forApproval) forApproval.checked = false;
+          if (showUsed) showUsed.checked = true;
+          envPost('screenwriter_for_approval', '0');
+          envPost('screenwriter_show_used', '1');
+        }
+        onFilterChange('screenwriter_top_quality', topQuality);
       });
     }
     if (showUsed) {
       showUsed.addEventListener('change', function() {
         if (showUsed.checked && forApproval && forApproval.checked) {
           forApproval.checked = false;
-          fetch('/producer/env', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'screenwriter_for_approval', value: '0' }) });
+          envPost('screenwriter_for_approval', '0');
         }
         onFilterChange('screenwriter_show_used', showUsed);
       });
@@ -388,7 +407,7 @@ var getDraftStoryId;
       onlyGood.addEventListener('change', function() {
         if (onlyGood.checked && forApproval && forApproval.checked) {
           forApproval.checked = false;
-          fetch('/producer/env', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'screenwriter_for_approval', value: '0' }) });
+          envPost('screenwriter_for_approval', '0');
         }
         onFilterChange('screenwriter_only_good', onlyGood);
       });

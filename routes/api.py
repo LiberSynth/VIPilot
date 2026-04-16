@@ -478,8 +478,9 @@ def api_producer_stories():
     show_used = request.args.get("show_used", "1") != "0"
     show_bad = request.args.get("show_bad", "1") != "0"
     for_approval = request.args.get("for_approval", "0") == "1"
+    top_quality = request.args.get("top_quality", "0") == "1"
     pin_id = request.args.get("pin_id") or None
-    stories = db_get_stories_list(show_used=show_used, show_bad=show_bad, for_approval=for_approval, pin_id=pin_id)
+    stories = db_get_stories_list(show_used=show_used, show_bad=show_bad, for_approval=for_approval, top_quality=top_quality, pin_id=pin_id)
     return jsonify(stories)
 
 
@@ -509,7 +510,7 @@ def api_producer_env_set():
     data = request.get_json(silent=True) or {}
     key = data.get("key", "")
     value = data.get("value", "")
-    allowed_keys = {"screenwriter_show_used", "screenwriter_only_good", "screenwriter_for_approval"}
+    allowed_keys = {"screenwriter_show_used", "screenwriter_only_good", "screenwriter_for_approval", "screenwriter_top_quality"}
     if key not in allowed_keys:
         return jsonify({"error": "invalid key"}), 400
     env_set(key, str(value))
