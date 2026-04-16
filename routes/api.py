@@ -415,7 +415,8 @@ def api_get_story(story_id):
     model_info = db_get_story_model_info(story_id)
     platform_name = model_info["platform_name"] if model_info else ""
     model_name = model_info["model_name"] if model_info else ""
-    return jsonify({"text": text, "title": title, "system_prompt": system_prompt, "user_prompt": user_prompt, "platform_name": platform_name, "model_name": model_name})
+    model_body = model_info["body"] if model_info else None
+    return jsonify({"text": text, "title": title, "system_prompt": system_prompt, "user_prompt": user_prompt, "platform_name": platform_name, "model_name": model_name, "model_body": model_body})
 
 
 @bp.route("/batch/<batch_id>/publish-frame")

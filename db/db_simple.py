@@ -269,7 +269,7 @@ def db_get_story_model_info(story_id):
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT p.name AS platform_name, m.name AS model_name
+                SELECT p.name AS platform_name, m.name AS model_name, m.body
                 FROM stories s
                 JOIN ai_models m ON m.id = s.model_id
                 JOIN ai_platforms p ON p.id = m.platform_id
@@ -280,7 +280,7 @@ def db_get_story_model_info(story_id):
             row = cur.fetchone()
     if not row:
         return None
-    return {"platform_name": row[0], "model_name": row[1]}
+    return {"platform_name": row[0], "model_name": row[1], "body": row[2]}
 
 
 def db_set_story_model(story_id, model_id):

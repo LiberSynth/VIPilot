@@ -17,6 +17,12 @@
         var parts = [];
         var modelLabel = (d.platform_name || '') + ': ' + (d.model_name || '');
         parts.push('/* Текстовая модель: ' + modelLabel + ' */');
+        var body = d.model_body || {};
+        var SKIP_KEYS = { messages: true };
+        var configLines = Object.keys(body).filter(function(k) { return !SKIP_KEYS[k]; }).map(function(k) { return k + ': ' + body[k]; });
+        if (configLines.length) {
+          parts.push('/* Конфиг модели НАЧАЛО */\n' + configLines.join('\n') + '\n/* Конфиг модели КОНЕЦ */');
+        }
         parts.push('/* Системный промпт НАЧАЛО */\n' + (d.system_prompt || '') + '\n/* Системный промпт КОНЕЦ */');
         parts.push('/* Промпт НАЧАЛО */\n' + (d.user_prompt || '') + '\n/* Промпт КОНЕЦ */');
         var answer = d.title ? d.title + '\n\n' + d.text : d.text;
