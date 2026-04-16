@@ -173,8 +173,8 @@
 <script src="/static/js/shell.js"></script>
 <script>
 (function() {
-  var _storyPoolLoaded = false;
   var _storyPoolData = [];
+  var _storyPoolReqId = 0;
 
   function selectOption(id, label) {
     var lbl = document.getElementById('director-story-label');
@@ -211,18 +211,35 @@
   }
 
   function loadDirectorStoryPool() {
-    if (_storyPoolLoaded) return;
-    _storyPoolLoaded = true;
+    var hid = document.getElementById('director-story-id');
+    var prevId = hid ? hid.value : '';
+    _storyPoolData = [];
+    var list = document.getElementById('director-story-list');
+    if (list) {
+      list.querySelectorAll('.cust-select-option:not([data-value=""])').forEach(function(o) { o.remove(); });
+    }
+    _storyPoolReqId += 1;
+    var reqId = _storyPoolReqId;
     fetch('/producer/stories/pool')
       .then(function(r) { return r.json(); })
       .then(function(stories) {
-        if (!Array.isArray(stories)) { _storyPoolLoaded = false; return; }
+        if (reqId !== _storyPoolReqId) return;
+        if (!Array.isArray(stories)) return;
         _storyPoolData = stories;
         stories.forEach(function(s) {
           addOption(s.id, s.title || ('Сюжет ' + s.id.slice(0, 8)));
         });
+        var match = prevId && stories.find(function(s) { return s.id === prevId; });
+        if (match) {
+          selectOption(match.id, match.title || ('Сюжет ' + match.id.slice(0, 8)));
+        } else {
+          selectOption('', 'Сгенерировать');
+        }
       })
-      .catch(function() { _storyPoolLoaded = false; });
+      .catch(function() {
+        if (reqId !== _storyPoolReqId) return;
+        selectOption('', 'Сгенерировать');
+      });
   }
 
   var _origSwitchPanel = window.switchPanel;
@@ -238,6 +255,7 @@
       var list = document.getElementById('director-story-list');
       if (!list) return;
       if (list.hidden) {
+        loadDirectorStoryPool();
         list.hidden = false;
         btn.classList.add('open');
       } else {
