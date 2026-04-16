@@ -193,7 +193,7 @@ var getDraftStoryId;
       var tqBtn = '<button class="story-top-quality-btn' + (tqActive ? ' active' : '') + '" ' +
         'data-id="' + s.id + '" data-tq="' + (tqActive ? '1' : '0') + '" ' +
         'title="' + (tqActive ? 'Образцовое качество: да' : 'Образцовое качество: нет') + '">' +
-        '<svg viewBox="0 0 16 16" fill="currentColor" stroke="none"><path d="M1 8h3v7H1V8z"/><path d="M5 15V8l3-8 1.2.6-2.2 6H13a1 1 0 0 1 1 1l-1.5 7a1 1 0 0 1-1 .9H5z"/></svg></button>';
+        '<svg viewBox="0 0 16 16" fill="currentColor" stroke="none"><path d="M8 13.8C6.2 12.6.5 9 .5 5.5a4 4 0 0 1 7.5-2 4 4 0 0 1 7.5 2c0 3.5-5.7 7.1-7.5 8.3z"/></svg></button>';
       var exportBtn = '<button class="story-icon story-export-btn" data-id="' + s.id + '" title="Выгрузить">' +
         (window.EXPORT_STORY_SVG || '') + '</button>';
       html += '<div class="story-row" data-id="' + s.id + '" data-used="' + (s.used ? '1' : '0') + '">' +
