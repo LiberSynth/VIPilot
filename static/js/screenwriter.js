@@ -188,9 +188,11 @@ var getDraftStoryId;
         'style="background:' + bg + ';color:' + tc + '" ' +
         'title="Оценка: ' + label + '. Нажмите для смены">' +
         label + '</button>';
+      var exportBtn = '<button class="story-icon story-export-btn" data-id="' + s.id + '" title="Выгрузить">' +
+        (window.EXPORT_STORY_SVG || '') + '</button>';
       html += '<div class="story-row" data-id="' + s.id + '" data-used="' + (s.used ? '1' : '0') + '">' +
         '<div class="story-title">' + escapeHtml(s.title || '(без названия)') + modelLabel + ' ' + gradeBadge + '</div>' +
-        '<div class="story-row-right">' + icons + '</div>' +
+        '<div class="story-row-right">' + icons + exportBtn + '</div>' +
       '</div>';
     }
     container.innerHTML = html;
@@ -207,6 +209,13 @@ var getDraftStoryId;
         }
         _updateSelectedRow();
         cycleGrade(btn);
+      });
+    });
+    container.querySelectorAll('.story-export-btn').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var storyId = btn.getAttribute('data-id');
+        if (typeof window.exportStory === 'function') window.exportStory(storyId, btn);
       });
     });
     container.querySelectorAll('.story-row').forEach(function(row) {
