@@ -256,7 +256,7 @@ def save():
     active_tab = request.form.get("active_tab", "pipeline")
     if not metaprompt:
         if active_tab == "story":
-            flash("Мета-промпт не может быть пустым", "error")
+            flash("Текстовый промпт не может быть пустым", "error")
             return redirect(url_for("web.root_page"))
     else:
         db_set("metaprompt", metaprompt)
