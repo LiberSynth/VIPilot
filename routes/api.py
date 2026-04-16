@@ -516,6 +516,23 @@ def api_producer_story_grade(story_id):
     return jsonify({"ok": True, "grade": grade})
 
 
+@producer_bp.route("/producer/story/<story_id>/top_quality", methods=["PATCH"])
+def api_producer_story_top_quality(story_id):
+    err = _producer_auth_check()
+    if err:
+        return err
+    data = request.get_json(silent=True) or {}
+    raw = data.get("value")
+    if not isinstance(raw, bool):
+        return jsonify({"error": "value must be a boolean"}), 400
+    value = raw
+    from db import db_set_story_top_quality
+    ok = db_set_story_top_quality(story_id, value)
+    if not ok:
+        return jsonify({"error": "not_found"}), 404
+    return jsonify({"ok": True, "top_quality": value})
+
+
 @producer_bp.route("/producer/story/draft", methods=["POST"])
 def api_producer_story_draft():
     err = _producer_auth_check()

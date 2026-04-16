@@ -66,6 +66,7 @@ var getDraftStoryId;
         _draftStoryId = d.story_id;
         if (isNew) {
           setDraftCardState('new');
+          if (typeof window.onDraftStoryFirstSaved === 'function') window.onDraftStoryFirstSaved();
         }
         if (typeof loadStoriesList === 'function') loadStoriesList();
       }
@@ -188,11 +189,16 @@ var getDraftStoryId;
         'style="background:' + bg + ';color:' + tc + '" ' +
         'title="Оценка: ' + label + '. Нажмите для смены">' +
         label + '</button>';
+      var tqActive = !!s.top_quality;
+      var tqBtn = '<button class="story-top-quality-btn' + (tqActive ? ' active' : '') + '" ' +
+        'data-id="' + s.id + '" data-tq="' + (tqActive ? '1' : '0') + '" ' +
+        'title="' + (tqActive ? 'Образцовое качество: да' : 'Образцовое качество: нет') + '">' +
+        '<svg viewBox="0 0 16 16" fill="currentColor" stroke="none"><path d="M8 1.5l1.6 4.9H15l-4.2 3 1.6 4.9L8 11.6l-4.4 2.8 1.6-4.9L1 6.4h5.4z"/></svg></button>';
       var exportBtn = '<button class="story-icon story-export-btn" data-id="' + s.id + '" title="Выгрузить">' +
         (window.EXPORT_STORY_SVG || '') + '</button>';
       html += '<div class="story-row" data-id="' + s.id + '" data-used="' + (s.used ? '1' : '0') + '">' +
         '<div class="story-title">' + escapeHtml(s.title || '(без названия)') + modelLabel + ' ' + gradeBadge + '</div>' +
-        '<div class="story-row-right">' + icons + exportBtn + '</div>' +
+        '<div class="story-row-right">' + icons + tqBtn + exportBtn + '</div>' +
       '</div>';
     }
     container.innerHTML = html;
@@ -216,6 +222,37 @@ var getDraftStoryId;
         e.stopPropagation();
         var storyId = btn.getAttribute('data-id');
         if (typeof window.exportStory === 'function') window.exportStory(storyId, btn);
+      });
+    });
+    container.querySelectorAll('.story-top-quality-btn').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var storyId = btn.getAttribute('data-id');
+        var currentTq = btn.getAttribute('data-tq') === '1';
+        var newTq = !currentTq;
+        btn.disabled = true;
+        fetch('/producer/story/' + storyId + '/top_quality', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ value: newTq }),
+        })
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(d) {
+          btn.disabled = false;
+          if (d && d.ok) {
+            var val = d.top_quality;
+            btn.setAttribute('data-tq', val ? '1' : '0');
+            btn.classList.toggle('active', !!val);
+            btn.title = val ? 'Образцовое качество: да' : 'Образцовое качество: нет';
+            var cardBtn = document.getElementById('btn-story-top-quality');
+            var currentCardId = typeof getDraftStoryId === 'function' ? getDraftStoryId() : null;
+            if (cardBtn && currentCardId && String(currentCardId) === String(storyId)) {
+              cardBtn.classList.toggle('active', !!val);
+              cardBtn.title = val ? 'Образцовое качество: да. Нажмите для снятия' : 'Образцовое качество: нет. Нажмите для пометки';
+            }
+          }
+        })
+        .catch(function() { btn.disabled = false; });
       });
     });
     container.querySelectorAll('.story-row').forEach(function(row) {
@@ -570,5 +607,82 @@ var getDraftStoryId;
     document.addEventListener('DOMContentLoaded', initGenerateButton);
   } else {
     initGenerateButton();
+  }
+})();
+
+/* ── Кнопка top_quality в карточке сюжета ── */
+(function() {
+  var TQ_TITLE_ON  = 'Образцовое качество: да. Нажмите для снятия';
+  var TQ_TITLE_OFF = 'Образцовое качество: нет. Нажмите для пометки';
+  var TQ_TITLE_DIS = 'Образцовое качество';
+
+  function setCardTQState(value, disabled) {
+    var btn = document.getElementById('btn-story-top-quality');
+    if (!btn) return;
+    btn.disabled = !!disabled;
+    if (disabled) {
+      btn.classList.remove('active');
+      btn.title = TQ_TITLE_DIS;
+    } else {
+      btn.classList.toggle('active', !!value);
+      btn.title = value ? TQ_TITLE_ON : TQ_TITLE_OFF;
+    }
+  }
+
+  window.onDraftStoryFirstSaved = function() {
+    setCardTQState(false, false);
+  };
+
+  var _origSetDraft = window.setDraftStoryFromRecord;
+  window.setDraftStoryFromRecord = function(story) {
+    if (_origSetDraft) _origSetDraft(story);
+    setCardTQState(!!story.top_quality, false);
+  };
+
+  var _origResetDraft = window.resetDraftStoryId;
+  window.resetDraftStoryId = function() {
+    if (_origResetDraft) _origResetDraft();
+    setCardTQState(false, true);
+  };
+
+  function initCardTQButton() {
+    var btn = document.getElementById('btn-story-top-quality');
+    if (!btn) return;
+
+    btn.addEventListener('click', function() {
+      var storyId = typeof getDraftStoryId === 'function' ? getDraftStoryId() : null;
+      if (!storyId || btn.disabled) return;
+      var newValue = !btn.classList.contains('active');
+      btn.disabled = true;
+      fetch('/producer/story/' + storyId + '/top_quality', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: newValue }),
+      })
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(d) {
+        btn.disabled = false;
+        if (d && d.ok) {
+          setCardTQState(d.top_quality, false);
+          var container = document.getElementById('stories-list');
+          if (container) {
+            var listBtn = container.querySelector('.story-top-quality-btn[data-id="' + storyId + '"]');
+            if (listBtn) {
+              listBtn.setAttribute('data-tq', d.top_quality ? '1' : '0');
+              listBtn.classList.toggle('active', !!d.top_quality);
+              listBtn.title = d.top_quality ? 'Образцовое качество: да' : 'Образцовое качество: нет';
+            }
+          }
+        }
+      })
+      .catch(function() { btn.disabled = false; });
+    });
+
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initCardTQButton);
+  } else {
+    initCardTQButton();
   }
 })();

@@ -19,6 +19,7 @@ from .db_simple import (
     db_get_target_session_context_saved_at,
     db_create_story,
     db_set_story_grade,
+    db_set_story_top_quality,
     db_get_story_text,
     db_get_story_title,
     db_get_story_model_info,

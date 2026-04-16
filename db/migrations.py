@@ -1732,6 +1732,17 @@ def _m059_rename_prompt_settings_keys(cur):
     """)
 
 
+def _m060_stories_top_quality(cur):
+    """
+    Добавляет поле top_quality (BOOLEAN NOT NULL DEFAULT FALSE) в таблицу stories
+    для пометки сюжетов образцового качества.
+    """
+    cur.execute("""
+        ALTER TABLE stories
+            ADD COLUMN IF NOT EXISTS top_quality BOOLEAN NOT NULL DEFAULT FALSE
+    """)
+
+
 def _m057_rename_model_id_keys_in_batches_data(cur):
     """
     Переименовывает устаревшие ключи в поле batches.data для устранения неоднозначности:
@@ -1812,6 +1823,7 @@ MIGRATIONS = [
     (57, _m057_rename_model_id_keys_in_batches_data),
     (58, _m058_deepseek_chat_api_params),
     (59, _m059_rename_prompt_settings_keys),
+    (60, _m060_stories_top_quality),
 ]
 
 
