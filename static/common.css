@@ -261,7 +261,7 @@
     font-family: inherit; transition: border-color .2s;
   }
   textarea:focus { border-color: #4a7cf7; }
-  #ta_sysprompt { height: 100px; }
+  #ta_formatprompt { height: 100px; }
   #ta { height: 300px; }
   .char-count { font-size: 11px; color: #666; text-align: right; margin-top: 6px; }
 

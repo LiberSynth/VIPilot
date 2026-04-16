@@ -1,7 +1,7 @@
 const ta    = document.getElementById('ta');
 const cc    = document.getElementById('charcount');
-const taSys = document.getElementById('ta_sysprompt');
-const ccSys = document.getElementById('charcount_sysprompt');
+const taSys = document.getElementById('ta_formatprompt');
+const ccSys = document.getElementById('charcount_formatprompt');
 
 function updateCount()    { if (ta    && cc)    cc.textContent    = ta.value.length    + ' символов'; }
 function updateSysCount() { if (taSys && ccSys) ccSys.textContent = taSys.value.length + ' символов'; }
@@ -10,8 +10,8 @@ if (ta)    { ta.addEventListener('input',    updateCount);    updateCount(); }
 if (taSys) { taSys.addEventListener('input', updateSysCount); updateSysCount(); }
 
 (function() {
-  var KEY_SYS  = 'rbc_sysprompt_h';
-  var KEY_META = 'rbc_metaprompt_h';
+  var KEY_SYS  = 'rbc_format_prompt_h';
+  var KEY_META = 'rbc_text_prompt_h';
 
   function applyHeight(el, key, defaultPx) {
     var saved = parseInt(localStorage.getItem(key), 10);
@@ -37,8 +37,8 @@ function collectAllSettings(activeTab) {
   const data = new FormData();
   data.set('active_tab', activeTab || 'pipeline');
   const setIfExists = (key, id) => { const el = document.getElementById(id); if (el) data.set(key, el.value); };
-  if (ta)    data.set('metaprompt',    ta.value);
-  if (taSys) data.set('system_prompt', taSys.value);
+  if (ta)    data.set('text_prompt',   ta.value);
+  if (taSys) data.set('format_prompt', taSys.value);
   setIfExists('video_duration',      'video_duration');
   setIfExists('video_post_prompt',   'ta_postprompt');
   setIfExists('story_fails_to_next', 'story_fails_to_next');

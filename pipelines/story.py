@@ -241,8 +241,8 @@ def run(batch_id, log_id):
         except (ValueError, TypeError):
             fails_to_next = 3
 
-        system_prompt = db_get("system_prompt", "")
-        user_prompt = db_get("metaprompt", "")
+        format_prompt = db_get("format_prompt", "")
+        user_prompt = db_get("text_prompt", "")
 
         try:
             video_duration = max(1, min(60, int(db_get('video_duration', '6'))))
@@ -250,8 +250,8 @@ def run(batch_id, log_id):
             video_duration = 6
         user_prompt = user_prompt.replace('{количество_слов}', str(video_duration * 4))
         user_prompt = user_prompt.replace('{продолжительность}', str(video_duration))
-        system_prompt = system_prompt.replace('{количество_слов}', str(video_duration * 4))
-        system_prompt = system_prompt.replace('{продолжительность}', str(video_duration))
+        format_prompt = format_prompt.replace('{количество_слов}', str(video_duration * 4))
+        format_prompt = format_prompt.replace('{продолжительность}', str(video_duration))
 
         write_log_entry(
             log_id, f"Моделей: {len(models)}, попыток на модель: {fails_to_next}"
@@ -273,7 +273,7 @@ def run(batch_id, log_id):
                 write_log_entry(
                     log_id, f"[story] Запрос к текстовой платформе: модель={model_name}"
                 )
-            raw = openrouter.generate(log_id, model_name, m, system_prompt, user_prompt)
+            raw = openrouter.generate(log_id, model_name, m, format_prompt, user_prompt)
             if raw:
                 first_line = raw.split("\n")[0]
                 if "." not in first_line:

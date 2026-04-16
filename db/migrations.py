@@ -1717,6 +1717,21 @@ def _m058_deepseek_chat_api_params(cur):
     """, (TEXT_BODY,))
 
 
+def _m059_rename_prompt_settings_keys(cur):
+    """
+    Переименовывает ключи настроек промптов, чтобы они соответствовали новым подписям UI:
+    - 'system_prompt' → 'format_prompt'  (Форматный промпт)
+    - 'metaprompt'    → 'text_prompt'    (Текстовый промпт)
+    Deployed: -
+    """
+    cur.execute("""
+        UPDATE settings SET key = 'format_prompt' WHERE key = 'system_prompt'
+    """)
+    cur.execute("""
+        UPDATE settings SET key = 'text_prompt' WHERE key = 'metaprompt'
+    """)
+
+
 def _m057_rename_model_id_keys_in_batches_data(cur):
     """
     Переименовывает устаревшие ключи в поле batches.data для устранения неоднозначности:
@@ -1796,6 +1811,7 @@ MIGRATIONS = [
     (56, _m056_deepseek_platform),
     (57, _m057_rename_model_id_keys_in_batches_data),
     (58, _m058_deepseek_chat_api_params),
+    (59, _m059_rename_prompt_settings_keys),
 ]
 
 

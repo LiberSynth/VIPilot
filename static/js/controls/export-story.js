@@ -32,7 +32,7 @@
         if (configLines.length) {
           parts.push('/* Конфиг модели НАЧАЛО */\n' + configLines.join('\n') + '\n/* Конфиг модели КОНЕЦ */');
         }
-        parts.push('/* Системный промпт НАЧАЛО */\n' + (d.system_prompt || '') + '\n/* Системный промпт КОНЕЦ */');
+        parts.push('/* Системный промпт НАЧАЛО */\n' + (d.format_prompt || '') + '\n/* Системный промпт КОНЕЦ */');
         parts.push('/* Промпт НАЧАЛО */\n' + (d.user_prompt || '') + '\n/* Промпт КОНЕЦ */');
         var answer = d.title ? d.title + '\n\n' + d.text : d.text;
         parts.push('/* Ответ текстовой модели НАЧАЛО */\n' + answer + '\n/* Ответ текстовой модели КОНЕЦ */');

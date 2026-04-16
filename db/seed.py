@@ -25,8 +25,8 @@ def seed_db():
 
                 cur.execute("""
                     INSERT INTO settings (key, value) VALUES
-                        ('metaprompt',        ''),
-                        ('system_prompt',     ''),
+                        ('text_prompt',        ''),
+                        ('format_prompt',     ''),
                         ('notify_email',      ''),
                         ('notify_phone',      ''),
                         ('video_duration',    '6'),

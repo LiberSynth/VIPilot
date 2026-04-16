@@ -405,21 +405,21 @@ def api_get_story(story_id):
     if text is None:
         return jsonify({"error": "not found"}), 404
     title = db_get_story_title(story_id) or ''
-    system_prompt = db_get("system_prompt", "") or ""
-    user_prompt = db_get("metaprompt", "") or ""
+    format_prompt = db_get("format_prompt", "") or ""
+    user_prompt = db_get("text_prompt", "") or ""
     try:
         video_duration = max(1, min(60, int(db_get('video_duration', '6'))))
     except (ValueError, TypeError):
         video_duration = 6
     user_prompt = user_prompt.replace('{количество_слов}', str(video_duration * 4))
     user_prompt = user_prompt.replace('{продолжительность}', str(video_duration))
-    system_prompt = system_prompt.replace('{количество_слов}', str(video_duration * 4))
-    system_prompt = system_prompt.replace('{продолжительность}', str(video_duration))
+    format_prompt = format_prompt.replace('{количество_слов}', str(video_duration * 4))
+    format_prompt = format_prompt.replace('{продолжительность}', str(video_duration))
     model_info = db_get_story_model_info(story_id)
     platform_name = model_info["platform_name"] if model_info else ""
     model_name = model_info["model_name"] if model_info else ""
     model_body = model_info["body"] if model_info else None
-    return jsonify({"text": text, "title": title, "system_prompt": system_prompt, "user_prompt": user_prompt, "platform_name": platform_name, "model_name": model_name, "model_body": model_body})
+    return jsonify({"text": text, "title": title, "format_prompt": format_prompt, "user_prompt": user_prompt, "platform_name": platform_name, "model_name": model_name, "model_body": model_body})
 
 
 @bp.route("/batch/<batch_id>/publish-frame")

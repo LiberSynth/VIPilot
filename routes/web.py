@@ -116,8 +116,8 @@ def root_page():
         if non_root:
             return redirect(url_for("web.select_module"))
         return redirect(url_for("web.login"))
-    metaprompt      = db_get("metaprompt", "")
-    system_prompt   = db_get("system_prompt", "")
+    text_prompt     = db_get("text_prompt", "")
+    format_prompt   = db_get("format_prompt", "")
     batch_lifetime     = parse_batch_lifetime(db_get("batch_lifetime", "7"))
     log_lifetime       = parse_log_lifetime(db_get("log_lifetime", "365"))
     entries_lifetime   = parse_entries_lifetime(db_get("entries_lifetime", "30"))
@@ -160,8 +160,8 @@ def root_page():
 
     resp = make_response(render_template(
         "root.html",
-        metaprompt=metaprompt,
-        system_prompt=system_prompt,
+        text_prompt=text_prompt,
+        format_prompt=format_prompt,
         batch_lifetime=batch_lifetime,
         log_lifetime=log_lifetime,
         entries_lifetime=entries_lifetime,
@@ -212,8 +212,8 @@ def producer_page():
         if other:
             return redirect(url_for("web.select_module"))
         return redirect(url_for("web.login"))
-    system_prompt       = db_get("system_prompt", "")
-    metaprompt          = db_get("metaprompt", "")
+    format_prompt       = db_get("format_prompt", "")
+    text_prompt         = db_get("text_prompt", "")
     video_post_prompt   = db_get("video_post_prompt", "")
     story_fails_to_next = max(1, int(db_get("story_fails_to_next", "3")))
     video_duration      = max(1, min(60, int(db_get("video_duration", "6"))))
@@ -224,8 +224,8 @@ def producer_page():
     screenwriter_for_approval = env_get("screenwriter_for_approval", "0") == "1"
     resp = make_response(render_template(
         "producer.html",
-        system_prompt=system_prompt,
-        metaprompt=metaprompt,
+        format_prompt=format_prompt,
+        text_prompt=text_prompt,
         video_post_prompt=video_post_prompt,
         story_fails_to_next=story_fails_to_next,
         video_duration=video_duration,
@@ -248,18 +248,18 @@ def save():
     if not is_authenticated():
         return redirect(url_for("web.login"))
 
-    system_prompt_val = request.form.get("system_prompt")
-    if system_prompt_val is not None:
-        db_set("system_prompt", system_prompt_val)
+    format_prompt_val = request.form.get("format_prompt")
+    if format_prompt_val is not None:
+        db_set("format_prompt", format_prompt_val)
 
-    metaprompt = request.form.get("metaprompt", "").strip()
+    text_prompt = request.form.get("text_prompt", "").strip()
     active_tab = request.form.get("active_tab", "pipeline")
-    if not metaprompt:
+    if not text_prompt:
         if active_tab == "story":
             flash("Текстовый промпт не может быть пустым", "error")
             return redirect(url_for("web.root_page"))
     else:
-        db_set("metaprompt", metaprompt)
+        db_set("text_prompt", text_prompt)
 
     entries_lifetime_raw = request.form.get("entries_lifetime", "").strip()
     log_lifetime_raw     = request.form.get("log_lifetime",     "").strip()
