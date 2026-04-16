@@ -48,7 +48,7 @@ var getDraftStoryId;
     if (!titleEl || !contentEl) return;
     var title = titleEl.value;
     var content = contentEl.value;
-    if (!_draftStoryId && !title && !content) return;
+    if (!title && !content) return;
     if (_draftSaving && !_draftStoryId) {
       _draftPendingRetry = true;
       return;
@@ -346,8 +346,6 @@ var getDraftStoryId;
       params.set('show_used', (showUsed && showUsed.checked) ? '1' : '0');
       params.set('show_bad', (onlyGood && onlyGood.checked) ? '0' : '1');
     }
-    var pinId = typeof getDraftStoryId === 'function' ? getDraftStoryId() : null;
-    if (pinId) params.set('pin_id', pinId);
     return params.toString();
   }
 
