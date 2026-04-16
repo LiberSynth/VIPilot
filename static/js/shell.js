@@ -1,12 +1,11 @@
 const PANEL_TITLES = {
   screenwriter: 'Сценарист',
   director:     'Режиссер',
-  pipeline: 'Расписание',
+  workflow: 'Рабочий поток',
   story:    'Генерация сюжета',
   request:  'Генерация видео',
   publish:  'Публикация',
   log:      'Монитор',
-  flow:     'Настройка потока',
   service:  'Служебные',
   info:     'Информация',
 };
