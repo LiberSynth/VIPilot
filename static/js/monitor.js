@@ -99,8 +99,12 @@
     const restartBtn = canRestart
       ? '<button class="cycle-float-btn" title="Перезапустить" data-bid="' + esc(batchId) + '" data-pip="' + esc(log.pipeline) + '" onclick="monitorPipelineRestart(this)">' + MON_SVG_RESTART + '</button>'
       : '';
+    const storyExportBtn = (log.pipeline === 'story' && storyId)
+      ? '<button class="cycle-float-btn" title="Выгрузка" onclick="exportStory(\'' + esc(storyId) + '\',this)">' + (window.EXPORT_STORY_SVG || '') + '</button>'
+      : '';
     const pipActions = '<div class="monitor-pip-actions" onclick="event.stopPropagation()">' +
       restartBtn +
+      storyExportBtn +
       '<button class="cycle-float-btn" title="Скопировать логи" onclick="monitorPipelineCopy(this)">'     + MON_SVG_COPY + '</button>' +
       '<button class="cycle-float-btn" title="Скопировать инфо" onclick="monitorPipelineCopyInfo(this)">' + MON_SVG_INFO + '</button>' +
     '</div>';
