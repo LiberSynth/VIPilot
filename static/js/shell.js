@@ -120,6 +120,15 @@ function loadGoodPoolCount() {
   if (tab && document.getElementById('panel-' + tab)) {
     switchPanel(tab);
     history.replaceState(null, '', window.location.pathname);
+  } else {
+    var activePanel = document.querySelector('.tab-panel.active');
+    if (activePanel && activePanel.id === 'panel-log') {
+      var _rawScroll = localStorage.getItem(_MONITOR_SCROLL_KEY);
+      if (_rawScroll !== null) {
+        var savedScroll = parseInt(_rawScroll, 10) || 0;
+        requestAnimationFrame(function() { window.scrollTo(0, savedScroll); });
+      }
+    }
   }
   loadGoodPoolCount();
 })();
