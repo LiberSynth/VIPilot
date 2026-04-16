@@ -338,7 +338,7 @@
       '<div class="story-modal" onclick="event.stopPropagation()">' +
         '<div class="story-modal-head">' +
           '<span class="story-modal-title" id="story-modal-title"></span>' +
-          '<button class="cycle-float-btn" id="story-modal-copy-btn" onclick="copyStoryText()">' +
+          '<button class="cycle-float-btn" id="story-modal-copy-btn" title="Скопировать" onclick="copyStoryText()">' +
             '<svg viewBox="0 0 16 16" fill="none" stroke="#8888b0" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11V3a1 1 0 0 1 1-1h8"/></svg>' +
           '</button>' +
           '<button class="story-modal-close" onclick="closeStoryModal()">&times;</button>' +
