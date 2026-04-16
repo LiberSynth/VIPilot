@@ -398,3 +398,13 @@ def db_get_last_pipeline_run(pipeline):
             )
             row = cur.fetchone()
     return row[0] if row and row[0] is not None else None
+
+
+def db_get_top_quality_stories():
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT title, content FROM stories WHERE top_quality = TRUE ORDER BY created_at DESC"
+            )
+            rows = cur.fetchall()
+    return [{"title": row[0], "content": row[1]} for row in rows]

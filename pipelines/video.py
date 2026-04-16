@@ -13,6 +13,7 @@ Pipeline 3 — Генерация видео.
 import time
 
 import common.environment as environment
+from utils.prompt_params import apply_prompt_params
 from db import (
     db_set_batch_video_model,
     db_get,
@@ -194,7 +195,7 @@ def run(batch_id, log_id):
 
         video_post_prompt = db_get('video_post_prompt', '').strip()
         if video_post_prompt:
-            video_post_prompt = video_post_prompt.replace('{продолжительность}', str(video_duration))
+            video_post_prompt = apply_prompt_params(video_post_prompt)
             story_text = story_text + '\n\n' + video_post_prompt
 
         db_log_update(log_id, f"Генерация видео… {'(возобновление)' if resumed else ''}".strip(), 'running')

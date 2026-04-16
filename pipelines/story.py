@@ -6,6 +6,7 @@ Pipeline 2 — Генерация сюжета.
 """
 
 import common.environment as environment
+from utils.prompt_params import apply_prompt_params
 from db import (
     db_set_story_model,
     db_get,
@@ -244,14 +245,8 @@ def run(batch_id, log_id):
         format_prompt = db_get("format_prompt", "")
         user_prompt = db_get("text_prompt", "")
 
-        try:
-            video_duration = max(1, min(60, int(db_get('video_duration', '6'))))
-        except (ValueError, TypeError):
-            video_duration = 6
-        user_prompt = user_prompt.replace('{количество_слов}', str(video_duration * 4))
-        user_prompt = user_prompt.replace('{продолжительность}', str(video_duration))
-        format_prompt = format_prompt.replace('{количество_слов}', str(video_duration * 4))
-        format_prompt = format_prompt.replace('{продолжительность}', str(video_duration))
+        user_prompt = apply_prompt_params(user_prompt)
+        format_prompt = apply_prompt_params(format_prompt)
 
         write_log_entry(
             log_id, f"Моделей: {len(models)}, попыток на модель: {fails_to_next}"

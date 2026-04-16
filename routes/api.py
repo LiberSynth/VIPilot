@@ -37,6 +37,7 @@ from db import (
 )
 from log import db_get_monitor, log_batch_planned, write_log_entry
 from utils.auth import is_authenticated
+from utils.prompt_params import apply_prompt_params
 from utils.utils import parse_hhmm, to_msk, to_utc_from_msk
 import common.environment as environment
 
@@ -407,14 +408,8 @@ def api_get_story(story_id):
     title = db_get_story_title(story_id) or ''
     format_prompt = db_get("format_prompt", "") or ""
     user_prompt = db_get("text_prompt", "") or ""
-    try:
-        video_duration = max(1, min(60, int(db_get('video_duration', '6'))))
-    except (ValueError, TypeError):
-        video_duration = 6
-    user_prompt = user_prompt.replace('{количество_слов}', str(video_duration * 4))
-    user_prompt = user_prompt.replace('{продолжительность}', str(video_duration))
-    format_prompt = format_prompt.replace('{количество_слов}', str(video_duration * 4))
-    format_prompt = format_prompt.replace('{продолжительность}', str(video_duration))
+    user_prompt = apply_prompt_params(user_prompt)
+    format_prompt = apply_prompt_params(format_prompt)
     model_info = db_get_story_model_info(story_id)
     platform_name = model_info["platform_name"] if model_info else ""
     model_name = model_info["model_name"] if model_info else ""
