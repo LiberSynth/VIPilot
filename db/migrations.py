@@ -1709,7 +1709,7 @@ def _m058_deepseek_chat_api_params(cur):
     TEXT_BODY = (
         '{"messages": [{"role": "system", "content": "{}"},'
         ' {"role": "user", "content": "{}"}],'
-        ' "max_tokens": 300, "temperature": 0.2, "top_p": 0.9,'
+        ' "max_tokens": 300, "temperature": 0.7, "top_p": 0.9,'
         ' "presence_penalty": 0.3, "frequency_penalty": 0.5}'
     )
     cur.execute("""
