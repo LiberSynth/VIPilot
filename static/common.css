@@ -1022,19 +1022,18 @@
   .story-export-btn.copied { opacity: 1; }
 
   .btn-story-return {
-    position: absolute; top: 10px; right: 10px;
-    width: 22px; height: 22px;
-    background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.13);
-    border-radius: 5px; cursor: pointer; padding: 0;
+    width: 26px; height: 26px;
+    background: transparent; border: 1px solid rgba(255,255,255,.1);
+    border-radius: 6px; cursor: pointer; padding: 0;
     display: flex; align-items: center; justify-content: center;
     transition: background .15s, border-color .15s;
   }
   .btn-story-return[hidden] { display: none; }
-  .btn-story-return:hover { background: rgba(255,255,255,.13); border-color: rgba(255,255,255,.25); }
-  .btn-story-return:active { background: rgba(255,255,255,.2); }
+  .btn-story-return:hover { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.2); }
+  .btn-story-return:active { background: rgba(255,255,255,.14); }
   .btn-story-return:disabled { opacity: .4; cursor: default; }
-  .btn-story-return svg { width: 12px; height: 12px; stroke: #a0a0cc; }
-  .btn-story-return:hover svg { stroke: #e0e0f0; }
+  .btn-story-return svg { width: 13px; height: 13px; stroke: #8888b0; }
+  .btn-story-return:hover svg { stroke: #c8c8e8; }
 
   /* ── Тултип долгого нажатия (мобильный) ── */
   #touch-tooltip {
@@ -1065,21 +1064,22 @@
   }
 
   .btn-story-top-quality {
-    width: 22px; height: 22px;
-    background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.13);
-    border-radius: 5px; cursor: pointer; padding: 0;
+    width: 26px; height: 26px;
+    background: transparent; border: 1px solid rgba(255,255,255,.1);
+    border-radius: 6px; cursor: pointer; padding: 0;
     display: flex; align-items: center; justify-content: center;
     transition: background .15s, border-color .15s;
     flex-shrink: 0;
   }
-  .btn-story-top-quality:hover { background: rgba(255,255,255,.13); border-color: rgba(255,255,255,.25); }
-  .btn-story-top-quality:active { background: rgba(255,255,255,.2); }
-  .btn-story-top-quality:disabled { opacity: .35; cursor: default; }
-  .btn-story-top-quality svg { width: 11px; height: 11px; }
-  .btn-story-top-quality svg path { stroke: #555; transition: stroke .15s; }
-  .btn-story-top-quality:not(:disabled):hover svg path { stroke: #9090b8; }
+  .btn-story-top-quality:hover { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.2); }
+  .btn-story-top-quality:active { background: rgba(255,255,255,.14); }
+  .btn-story-top-quality svg { width: 13px; height: 13px; }
+  .btn-story-top-quality svg path { stroke: #8888b0; transition: stroke .15s; }
+  .btn-story-top-quality:hover svg path { stroke: #c8c8e8; }
+  .btn-story-top-quality.active { border-color: rgba(245,166,35,.5); }
   .btn-story-top-quality.active svg path { stroke: #f5a623; }
-  .btn-story-top-quality.active:not(:disabled):hover svg path { stroke: #f7c860; }
+  .btn-story-top-quality.active:hover { border-color: rgba(247,200,96,.6); }
+  .btn-story-top-quality.active:hover svg path { stroke: #f7c860; }
 
   /* ── Top quality button in story list row ── */
   .story-top-quality-btn {
