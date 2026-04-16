@@ -266,6 +266,7 @@ var getDraftStoryId;
       row.addEventListener('click', function() {
         if (typeof setDraftStoryFromRecord === 'function') setDraftStoryFromRecord(storyObj);
         _updateSelectedRow();
+        if (typeof window.loadStoriesList === 'function') window.loadStoriesList();
       });
     });
     _updateSelectedRow();
