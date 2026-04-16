@@ -412,6 +412,7 @@ def api_get_story(story_id):
     except (ValueError, TypeError):
         video_duration = 6
     user_prompt = user_prompt.replace('{количество_слов}', str(video_duration * 4))
+    user_prompt = user_prompt.replace('{продолжительность}', str(video_duration))
     model_info = db_get_story_model_info(story_id)
     platform_name = model_info["platform_name"] if model_info else ""
     model_name = model_info["model_name"] if model_info else ""

@@ -249,6 +249,7 @@ def run(batch_id, log_id):
         except (ValueError, TypeError):
             video_duration = 6
         user_prompt = user_prompt.replace('{количество_слов}', str(video_duration * 4))
+        user_prompt = user_prompt.replace('{продолжительность}', str(video_duration))
 
         write_log_entry(
             log_id, f"Моделей: {len(models)}, попыток на модель: {fails_to_next}"
