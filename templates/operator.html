@@ -15,19 +15,39 @@
     <button class="sidebar-close" onclick="closeSidebar()">✕</button>
   </div>
   <nav class="sidebar-nav">
-    <button class="sidebar-item active" data-panel="info" onclick="switchPanel('info')">
+    <button class="sidebar-item active" data-panel="export" onclick="switchPanel('export')">
+      <span class="sidebar-item-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v7M5 6l3 3 3-3"/><path d="M3 11v2a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-2"/></svg></span>Выгрузка
+    </button>
+    <button class="sidebar-item" data-panel="info" onclick="switchPanel('info')">
       <span class="sidebar-item-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.5"/><line x1="8" y1="7.5" x2="8" y2="11.5"/><circle cx="8" cy="5" r="0.5" fill="currentColor" stroke="none"/></svg></span>Информация
     </button>
   </nav>
 </div>
 
-{% set page_title = 'Информация' %}
+{% set page_title = 'Выгрузка' %}
 {% include 'common/header.html' %}
 
 <div class="container">
 
+  <!-- ══ ВЫГРУЗКА ══ -->
+  <div id="panel-export" class="tab-panel active">
+    <div class="card" style="margin-top:12px">
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:4px">
+        <div class="card-title" style="margin-bottom:0">Сюжеты</div>
+        <span id="op-stories-count" style="font-size:12px; color:#888; background:rgba(255,255,255,.07); border-radius:10px; padding:1px 8px;"></span>
+        <button id="op-stories-refresh" style="background:none;border:none;cursor:pointer;padding:2px;color:#7878a0;flex-shrink:0" title="Обновить список">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><path d="M13.5 8A5.5 5.5 0 1 1 8 2.5"/><path d="M13.5 2.5v3.5h-3.5"/></svg>
+        </button>
+      </div>
+      <div class="hint" style="margin-bottom:10px">Список доступных сюжетов для ручной выгрузки. Иконка ★ означает образцовое качество.</div>
+      <div id="op-stories-list" class="stories-list">
+        <div class="stories-loading">Загрузка...</div>
+      </div>
+    </div>
+  </div>
+
   <!-- ══ ИНФОРМАЦИЯ ══ -->
-  <div id="panel-info" class="tab-panel active">
+  <div id="panel-info" class="tab-panel">
     {% from 'common/info_panel.html' import info_panel %}
     {{ info_panel('OPERATOR', 'Модуль выгрузки контента.', show_developer=False, app_version=app_version) }}
   </div>
@@ -38,6 +58,80 @@
 <script src="/static/js/controls/tooltip.js"></script>
 <script src="/static/js/controls/memo.js"></script>
 <script src="/static/js/shell.js"></script>
+<script>
+(function() {
+  var _loaded = false;
+
+  function escapeHtml(s) {
+    if (!s) return '';
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function renderStories(stories) {
+    var container = document.getElementById('op-stories-list');
+    var countEl = document.getElementById('op-stories-count');
+    if (!container) return;
+    if (!stories.length) {
+      container.innerHTML = '<div class="stories-empty">Нет доступных сюжетов</div>';
+      if (countEl) countEl.textContent = '0';
+      return;
+    }
+    if (countEl) countEl.textContent = String(stories.length);
+    var html = '';
+    stories.forEach(function(s) {
+      var tqHtml = '';
+      if (s.top_quality) {
+        tqHtml = '<span class="story-top-quality-btn active" title="Образцовое качество" style="cursor:default;pointer-events:none">' +
+          '<svg viewBox="0 0 16 16" fill="currentColor" stroke="none">' +
+          '<path d="M8 1.5l1.6 4.9H15l-4.2 3 1.6 4.9L8 11.6l-4.4 2.8 1.6-4.9L1 6.4h5.4z"/>' +
+          '</svg></span>';
+      }
+      var title = escapeHtml(s.title || '(без названия)');
+      html += '<div class="story-row" data-id="' + s.id + '">' +
+        '<div class="story-title" style="flex:1">' + title + '</div>' +
+        '<div class="story-row-right">' + tqHtml + '</div>' +
+        '</div>';
+    });
+    container.innerHTML = html;
+  }
+
+  function loadStories() {
+    var container = document.getElementById('op-stories-list');
+    if (container) container.innerHTML = '<div class="stories-loading">Загрузка...</div>';
+    fetch('/operator/stories')
+      .then(function(r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      })
+      .then(function(data) {
+        _loaded = true;
+        renderStories(Array.isArray(data) ? data : []);
+      })
+      .catch(function() {
+        var container = document.getElementById('op-stories-list');
+        if (container) container.innerHTML = '<div class="stories-empty">Ошибка загрузки</div>';
+      });
+  }
+
+  var _origSwitch = window.switchPanel;
+  window.switchPanel = function(name) {
+    if (_origSwitch) _origSwitch(name);
+    if (name === 'export' && !_loaded) loadStories();
+  };
+
+  var refreshBtn = document.getElementById('op-stories-refresh');
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', function() { loadStories(); });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() { loadStories(); });
+  } else {
+    loadStories();
+  }
+})();
+switchPanel('export');
+</script>
 
 </body>
 </html>
