@@ -1076,10 +1076,10 @@
   .btn-story-top-quality:active { background: rgba(255,255,255,.2); }
   .btn-story-top-quality:disabled { opacity: .35; cursor: default; }
   .btn-story-top-quality svg { width: 11px; height: 11px; }
-  .btn-story-top-quality svg path { fill: #555; transition: fill .15s; }
-  .btn-story-top-quality:not(:disabled):hover svg path { fill: #9090b8; }
-  .btn-story-top-quality.active svg path { fill: #f5a623; }
-  .btn-story-top-quality.active:not(:disabled):hover svg path { fill: #f7c860; }
+  .btn-story-top-quality svg path { stroke: #555; transition: stroke .15s; }
+  .btn-story-top-quality:not(:disabled):hover svg path { stroke: #9090b8; }
+  .btn-story-top-quality.active svg path { stroke: #f5a623; }
+  .btn-story-top-quality.active:not(:disabled):hover svg path { stroke: #f7c860; }
 
   /* ── Top quality button in story list row ── */
   .story-top-quality-btn {
@@ -1089,8 +1089,8 @@
     opacity: .35; transition: opacity .15s;
   }
   .story-top-quality-btn svg { width: 13px; height: 13px; }
-  .story-top-quality-btn svg path { fill: #888; transition: fill .15s; }
+  .story-top-quality-btn svg path { stroke: #888; transition: stroke .15s; }
   .story-top-quality-btn:hover { opacity: .7; }
   .story-top-quality-btn.active { opacity: 1; }
-  .story-top-quality-btn.active svg path { fill: #f5a623; }
+  .story-top-quality-btn.active svg path { stroke: #f5a623; }
   .story-top-quality-btn:disabled { opacity: .2; cursor: default; }
