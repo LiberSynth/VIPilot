@@ -21,6 +21,7 @@ from db import (
     db_get_target_by_name,
     db_update_target_publish_method_by_slug,
     db_get_user_by_login,
+    db_get_role_modules,
 )
 import common.environment as environment
 from utils.auth import is_authenticated
@@ -379,7 +380,8 @@ def select_module():
         return redirect(url_for("web.login"))
     if len(roles) == 1:
         return redirect(_role_url(roles[0]))
-    roles_display = [dict(r, url=_role_url(r)) for r in roles]
+    fresh_modules = db_get_role_modules()
+    roles_display = [dict(r, url=_role_url(r), module=fresh_modules.get(r["slug"], r["module"])) for r in roles]
     return render_template("select_module.html", roles=roles_display)
 
 

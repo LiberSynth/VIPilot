@@ -88,6 +88,7 @@ from .db_ui import (
     db_count_good_pool,
     db_get_models,
     db_get_user_by_login,
+    db_get_role_modules,
 )
 from .db_service import (
     db_cleanup_log_entries,

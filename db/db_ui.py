@@ -201,6 +201,13 @@ def db_get_models(model_type: str):
     return models
 
 
+def db_get_role_modules():
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT slug, module FROM user_roles")
+            return {row[0]: row[1] for row in cur.fetchall()}
+
+
 def db_get_user_by_login(login):
     with get_db() as conn:
         with conn.cursor() as cur:
