@@ -720,6 +720,7 @@ var getDraftStoryId;
     if (!btn) return;
     btn.addEventListener('click', function() {
       if (btn.classList.contains('pending')) return;
+      if (!window.confirm('Удалить все неудачные сюжеты без видео?')) return;
       btn.classList.add('pending');
       fetch('/producer/stories/delete_bad', { method: 'POST' })
         .then(function(r) { return r.ok ? r.json() : null; })
