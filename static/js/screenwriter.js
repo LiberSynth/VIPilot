@@ -715,21 +715,43 @@ var getDraftStoryId;
 
 /* ── Кнопка «Удалить неудачные» сюжеты ── */
 (function() {
-  function initDeleteBadStoriesButton() {
-    var btn = document.getElementById('btn-delete-bad-stories');
-    if (!btn) return;
-    btn.addEventListener('click', function() {
-      if (btn.classList.contains('pending')) return;
-      if (!window.confirm('Удалить все неудачные сюжеты без видео?')) return;
+  function _closeDeleteBadDialog() {
+    var el = document.getElementById('deleteBadStoriesOverlay');
+    if (el) el.remove();
+  }
+
+  function _openDeleteBadDialog(btn) {
+    var existing = document.getElementById('deleteBadStoriesOverlay');
+    if (existing) existing.remove();
+    var el = document.createElement('div');
+    el.className = 'confirm-overlay open';
+    el.id = 'deleteBadStoriesOverlay';
+    el.innerHTML =
+      '<div class="confirm-box">' +
+        '<div class="confirm-box-title">Удалить неудачные сюжеты?</div>' +
+        '<div class="confirm-box-text">' +
+          'Будут удалены все сюжеты с оценкой «плохо», по которым не создавалось видео,<br>а также связанные с ними батчи и записи лога.' +
+        '</div>' +
+        '<div class="confirm-box-btns">' +
+          '<button class="confirm-cancel" id="deleteBadCancelBtn">Отмена</button>' +
+          '<button class="confirm-confirm" id="deleteBadConfirmBtn" style="background:#b05820">Удалить</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(el);
+    document.getElementById('deleteBadCancelBtn').addEventListener('click', _closeDeleteBadDialog);
+    document.getElementById('deleteBadConfirmBtn').addEventListener('click', function() {
+      var confirmBtn = document.getElementById('deleteBadConfirmBtn');
+      if (confirmBtn) { confirmBtn.disabled = true; confirmBtn.textContent = 'Удаление…'; }
       btn.classList.add('pending');
       fetch('/producer/stories/delete_bad', { method: 'POST' })
         .then(function(r) { return r.ok ? r.json() : null; })
         .then(function(d) {
           btn.classList.remove('pending');
+          _closeDeleteBadDialog();
           if (d && d.ok) {
             var n = d.deleted ? (d.deleted.stories || 0) : 0;
-            var word;
             var mod10 = n % 10, mod100 = n % 100;
+            var word;
             if (mod100 >= 11 && mod100 <= 14) { word = 'сюжетов'; }
             else if (mod10 === 1) { word = 'сюжет'; }
             else if (mod10 >= 2 && mod10 <= 4) { word = 'сюжета'; }
@@ -738,7 +760,16 @@ var getDraftStoryId;
             if (typeof window.loadStoriesList === 'function') window.loadStoriesList();
           }
         })
-        .catch(function() { btn.classList.remove('pending'); });
+        .catch(function() { btn.classList.remove('pending'); _closeDeleteBadDialog(); });
+    });
+  }
+
+  function initDeleteBadStoriesButton() {
+    var btn = document.getElementById('btn-delete-bad-stories');
+    if (!btn) return;
+    btn.addEventListener('click', function() {
+      if (btn.classList.contains('pending')) return;
+      _openDeleteBadDialog(btn);
     });
   }
 
