@@ -1879,6 +1879,18 @@ def _m057_rename_model_id_keys_in_batches_data(cur):
     """)
 
 
+def _m063_rename_producer_module_to_production(cur):
+    """
+    Переименовывает user_roles.module = 'PRODUCER' → 'PRODUCTION'.
+    Slug пользователя и slug роли ('producer') не изменяются.
+    """
+    cur.execute("""
+        UPDATE user_roles
+           SET module = 'PRODUCTION'
+         WHERE module = 'PRODUCER'
+    """)
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -1942,6 +1954,7 @@ MIGRATIONS = [
     (60, _m060_stories_top_quality),
     (61, _m061_fix_model_names),
     (62, _m062_official_display_names),
+    (63, _m063_rename_producer_module_to_production),
 ]
 
 

@@ -104,7 +104,7 @@ function monitorClockStart() {
 function loadGoodPoolCount() {
   var els = document.querySelectorAll('.pool-count-value');
   if (!els.length) return;
-  fetch('/producer/stories/good_pool_count')
+  fetch('/production/stories/good_pool_count')
     .then(function(r) { return r.ok ? r.json() : null; })
     .then(function(d) {
       if (d && d.count !== undefined) {

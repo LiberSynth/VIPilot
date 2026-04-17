@@ -156,7 +156,7 @@
   <!-- ══ ИНФОРМАЦИЯ ══ -->
   <div id="panel-info" class="tab-panel">
     {% from 'common/info_panel.html' import info_panel %}
-    {{ info_panel('PRODUCER', 'Модуль для генерации контента.', show_developer=False, app_version=app_version) }}
+    {{ info_panel('PRODUCTION', 'Модуль для генерации контента.', show_developer=False, app_version=app_version) }}
   </div>
 
   <!-- ══ ГЕНЕРАЦИЯ СЮЖЕТА ══ -->
@@ -229,7 +229,7 @@
     }
     _storyPoolReqId += 1;
     var reqId = _storyPoolReqId;
-    fetch('/producer/stories/pool')
+    fetch('/production/stories/pool')
       .then(function(r) { return r.json(); })
       .then(function(stories) {
         if (reqId !== _storyPoolReqId) return;

@@ -34,7 +34,7 @@ from utils.utils import (
 
 bp = Blueprint("web", __name__)
 
-RESERVED_SLUGS = {"web", "save", "logout", "select-module", "healthz", "favicon.ico", "icon-preview", "root", "producer"}
+RESERVED_SLUGS = {"web", "save", "logout", "select-module", "healthz", "favicon.ico", "icon-preview", "root", "production"}
 
 
 def _get_session_roles():
@@ -45,15 +45,24 @@ def _has_slug(slug):
     return any(r["slug"] == slug for r in _get_session_roles())
 
 
+_SLUG_TO_URL = {"producer": "/production"}
+
+
 def _role_url(role):
-    return url_for("web.root_page") if role["slug"] == "root" else f"/{role['slug']}"
+    if role["slug"] == "root":
+        return url_for("web.root_page")
+    return _SLUG_TO_URL.get(role["slug"], f"/{role['slug']}")
+
+
+_URL_TO_SLUG = {v.lstrip("/"): k for k, v in _SLUG_TO_URL.items()}
 
 
 def _nav_modules(current_slug):
     roles = _get_session_roles()
     if len(roles) < 2:
         return []
-    return [r for r in roles if r["slug"] != current_slug]
+    effective_slug = _URL_TO_SLUG.get(current_slug, current_slug)
+    return [r for r in roles if r["slug"] != effective_slug]
 
 
 def _redirect_after_login():
@@ -112,7 +121,7 @@ def root_page():
         roles = _get_session_roles()
         non_root = [r for r in roles if r["slug"] != "root"]
         if len(non_root) == 1:
-            return redirect(f"/{non_root[0]['slug']}")
+            return redirect(_role_url(non_root[0]))
         if non_root:
             return redirect(url_for("web.select_module"))
         return redirect(url_for("web.login"))
@@ -200,8 +209,8 @@ def root_page():
     return resp
 
 
-@bp.route("/producer")
-def producer_page():
+@bp.route("/production")
+def production_page():
     if not is_authenticated():
         return redirect(url_for("web.login"))
     if not _has_slug("producer"):
@@ -224,7 +233,7 @@ def producer_page():
     screenwriter_for_approval = env_get("screenwriter_for_approval", "0") == "1"
     screenwriter_top_quality = env_get("screenwriter_top_quality", "0") == "1"
     resp = make_response(render_template(
-        "producer.html",
+        "production.html",
         format_prompt=format_prompt,
         text_prompt=text_prompt,
         video_post_prompt=video_post_prompt,
@@ -233,7 +242,7 @@ def producer_page():
         video_fails_to_next=video_fails_to_next,
         approve_stories=approve_stories_prod,
         app_version=APP_VERSION,
-        nav_modules=_nav_modules("producer"),
+        nav_modules=_nav_modules("production"),
         screenwriter_show_used=screenwriter_show_used,
         screenwriter_only_good=screenwriter_only_good,
         screenwriter_for_approval=screenwriter_for_approval,

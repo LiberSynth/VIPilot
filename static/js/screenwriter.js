@@ -54,7 +54,7 @@ var getDraftStoryId;
       return;
     }
     _draftSaving = true;
-    fetch('/producer/story/draft', {
+    fetch('/production/story/draft', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ story_id: _draftStoryId, title: title, content: content }),
@@ -292,7 +292,7 @@ var getDraftStoryId;
     var idx = GRADE_CYCLE.indexOf(currentGrade);
     var nextGrade = GRADE_CYCLE[(idx + 1) % GRADE_CYCLE.length];
     btn.disabled = true;
-    fetch('/producer/story/' + storyId + '/grade', {
+    fetch('/production/story/' + storyId + '/grade', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ grade: nextGrade }),
@@ -341,7 +341,7 @@ var getDraftStoryId;
     if (!hasContent) {
       container.innerHTML = '<div class="stories-loading">Загрузка...</div>';
     }
-    fetch('/producer/stories?' + getFilterParams())
+    fetch('/production/stories?' + getFilterParams())
       .then(function(r) { return r.ok ? r.json() : []; })
       .then(renderStories)
       .catch(function() {
@@ -357,11 +357,11 @@ var getDraftStoryId;
     var forApproval = document.getElementById('filter-for-approval');
     var topQuality = document.getElementById('filter-top-quality');
     function envPost(key, value) {
-      fetch('/producer/env', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: key, value: value }) });
+      fetch('/production/env', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: key, value: value }) });
     }
     function onFilterChange(key, checkbox) {
       var value = checkbox.checked ? '1' : '0';
-      fetch('/producer/env', {
+      fetch('/production/env', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key: key, value: value }),
@@ -434,7 +434,7 @@ var getDraftStoryId;
       var storyId = typeof getDraftStoryId === 'function' ? getDraftStoryId() : null;
       if (!storyId) return;
       btn.disabled = true;
-      fetch('/producer/story/' + storyId + '/grade', {
+      fetch('/production/story/' + storyId + '/grade', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ grade: null }),
@@ -571,7 +571,7 @@ var getDraftStoryId;
       setHint(count > 1 ? 'Создаю ' + count + ' батчей…' : 'Запускаю генерацию…');
       var remaining = count;
       for (var i = 0; i < count; i++) {
-        fetch('/producer/story/generate', { method: 'POST' })
+        fetch('/production/story/generate', { method: 'POST' })
           .then(function(r) { return r.json(); })
           .then(function(d) {
             if (d.batch_id) _batchQueue.push(d.batch_id);
@@ -653,7 +653,7 @@ var getDraftStoryId;
         return Promise.resolve(false);
       }
     }
-    return fetch('/producer/story/' + storyId + '/top_quality', {
+    return fetch('/production/story/' + storyId + '/top_quality', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ value: newValue }),
@@ -743,7 +743,7 @@ var getDraftStoryId;
       var confirmBtn = document.getElementById('deleteBadConfirmBtn');
       if (confirmBtn) { confirmBtn.disabled = true; confirmBtn.textContent = 'Удаление…'; }
       btn.classList.add('pending');
-      fetch('/producer/stories/delete_bad', { method: 'POST' })
+      fetch('/production/stories/delete_bad', { method: 'POST' })
         .then(function(r) { return r.ok ? r.json() : null; })
         .then(function(d) {
           btn.classList.remove('pending');

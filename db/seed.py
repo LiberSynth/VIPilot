@@ -64,7 +64,7 @@ def seed_db():
                     INSERT INTO user_roles (name, slug, module)
                     SELECT v.name, v.slug, v.module FROM (VALUES
                         ('root',     'root',     'ROOT'),
-                        ('producer', 'producer', 'PRODUCER'),
+                        ('producer', 'producer', 'PRODUCTION'),
                         ('operator', 'operator', 'OPERATOR')
                     ) AS v(name, slug, module)
                     WHERE NOT EXISTS (

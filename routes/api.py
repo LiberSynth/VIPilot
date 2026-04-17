@@ -457,10 +457,10 @@ def api_operator_stories():
     return jsonify(stories)
 
 
-producer_bp = Blueprint("producer_api", __name__)
+production_bp = Blueprint("production_api", __name__)
 
 
-def _producer_auth_check():
+def _production_auth_check():
     from flask import session
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
@@ -471,9 +471,9 @@ def _producer_auth_check():
     return None
 
 
-@producer_bp.route("/producer/stories", methods=["GET"])
-def api_producer_stories():
-    err = _producer_auth_check()
+@production_bp.route("/production/stories", methods=["GET"])
+def api_production_stories():
+    err = _production_auth_check()
     if err:
         return err
     show_used = request.args.get("show_used", "1") != "0"
@@ -485,9 +485,9 @@ def api_producer_stories():
     return jsonify(stories)
 
 
-@producer_bp.route("/producer/stories/pool", methods=["GET"])
-def api_producer_stories_pool():
-    err = _producer_auth_check()
+@production_bp.route("/production/stories/pool", methods=["GET"])
+def api_production_stories_pool():
+    err = _production_auth_check()
     if err:
         return err
     approve_stories = db_get("approve_stories", "0") == "1"
@@ -495,17 +495,17 @@ def api_producer_stories_pool():
     return jsonify(stories)
 
 
-@producer_bp.route("/producer/stories/good_pool_count", methods=["GET"])
-def api_producer_good_pool_count():
-    err = _producer_auth_check()
+@production_bp.route("/production/stories/good_pool_count", methods=["GET"])
+def api_production_good_pool_count():
+    err = _production_auth_check()
     if err:
         return err
     return jsonify({"count": db_count_good_pool()})
 
 
-@producer_bp.route("/producer/env", methods=["POST"])
-def api_producer_env_set():
-    err = _producer_auth_check()
+@production_bp.route("/production/env", methods=["POST"])
+def api_production_env_set():
+    err = _production_auth_check()
     if err:
         return err
     data = request.get_json(silent=True) or {}
@@ -518,17 +518,17 @@ def api_producer_env_set():
     return jsonify({"ok": True})
 
 
-_PRODUCER_GRADE_CYCLE = ["good", "bad", None]
+_PRODUCTION_GRADE_CYCLE = ["good", "bad", None]
 
 
-@producer_bp.route("/producer/story/<story_id>/grade", methods=["POST"])
-def api_producer_story_grade(story_id):
-    err = _producer_auth_check()
+@production_bp.route("/production/story/<story_id>/grade", methods=["POST"])
+def api_production_story_grade(story_id):
+    err = _production_auth_check()
     if err:
         return err
     data = request.get_json(silent=True) or {}
     grade = data.get("grade", "good")
-    if grade not in _PRODUCER_GRADE_CYCLE:
+    if grade not in _PRODUCTION_GRADE_CYCLE:
         return jsonify({"error": "invalid_grade"}), 400
     ok = db_set_story_grade(story_id, grade)
     if ok is None or ok is False:
@@ -536,9 +536,9 @@ def api_producer_story_grade(story_id):
     return jsonify({"ok": True, "grade": grade})
 
 
-@producer_bp.route("/producer/story/<story_id>/top_quality", methods=["PATCH"])
-def api_producer_story_top_quality(story_id):
-    err = _producer_auth_check()
+@production_bp.route("/production/story/<story_id>/top_quality", methods=["PATCH"])
+def api_production_story_top_quality(story_id):
+    err = _production_auth_check()
     if err:
         return err
     data = request.get_json(silent=True) or {}
@@ -553,9 +553,9 @@ def api_producer_story_top_quality(story_id):
     return jsonify({"ok": True, "top_quality": value})
 
 
-@producer_bp.route("/producer/story/draft", methods=["POST"])
-def api_producer_story_draft():
-    err = _producer_auth_check()
+@production_bp.route("/production/story/draft", methods=["POST"])
+def api_production_story_draft():
+    err = _production_auth_check()
     if err:
         return err
     data = request.get_json(silent=True) or {}
@@ -568,9 +568,9 @@ def api_producer_story_draft():
     return jsonify({"story_id": new_id})
 
 
-@producer_bp.route("/producer/stories/delete_bad", methods=["POST"])
-def api_producer_delete_bad_stories():
-    err = _producer_auth_check()
+@production_bp.route("/production/stories/delete_bad", methods=["POST"])
+def api_production_delete_bad_stories():
+    err = _production_auth_check()
     if err:
         return err
     try:
@@ -580,9 +580,9 @@ def api_producer_delete_bad_stories():
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
-@producer_bp.route("/producer/story/generate", methods=["POST"])
-def api_producer_story_generate():
-    err = _producer_auth_check()
+@production_bp.route("/production/story/generate", methods=["POST"])
+def api_production_story_generate():
+    err = _production_auth_check()
     if err:
         return err
     batch_id = db_create_story_generate_batch()
