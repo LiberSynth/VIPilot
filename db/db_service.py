@@ -237,6 +237,58 @@ def db_cleanup_video_data(file_lifetime_days: int) -> int:
     return count
 
 
+def db_delete_bad_stories() -> dict:
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id FROM stories
+                WHERE grade = 'bad'
+                  AND id NOT IN (
+                      SELECT DISTINCT story_id FROM batches
+                      WHERE story_id IS NOT NULL AND movie_id IS NOT NULL
+                  )
+            """)
+            story_ids = [r[0] for r in cur.fetchall()]
+
+            if not story_ids:
+                conn.commit()
+                write_log_entry(None, "[DB] Удалены неудачные сюжеты: stories=0, batches=0, log=0, log_entries=0", level='silent')
+                return {"stories": 0, "batches": 0, "logs": 0, "log_entries": 0}
+
+            fmt = ','.join(['%s'] * len(story_ids))
+
+            cur.execute(f"SELECT id FROM batches WHERE story_id IN ({fmt})", story_ids)
+            batch_ids = [r[0] for r in cur.fetchall()]
+
+            le_count = 0
+            ll_count = 0
+            bl_count = 0
+
+            if batch_ids:
+                bfmt = ','.join(['%s'] * len(batch_ids))
+                cur.execute(f"""
+                    DELETE FROM log_entries
+                    WHERE log_id IN (
+                        SELECT id FROM log WHERE batch_id IN ({bfmt})
+                    )
+                """, batch_ids)
+                le_count = cur.rowcount
+
+                cur.execute(f"DELETE FROM log WHERE batch_id IN ({bfmt})", batch_ids)
+                ll_count = cur.rowcount
+
+                cur.execute(f"DELETE FROM batches WHERE id IN ({bfmt})", batch_ids)
+                bl_count = cur.rowcount
+
+            cur.execute(f"DELETE FROM stories WHERE id IN ({fmt})", story_ids)
+            sl_count = cur.rowcount
+
+        conn.commit()
+
+    write_log_entry(None, f"[DB] Удалены неудачные сюжеты: stories={sl_count}, batches={bl_count}, log={ll_count}, log_entries={le_count}", level='silent')
+    return {"stories": sl_count, "batches": bl_count, "logs": ll_count, "log_entries": le_count}
+
+
 def db_cleanup_batches(batch_lifetime_days: int) -> int:
     with get_db() as conn:
         with conn.cursor() as cur:

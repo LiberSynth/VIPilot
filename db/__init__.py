@@ -95,5 +95,6 @@ from .db_service import (
     db_cleanup_batches,
     db_cleanup_video_data,
     db_clear_all_history,
+    db_delete_bad_stories,
 )
 from common.statuses import KNOWN_BATCH_STATUSES

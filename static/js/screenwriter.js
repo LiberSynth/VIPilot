@@ -712,3 +712,38 @@ var getDraftStoryId;
     initCardTQButton();
   }
 })();
+
+/* ── Кнопка «Удалить неудачные» сюжеты ── */
+(function() {
+  function initDeleteBadStoriesButton() {
+    var btn = document.getElementById('btn-delete-bad-stories');
+    if (!btn) return;
+    btn.addEventListener('click', function() {
+      if (btn.classList.contains('pending')) return;
+      btn.classList.add('pending');
+      fetch('/producer/stories/delete_bad', { method: 'POST' })
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(d) {
+          btn.classList.remove('pending');
+          if (d && d.ok) {
+            var n = d.deleted ? (d.deleted.stories || 0) : 0;
+            var word;
+            var mod10 = n % 10, mod100 = n % 100;
+            if (mod100 >= 11 && mod100 <= 14) { word = 'сюжетов'; }
+            else if (mod10 === 1) { word = 'сюжет'; }
+            else if (mod10 >= 2 && mod10 <= 4) { word = 'сюжета'; }
+            else { word = 'сюжетов'; }
+            if (typeof window.showToast === 'function') window.showToast('Удалено ' + n + ' ' + word);
+            if (typeof window.loadStoriesList === 'function') window.loadStoriesList();
+          }
+        })
+        .catch(function() { btn.classList.remove('pending'); });
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initDeleteBadStoriesButton);
+  } else {
+    initDeleteBadStoriesButton();
+  }
+})();

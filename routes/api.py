@@ -34,6 +34,7 @@ from db import (
     db_upsert_story_draft,
     db_create_story_generate_batch,
     db_set,
+    db_delete_bad_stories,
 )
 from log import db_get_monitor, log_batch_planned, write_log_entry
 from utils.auth import is_authenticated
@@ -565,6 +566,18 @@ def api_producer_story_draft():
     if new_id is None:
         return jsonify({"error": "db_error"}), 500
     return jsonify({"story_id": new_id})
+
+
+@producer_bp.route("/producer/stories/delete_bad", methods=["POST"])
+def api_producer_delete_bad_stories():
+    err = _producer_auth_check()
+    if err:
+        return err
+    try:
+        deleted = db_delete_bad_stories()
+        return jsonify({"ok": True, "deleted": deleted})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 
 @producer_bp.route("/producer/story/generate", methods=["POST"])
