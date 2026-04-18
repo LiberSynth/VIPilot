@@ -1937,6 +1937,21 @@ def _m066_grok_video_model(cur):
     """)
 
 
+def _m067_grok_video_durations(cur):
+    """
+    Добавляет допустимые длительности 1–15 сек для модели Grok Video
+    в таблицу model_durations. Idempotent (ON CONFLICT DO NOTHING).
+    """
+    cur.execute("""
+        INSERT INTO model_durations (model_id, duration)
+        SELECT m.id, d.duration
+        FROM ai_models m
+        CROSS JOIN generate_series(1, 15) AS d(duration)
+        WHERE m.name = 'Grok Video'
+        ON CONFLICT DO NOTHING
+    """)
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -2004,6 +2019,7 @@ MIGRATIONS = [
     (64, _m064_grok_platform),
     (65, _m065_ai_models_note),
     (66, _m066_grok_video_model),
+    (67, _m067_grok_video_durations),
 ]
 
 
