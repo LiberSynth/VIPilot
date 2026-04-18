@@ -174,7 +174,7 @@ def db_get_models(model_type: str):
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("""
                 SELECT m.id, m.name, m.url, m.body, m."order", m.active,
-                       m.grade, m.price, p.name AS platform_name
+                       m.grade, m.price, m.note, p.name AS platform_name
                 FROM ai_models m
                 LEFT JOIN ai_platforms p ON p.id = m.platform_id
                 WHERE m.type = %s

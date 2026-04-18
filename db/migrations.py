@@ -1903,6 +1903,40 @@ def _m064_grok_platform(cur):
     """)
 
 
+def _m065_ai_models_note(cur):
+    """
+    Добавляет колонку note (TEXT) в таблицу ai_models для хранения
+    произвольных комментариев о модели (доступные параметры и т.п.).
+    """
+    cur.execute("""
+        ALTER TABLE ai_models ADD COLUMN IF NOT EXISTS note TEXT
+    """)
+
+
+def _m066_grok_video_model(cur):
+    """
+    Добавляет модель Grok Video (grok-imagine-video) в таблицу ai_models.
+    Ставится первой (order=1) и активной. Idempotent.
+    """
+    cur.execute("""
+        INSERT INTO ai_models (name, url, body, "order", active, type, grade, price, platform_id, note)
+        SELECT
+            'Grok Video',
+            'videos/generations',
+            '{"model": "grok-imagine-video", "prompt": "{}", "duration": "{:int}", "aspect_ratio": "{:d}:{:d}", "resolution": "720p", "fps": 24}'::jsonb,
+            1,
+            true,
+            'text-to-video',
+            'good',
+            '1.050 $/15сек',
+            p.id,
+            'Есть возможность задавать seed (int, для воспроизводимости результата) и negative_prompt (str, описание нежелательных элементов в кадре).'
+        FROM ai_platforms p
+        WHERE p.name = 'Grok'
+          AND NOT EXISTS (SELECT 1 FROM ai_models WHERE name = 'Grok Video')
+    """)
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -1968,6 +2002,8 @@ MIGRATIONS = [
     (62, _m062_official_display_names),
     (63, _m063_rename_producer_module_to_production),
     (64, _m064_grok_platform),
+    (65, _m065_ai_models_note),
+    (66, _m066_grok_video_model),
 ]
 
 
