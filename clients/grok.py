@@ -90,7 +90,8 @@ def poll(log_id, status_url: str, response_url: str):
             status = s.get('status')
             write_log_entry(log_id, f"Статус [{attempt + 1}]: {status}")
 
-            if status == 'completed':
+            if status in ('completed', 'done'):
+                write_log_entry(log_id, f"[xAI] Ответ при завершении: {str(s)}")
                 video_url = s.get('video_url') or s.get('url')
                 if not video_url:
                     msg = f'Нет URL видео в ответе xAI: {str(s)}'
@@ -98,7 +99,7 @@ def poll(log_id, status_url: str, response_url: str):
                     return None, msg
                 return video_url, None
 
-            elif status == 'failed':
+            elif status in ('failed', 'error'):
                 msg = f'xAI Grok: генерация провалилась: {str(s)}'
                 write_log_entry(log_id, msg, level='error')
                 return None, msg
