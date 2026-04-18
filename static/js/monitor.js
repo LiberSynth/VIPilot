@@ -19,7 +19,7 @@
     error:            'ошибка',
     info:             'инфо',
     story_ready:      'сюжет готов',
-    video_pending:    'видео: ожидание fal.ai',
+    video_pending:    'видео: ожидание',
     video_ready:      'видео готово',
     video_error:      'видео: ошибка',
     transcode_ready:  'транскод готов',
