@@ -1891,6 +1891,18 @@ def _m063_rename_producer_module_to_production(cur):
     """)
 
 
+def _m064_grok_platform(cur):
+    """
+    Добавляет платформу Grok (xAI) в таблицу ai_platforms.
+    Idempotent: пропускает вставку, если запись уже существует.
+    """
+    cur.execute("""
+        INSERT INTO ai_platforms (name, url, key_env)
+        VALUES ('Grok', 'https://api.x.ai/v1', 'XAI_API_KEY')
+        ON CONFLICT DO NOTHING
+    """)
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -1955,6 +1967,7 @@ MIGRATIONS = [
     (61, _m061_fix_model_names),
     (62, _m062_official_display_names),
     (63, _m063_rename_producer_module_to_production),
+    (64, _m064_grok_platform),
 ]
 
 
