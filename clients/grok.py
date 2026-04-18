@@ -64,9 +64,9 @@ def submit(log_id, model_name: str, submit_url: str, platform_url: str,
         write_log_entry(log_id, f"[{model_name}] HTTP {resp.status_code}: {err}", level='warn')
         return None
 
-    request_id = data.get('id')
+    request_id = data.get('request_id') or data.get('id')
     if not request_id:
-        write_log_entry(log_id, f"[{model_name}] нет id в ответе: {str(data)}", level='warn')
+        write_log_entry(log_id, f"[{model_name}] нет request_id в ответе: {str(data)}", level='warn')
         return None
 
     status_url   = f"{platform_url}/videos/{request_id}"
