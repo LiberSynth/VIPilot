@@ -35,9 +35,16 @@ from db import (
 from log import write_log, db_log_update, write_log_entry
 from pipelines.base import check_cancelled, iterate_models
 from common.exceptions import AppException
-from clients import falai
+from clients import falai, grok
 from clients.falai import ProviderFatalError
 from utils.utils import fmt_id_msg, nearest_allowed_duration
+
+
+def _video_client(platform_name: str):
+    """Возвращает клиент нужной платформы по имени."""
+    if platform_name == 'Grok':
+        return grok
+    return falai
 
 
 class AspectRatioConflictError(Exception):
@@ -235,9 +242,11 @@ def run(batch_id, log_id):
             saved_response_url = current_data.get('response_url')
             saved_model_id     = current_data.get('movie_model_id')
 
+            client = _video_client(m.get('platform_name', ''))
+
             if saved_request_id:
                 write_log_entry(log_id, fmt_id_msg("Возобновление: request_id={}", saved_request_id))
-                video_url, poll_err = falai.poll(log_id, saved_status_url, saved_response_url)
+                video_url, poll_err = client.poll(log_id, saved_status_url, saved_response_url)
                 if video_url:
                     used_model_id = saved_model_id
                     return video_url
@@ -261,7 +270,7 @@ def run(batch_id, log_id):
             if actual_duration != video_duration:
                 write_log_entry(log_id, f"Длительность скорректирована: {video_duration}с → {actual_duration}с (модель поддерживает: {allowed})", level='warn')
 
-            sr = falai.submit(
+            sr = client.submit(
                 log_id, model_name, m['submit_url'], m['platform_url'],
                 m['body_tpl'], story_text, ar_x, ar_y, actual_duration,
             )
@@ -285,7 +294,7 @@ def run(batch_id, log_id):
             write_log_entry(log_id, fmt_id_msg("Запрос принят ({}): {}", model_name, req_id))
             write_log_entry(log_id, fmt_id_msg("[video] Генерация запущена: request_id={}", req_id))
 
-            video_url, poll_err = falai.poll(log_id, s_url, r_url)
+            video_url, poll_err = client.poll(log_id, s_url, r_url)
             if video_url:
                 used_model    = model_name
                 used_model_id = m_id

@@ -683,8 +683,8 @@ def db_get_active_video_models():
     with get_db() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("""
-                SELECT p.url AS platform_url, m.url AS model_url,
-                       m.body, m.name, m.id
+                SELECT p.url AS platform_url, p.name AS platform_name,
+                       m.url AS model_url, m.body, m.name, m.id
                 FROM ai_models m
                 JOIN ai_platforms p ON p.id = m.platform_id
                 WHERE m.active = TRUE AND m.type = 'text-to-video'
@@ -699,6 +699,7 @@ def db_get_active_video_models():
         result.append(
             {
                 "platform_url": row["platform_url"],
+                "platform_name": row["platform_name"],
                 "model_url": row["model_url"],
                 "body_tpl": row["body"] if isinstance(row["body"], dict) else {},
                 "name": row["name"],
@@ -715,8 +716,8 @@ def db_get_video_model_by_id(model_id: str):
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
                 """
-                SELECT p.url AS platform_url, m.url AS model_url,
-                       m.body, m.name, m.id
+                SELECT p.url AS platform_url, p.name AS platform_name,
+                       m.url AS model_url, m.body, m.name, m.id
                 FROM ai_models m
                 JOIN ai_platforms p ON p.id = m.platform_id
                 WHERE m.id = %s AND m.type = 'text-to-video'
@@ -727,15 +728,17 @@ def db_get_video_model_by_id(model_id: str):
             if not row:
                 return None
             durations_map = _fetch_allowed_durations(cur, [row["id"]])
-    platform_url = row["platform_url"]
-    model_url = row["model_url"]
-    mid = str(row["id"])
+    platform_url  = row["platform_url"]
+    platform_name = row["platform_name"]
+    model_url     = row["model_url"]
+    mid           = str(row["id"])
     return {
-        "platform_url": platform_url,
-        "model_url": model_url,
-        "body_tpl": row["body"] if isinstance(row["body"], dict) else {},
-        "name": row["name"],
-        "id": mid,
-        "submit_url": f"{platform_url}/{model_url}",
+        "platform_url":  platform_url,
+        "platform_name": platform_name,
+        "model_url":     model_url,
+        "body_tpl":      row["body"] if isinstance(row["body"], dict) else {},
+        "name":          row["name"],
+        "id":            mid,
+        "submit_url":    f"{platform_url}/{model_url}",
         "allowed_durations": durations_map.get(mid, [0]),
     }
