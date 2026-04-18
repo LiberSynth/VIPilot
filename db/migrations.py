@@ -622,14 +622,14 @@ def _m013_sync_video_models(cur):
 
     # 4. Обновить order, active, price для всех video-моделей
     video_updates = [
-        ('seedance/v1.5/pro',         1, True,  '0.520 $/10сек'),
-        ('ltx-2.3',                   2, False, '0.600 $/10сек'),
-        ('sora-2',                    3, False, '1.000 $/10сек'),
-        ('kling-video/v1.6/standard', 4, False, '0.450 $/10сек'),
-        ('veo2',                      5, False, '5.000 $/10сек'),
-        ('minimax/video-01',          6, False, '0.830 $/10сек'),
+        ('seedance/v1.5/pro',         1, True,  '0.780 $/15сек'),
+        ('ltx-2.3',                   2, False, '0.900 $/15сек'),
+        ('sora-2',                    3, False, '1.500 $/15сек'),
+        ('kling-video/v1.6/standard', 4, False, '0.675 $/15сек'),
+        ('veo2',                      5, False, '7.500 $/15сек'),
+        ('minimax/video-01',          6, False, '1.245 $/15сек'),
         ('ltx-video',                 7, False, '0.02 $/видео'),
-        ('wan-2.6',                   8, False, '1.500 $/10сек'),
+        ('wan-2.6',                   8, False, '2.250 $/15сек'),
     ]
     for name, order, active, price in video_updates:
         cur.execute("""
