@@ -1,5 +1,8 @@
 (function() {
-  function renderSchedule(times) {
+  var _scheduleGen = 0;
+
+  function renderSchedule(times, gen) {
+    if (gen !== _scheduleGen) return;
     const list = document.getElementById('schedule-list');
     if (!list) return;
     list.innerHTML = '';
@@ -23,18 +26,20 @@
   function loadSchedule() {
     const list = document.getElementById('schedule-list');
     if (list) list.innerHTML = '<div style="font-size:13px;color:#555;padding:4px 0;">Загрузка…</div>';
+    const gen = ++_scheduleGen;
     return fetch('/api/schedule')
       .then(function(r) { return r.json(); })
-      .then(renderSchedule)
+      .then(function(times) { renderSchedule(times, gen); })
       .catch(function() {
-        if (list) list.innerHTML = '<div style="font-size:13px;color:#555;padding:4px 0;">Ошибка загрузки</div>';
+        if (gen === _scheduleGen && list) list.innerHTML = '<div style="font-size:13px;color:#555;padding:4px 0;">Ошибка загрузки</div>';
       });
   }
 
   function loadScheduleSilent() {
+    const gen = ++_scheduleGen;
     return fetch('/api/schedule')
       .then(function(r) { return r.json(); })
-      .then(renderSchedule)
+      .then(function(times) { renderSchedule(times, gen); })
       .catch(function() {});
   }
 
