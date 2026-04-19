@@ -129,6 +129,51 @@ raise AppException(batch_id, 'story', msg)
 
 ---
 
+## Правило 9: Каждая SQL-инструкция в миграции должна быть идемпотентной
+
+Миграции запускаются при каждом старте приложения. Любая SQL-инструкция внутри миграции **обязана** корректно отрабатывать при повторном запуске — без ошибок и без создания дублей.
+
+### Вставка строк
+
+Единственный допустимый паттерн — `WHERE NOT EXISTS`:
+
+```sql
+-- ПРАВИЛЬНО
+INSERT INTO ai_platforms (name, url, key_env)
+SELECT 'Grok', 'https://api.x.ai/v1', 'XAI_API_KEY'
+WHERE NOT EXISTS (SELECT 1 FROM ai_platforms WHERE name = 'Grok');
+```
+
+`ON CONFLICT DO NOTHING` **запрещён** как инструмент идемпотентности вставок, если на целевом столбце нет `UNIQUE`-ограничения. Без уникального индекса эта конструкция не срабатывает и запись вставляется повторно при каждом прогоне.
+
+```sql
+-- ЗАПРЕЩЕНО (нет UNIQUE на name — конфликт никогда не возникнет)
+INSERT INTO ai_platforms (name, url, key_env)
+VALUES ('Grok', 'https://api.x.ai/v1', 'XAI_API_KEY')
+ON CONFLICT DO NOTHING;
+```
+
+Исключение: `ON CONFLICT DO NOTHING` допустим только если на целевом столбце или комбинации столбцов уже существует `UNIQUE`-индекс или первичный ключ.
+
+### DDL-инструкции
+
+Используй встроенные идемпотентные варианты:
+
+```sql
+ALTER TABLE t ADD COLUMN IF NOT EXISTS col TEXT;
+ALTER TABLE t DROP COLUMN IF EXISTS col;
+CREATE INDEX IF NOT EXISTS idx_name ON t(col);
+DROP INDEX IF EXISTS idx_name;
+CREATE TABLE IF NOT EXISTS t (...);
+DROP TABLE IF EXISTS t;
+```
+
+### Перед тем как написать новую миграцию
+
+Открой `db/migrations.py` и найди аналогичную инструкцию, уже написанную ранее. Сверься с её паттерном — он уже проверен и идемпотентен.
+
+---
+
 ## Сводная таблица
 
 | Ситуация | Механизм |
@@ -142,3 +187,5 @@ raise AppException(batch_id, 'story', msg)
 | GUID/UUID в лог-сообщении | `fmt_id_msg(template, *ids)` из `utils.utils` |
 | Чтение переменных окружения | Только в `refresh_environment()`, далее через `environment.*` или `snap.*` |
 | Чтение окружения внутри потока | `snap = environment.snapshot()` — первая строка `run()` |
+| Вставка в миграции | `INSERT ... SELECT ... WHERE NOT EXISTS (...)` |
+| DDL в миграции | `ADD COLUMN IF NOT EXISTS`, `DROP COLUMN IF EXISTS`, `CREATE INDEX IF NOT EXISTS` и т.д. |
