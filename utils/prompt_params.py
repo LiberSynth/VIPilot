@@ -1,4 +1,4 @@
-from db import db_get, db_get_top_quality_stories
+from db import db_get, db_get_graded_stories
 
 
 def _get_video_duration() -> int:
@@ -17,16 +17,25 @@ def _get_word_count() -> str:
 
 
 def _get_sample_list() -> str:
-    stories = db_get_top_quality_stories()
+    stories = db_get_graded_stories()
     if not stories:
         return ''
+    good = [s for s in stories if s['grade'] == 'good']
+    bad  = [s for s in stories if s['grade'] == 'bad']
     parts = []
-    for i, story in enumerate(stories, start=1):
+    for i, story in enumerate(good, start=1):
         parts.append(
-            f'/* Образец {i} НАЧАЛО */\n\n'
+            f'/* Образец хорошего качества {i} НАЧАЛО */\n\n'
             f'{story["title"]}\n\n'
             f'{story["content"]}\n\n'
-            f'/* Образец {i} КОНЕЦ */'
+            f'/* Образец хорошего качества {i} КОНЕЦ */'
+        )
+    for i, story in enumerate(bad, start=1):
+        parts.append(
+            f'/* Образец плохого качества {i} НАЧАЛО */\n\n'
+            f'{story["title"]}\n\n'
+            f'{story["content"]}\n\n'
+            f'/* Образец плохого качества {i} КОНЕЦ */'
         )
     return '\n\n'.join(parts)
 

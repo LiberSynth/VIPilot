@@ -408,3 +408,15 @@ def db_get_top_quality_stories():
             )
             rows = cur.fetchall()
     return [{"title": row[0], "content": row[1]} for row in rows]
+
+
+def db_get_graded_stories():
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT title, content, grade FROM stories"
+                " WHERE grade IN ('good', 'bad')"
+                " ORDER BY CASE WHEN grade = 'good' THEN 0 ELSE 1 END, created_at DESC"
+            )
+            rows = cur.fetchall()
+    return [{"title": row[0], "content": row[1], "grade": row[2]} for row in rows]
