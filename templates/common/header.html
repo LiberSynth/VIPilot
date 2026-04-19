@@ -1,9 +1,11 @@
 <header>
   <div class="header-top">
     <div class="header-left">
+      {% if show_sidebar is not defined or show_sidebar %}
       <button class="hamburger" onclick="openSidebar()" aria-label="Меню" title="Открыть меню">
         <span></span><span></span><span></span>
       </button>
+      {% endif %}
       <div class="header-icon">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 44 44" fill="none" width="22" height="22" overflow="visible" shape-rendering="geometricPrecision">
           <circle cx="2" cy="37" r="4" fill="#00E8FF" opacity="0.9"/>

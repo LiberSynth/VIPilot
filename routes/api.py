@@ -434,29 +434,6 @@ def api_batch_publish_frame(batch_id):
     )
 
 
-operator_bp = Blueprint("operator_api", __name__)
-
-
-def _operator_auth_check():
-    from flask import session
-    if not is_authenticated():
-        return jsonify({"error": "unauthorized"}), 401
-    roles = session.get("roles", [])
-    slugs = {r["slug"] for r in roles}
-    if not (slugs & {"operator", "root"}):
-        return jsonify({"error": "forbidden"}), 403
-    return None
-
-
-@operator_bp.route("/operator/stories", methods=["GET"])
-def api_operator_stories():
-    err = _operator_auth_check()
-    if err:
-        return err
-    stories = db_get_stories_list(show_used=False, show_bad=False)
-    return jsonify(stories)
-
-
 production_bp = Blueprint("production_api", __name__)
 
 
