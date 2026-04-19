@@ -1898,8 +1898,8 @@ def _m064_grok_platform(cur):
     """
     cur.execute("""
         INSERT INTO ai_platforms (name, url, key_env)
-        VALUES ('Grok', 'https://api.x.ai/v1', 'XAI_API_KEY')
-        ON CONFLICT DO NOTHING
+        SELECT 'Grok', 'https://api.x.ai/v1', 'XAI_API_KEY'
+        WHERE NOT EXISTS (SELECT 1 FROM ai_platforms WHERE name = 'Grok')
     """)
 
 
