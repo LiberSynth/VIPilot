@@ -106,13 +106,13 @@
   })();
 
   (function() {
-    const panel = document.getElementById('panel-pipeline');
+    const panel = document.getElementById('panel-workflow');
     if (panel && panel.classList.contains('active')) loadSchedule();
   })();
 
   var _origSwitchPanel = window.switchPanel;
   window.switchPanel = function(name) {
     if (_origSwitchPanel) _origSwitchPanel(name);
-    if (name === 'pipeline') loadSchedule();
+    if (name === 'workflow') loadSchedule();
   };
 })();
