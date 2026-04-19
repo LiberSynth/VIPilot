@@ -99,16 +99,16 @@ def run(batch_id, log_id):
             donor_batch_id = batch_data.get('donor_batch_id') if isinstance(batch_data, dict) else None
             if donor_batch_id:
                 if batch.get('movie_id') is not None:
-                    write_log_entry(log_id, fmt_id_msg("[video] Батч {} — донор, movie_id уже перенесён (возобновление)", batch_id))
+                    write_log_entry(log_id, fmt_id_msg("[video] Батч {} — из пула, movie_id уже перенесён (возобновление)", batch_id))
                     return
                 if not check_cancelled('video', batch_id, batch, log_id):
-                    write_log_entry(log_id, fmt_id_msg("[video] Батч {} — режим донора, переносим видео от {}", batch_id, donor_batch_id))
-                    db_log_update(log_id, 'Видео получено от донора', 'running')
+                    write_log_entry(log_id, fmt_id_msg("[video] Батч {} — режим пула, переносим видео из пула {}", batch_id, donor_batch_id))
+                    db_log_update(log_id, 'Видео получено из пула', 'running')
                     result_donor_id = db_get_movie_from_donor(donor_batch_id, batch_id)
                     if result_donor_id:
                         updated = db_get_batch_by_id(batch_id)
                         new_status = updated['status'] if updated else None
-                        detail = fmt_id_msg("Видео перенесено от донора {}", donor_batch_id)
+                        detail = fmt_id_msg("Видео подобрано из пула {}", donor_batch_id)
                         db_log_update(log_id, detail, 'ok')
                         write_log_entry(log_id, detail)
                         if new_status == 'transcode_ready':
@@ -116,13 +116,13 @@ def run(batch_id, log_id):
                             # т.к. статус уже transcode_ready; запись создаётся здесь,
                             # чтобы в мониторе отображался лог для пропущенного шага.
                             tr_log_id = write_log(
-                                'transcode', 'Транскодирование пропущено — видео получено от донора',
+                                'transcode', 'Транскодирование пропущено — видео получено из пула',
                                 status='ok', batch_id=batch_id,
                             )
                             write_log_entry(tr_log_id, detail)
-                        write_log_entry(log_id, fmt_id_msg("[video] Батч {} — видео от донора, новый статус: {}", batch_id, new_status))
+                        write_log_entry(log_id, fmt_id_msg("[video] Батч {} — видео из пула, новый статус: {}", batch_id, new_status))
                     else:
-                        msg = fmt_id_msg("Не удалось перенести видео от донора {}", donor_batch_id)
+                        msg = fmt_id_msg("Не удалось получить видео из пула {}", donor_batch_id)
                         db_log_update(log_id, msg, 'error')
                         write_log_entry(log_id, msg, level='error')
                         write_log_entry(log_id, f"[video] {msg}")

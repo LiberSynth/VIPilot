@@ -117,7 +117,7 @@ def run(batch_id, log_id):
                     batch_id, donor_batch_id, donor_story_id
                 ):
                     msg = fmt_id_msg(
-                        "Не удалось записать donor_batch_id для батча {} — донор {}",
+                        "Не удалось записать donor_batch_id для батча {} — видео из пула {}",
                         batch_id,
                         donor_batch_id,
                     )
@@ -128,17 +128,17 @@ def run(batch_id, log_id):
                     db_get_story_title(donor_story_id) if donor_story_id else None
                 )
                 if donor_title:
-                    detail = f"Включен режим «Использовать донора». Контент будет заимствован от донора. Сюжет: «{donor_title}»"
+                    detail = f"Включен режим «Подбирать видео из пула». Контент будет подобран из пула. Сюжет: «{donor_title}»"
                 else:
-                    detail = "Включен режим «Использовать донора». Контент будет заимствован от донора."
+                    detail = "Включен режим «Подбирать видео из пула». Контент будет подобран из пула."
                 db_log_update(
-                    log_id, "Найден донор, генерация сюжета не требуется", "ok"
+                    log_id, "Подобрано видео из пула, генерация сюжета не требуется", "ok"
                 )
                 write_log_entry(log_id, detail)
                 write_log_entry(
                     log_id,
                     fmt_id_msg(
-                        "[story] Батч {} — найден донор {}, батч → story_ready",
+                        "[story] Батч {} — подобрано видео из пула {}, батч → story_ready",
                         batch_id,
                         donor_batch_id,
                     ),

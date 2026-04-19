@@ -308,7 +308,7 @@ def api_workflow_use_donor():
     val = "1" if body.get("enabled") == "1" else "0"
     env_set("use_donor", val)
     label = "включен" if val == "1" else "выключен"
-    write_log_entry(None, f"[api] Использовать донора {label}")
+    write_log_entry(None, f"[api] Подбирать видео из пула: {label}")
     return jsonify({"ok": True, "use_donor": val})
 
 

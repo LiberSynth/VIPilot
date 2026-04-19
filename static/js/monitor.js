@@ -30,7 +30,7 @@
     movie_probe:      'пробный',
     story_probe:      'пробный (сюжет)',
     cancelled:        'отменён',
-    donated:          'донор',
+    donated:          'из пула',
   };
 
   function esc(s) {
