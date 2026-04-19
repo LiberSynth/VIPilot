@@ -8,15 +8,15 @@ def _get_video_duration() -> int:
         return 6
 
 
-def _get_продолжительность() -> str:
+def _get_duration() -> str:
     return str(_get_video_duration())
 
 
-def _get_количество_слов() -> str:
+def _get_word_count() -> str:
     return str(_get_video_duration() * 4)
 
 
-def _get_список_образцов() -> str:
+def _get_sample_list() -> str:
     stories = db_get_top_quality_stories()
     if not stories:
         return ''
@@ -32,9 +32,9 @@ def _get_список_образцов() -> str:
 
 
 _PARAMS = [
-    ('{продолжительность}', _get_продолжительность),
-    ('{количество_слов}', _get_количество_слов),
-    ('{список_образцов}', _get_список_образцов),
+    ('{продолжительность}', _get_duration),
+    ('{количество_слов}', _get_word_count),
+    ('{список_образцов}', _get_sample_list),
 ]
 
 
