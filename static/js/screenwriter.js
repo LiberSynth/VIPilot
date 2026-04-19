@@ -658,6 +658,12 @@ var getDraftStoryId;
     setCardGradeBadge(null, true);
   };
 
+  var _origFirstSaved = window.onDraftStoryFirstSaved;
+  window.onDraftStoryFirstSaved = function() {
+    if (_origFirstSaved) _origFirstSaved();
+    setCardGradeBadge(null, false);
+  };
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initCardGradeBadge);
   } else {
