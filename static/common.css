@@ -1003,6 +1003,7 @@
     white-space: nowrap; flex-shrink: 0;
     opacity: .85;
   }
+  .story-grade-badge[hidden] { display: none; }
   .story-grade-badge:hover { filter: brightness(1.2); opacity: 1; }
   .story-grade-badge:active { filter: brightness(0.85); }
   .story-grade-badge:disabled { opacity: .5; cursor: default; }
