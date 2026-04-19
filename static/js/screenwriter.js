@@ -254,6 +254,10 @@ var getDraftStoryId;
     _storyGradedAway = false;
     updateReturnButton();
   };
+  window.markGradedAway = function() {
+    _storyGradedAway = true;
+    updateReturnButton();
+  };
 
   function _updateSelectedRow() {
     var currentId = typeof getDraftStoryId === 'function' ? getDraftStoryId() : null;
@@ -292,6 +296,10 @@ var getDraftStoryId;
         btn.textContent = GRADE_LABELS[gk] || gk;
         btn.title = 'Оценка: ' + (GRADE_LABELS[gk] || gk) + '. Нажмите для смены';
 
+        var _cardId = typeof getDraftStoryId === 'function' ? getDraftStoryId() : null;
+        if (_cardId && String(_cardId) === String(storyId) && typeof window.setCardGradeBadge === 'function') {
+          window.setCardGradeBadge(grade, false);
+        }
         if (grade !== null) { _storyGradedAway = true; }
         window.loadStoriesList();
       }
@@ -575,6 +583,85 @@ var getDraftStoryId;
     document.addEventListener('DOMContentLoaded', initGenerateButton);
   } else {
     initGenerateButton();
+  }
+})();
+
+/* ── Плашка grade в карточке сюжета ── */
+(function() {
+  var GRADE_LABELS = { good: 'хорошо', bad: 'плохо', 'null': 'не указано' };
+  var GRADE_COLORS = { good: '#3ecf8e', bad: '#ff6060', 'null': 'rgba(255,255,255,.07)' };
+  var GRADE_TEXT_COLORS = { good: '#fff', bad: '#fff', 'null': '#aaa' };
+  var GRADE_CYCLE = ['good', 'bad', null];
+
+  function gradeKey(g) { return g === null || g === undefined ? 'null' : g; }
+
+  function setCardGradeBadge(grade, hidden) {
+    var btn = document.getElementById('card-story-grade');
+    if (!btn) return;
+    if (hidden) {
+      btn.hidden = true;
+      btn.disabled = true;
+      return;
+    }
+    var gk = gradeKey(grade);
+    btn.hidden = false;
+    btn.disabled = false;
+    btn.setAttribute('data-grade', gk);
+    btn.style.background = GRADE_COLORS[gk] || 'rgba(255,255,255,.07)';
+    btn.style.color = GRADE_TEXT_COLORS[gk] || '#aaa';
+    btn.textContent = GRADE_LABELS[gk] || gk;
+    btn.title = 'Оценка: ' + (GRADE_LABELS[gk] || gk) + '. Нажмите для смены';
+  }
+
+  window.setCardGradeBadge = setCardGradeBadge;
+
+  function initCardGradeBadge() {
+    var btn = document.getElementById('card-story-grade');
+    if (!btn) return;
+    btn.addEventListener('click', function() {
+      if (btn.disabled) return;
+      var storyId = typeof getDraftStoryId === 'function' ? getDraftStoryId() : null;
+      if (!storyId) return;
+      var currentGradeAttr = btn.getAttribute('data-grade');
+      var currentGrade = currentGradeAttr === 'null' ? null : currentGradeAttr;
+      var idx = GRADE_CYCLE.indexOf(currentGrade);
+      var nextGrade = GRADE_CYCLE[(idx + 1) % GRADE_CYCLE.length];
+      btn.disabled = true;
+      fetch('/production/story/' + storyId + '/grade', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ grade: nextGrade }),
+      })
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(d) {
+        btn.disabled = false;
+        if (d && d.ok) {
+          var grade = d.grade !== undefined ? d.grade : null;
+          setCardGradeBadge(grade, false);
+          if (grade !== null && typeof window.markGradedAway === 'function') window.markGradedAway();
+          if (typeof window.loadStoriesList === 'function') window.loadStoriesList();
+        }
+      })
+      .catch(function() { btn.disabled = false; });
+    });
+  }
+
+  var _origSetDraft = window.setDraftStoryFromRecord;
+  window.setDraftStoryFromRecord = function(story) {
+    if (_origSetDraft) _origSetDraft(story);
+    setCardGradeBadge(story.grade !== undefined ? story.grade : null, false);
+  };
+
+  var _origResetDraft = window.resetDraftStoryId;
+  window.resetDraftStoryId = function() {
+    if (_origResetDraft) _origResetDraft();
+    setCardGradeBadge(null, true);
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initCardGradeBadge);
+  } else {
+    initCardGradeBadge();
   }
 })();
 
