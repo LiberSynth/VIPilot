@@ -232,7 +232,6 @@ def production_page():
     screenwriter_show_used = env_get("screenwriter_show_used", "0") == "1"
     screenwriter_only_good = env_get("screenwriter_only_good", "0") == "1"
     screenwriter_for_approval = env_get("screenwriter_for_approval", "0") == "1"
-    screenwriter_top_quality = env_get("screenwriter_top_quality", "0") == "1"
     resp = make_response(render_template(
         "production.html",
         format_prompt=format_prompt,
@@ -247,7 +246,6 @@ def production_page():
         screenwriter_show_used=screenwriter_show_used,
         screenwriter_only_good=screenwriter_only_good,
         screenwriter_for_approval=screenwriter_for_approval,
-        screenwriter_top_quality=screenwriter_top_quality,
     ))
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     resp.headers["Pragma"] = "no-cache"

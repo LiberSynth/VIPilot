@@ -1062,36 +1062,3 @@
   .card-top-actions {
     display: flex; gap: 4px; align-items: center; flex-shrink: 0;
   }
-
-  .btn-story-top-quality {
-    width: 26px; height: 26px;
-    background: transparent; border: 1px solid rgba(255,255,255,.1);
-    border-radius: 6px; cursor: pointer; padding: 0;
-    display: flex; align-items: center; justify-content: center;
-    transition: background .15s, border-color .15s;
-    flex-shrink: 0;
-  }
-  .btn-story-top-quality[hidden] { display: none; }
-  .btn-story-top-quality:hover { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.2); }
-  .btn-story-top-quality:active { background: rgba(255,255,255,.14); }
-  .btn-story-top-quality svg { width: 13px; height: 13px; }
-  .btn-story-top-quality svg path { stroke: #8888b0; transition: stroke .15s; }
-  .btn-story-top-quality:hover svg path { stroke: #c8c8e8; }
-  .btn-story-top-quality.active { border-color: rgba(245,166,35,.5); }
-  .btn-story-top-quality.active svg path { stroke: #f5a623; }
-  .btn-story-top-quality.active:hover { border-color: rgba(247,200,96,.6); }
-  .btn-story-top-quality.active:hover svg path { stroke: #f7c860; }
-
-  /* ── Top quality button in story list row ── */
-  .story-top-quality-btn {
-    background: none; border: none; padding: 0; cursor: pointer;
-    width: 16px; height: 16px; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center;
-    opacity: .35; transition: opacity .15s;
-  }
-  .story-top-quality-btn svg { width: 13px; height: 13px; }
-  .story-top-quality-btn svg path { stroke: #888; transition: stroke .15s; }
-  .story-top-quality-btn:hover { opacity: .7; }
-  .story-top-quality-btn.active { opacity: 1; }
-  .story-top-quality-btn.active svg path { stroke: #f5a623; }
-  .story-top-quality-btn:disabled { opacity: .2; cursor: default; }

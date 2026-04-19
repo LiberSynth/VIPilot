@@ -74,7 +74,7 @@ def db_get_batch_logs(batch_id):
     }
 
 
-def db_get_stories_list(show_used=True, show_bad=True, for_approval=False, top_quality=False, pin_id=None):
+def db_get_stories_list(show_used=True, show_bad=True, for_approval=False, pin_id=None):
     filter_conditions = []
     if for_approval:
         filter_conditions.append("s.grade IS NULL")
@@ -84,8 +84,6 @@ def db_get_stories_list(show_used=True, show_bad=True, for_approval=False, top_q
             filter_conditions.append("NOT EXISTS (SELECT 1 FROM batches b WHERE b.story_id = s.id AND b.movie_id IS NOT NULL)")
         if not show_bad:
             filter_conditions.append("s.grade = 'good'")
-        if top_quality:
-            filter_conditions.append("s.top_quality = TRUE")
     params = []
     if pin_id and filter_conditions:
         base_cond = " AND ".join(filter_conditions)
@@ -109,8 +107,7 @@ def db_get_stories_list(show_used=True, show_bad=True, for_approval=False, top_q
                         SELECT 1 FROM batches b
                         WHERE b.story_id = s.id AND b.movie_id IS NOT NULL
                     ) AS used,
-                    am.name AS model_name,
-                    s.top_quality
+                    am.name AS model_name
                 FROM stories s
                 LEFT JOIN ai_models am ON am.id = s.model_id
                 {where_clause}
@@ -127,7 +124,6 @@ def db_get_stories_list(show_used=True, show_bad=True, for_approval=False, top_q
             "ai_generated": bool(row[5]),
             "used": bool(row[6]),
             "model_name": row[7] or "",
-            "top_quality": bool(row[8]),
         }
         for row in rows
     ]

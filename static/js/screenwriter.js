@@ -189,16 +189,11 @@ var getDraftStoryId;
         'style="background:' + bg + ';color:' + tc + '" ' +
         'title="Оценка: ' + label + '. Нажмите для смены">' +
         label + '</button>';
-      var tqActive = !!s.top_quality;
-      var tqBtn = '<button class="story-top-quality-btn' + (tqActive ? ' active' : '') + '" ' +
-        'data-id="' + s.id + '" data-tq="' + (tqActive ? '1' : '0') + '" ' +
-        'title="' + (tqActive ? 'Образцовое качество: да' : 'Образцовое качество: нет') + '">' +
-        '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13C5 11 1 9.5 1 6.5C1 3.5 3 2.5 5 2.5C6.5 2.5 7.5 3.5 8 5C8.5 3.5 9.5 2.5 11 2.5C13 2.5 15 3.5 15 6.5C15 9.5 11 11 8 13Z"/></svg></button>';
       var exportBtn = '<button class="story-icon story-export-btn" data-id="' + s.id + '" title="Выгрузить">' +
         (window.EXPORT_STORY_SVG || '') + '</button>';
       html += '<div class="story-row" data-id="' + s.id + '" data-used="' + (s.used ? '1' : '0') + '">' +
         '<div class="story-title">' + escapeHtml(s.title || '(без названия)') + modelLabel + ' ' + gradeBadge + '</div>' +
-        '<div class="story-row-right">' + icons + tqBtn + exportBtn + '</div>' +
+        '<div class="story-row-right">' + icons + exportBtn + '</div>' +
       '</div>';
     }
     container.innerHTML = html;
@@ -222,18 +217,6 @@ var getDraftStoryId;
         e.stopPropagation();
         var storyId = btn.getAttribute('data-id');
         if (typeof window.exportStory === 'function') window.exportStory(storyId, btn);
-      });
-    });
-    container.querySelectorAll('.story-top-quality-btn').forEach(function(btn) {
-      btn.addEventListener('click', function(e) {
-        e.stopPropagation();
-        var storyId = btn.getAttribute('data-id');
-        var currentTq = btn.getAttribute('data-tq') === '1';
-        var newTq = !currentTq;
-        btn.disabled = true;
-        window.applyTopQuality(storyId, newTq).then(function(ok) {
-          if (!ok) btn.disabled = false;
-        }).catch(function() { btn.disabled = false; });
       });
     });
     container.querySelectorAll('.story-row').forEach(function(row) {
@@ -320,14 +303,12 @@ var getDraftStoryId;
     var showUsed = document.getElementById('filter-show-used');
     var onlyGood = document.getElementById('filter-only-good');
     var forApproval = document.getElementById('filter-for-approval');
-    var topQuality = document.getElementById('filter-top-quality');
     var params = new URLSearchParams();
     if (forApproval && forApproval.checked) {
       params.set('for_approval', '1');
     } else {
       params.set('show_used', (showUsed && showUsed.checked) ? '1' : '0');
       params.set('show_bad', (onlyGood && onlyGood.checked) ? '0' : '1');
-      if (topQuality && topQuality.checked) params.set('top_quality', '1');
     }
     var pinId = typeof getDraftStoryId === 'function' ? getDraftStoryId() : null;
     if (pinId) params.set('pin_id', pinId);
@@ -355,7 +336,6 @@ var getDraftStoryId;
     var showUsed = document.getElementById('filter-show-used');
     var onlyGood = document.getElementById('filter-only-good');
     var forApproval = document.getElementById('filter-for-approval');
-    var topQuality = document.getElementById('filter-top-quality');
     function envPost(key, value) {
       fetch('/production/env', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: key, value: value }) });
     }
@@ -374,24 +354,11 @@ var getDraftStoryId;
         if (forApproval.checked) {
           if (onlyGood) onlyGood.checked = false;
           if (showUsed) showUsed.checked = false;
-          if (topQuality) topQuality.checked = false;
           envPost('screenwriter_only_good', '0');
           envPost('screenwriter_show_used', '0');
-          envPost('screenwriter_top_quality', '0');
         }
         updateReturnButton();
         onFilterChange('screenwriter_for_approval', forApproval);
-      });
-    }
-    if (topQuality) {
-      topQuality.addEventListener('change', function() {
-        if (topQuality.checked) {
-          if (forApproval) forApproval.checked = false;
-          if (showUsed) showUsed.checked = true;
-          envPost('screenwriter_for_approval', '0');
-          envPost('screenwriter_show_used', '1');
-        }
-        onFilterChange('screenwriter_top_quality', topQuality);
       });
     }
     if (showUsed) {
@@ -608,108 +575,6 @@ var getDraftStoryId;
     document.addEventListener('DOMContentLoaded', initGenerateButton);
   } else {
     initGenerateButton();
-  }
-})();
-
-/* ── Кнопка top_quality в карточке сюжета ── */
-(function() {
-  var TQ_TITLE_ON  = 'Образцовое качество: да. Нажмите для снятия';
-  var TQ_TITLE_OFF = 'Образцовое качество: нет. Нажмите для пометки';
-  var TQ_TITLE_DIS = 'Образцовое качество';
-
-  function setCardTQState(value, disabled) {
-    var btn = document.getElementById('btn-story-top-quality');
-    if (!btn) return;
-    if (disabled) {
-      btn.hidden = true;
-      btn.disabled = true;
-      btn.classList.remove('active');
-      btn.title = TQ_TITLE_DIS;
-    } else {
-      btn.hidden = false;
-      btn.disabled = false;
-      btn.classList.toggle('active', !!value);
-      btn.title = value ? TQ_TITLE_ON : TQ_TITLE_OFF;
-    }
-  }
-
-  function showTQValidationBanner() {
-    var existing = document.getElementById('tq-validation-banner');
-    if (existing) { clearTimeout(existing._hideTimer); existing.remove(); }
-    var banner = document.createElement('div');
-    banner.id = 'tq-validation-banner';
-    banner.textContent = 'Плохой сюжет не может быть образцовым';
-    banner.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);background:#c0392b;color:#fff;padding:10px 24px;border-radius:6px;z-index:9999;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,.3);';
-    document.body.appendChild(banner);
-    banner._hideTimer = setTimeout(function() { banner.remove(); }, 3500);
-  }
-
-  function applyTopQuality(storyId, newValue) {
-    if (newValue === true) {
-      var gradeBadge = document.querySelector('.story-grade-badge[data-id="' + storyId + '"]');
-      var grade = gradeBadge ? gradeBadge.getAttribute('data-grade') : null;
-      if (grade !== 'good') {
-        showTQValidationBanner();
-        return Promise.resolve(false);
-      }
-    }
-    return fetch('/production/story/' + storyId + '/top_quality', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ value: newValue }),
-    })
-    .then(function(r) { return r.ok ? r.json() : null; })
-    .then(function(d) {
-      if (d && d.ok) {
-        var currentCardId = typeof getDraftStoryId === 'function' ? getDraftStoryId() : null;
-        if (currentCardId && String(currentCardId) === String(storyId)) {
-          setCardTQState(d.top_quality, false);
-        }
-        if (typeof window.loadStoriesList === 'function') window.loadStoriesList();
-        return true;
-      }
-      return false;
-    });
-  }
-
-  window.applyTopQuality = applyTopQuality;
-
-  window.onDraftStoryFirstSaved = function() {
-    setCardTQState(false, false);
-  };
-
-  var _origSetDraft = window.setDraftStoryFromRecord;
-  window.setDraftStoryFromRecord = function(story) {
-    if (_origSetDraft) _origSetDraft(story);
-    setCardTQState(!!story.top_quality, false);
-  };
-
-  var _origResetDraft = window.resetDraftStoryId;
-  window.resetDraftStoryId = function() {
-    if (_origResetDraft) _origResetDraft();
-    setCardTQState(false, true);
-  };
-
-  function initCardTQButton() {
-    var btn = document.getElementById('btn-story-top-quality');
-    if (!btn) return;
-
-    btn.addEventListener('click', function() {
-      var storyId = typeof getDraftStoryId === 'function' ? getDraftStoryId() : null;
-      if (!storyId || btn.disabled) return;
-      var newValue = !btn.classList.contains('active');
-      btn.disabled = true;
-      applyTopQuality(storyId, newValue).then(function(ok) {
-        if (!ok) btn.disabled = false;
-      }).catch(function() { btn.disabled = false; });
-    });
-
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initCardTQButton);
-  } else {
-    initCardTQButton();
   }
 })();
 

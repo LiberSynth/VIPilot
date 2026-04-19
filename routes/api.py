@@ -456,9 +456,8 @@ def api_production_stories():
     show_used = request.args.get("show_used", "1") != "0"
     show_bad = request.args.get("show_bad", "1") != "0"
     for_approval = request.args.get("for_approval", "0") == "1"
-    top_quality = request.args.get("top_quality", "0") == "1"
     pin_id = request.args.get("pin_id") or None
-    stories = db_get_stories_list(show_used=show_used, show_bad=show_bad, for_approval=for_approval, top_quality=top_quality, pin_id=pin_id)
+    stories = db_get_stories_list(show_used=show_used, show_bad=show_bad, for_approval=for_approval, pin_id=pin_id)
     return jsonify(stories)
 
 
@@ -488,7 +487,7 @@ def api_production_env_set():
     data = request.get_json(silent=True) or {}
     key = data.get("key", "")
     value = data.get("value", "")
-    allowed_keys = {"screenwriter_show_used", "screenwriter_only_good", "screenwriter_for_approval", "screenwriter_top_quality"}
+    allowed_keys = {"screenwriter_show_used", "screenwriter_only_good", "screenwriter_for_approval"}
     if key not in allowed_keys:
         return jsonify({"error": "invalid key"}), 400
     env_set(key, str(value))
@@ -511,23 +510,6 @@ def api_production_story_grade(story_id):
     if ok is None or ok is False:
         return jsonify({"error": "not_found"}), 404
     return jsonify({"ok": True, "grade": grade})
-
-
-@production_bp.route("/production/story/<story_id>/top_quality", methods=["PATCH"])
-def api_production_story_top_quality(story_id):
-    err = _production_auth_check()
-    if err:
-        return err
-    data = request.get_json(silent=True) or {}
-    raw = data.get("value")
-    if not isinstance(raw, bool):
-        return jsonify({"error": "value must be a boolean"}), 400
-    value = raw
-    from db import db_set_story_top_quality
-    ok = db_set_story_top_quality(story_id, value)
-    if not ok:
-        return jsonify({"error": "not_found"}), 404
-    return jsonify({"ok": True, "top_quality": value})
 
 
 @production_bp.route("/production/story/draft", methods=["POST"])
