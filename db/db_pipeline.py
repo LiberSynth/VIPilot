@@ -259,10 +259,10 @@ def db_claim_unused_story_for_batch(batch_id: str, grade_required: bool) -> dict
     return {"id": story_id, "title": row[1] or "", "content": row[2] or ""}
 
 
-def db_claim_donor_batch(batch_id: str) -> None:
+def db_claim_donor_batch(batch_id: str, good_only: bool = False) -> None:
     with get_db() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT claim_donor_batch(%s::uuid)", (batch_id,))
+            cur.execute("SELECT claim_donor_batch(%s::uuid, %s)", (batch_id, good_only))
         conn.commit()
 
 
@@ -328,10 +328,10 @@ def db_get_movie_from_donor(donor_batch_id: str, batch_id: str) -> str | None:
     return str(donor_id)
 
 
-def db_get_donor_count() -> int:
+def db_get_donor_count(good_only: bool = False) -> int:
     with get_db() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT get_donor_count()")
+            cur.execute("SELECT get_donor_count(%s)", (good_only,))
             return cur.fetchone()[0]
 
 

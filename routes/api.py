@@ -321,7 +321,22 @@ def api_donors_count():
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
     from db import db_get_donor_count
-    return jsonify({"count": db_get_donor_count()})
+    good_only = request.args.get("good_only") == "1"
+    return jsonify({"count": db_get_donor_count(good_only=good_only)})
+
+
+@bp.route("/workflow/approve_movies", methods=["POST"])
+def api_workflow_approve_movies():
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    body = request.get_json(silent=True) or {}
+    val = "1" if body.get("enabled") == "1" else "0"
+    db_set("approve_movies", val)
+    if val == "1":
+        env_set("use_donor", "1")
+    label = "включено" if val == "1" else "выключено"
+    write_log_entry(None, f"[api] Утверждать видео: {label}")
+    return jsonify({"ok": True, "approve_movies": val})
 
 
 @bp.route("/workflow/emulation", methods=["POST"])

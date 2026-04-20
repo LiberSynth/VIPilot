@@ -94,6 +94,9 @@ def run(batch_id, log_id):
         # Находим батч-донор с готовым видео → записываем donor_batch_id в data
         # и переводим в story_ready. Видео-пайплайн потом перенесёт готовое видео,
         # минуя генерацию. Если подходящего донора нет — падаем в AI-генерацию.
+        # approve_movies: если включено, ищем только доноров с grade = good;
+        # если пул пуст — ошибка (AI-генерация запрещена).
+        approve_movies = db_get("approve_movies", "0") == "1"
         if (
             not is_probe
             and not snap.emulation_mode
@@ -108,7 +111,7 @@ def run(batch_id, log_id):
             )
 
             if donor_batch_id is None:
-                db_claim_donor_batch(batch_id)
+                db_claim_donor_batch(batch_id, good_only=approve_movies)
                 batch = db_get_batch_by_id(batch_id)
                 if not batch:
                     return
@@ -149,6 +152,15 @@ def run(batch_id, log_id):
                     ),
                 )
                 return
+            else:
+                if approve_movies:
+                    msg = "Пул видео пуст (grade = good) — AI-генерация запрещена (approve_movies включён)"
+                    write_log_entry(log_id, msg, level="error")
+                    db_log_update(log_id, msg, "error")
+                    write_log_entry(
+                        log_id, fmt_id_msg("[story] Батч {} — {}", batch_id, msg)
+                    )
+                    raise AppException(batch_id, "story", msg, log_id)
 
         # Поиск готового сюжета в пуле: только для slot/adhoc (не story_probe).
         # Если approve_stories включён — берём только grade=good (одобренные вручную).

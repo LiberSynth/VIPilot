@@ -30,7 +30,58 @@ from log.log import write_log_entry
 # ---------------------------------------------------------------------------
 
 # Миграции 1–70 удалены: задеплоены на prod 2026-04-20, db_version = 70.
-# Следующая миграция: _m071_...
+# Следующая миграция: _m072_...
+
+
+def _m071_donor_good_only(cur):
+    """
+    Добавляет параметр p_good_only к функциям get_donor_count и claim_donor_batch.
+    Позволяет считать и выбирать только доноров с grade = 'good'.
+    Старые функции (без параметра) удаляются во избежание конфликта перегрузок.
+    """
+    cur.execute("DROP FUNCTION IF EXISTS get_donor_count()")
+    cur.execute("""
+        CREATE FUNCTION get_donor_count(p_good_only boolean)
+        RETURNS bigint LANGUAGE plpgsql AS $$
+        DECLARE
+            v_count bigint;
+        BEGIN
+            PERFORM pg_advisory_xact_lock(hashtext('donor_claim'));
+            SELECT COUNT(*) INTO v_count
+            FROM batches b
+            JOIN movies m ON m.id = b.movie_id
+            WHERE (m.transcoded_data IS NOT NULL OR m.raw_data IS NOT NULL)
+              AND b.status IN ('cancelled', 'movie_probe')
+              AND (NOT p_good_only OR m.grade = 'good');
+            RETURN v_count;
+        END;
+        $$
+    """)
+    cur.execute("DROP FUNCTION IF EXISTS claim_donor_batch(uuid)")
+    cur.execute("""
+        CREATE FUNCTION claim_donor_batch(p_batch_id uuid, p_good_only boolean)
+        RETURNS void LANGUAGE plpgsql AS $$
+        DECLARE
+            v_donor_id uuid;
+            v_donated_status text := 'donated';
+        BEGIN
+            PERFORM pg_advisory_xact_lock(hashtext('donor_claim'));
+            SELECT b.id INTO v_donor_id
+            FROM batches b
+            JOIN movies m ON m.id = b.movie_id
+            WHERE (m.transcoded_data IS NOT NULL OR m.raw_data IS NOT NULL)
+              AND b.status IN ('cancelled', 'movie_probe')
+              AND (NOT p_good_only OR m.grade = 'good')
+            ORDER BY b.created_at ASC
+            LIMIT 1 FOR UPDATE OF b;
+            IF v_donor_id IS NULL THEN RETURN; END IF;
+            UPDATE batches SET status = v_donated_status WHERE id = v_donor_id;
+            UPDATE batches
+            SET data = COALESCE(data, '{}'::jsonb) || jsonb_build_object('donor_batch_id', v_donor_id::text)
+            WHERE id = p_batch_id;
+        END;
+        $$
+    """)
 
 
 # ---------------------------------------------------------------------------
@@ -38,6 +89,7 @@ from log.log import write_log_entry
 # ---------------------------------------------------------------------------
 
 MIGRATIONS = [
+    (71, _m071_donor_good_only),
 ]
 
 

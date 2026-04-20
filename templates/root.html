@@ -54,7 +54,7 @@
   <div id="panel-workflow" class="tab-panel active">
     <form id="settings-form" style="margin-top:0">
       {% from 'common/controls.html' import modes_card %}
-      {{ modes_card(approve_stories, use_donor) }}
+      {{ modes_card(approve_stories, use_donor, approve_movies) }}
       <div class="card" style="margin-top:12px">
         <div class="card-title">Оперативный запуск</div>
         <div class="hint">Создаёт батч вне расписания и запускает его немедленно.</div>

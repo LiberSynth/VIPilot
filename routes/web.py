@@ -150,6 +150,7 @@ def root_page():
     story_fails_to_next = max(1, int(db_get("story_fails_to_next", "3")))
     video_fails_to_next = max(1, int(db_get("video_fails_to_next", "3")))
     approve_stories     = db_get("approve_stories", "0") == "1"
+    approve_movies      = db_get("approve_movies",  "0") == "1"
     deep_debugging      = environment.deep_logging
 
     workflow_state = env_get("workflow_state", "running")
@@ -192,6 +193,7 @@ def root_page():
         story_fails_to_next=story_fails_to_next,
         video_fails_to_next=video_fails_to_next,
         approve_stories=approve_stories,
+        approve_movies=approve_movies,
         deep_debugging=deep_debugging,
         workflow_state=workflow_state,
         target_id=target_id,
@@ -231,6 +233,7 @@ def production_page():
     video_duration      = max(1, min(60, int(db_get("video_duration", "6"))))
     video_fails_to_next = max(1, int(db_get("video_fails_to_next", "3")))
     approve_stories_prod = db_get("approve_stories", "0") == "1"
+    approve_movies_prod  = db_get("approve_movies",  "0") == "1"
     use_donor_prod       = environment.use_donor
     screenwriter_show_used = env_get("screenwriter_show_used", "0") == "1"
     screenwriter_only_good = env_get("screenwriter_only_good", "0") == "1"
@@ -244,6 +247,7 @@ def production_page():
         video_duration=video_duration,
         video_fails_to_next=video_fails_to_next,
         approve_stories=approve_stories_prod,
+        approve_movies=approve_movies_prod,
         use_donor=use_donor_prod,
         app_version=APP_VERSION,
         nav_modules=_nav_modules("production"),

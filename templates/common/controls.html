@@ -1,4 +1,4 @@
-{% macro modes_card(approve_stories, use_donor) %}
+{% macro modes_card(approve_stories, use_donor, approve_movies) %}
 {% from "common/macros.html" import approve_stories_hint %}
 <div class="card" style="margin-top:12px">
   <div class="card-title">Режимы</div>
@@ -17,13 +17,25 @@
   <input type="hidden" id="approve_stories_hidden" name="approve_stories" value="{{ '1' if approve_stories else '0' }}">
   <div class="wf-row" style="margin-top:12px;padding-top:10px;border-top:1px solid #1e1e2e">
     <div style="flex:1">
+      <div class="toggle-label">Утверждать видео</div>
+      <div class="hint" style="margin-top:2px">Если включено, пайплайн публикации берёт из пула только видео с оценкой «хорошо»; если пул пуст — батч завершается ошибкой. Если выключено — берётся любое неопубликованное видео; если пул пуст — запускается AI-генерация. Текущий пул: <span id="movie-pool-count" style="color:#f59e0b">…</span>.</div>
+    </div>
+    <span id="approve-movies-badge" class="emulation-badge" {% if not approve_movies %}style="display:none"{% endif %}>ВКЛ</span>
+    <label class="toggle-wrap" style="margin-left:8px">
+      <input type="checkbox" id="approve_movies_check" {% if approve_movies %}checked{% endif %}
+             onchange="wfApproveMovies(this.checked)">
+      <span class="toggle-track"></span>
+    </label>
+  </div>
+  <div class="wf-row" style="margin-top:12px;padding-top:10px;border-top:1px solid #1e1e2e">
+    <div style="flex:1">
       <div class="toggle-label">Подбирать видео из пула</div>
       <div class="hint" style="margin-top:2px">Прежде чем запускать генерацию видео, производится поиск готового среди отменённых или пробных пакетов. Текущий пул: <span id="donor-count" style="color:#f59e0b">…</span>.</div>
     </div>
     <span id="use-donor-badge" class="emulation-badge" {% if not use_donor %}style="display:none"{% endif %}>ВКЛ</span>
     <label class="toggle-wrap" style="margin-left:8px">
       <input type="checkbox" id="use_donor_check" {% if use_donor %}checked{% endif %}
-             onchange="wfUseDonor(this.checked)">
+             onchange="wfUseDonor(this.checked)" {% if approve_movies %}disabled{% endif %}>
       <span class="toggle-track"></span>
     </label>
   </div>

@@ -160,6 +160,39 @@ function confirmRestart() {
     .catch(function() { closeRestartDialog(); showToast('Ошибка соединения', 'error'); });
 }
 
+function _syncUseDonorDisabled() {
+  var approveMoviesChk = document.getElementById('approve_movies_check');
+  var useDonorChk      = document.getElementById('use_donor_check');
+  if (!approveMoviesChk || !useDonorChk) return;
+  useDonorChk.disabled = approveMoviesChk.checked;
+}
+
+function wfApproveMovies(checked) {
+  fetch('/api/workflow/approve_movies', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled: checked ? '1' : '0' }),
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var badge = document.getElementById('approve-movies-badge');
+      var on    = d.approve_movies === '1';
+      if (badge) badge.style.display = on ? '' : 'none';
+      if (on) {
+        var useDonorChk  = document.getElementById('use_donor_check');
+        var useDonorBadge = document.getElementById('use-donor-badge');
+        if (useDonorChk && !useDonorChk.checked) {
+          useDonorChk.checked = true;
+          if (useDonorBadge) useDonorBadge.style.display = '';
+          wfUseDonor(true);
+        }
+      }
+      _syncUseDonorDisabled();
+      showToast(on ? 'Утверждать видео: включено' : 'Утверждать видео: выключено', on ? 'warn' : 'success');
+    })
+    .catch(function() { showToast('Ошибка соединения', 'error'); });
+}
+
 function refreshDonorCount() {
   fetch('/api/donors/count')
     .then(function(r) { return r.json(); })
@@ -170,9 +203,22 @@ function refreshDonorCount() {
     .catch(function() {});
 }
 
+function refreshMoviePoolCount() {
+  fetch('/api/donors/count?good_only=1')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var el = document.getElementById('movie-pool-count');
+      if (el) el.textContent = d.count;
+    })
+    .catch(function() {});
+}
+
 (function() {
+  _syncUseDonorDisabled();
   refreshDonorCount();
+  refreshMoviePoolCount();
   setInterval(refreshDonorCount, 10000);
+  setInterval(refreshMoviePoolCount, 10000);
 })();
 
 function _buildClearHistoryOverlay() {
