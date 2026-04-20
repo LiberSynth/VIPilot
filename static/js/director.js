@@ -130,9 +130,10 @@
     }
     var rec = _moviesData.filter(function(m) { return String(m.id) === String(movieId); })[0];
     if (titleEl) {
-      var t = (rec && rec.story_title) ? rec.story_title : '';
-      titleEl.textContent  = t;
-      titleEl.style.display = t ? '' : 'none';
+      var title = (rec && rec.story_title) ? rec.story_title : '';
+      var model = (rec && rec.model_name)  ? rec.model_name  : '';
+      titleEl.textContent  = title + (model ? ' (' + model + ')' : '');
+      titleEl.style.display = (title || model) ? '' : 'none';
     }
     var src = '/production/movie/' + encodeURIComponent(movieId) + '/video';
     wrap.innerHTML = '<video class="probe-video" controls src="' + src + '"></video>';
