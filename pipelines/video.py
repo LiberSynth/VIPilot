@@ -310,15 +310,30 @@ def run(batch_id, log_id):
 
         if pinned_model_id:
             db_update_batch_movie_model_id(batch_id, pinned_model_id)
-        elif resumed:
-            resume_model_id = batch_data.get('current_movie_model_id') if isinstance(batch_data, dict) else None
-            if resume_model_id:
-                idx = next((i for i, m in enumerate(models) if str(m['id']) == resume_model_id), 0)
-                if idx > 0:
-                    write_log_entry(log_id, fmt_id_msg("[video] Подхват: продолжаем с модели {} (позиция {} из {})", resume_model_id, idx + 1, len(models)))
-                    models = models[idx:]
+        resume_model_id = (
+            (batch_data.get('current_movie_model_id') if isinstance(batch_data, dict) else None)
+            if resumed and not pinned_model_id else None
+        )
+        resume_unlocked = not resume_model_id
+        if resume_model_id:
+            idx = next((i for i, m in enumerate(models) if str(m['id']) == resume_model_id), None)
+            if idx is not None and idx > 0:
+                write_log_entry(log_id, fmt_id_msg("[video] Подхват: первый проход начинается с модели {} (позиция {} из {})", resume_model_id, idx + 1, len(models)))
+            else:
+                resume_unlocked = True
+
+        def _orig_video_callback(m):
+            nonlocal resume_unlocked
+            if not resume_unlocked:
+                if str(m['id']) == resume_model_id:
+                    resume_unlocked = True
+                else:
+                    return None
+            return video_callback(m)
+
+        cb = _orig_video_callback if resume_model_id else video_callback
         max_passes = 1 if pinned_model_id else snap.max_model_passes
-        video_url = iterate_models(models, fails_to_next, video_callback, max_passes=max_passes)
+        video_url = iterate_models(models, fails_to_next, cb, max_passes=max_passes)
 
         if not video_url:
             if is_probe:
