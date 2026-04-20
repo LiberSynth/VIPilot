@@ -46,69 +46,27 @@ def db_create_adhoc_batch():
     return str(row[0]) if row else None
 
 
-def db_create_probe_batch(video_model_id, story_id=None):
+def db_create_video_batch(batch_type, movie_model_id=None, story_id=None):
+    data = json.dumps({'movie_model_id': str(movie_model_id)}) if movie_model_id else None
     with get_db() as conn:
         with conn.cursor() as cur:
-            cur.execute(
-                """
-                INSERT INTO movies (model_id)
-                VALUES (%s)
-                RETURNING id
-            """,
-                (video_model_id,),
-            )
-            movie_row = cur.fetchone()
-            movie_id = movie_row[0]
             if story_id:
                 cur.execute(
                     """
-                    INSERT INTO batches
-                        (status, type, movie_id, story_id)
-                    VALUES ('pending', 'movie_probe', %s, %s)
+                    INSERT INTO batches (status, type, story_id, data)
+                    VALUES ('pending', %s, %s, %s)
                     RETURNING id
-                """,
-                    (movie_id, story_id),
+                    """,
+                    (batch_type, story_id, data),
                 )
             else:
                 cur.execute(
                     """
-                    INSERT INTO batches
-                        (status, type, movie_id)
-                    VALUES ('pending', 'movie_probe', %s)
+                    INSERT INTO batches (status, type, data)
+                    VALUES ('pending', %s, %s)
                     RETURNING id
-                """,
-                    (movie_id,),
-                )
-            row = cur.fetchone()
-        conn.commit()
-    return str(row[0]) if row else None
-
-
-def db_create_video_generate_batch(story_id=None):
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute("INSERT INTO movies DEFAULT VALUES RETURNING id")
-            movie_row = cur.fetchone()
-            movie_id = movie_row[0]
-            if story_id:
-                cur.execute(
-                    """
-                    INSERT INTO batches
-                        (status, type, movie_id, story_id)
-                    VALUES ('pending', 'movie_probe', %s, %s)
-                    RETURNING id
-                """,
-                    (movie_id, story_id),
-                )
-            else:
-                cur.execute(
-                    """
-                    INSERT INTO batches
-                        (status, type, movie_id)
-                    VALUES ('pending', 'movie_probe', %s)
-                    RETURNING id
-                """,
-                    (movie_id,),
+                    """,
+                    (batch_type, data),
                 )
             row = cur.fetchone()
         conn.commit()

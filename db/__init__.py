@@ -38,8 +38,7 @@ from .db_simple import (
 from .db_pipeline import (
     db_ensure_batch,
     db_create_adhoc_batch,
-    db_create_probe_batch,
-    db_create_video_generate_batch,
+    db_create_video_batch,
     db_create_story_probe_batch,
     db_create_story_generate_batch,
     db_update_batch_movie_model_id,

@@ -24,7 +24,7 @@ from db import (
     db_get_movie_video_data,
     db_get_text_model_by_id,
     db_get_video_model_by_id,
-    db_create_probe_batch,
+    db_create_video_batch,
     db_create_story_probe_batch,
     db_get_batch_logs,
     db_get,
@@ -36,7 +36,6 @@ from db import (
     db_set_movie_grade,
     db_upsert_story_draft,
     db_create_story_generate_batch,
-    db_create_video_generate_batch,
     db_set,
     db_delete_bad_stories,
 )
@@ -224,7 +223,7 @@ def api_video_model_probe(model_id):
     body = request.get_json(silent=True) or {}
     story_id = body.get("story_id") or None
 
-    batch_id = db_create_probe_batch(model_id, story_id=story_id)
+    batch_id = db_create_video_batch('movie_probe', movie_model_id=model_id, story_id=story_id)
     if not batch_id:
         return jsonify({"error": "Не удалось создать батч"}), 500
     log_batch_planned(batch_id, 'Пробный запуск видеомодели', f"Модель: {m['name']}")
@@ -615,9 +614,9 @@ def api_production_video_generate():
     model_id = data.get("model_id") or None
     story_id = data.get("story_id") or None
     if model_id:
-        batch_id = db_create_probe_batch(model_id, story_id=story_id)
+        batch_id = db_create_video_batch('movie_probe', movie_model_id=model_id, story_id=story_id)
     else:
-        batch_id = db_create_video_generate_batch(story_id=story_id)
+        batch_id = db_create_video_batch('movie_probe', story_id=story_id)
     if not batch_id:
         return jsonify({"error": "db_error"}), 500
     environment.wakeup_loop()
