@@ -37,6 +37,11 @@ def run(batch_id, log_id):
         if not batch:
             return
 
+        # Два допустимых входных статуса:
+        # - pending:          батч только что создан. CAS-переход pending → story_generating
+        #                     защищает от двойного подхвата: если другой воркер успел,
+        #                     возвращаем 0 строк → выходим.
+        # - story_generating: пайплайн был прерван после CAS. Подхватываем без повторного CAS.
         if batch["status"] not in ("pending", "story_generating"):
             return
 
@@ -44,6 +49,9 @@ def run(batch_id, log_id):
             if not db_set_batch_story_generating_by_id(batch_id):
                 return
 
+        # is_probe: батч создан вручную (story_probe — тест текстовой модели,
+        # movie_probe — тест видеомодели, которому нужен сюжет).
+        # Для probe: пул, донор и отмена не применяются — нужен живой результат.
         is_probe = batch["type"] in ("story_probe", "movie_probe")
         if is_probe:
             target = "пробный"
@@ -52,6 +60,8 @@ def run(batch_id, log_id):
             tgt = active_targets[0] if active_targets else {}
             target = tgt.get("name") or "adhoc"
 
+        # movie_probe с уже заданным story_id: пользователь прикрепил конкретный сюжет
+        # к пробному запуску видеомодели. Генерация сюжета не нужна — сразу story_ready.
         if batch.get("story_id") is not None and batch["type"] == "movie_probe":
             preset_story_id = str(batch["story_id"])
             db_log_update(
@@ -77,9 +87,16 @@ def run(batch_id, log_id):
                 raise AppException(batch_id, "story", msg, log_id)
             return
 
+        # Проверка отмены: только для slot/adhoc.
+        # Probe запускается пользователем явно — отменять его нет смысла.
         if not is_probe and check_cancelled("story", batch_id, batch, log_id):
             return
 
+        # Режим пула (donor): только для slot/adhoc, только если эмуляция выключена,
+        # use_donor включён и story_id ещё не задан.
+        # Находим батч-донор с готовым видео → записываем donor_batch_id в data
+        # и переводим в story_ready. Видео-пайплайн потом перенесёт готовое видео,
+        # минуя генерацию. Если подходящего донора нет — падаем в AI-генерацию.
         if (
             not is_probe
             and not snap.emulation_mode
@@ -144,6 +161,10 @@ def run(batch_id, log_id):
                 )
                 return
 
+        # Поиск готового сюжета в пуле: только для slot/adhoc (не story_probe).
+        # Если approve_stories включён — берём только grade=good (одобренные вручную).
+        # Нашли → story_ready без AI. Не нашли → идём в AI-генерацию.
+        # Если approve_stories включён и пул пуст — ошибка (AI-генерация запрещена).
         if batch["type"] != "story_probe":
             approve_stories = db_get("approve_stories", "0") == "1"
             grade_required = approve_stories
@@ -219,10 +240,17 @@ def run(batch_id, log_id):
 
         batch_data = batch.get("data") or {}
         is_story_probe = batch["type"] == "story_probe"
+        # pinned_model_id (из batches.data.story_model_id): пользователь задал
+        # конкретную текстовую модель для story_probe.
+        # Только для story_probe — для slot/adhoc story_model_id не пишется,
+        # поэтому на практике pinned_model_id бывает только при is_story_probe.
         pinned_model_id = (
             batch_data.get("story_model_id") if isinstance(batch_data, dict) else None
         )
 
+        # Выбор набора моделей:
+        # - story_probe + pinned: список из одной модели, один проход.
+        # - всё остальное: перебор всех активных текстовых моделей.
         if is_story_probe and pinned_model_id:
             probe_model = db_get_text_model_by_id(pinned_model_id)
             models = [probe_model] if probe_model else []

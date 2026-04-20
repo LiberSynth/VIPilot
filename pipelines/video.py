@@ -62,6 +62,14 @@ def run(batch_id, log_id):
 
         status = batch['status']
 
+        # Три допустимых входных статуса:
+        # - video_pending:    handshake с провайдером уже существует — это подхват
+        #                     прерванного поллинга. Генерацию не перезапускаем.
+        # - story_ready:      сюжет готов, видео ещё не стартовало. CAS-переход
+        #                     story_ready → video_generating защищает от двойного подхвата:
+        #                     если другой воркер успел раньше, возвращаем 0 строк → выходим.
+        # - video_generating: пайплайн был прерван после CAS, но до первого submit.
+        #                     Подхватываем без повторного CAS (статус уже выставлен).
         if status == 'video_pending':
             resumed = True
         elif status in ('story_ready', 'video_generating'):
@@ -72,6 +80,10 @@ def run(batch_id, log_id):
         else:
             return
 
+        # is_probe: батч создан вручную для тестирования конкретной модели (movie_probe).
+        # Для проба aspect ratio жёстко 9:16 — результат идёт на просмотр, а не в эфир.
+        # Для slot/adhoc aspect ratio берётся из конфигурации активного таргета.
+        # Конфликт соотношений у нескольких таргетов — фатальная ошибка конфигурации.
         is_probe        = batch['type'] == 'movie_probe'
         if is_probe:
             target = 'пробный'
@@ -96,6 +108,11 @@ def run(batch_id, log_id):
             target = tgt.get('name') or 'adhoc'
             ar_x   = tgt.get('aspect_ratio_x') or 9
             ar_y   = tgt.get('aspect_ratio_y') or 16
+
+        # Режим пула (donor): только для slot/adhoc и только при первом запуске (not resumed).
+        # Story-пайплайн уже записал donor_batch_id в batches.data; здесь переносим
+        # готовое видео из донорского батча, минуя генерацию полностью.
+        # Для probe пул не используется — нам важен результат конкретной модели.
         if not resumed and not is_probe:
             batch_data = batch.get('data') or {}
             donor_batch_id = batch_data.get('donor_batch_id') if isinstance(batch_data, dict) else None
@@ -143,9 +160,13 @@ def run(batch_id, log_id):
         except (ValueError, TypeError):
             video_duration = 6
 
+        # Проверка отмены: только для slot/adhoc.
+        # Probe-батч запускается пользователем явно — отменять его нет смысла.
         if not is_probe and check_cancelled('video', batch_id, batch, log_id):
             return
 
+        # Эмуляция: заимствуем оригинальное видео из случайного реального батча в пуле.
+        # Используется при разработке, когда дёргать реального провайдера нежелательно.
         if snap.emulation_mode:
             write_log_entry(log_id, fmt_id_msg("[video] Батч {} — эмуляция генерации видео", batch_id))
             db_log_update(log_id, 'Видео [эмуляция]', 'running')
@@ -180,6 +201,10 @@ def run(batch_id, log_id):
         except (ValueError, TypeError):
             fails_to_next = 3
 
+        # Выбор набора моделей:
+        # - pinned_model_id (из batches.data.movie_model_id): пользователь жёстко
+        #   задал модель → список из одного элемента, один проход (max_passes=1).
+        # - нет pinned: перебор всех активных моделей с max_passes проходами.
         if pinned_model_id:
             pinned_m = db_get_video_model_by_id(pinned_model_id)
             if not pinned_m:
@@ -308,8 +333,20 @@ def run(batch_id, log_id):
             })
             return None
 
+        # Для pinned-модели фиксируем movie_model_id в batches.data (один раз).
+        # При подхвате значение уже лежит там — вызов идемпотентен.
         if pinned_model_id:
             db_update_batch_movie_model_id(batch_id, pinned_model_id)
+
+        # Подхват при переборе моделей (slot/adhoc, not pinned):
+        # current_movie_model_id в batches.data хранит модель, на которой
+        # остановились. При подхвате первый проход начинается с неё, а не с
+        # начала списка — чтобы не повторять уже провалившиеся модели.
+        # Второй и последующие проходы идут по полному списку с самого начала:
+        # передаём полный models в iterate_models, но _orig_video_callback
+        # молча пропускает (None) модели до resume_model_id без инкремента
+        # attempt_counts, так что счётчики попыток этих моделей остаются чистыми
+        # для следующих проходов.
         resume_model_id = (
             (batch_data.get('current_movie_model_id') if isinstance(batch_data, dict) else None)
             if resumed and not pinned_model_id else None
@@ -332,6 +369,8 @@ def run(batch_id, log_id):
             return video_callback(m)
 
         cb = _orig_video_callback if resume_model_id else video_callback
+        # pinned: один проход (модель задана жёстко, повторять нет смысла).
+        # перебор: max_model_passes проходов по всему списку.
         max_passes = 1 if pinned_model_id else snap.max_model_passes
         video_url = iterate_models(models, fails_to_next, cb, max_passes=max_passes)
 
