@@ -120,14 +120,13 @@ def db_update_batch_current_movie_model_id(batch_id, model_id):
 
 
 def db_set_batch_story_probe(batch_id, story_id):
-    _assert_known_status("story_probe")
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "UPDATE batches SET status = 'story_probe', story_id = %s WHERE id = %s",
+                "UPDATE batches SET story_id = %s WHERE id = %s",
                 (story_id, batch_id),
             )
-        conn.commit()
+        db_set_batch_status(batch_id, 'story_probe', conn)
 
 
 def db_set_batch_story(batch_id, story_id):
@@ -152,9 +151,17 @@ def db_set_batch_story_id(batch_id, story_id):
         conn.commit()
 
 
-def db_set_batch_status(batch_id: str, status: str) -> bool:
+def db_set_batch_status(batch_id: str, status: str, conn=None) -> bool:
     _assert_known_status(status)
-    with get_db() as conn:
+    if conn is None:
+        with get_db() as _conn:
+            with _conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE batches SET status = %s WHERE id = %s",
+                    (status, batch_id),
+                )
+            _conn.commit()
+    else:
         with conn.cursor() as cur:
             cur.execute(
                 "UPDATE batches SET status = %s WHERE id = %s",
