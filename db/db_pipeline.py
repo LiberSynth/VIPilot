@@ -171,16 +171,13 @@ def db_claim_batch_status(batch_id: str, from_status: str, to_status: str) -> bo
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                """
-                UPDATE batches SET status = %s
-                WHERE id = %s AND status = %s
-                RETURNING id
-                """,
-                (to_status, batch_id, from_status),
+                "SELECT id FROM batches WHERE id = %s AND status = %s FOR UPDATE",
+                (batch_id, from_status),
             )
             row = cur.fetchone()
-        conn.commit()
-    return row is not None
+        if row is None:
+            return False
+        return db_set_batch_status(batch_id, to_status, conn)
 
 
 def db_cancel_waiting_batches():
