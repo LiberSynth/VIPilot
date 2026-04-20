@@ -32,7 +32,7 @@ from db import (
 )
 from log import db_log_update, write_log_entry
 from pipelines.base import check_cancelled
-from common.exceptions import AppException
+from common.exceptions import AppException, FatalError
 from utils.utils import fmt_id_msg
 
 
@@ -125,7 +125,7 @@ def run(batch_id, log_id):
         if original_data is None:
             msg = 'movies.raw_data = NULL у батча в статусе video_ready — ошибка логики'
             write_log_entry(log_id, msg, level='error')
-            raise RuntimeError(msg)
+            raise FatalError(msg)
 
         src_mb = round(len(original_data) / 1024 / 1024, 1)
         write_log_entry(log_id, f'Оригинал получен из БД ({src_mb} МБ), запускаю ffmpeg…')
