@@ -135,7 +135,7 @@
       titleEl.style.display = t ? '' : 'none';
     }
     var src = '/production/movie/' + encodeURIComponent(movieId) + '/video';
-    wrap.innerHTML = '<video class="probe-video" controls autoplay src="' + src + '"></video>';
+    wrap.innerHTML = '<video class="probe-video" controls src="' + src + '"></video>';
     wrap.style.display = 'block';
     if (empty) empty.style.display = 'none';
     setCardMovieGradeBadge(rec ? rec.grade : null, false);
