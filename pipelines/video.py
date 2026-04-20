@@ -19,6 +19,7 @@ from db import (
     db_get,
     db_get_batch_by_id,
     db_get_active_targets,
+    db_update_batch_current_movie_model_id,
     db_update_batch_movie_model_id,
     db_set_batch_video_generating_by_id,
     db_get_story_text,
@@ -242,26 +243,24 @@ def run(batch_id, log_id):
             saved_request_id   = current_data.get('request_id')
             saved_status_url   = current_data.get('status_url')
             saved_response_url = current_data.get('response_url')
-            saved_model_id     = current_data.get('current_movie_model_id')
-
             client = _video_client(m.get('platform_name', ''))
 
             if saved_request_id:
                 write_log_entry(log_id, fmt_id_msg("Возобновление: request_id={}", saved_request_id))
                 video_url, poll_err = client.poll(log_id, saved_status_url, saved_response_url)
                 if video_url:
-                    used_model_id = saved_model_id
+                    used_model_id = str(m['id'])
                     return video_url
                 write_log_entry(log_id, f"Поллинг не дал результата, сброс handshake", level='warn')
                 db_set_batch_video_pending(batch_id, {
                     'request_id':   None,
                     'status_url':   None,
                     'response_url': None,
-                    'current_movie_model_id': None,
                 })
                 return None
 
             if cnt == 0:
+                db_update_batch_current_movie_model_id(batch_id, m['id'])
                 write_log_entry(log_id, f"Модель: {model_name}")
                 write_log_entry(log_id, f"[video] Запрос к провайдеру: модель={model_name}, ar={ar_x}:{ar_y}")
             else:
@@ -291,7 +290,6 @@ def run(batch_id, log_id):
                 'request_id':   req_id,
                 'status_url':   s_url,
                 'response_url': r_url,
-                'current_movie_model_id': m_id,
             })
             write_log_entry(log_id, fmt_id_msg("Запрос принят ({}): {}", model_name, req_id))
             write_log_entry(log_id, fmt_id_msg("[video] Генерация запущена: request_id={}", req_id))
@@ -307,12 +305,18 @@ def run(batch_id, log_id):
                 'request_id':   None,
                 'status_url':   None,
                 'response_url': None,
-                'current_movie_model_id': None,
             })
             return None
 
         if pinned_model_id:
             db_update_batch_movie_model_id(batch_id, pinned_model_id)
+        elif resumed:
+            resume_model_id = batch_data.get('current_movie_model_id') if isinstance(batch_data, dict) else None
+            if resume_model_id:
+                idx = next((i for i, m in enumerate(models) if str(m['id']) == resume_model_id), 0)
+                if idx > 0:
+                    write_log_entry(log_id, fmt_id_msg("[video] Подхват: продолжаем с модели {} (позиция {} из {})", resume_model_id, idx + 1, len(models)))
+                    models = models[idx:]
         max_passes = 1 if pinned_model_id else snap.max_model_passes
         video_url = iterate_models(models, fails_to_next, video_callback, max_passes=max_passes)
 

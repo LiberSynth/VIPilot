@@ -103,7 +103,7 @@ def db_set_batch_video_pending(batch_id, job_data):
             cur.execute(
                 """UPDATE batches
                    SET status = 'video_pending',
-                       data   = %s::jsonb
+                       data   = COALESCE(data::jsonb, '{}'::jsonb) || %s::jsonb
                    WHERE id = %s""",
                 (json.dumps(job_data), batch_id),
             )

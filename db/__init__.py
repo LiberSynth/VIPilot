@@ -41,6 +41,7 @@ from .db_pipeline import (
     db_create_video_batch,
     db_create_story_probe_batch,
     db_create_story_generate_batch,
+    db_update_batch_current_movie_model_id,
     db_update_batch_movie_model_id,
     db_set_batch_story_probe,
     db_set_batch_story,

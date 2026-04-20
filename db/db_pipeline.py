@@ -104,6 +104,21 @@ def db_create_story_generate_batch():
     return str(row[0]) if row else None
 
 
+def db_update_batch_current_movie_model_id(batch_id, model_id):
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE batches
+                   SET data = COALESCE(data::jsonb, '{}'::jsonb)
+                           || jsonb_build_object('current_movie_model_id', %s::text)
+                 WHERE id = %s
+                """,
+                (str(model_id), batch_id),
+            )
+        conn.commit()
+
+
 def db_update_batch_movie_model_id(batch_id, model_id):
     with get_db() as conn:
         with conn.cursor() as cur:
