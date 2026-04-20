@@ -246,14 +246,9 @@ def run(batch_id, log_id):
                     resume_from = (ns, nm)
                     write_log_entry(log_id, fmt_id_msg("[publish] Батч {} resume с шага {}.{}", batch_id, ns, nm))
                 else:
-                    saved = db_set_batch_status(batch_id, 'published')
-                    if saved:
-                        db_log_update(log_id, 'Опубликовано (возобновление — все шаги завершены)', 'ok')
-                        write_log_entry(log_id, fmt_id_msg("[publish] Батч {} опубликован (возобновление)", batch_id))
-                    else:
-                        msg = 'Ошибка записи published в БД (возобновление)'
-                        db_log_update(log_id, msg, 'error')
-                        raise AppException(batch_id, 'publish', msg, log_id)
+                    db_set_batch_status(batch_id, 'published')
+                    db_log_update(log_id, 'Опубликовано (возобновление — все шаги завершены)', 'ok')
+                    write_log_entry(log_id, fmt_id_msg("[publish] Батч {} опубликован (возобновление)", batch_id))
                     return
 
         any_ok = False
@@ -292,62 +287,42 @@ def run(batch_id, log_id):
                 failed_steps.append(f"{slug}.{method}")
                 err_msg = step_error or 'ошибка публикации'
                 write_log_entry(log_id, fmt_id_msg("[publish] Батч {} ошибка {}.{}: {}", batch_id, slug, method, err_msg))
-                step_saved = db_set_batch_status(batch_id, failed_status)
-                if not step_saved:
-                    abt_msg = f'Шаг {slug}.{method}: ошибка, не удалось сохранить статус — аварийная остановка'
-                    db_log_update(log_id, abt_msg, 'error')
-                    raise AppException(batch_id, 'publish', abt_msg, log_id)
+                db_set_batch_status(batch_id, failed_status)
                 expected_from = failed_status
                 continue
 
             any_ok = True
 
-            step_saved = db_set_batch_status(batch_id, published_status)
-            if not step_saved:
-                abt_msg = f'Шаг {slug}.{method}: опубликовано, но ошибка записи статуса в БД'
-                db_log_update(log_id, abt_msg, 'error')
-                raise AppException(batch_id, 'publish', abt_msg, log_id)
+            db_set_batch_status(batch_id, published_status)
             write_log_entry(log_id, f'Шаг {slug}.{method}: опубликовано')
             expected_from = published_status
 
         if any_ok:
             if failed_steps:
                 fail_list = ', '.join(failed_steps)
-                saved = db_set_batch_status(batch_id, 'published_partially')
-                if saved:
-                    db_log_update(log_id, f'Частично опубликовано ({target_names}); ошибки: {fail_list}', 'ok')
-                    write_log_entry(log_id, fmt_id_msg("[publish] Батч {} частично опубликован (ошибки: {})", batch_id, fail_list))
-                    entries = db_get_log_entries(log_id) if log_id else []
-                    err_entries = [e for e in entries if e['level'] in ('warn', 'error')]
-                    notify_failure(
-                        fmt_id_msg("publish: батч {} частично опубликован; не удалось: {}", batch_id, fail_list),
-                        log_entries=err_entries,
-                        partial=True,
-                    )
-                else:
-                    abt_msg = 'Частично опубликовано, но ошибка записи статуса в БД'
-                    db_log_update(log_id, abt_msg, 'error')
-                    write_log_entry(log_id, fmt_id_msg("[publish] Батч {} ошибка записи published_partially в БД", batch_id))
-                    raise AppException(batch_id, 'publish', abt_msg, log_id)
+                db_set_batch_status(batch_id, 'published_partially')
+                db_log_update(log_id, f'Частично опубликовано ({target_names}); ошибки: {fail_list}', 'ok')
+                write_log_entry(log_id, fmt_id_msg("[publish] Батч {} частично опубликован (ошибки: {})", batch_id, fail_list))
+                entries = db_get_log_entries(log_id) if log_id else []
+                err_entries = [e for e in entries if e['level'] in ('warn', 'error')]
+                notify_failure(
+                    fmt_id_msg("publish: батч {} частично опубликован; не удалось: {}", batch_id, fail_list),
+                    log_entries=err_entries,
+                    partial=True,
+                )
             else:
-                saved = db_set_batch_status(batch_id, 'published')
-                if saved:
-                    db_log_update(log_id, f'Опубликовано ({target_names})', 'ok')
-                    write_log_entry(log_id, fmt_id_msg("[publish] Батч {} опубликован", batch_id))
-                    if log_id:
-                        entries = db_get_log_entries(log_id)
-                        warn_entries = [e for e in entries if e['level'] in ('warn', 'error')]
-                        if warn_entries:
-                            notify_failure(
-                                fmt_id_msg("publish: батч {} опубликован, но в процессе были некритичные ошибки", batch_id),
-                                log_entries=warn_entries,
-                                partial=True,
-                            )
-                else:
-                    abt_msg = 'Опубликовано, но ошибка записи статуса в БД'
-                    db_log_update(log_id, abt_msg, 'error')
-                    write_log_entry(log_id, fmt_id_msg("[publish] Батч {} ошибка записи published в БД", batch_id))
-                    raise AppException(batch_id, 'publish', abt_msg, log_id)
+                db_set_batch_status(batch_id, 'published')
+                db_log_update(log_id, f'Опубликовано ({target_names})', 'ok')
+                write_log_entry(log_id, fmt_id_msg("[publish] Батч {} опубликован", batch_id))
+                if log_id:
+                    entries = db_get_log_entries(log_id)
+                    warn_entries = [e for e in entries if e['level'] in ('warn', 'error')]
+                    if warn_entries:
+                        notify_failure(
+                            fmt_id_msg("publish: батч {} опубликован, но в процессе были некритичные ошибки", batch_id),
+                            log_entries=warn_entries,
+                            partial=True,
+                        )
         else:
             abt_msg = f'Ошибка публикации батча в {target_names}'
             db_log_update(log_id, 'Ошибка публикации', 'error')

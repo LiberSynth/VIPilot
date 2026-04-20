@@ -151,18 +151,18 @@ def db_set_batch_story_id(batch_id, story_id):
         conn.commit()
 
 
-def db_set_batch_status(batch_id: str, status: str, conn=None) -> bool:
+def db_set_batch_status(batch_id: str, status: str, conn=None) -> None:
     _assert_known_status(status)
     if conn is None:
         with get_db() as _conn:
-            return db_set_batch_status(batch_id, status, _conn)
+            db_set_batch_status(batch_id, status, _conn)
+        return
     with conn.cursor() as cur:
         cur.execute(
             "UPDATE batches SET status = %s WHERE id = %s",
             (status, batch_id),
         )
     conn.commit()
-    return True
 
 
 def db_claim_batch_status(batch_id: str, from_status: str, to_status: str) -> bool:
@@ -177,7 +177,8 @@ def db_claim_batch_status(batch_id: str, from_status: str, to_status: str) -> bo
             row = cur.fetchone()
         if row is None:
             return False
-        return db_set_batch_status(batch_id, to_status, conn)
+        db_set_batch_status(batch_id, to_status, conn)
+    return True
 
 
 def db_cancel_waiting_batches():
@@ -479,7 +480,8 @@ def db_reset_batch_pipeline(batch_id: str, pipeline: str) -> bool:
     target_status = PIPELINE_RESET_STATUS.get(pipeline)
     if not target_status:
         return False
-    return db_set_batch_status(batch_id, target_status)
+    db_set_batch_status(batch_id, target_status)
+    return True
 
 
 def db_get_active_text_model():
