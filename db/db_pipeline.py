@@ -420,54 +420,33 @@ def db_reset_stalled_batches() -> list[dict]:
     ]
     affected = []
     with get_db() as conn:
+        for old_status, new_status in static_resets:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT id FROM batches WHERE status = %s FOR UPDATE",
+                    (old_status,),
+                )
+                ids = [str(r[0]) for r in cur.fetchall()]
+            for batch_id in ids:
+                db_set_batch_status(batch_id, new_status, conn)
+                affected.append({"id": batch_id, "old_status": old_status, "new_status": new_status})
+
         with conn.cursor() as cur:
-            for old_status, new_status in static_resets:
-                cur.execute(
-                    """
-                    UPDATE batches
-                       SET status = %s
-                     WHERE status = %s
-                    RETURNING id
-                    """,
-                    (new_status, old_status),
-                )
-                rows = cur.fetchall()
-                for row in rows:
-                    affected.append(
-                        {
-                            "id": str(row[0]),
-                            "old_status": old_status,
-                            "new_status": new_status,
-                        }
-                    )
+            cur.execute("SELECT DISTINCT status FROM batches WHERE status LIKE '%.posting'")
+            posting_statuses = [r[0] for r in cur.fetchall()]
 
-            cur.execute("""
-                SELECT DISTINCT status FROM batches
-                WHERE status LIKE '%.posting'
-            """)
-            posting_rows = cur.fetchall()
-            for (posting_status,) in posting_rows:
-                pending_status = posting_status[: -len(".posting")] + ".pending"
+        for posting_status in posting_statuses:
+            pending_status = posting_status[:-len(".posting")] + ".pending"
+            with conn.cursor() as cur:
                 cur.execute(
-                    """
-                    UPDATE batches
-                       SET status = %s
-                     WHERE status = %s
-                    RETURNING id
-                    """,
-                    (pending_status, posting_status),
+                    "SELECT id FROM batches WHERE status = %s FOR UPDATE",
+                    (posting_status,),
                 )
-                rows = cur.fetchall()
-                for row in rows:
-                    affected.append(
-                        {
-                            "id": str(row[0]),
-                            "old_status": posting_status,
-                            "new_status": pending_status,
-                        }
-                    )
+                ids = [str(r[0]) for r in cur.fetchall()]
+            for batch_id in ids:
+                db_set_batch_status(batch_id, pending_status, conn)
+                affected.append({"id": batch_id, "old_status": posting_status, "new_status": pending_status})
 
-        conn.commit()
     return affected
 
 
