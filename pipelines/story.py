@@ -129,17 +129,9 @@ def run(batch_id, log_id):
                     if donor_batch and donor_batch.get("story_id")
                     else None
                 )
-                if not db_set_batch_story_ready_from_donor(
+                db_set_batch_story_ready_from_donor(
                     batch_id, donor_batch_id, donor_story_id
-                ):
-                    msg = fmt_id_msg(
-                        "Не удалось записать donor_batch_id для батча {} — видео из пула {}",
-                        batch_id,
-                        donor_batch_id,
-                    )
-                    db_log_update(log_id, msg, "error")
-                    write_log_entry(log_id, f"[story] {msg}")
-                    raise AppException(batch_id, "story", msg, log_id)
+                )
                 donor_title = (
                     db_get_story_title(donor_story_id) if donor_story_id else None
                 )

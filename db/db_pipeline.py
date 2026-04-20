@@ -267,15 +267,13 @@ def db_claim_donor_batch(batch_id: str) -> None:
 
 def db_set_batch_story_ready_from_donor(
     batch_id: str, donor_batch_id: str, donor_story_id: str | None
-) -> bool:
-    _assert_known_status("story_ready")
+):
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
                 UPDATE batches
-                SET status   = 'story_ready',
-                    story_id = COALESCE(story_id, %s),
+                SET story_id = COALESCE(story_id, %s),
                     data     = COALESCE(data, '{}'::jsonb) || jsonb_build_object('donor_batch_id', %s)
                 WHERE id = %s
                 RETURNING story_id
@@ -293,8 +291,7 @@ def db_set_batch_story_ready_from_donor(
                     "UPDATE batches SET story_id = NULL WHERE id = %s::uuid",
                     (donor_batch_id,),
                 )
-        conn.commit()
-    return True
+        db_set_batch_status(batch_id, 'story_ready', conn)
 
 
 def db_get_movie_from_donor(donor_batch_id: str, batch_id: str) -> str | None:
