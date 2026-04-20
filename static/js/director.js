@@ -117,22 +117,28 @@
 
   /* ── плеер ── */
   function loadMovieInPlayer(movieId) {
-    var wrap  = document.getElementById('director-video-wrap');
-    var empty = document.getElementById('director-movie-empty');
+    var wrap     = document.getElementById('director-video-wrap');
+    var empty    = document.getElementById('director-movie-empty');
+    var titleEl  = document.getElementById('director-movie-title');
     if (!wrap) return;
     if (!movieId) {
       wrap.innerHTML = '';
       wrap.style.display = 'none';
-      if (empty) empty.style.display = '';
+      if (empty)   empty.style.display   = '';
+      if (titleEl) { titleEl.textContent = ''; titleEl.style.display = 'none'; }
       setCardMovieGradeBadge(null, true);
       return;
+    }
+    var rec = _moviesData.filter(function(m) { return String(m.id) === String(movieId); })[0];
+    if (titleEl) {
+      var t = (rec && rec.story_title) ? rec.story_title : '';
+      titleEl.textContent  = t;
+      titleEl.style.display = t ? '' : 'none';
     }
     var src = '/production/movie/' + encodeURIComponent(movieId) + '/video';
     wrap.innerHTML = '<video class="probe-video" controls autoplay src="' + src + '"></video>';
     wrap.style.display = 'block';
     if (empty) empty.style.display = 'none';
-    /* показываем плашку с текущей оценкой */
-    var rec = _moviesData.filter(function(m) { return String(m.id) === String(movieId); })[0];
     setCardMovieGradeBadge(rec ? rec.grade : null, false);
   }
 
