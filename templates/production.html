@@ -115,23 +115,8 @@
 
   <!-- ══ РЕЖИССЕР ══ -->
   <div id="panel-director" class="tab-panel">
-    <div class="card" style="margin-top:12px">
-      <div class="card-title">Утверждение сюжета</div>
-      {% from "common/macros.html" import approve_stories_hint %}
-      {{ approve_stories_hint() }}
-      <div class="wf-row" style="margin-top:8px">
-        <div style="flex:1">
-          <div class="toggle-label">Утверждать сюжеты</div>
-        </div>
-        <label class="toggle-wrap" style="margin-left:8px">
-          <input type="checkbox" id="approve_stories_check"
-            {% if approve_stories %}checked{% endif %}
-            onchange="onApproveStoriesToggle(this)">
-          <span class="toggle-track"></span>
-        </label>
-      </div>
-      <input type="hidden" id="approve_stories_hidden" name="approve_stories" value="{{ '1' if approve_stories else '0' }}">
-    </div>
+    {% from 'common/controls.html' import modes_card %}
+    {{ modes_card(approve_stories, use_donor) }}
 
     <div class="card" style="margin-top:0">
       <div class="card-title">Сюжет</div>

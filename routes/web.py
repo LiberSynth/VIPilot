@@ -231,6 +231,7 @@ def production_page():
     video_duration      = max(1, min(60, int(db_get("video_duration", "6"))))
     video_fails_to_next = max(1, int(db_get("video_fails_to_next", "3")))
     approve_stories_prod = db_get("approve_stories", "0") == "1"
+    use_donor_prod       = environment.use_donor
     screenwriter_show_used = env_get("screenwriter_show_used", "0") == "1"
     screenwriter_only_good = env_get("screenwriter_only_good", "0") == "1"
     screenwriter_for_approval = env_get("screenwriter_for_approval", "0") == "1"
@@ -243,6 +244,7 @@ def production_page():
         video_duration=video_duration,
         video_fails_to_next=video_fails_to_next,
         approve_stories=approve_stories_prod,
+        use_donor=use_donor_prod,
         app_version=APP_VERSION,
         nav_modules=_nav_modules("production"),
         screenwriter_show_used=screenwriter_show_used,

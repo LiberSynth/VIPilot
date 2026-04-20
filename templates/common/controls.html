@@ -1,0 +1,31 @@
+{% macro modes_card(approve_stories, use_donor) %}
+{% from "common/macros.html" import approve_stories_hint %}
+<div class="card" style="margin-top:12px">
+  <div class="card-title">Режимы</div>
+  <div class="wf-row" style="margin-top:4px">
+    <div style="flex:1">
+      <div class="toggle-label">Утверждать сюжеты</div>
+      {{ approve_stories_hint() }}
+    </div>
+    <span id="approve-stories-badge" class="emulation-badge" {% if not approve_stories %}style="display:none"{% endif %}>ВКЛ</span>
+    <label class="toggle-wrap" style="margin-left:8px">
+      <input type="checkbox" id="approve_stories_check" {% if approve_stories %}checked{% endif %}
+             onchange="onApproveStoriesToggle(this)">
+      <span class="toggle-track"></span>
+    </label>
+  </div>
+  <input type="hidden" id="approve_stories_hidden" name="approve_stories" value="{{ '1' if approve_stories else '0' }}">
+  <div class="wf-row" style="margin-top:12px;padding-top:10px;border-top:1px solid #1e1e2e">
+    <div style="flex:1">
+      <div class="toggle-label">Подбирать видео из пула</div>
+      <div class="hint" style="margin-top:2px">Прежде чем запускать генерацию видео, производится поиск готового среди отменённых или пробных пакетов. Текущий пул: <span id="donor-count" style="color:#f59e0b">…</span>.</div>
+    </div>
+    <span id="use-donor-badge" class="emulation-badge" {% if not use_donor %}style="display:none"{% endif %}>ВКЛ</span>
+    <label class="toggle-wrap" style="margin-left:8px">
+      <input type="checkbox" id="use_donor_check" {% if use_donor %}checked{% endif %}
+             onchange="wfUseDonor(this.checked)">
+      <span class="toggle-track"></span>
+    </label>
+  </div>
+</div>
+{% endmacro %}
