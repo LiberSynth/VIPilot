@@ -481,15 +481,7 @@ def db_reset_batch_pipeline(batch_id: str, pipeline: str) -> bool:
     target_status = PIPELINE_RESET_STATUS.get(pipeline)
     if not target_status:
         return False
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "UPDATE batches SET status = %s WHERE id = %s",
-                (target_status, batch_id),
-            )
-            updated = cur.rowcount
-        conn.commit()
-    return updated > 0
+    return db_set_batch_status(batch_id, target_status)
 
 
 def db_get_active_text_model():
