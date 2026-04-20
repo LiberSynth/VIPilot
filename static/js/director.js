@@ -4,6 +4,8 @@
   var GRADE_TEXT_COLORS = { 'null': '#aaa', 'good': '#6ee7a0', 'bad': '#f87171' };
   var GRADE_CYCLE       = ['good', 'bad', null];
 
+  var _selectedMovieId = null;
+
   function gradeKey(g) { return (g === null || g === undefined) ? 'null' : String(g); }
 
   function escHtml(s) {
@@ -35,6 +37,40 @@
       params.set('show_bad', (onlyGood && onlyGood.checked) ? '0' : '1');
     }
     return params.toString();
+  }
+
+  function _updateMovieSelection() {
+    var container = document.getElementById('movies-list');
+    if (!container) return;
+    container.querySelectorAll('.story-row--selected').forEach(function(r) {
+      r.classList.remove('story-row--selected');
+    });
+    if (_selectedMovieId) {
+      var sel = container.querySelector('.story-row[data-id="' + _selectedMovieId + '"]');
+      if (sel) sel.classList.add('story-row--selected');
+    }
+  }
+
+  function loadMovieInPlayer(movieId) {
+    var wrap  = document.getElementById('director-video-wrap');
+    var empty = document.getElementById('director-movie-empty');
+    if (!wrap) return;
+    if (!movieId) {
+      wrap.innerHTML = '';
+      wrap.style.display = 'none';
+      if (empty) empty.style.display = '';
+      return;
+    }
+    var src = '/production/movie/' + encodeURIComponent(movieId) + '/video';
+    wrap.innerHTML = '<video class="probe-video" controls autoplay src="' + src + '"></video>';
+    wrap.style.display = 'block';
+    if (empty) empty.style.display = 'none';
+  }
+
+  function selectMovie(movieId) {
+    _selectedMovieId = movieId || null;
+    _updateMovieSelection();
+    loadMovieInPlayer(_selectedMovieId);
   }
 
   function renderMovies(movies) {
@@ -72,12 +108,19 @@
         + '</div>';
     }
     container.innerHTML = html;
+    container.querySelectorAll('.story-row').forEach(function(row) {
+      row.addEventListener('click', function() {
+        var movieId = row.getAttribute('data-id');
+        selectMovie(movieId);
+      });
+    });
     container.querySelectorAll('.story-grade-badge').forEach(function(btn) {
       btn.addEventListener('click', function(e) {
         e.stopPropagation();
         cycleMovieGrade(btn);
       });
     });
+    _updateMovieSelection();
   }
 
   function cycleMovieGrade(btn) {

@@ -21,6 +21,7 @@ from db import (
     db_get_story_title,
     db_get_story_model_info,
     db_get_batch_video_data,
+    db_get_movie_video_data,
     db_get_text_model_by_id,
     db_get_video_model_by_id,
     db_create_probe_batch,
@@ -514,6 +515,38 @@ def api_production_movies():
         for_approval=for_approval,
     )
     return jsonify(movies)
+
+
+@production_bp.route("/production/movie/<movie_id>/video", methods=["GET"])
+def api_production_movie_video(movie_id):
+    err = _production_auth_check()
+    if err:
+        return err
+    data = db_get_movie_video_data(movie_id)
+    if data is None:
+        return Response("Not found", status=404)
+    data = bytes(data)
+    total = len(data)
+    range_header = request.headers.get("Range")
+    if range_header:
+        try:
+            ranges = range_header.strip().replace("bytes=", "").split("-")
+            start = int(ranges[0])
+            end   = int(ranges[1]) if ranges[1] else total - 1
+        except (IndexError, ValueError):
+            start, end = 0, total - 1
+        end = min(end, total - 1)
+        chunk = data[start:end + 1]
+        resp = Response(chunk, status=206, mimetype="video/mp4", direct_passthrough=True)
+        resp.headers["Content-Range"]  = f"bytes {start}-{end}/{total}"
+        resp.headers["Accept-Ranges"]  = "bytes"
+        resp.headers["Content-Length"] = str(len(chunk))
+    else:
+        resp = Response(data, status=200, mimetype="video/mp4")
+        resp.headers["Accept-Ranges"]  = "bytes"
+        resp.headers["Content-Length"] = str(total)
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
 
 
 @production_bp.route("/production/movie/<movie_id>/grade", methods=["POST"])
