@@ -19,6 +19,7 @@ from db import (
     db_get,
     db_get_batch_by_id,
     db_get_active_targets,
+    db_update_batch_movie_model_id,
     db_set_batch_video_generating_by_id,
     db_get_story_text,
     db_get_active_video_models,
@@ -309,6 +310,8 @@ def run(batch_id, log_id):
             })
             return None
 
+        if pinned_model_id:
+            db_update_batch_movie_model_id(batch_id, pinned_model_id)
         max_passes = 1 if pinned_model_id else snap.max_model_passes
         video_url = iterate_models(models, fails_to_next, video_callback, max_passes=max_passes)
 
