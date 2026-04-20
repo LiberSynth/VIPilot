@@ -151,7 +151,7 @@ def db_set_batch_story_id(batch_id, story_id):
         conn.commit()
 
 
-def db_set_batch_status(batch_id: str, status: str, conn=None) -> None:
+def db_set_batch_status(batch_id: str, status: str, conn=None):
     _assert_known_status(status)
     if conn is None:
         with get_db() as _conn:
