@@ -151,37 +151,28 @@ def db_set_batch_story_id(batch_id, story_id):
         conn.commit()
 
 
-def db_set_batch_status(batch_id: str, status: str, conn=None) -> bool:
+def db_set_batch_status(batch_id: str, status: str, conn=None, from_status: str | None = None) -> bool:
     _assert_known_status(status)
     if conn is None:
         with get_db() as _conn:
-            db_set_batch_status(batch_id, status, _conn)
-        return True
+            return db_set_batch_status(batch_id, status, _conn, from_status)
+    if from_status is not None:
+        sql = "UPDATE batches SET status = %s WHERE id = %s AND status = %s RETURNING id"
+        params = (status, batch_id, from_status)
+    else:
+        sql = "UPDATE batches SET status = %s WHERE id = %s RETURNING id"
+        params = (status, batch_id)
     with conn.cursor() as cur:
-        cur.execute(
-            "UPDATE batches SET status = %s WHERE id = %s",
-            (status, batch_id),
-        )
+        cur.execute(sql, params)
+        row = cur.fetchone()
     conn.commit()
-    return True
+    return row is not None
 
 
 def db_claim_batch_status(batch_id: str, from_status: str, to_status: str) -> bool:
     _assert_known_status(from_status)
     _assert_known_status(to_status)
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                UPDATE batches SET status = %s
-                WHERE id = %s AND status = %s
-                RETURNING id
-                """,
-                (to_status, batch_id, from_status),
-            )
-            row = cur.fetchone()
-        conn.commit()
-    return row is not None
+    return db_set_batch_status(batch_id, to_status, from_status=from_status)
 
 
 def db_cancel_waiting_batches():
