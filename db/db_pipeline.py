@@ -317,23 +317,14 @@ def db_get_movie_from_donor(donor_batch_id: str, batch_id: str) -> str | None:
 
             new_status = "transcode_ready" if has_transcoded else "video_ready"
             cur.execute(
-                """
-                UPDATE batches
-                SET movie_id = %s,
-                    status   = %s
-                WHERE id = %s::uuid AND movie_id IS NULL
-            """,
-                (donor_movie_id, new_status, batch_id),
+                "UPDATE batches SET movie_id = %s WHERE id = %s::uuid",
+                (donor_movie_id, batch_id),
             )
-            if cur.rowcount == 0:
-                return None
-
             cur.execute(
                 "UPDATE batches SET movie_id = NULL WHERE id = %s::uuid",
                 (donor_batch_id,),
             )
-
-        conn.commit()
+        db_set_batch_status(batch_id, new_status, conn)
     return str(donor_id)
 
 
