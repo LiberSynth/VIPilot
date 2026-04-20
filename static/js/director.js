@@ -5,6 +5,7 @@
   var GRADE_CYCLE       = ['good', 'bad', null];
 
   var _selectedMovieId = null;
+  var _moviesData      = [];
 
   function gradeKey(g) { return (g === null || g === undefined) ? 'null' : String(g); }
 
@@ -12,6 +13,7 @@
     return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
+  /* ── счётчик ── */
   function updateCount(n) {
     var el = document.getElementById('movies-count');
     if (!el) return;
@@ -25,6 +27,7 @@
     el.textContent = n + ' ' + w;
   }
 
+  /* ── фильтры ── */
   function getFilterParams() {
     var forApproval   = document.getElementById('movie-filter-for-approval');
     var onlyGood      = document.getElementById('movie-filter-only-good');
@@ -39,6 +42,65 @@
     return params.toString();
   }
 
+  /* ── плашка grade в карточке ВИДЕО ── */
+  function setCardMovieGradeBadge(grade, hidden) {
+    var btn = document.getElementById('card-movie-grade');
+    if (!btn) return;
+    if (hidden) { btn.hidden = true; btn.disabled = true; return; }
+    var gk = gradeKey(grade);
+    btn.hidden   = false;
+    btn.disabled = false;
+    btn.setAttribute('data-grade', gk);
+    btn.style.background = gk !== 'null' ? (GRADE_COLORS[gk] || '') : '';
+    btn.style.color      = gk !== 'null' ? (GRADE_TEXT_COLORS[gk] || '') : '';
+    btn.textContent = GRADE_LABELS[gk] || gk;
+    btn.title = 'Оценка: ' + (GRADE_LABELS[gk] || gk) + '. Нажмите для смены';
+  }
+
+  function initCardMovieGradeBadge() {
+    var btn = document.getElementById('card-movie-grade');
+    if (!btn) return;
+    btn.addEventListener('click', function() {
+      if (btn.disabled || !_selectedMovieId) return;
+      var currentAttr = btn.getAttribute('data-grade');
+      var current = currentAttr === 'null' ? null : currentAttr;
+      var idx = GRADE_CYCLE.indexOf(current);
+      var next = GRADE_CYCLE[(idx + 1) % GRADE_CYCLE.length];
+      btn.disabled = true;
+      fetch('/production/movie/' + _selectedMovieId + '/grade', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ grade: next }),
+      })
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(d) {
+        btn.disabled = false;
+        if (d && d.ok) {
+          var g = d.grade !== undefined ? d.grade : null;
+          setCardMovieGradeBadge(g, false);
+          _syncListRowGrade(_selectedMovieId, g);
+          window.loadMovieList();
+        }
+      })
+      .catch(function() { btn.disabled = false; });
+    });
+  }
+
+  /* синхронизирует плашку в строке списка без перезагрузки */
+  function _syncListRowGrade(movieId, grade) {
+    var container = document.getElementById('movies-list');
+    if (!container) return;
+    var btn = container.querySelector('.story-grade-badge[data-id="' + movieId + '"]');
+    if (!btn) return;
+    var gk = gradeKey(grade);
+    btn.setAttribute('data-grade', gk);
+    btn.style.background = gk !== 'null' ? (GRADE_COLORS[gk] || '') : '';
+    btn.style.color      = gk !== 'null' ? (GRADE_TEXT_COLORS[gk] || '') : '';
+    btn.textContent = GRADE_LABELS[gk] || gk;
+    btn.title = 'Оценка: ' + (GRADE_LABELS[gk] || gk) + '. Нажмите для смены';
+  }
+
+  /* ── выделение строки в списке ── */
   function _updateMovieSelection() {
     var container = document.getElementById('movies-list');
     if (!container) return;
@@ -51,6 +113,7 @@
     }
   }
 
+  /* ── плеер ── */
   function loadMovieInPlayer(movieId) {
     var wrap  = document.getElementById('director-video-wrap');
     var empty = document.getElementById('director-movie-empty');
@@ -59,12 +122,16 @@
       wrap.innerHTML = '';
       wrap.style.display = 'none';
       if (empty) empty.style.display = '';
+      setCardMovieGradeBadge(null, true);
       return;
     }
     var src = '/production/movie/' + encodeURIComponent(movieId) + '/video';
     wrap.innerHTML = '<video class="probe-video" controls autoplay src="' + src + '"></video>';
     wrap.style.display = 'block';
     if (empty) empty.style.display = 'none';
+    /* показываем плашку с текущей оценкой */
+    var rec = _moviesData.filter(function(m) { return String(m.id) === String(movieId); })[0];
+    setCardMovieGradeBadge(rec ? rec.grade : null, false);
   }
 
   function selectMovie(movieId) {
@@ -73,18 +140,20 @@
     loadMovieInPlayer(_selectedMovieId);
   }
 
+  /* ── рендер списка ── */
   function renderMovies(movies) {
+    _moviesData = movies || [];
     var container = document.getElementById('movies-list');
     if (!container) return;
-    if (!movies || movies.length === 0) {
+    if (!_moviesData.length) {
       updateCount(0);
       container.innerHTML = '<div class="stories-empty">Нет видео</div>';
       return;
     }
-    updateCount(movies.length);
+    updateCount(_moviesData.length);
     var html = '';
-    for (var i = 0; i < movies.length; i++) {
-      var m = movies[i];
+    for (var i = 0; i < _moviesData.length; i++) {
+      var m = _moviesData[i];
       var grade = m.grade !== undefined ? m.grade : null;
       var gk = gradeKey(grade);
       var label = GRADE_LABELS[gk] || gk;
@@ -110,8 +179,7 @@
     container.innerHTML = html;
     container.querySelectorAll('.story-row').forEach(function(row) {
       row.addEventListener('click', function() {
-        var movieId = row.getAttribute('data-id');
-        selectMovie(movieId);
+        selectMovie(row.getAttribute('data-id'));
       });
     });
     container.querySelectorAll('.story-grade-badge').forEach(function(btn) {
@@ -121,8 +189,14 @@
       });
     });
     _updateMovieSelection();
+    /* обновляем плашку карточки если выбранный фильм есть в новом списке */
+    if (_selectedMovieId) {
+      var rec = _moviesData.filter(function(m) { return String(m.id) === String(_selectedMovieId); })[0];
+      if (rec) setCardMovieGradeBadge(rec.grade !== undefined ? rec.grade : null, false);
+    }
   }
 
+  /* ── цикл grade в строке списка ── */
   function cycleMovieGrade(btn) {
     var movieId = btn.getAttribute('data-id');
     var currentAttr = btn.getAttribute('data-grade');
@@ -143,15 +217,20 @@
         var gk = gradeKey(g);
         btn.setAttribute('data-grade', gk);
         btn.style.background = gk !== 'null' ? (GRADE_COLORS[gk] || '') : '';
-        btn.style.color = gk !== 'null' ? (GRADE_TEXT_COLORS[gk] || '') : '';
+        btn.style.color      = gk !== 'null' ? (GRADE_TEXT_COLORS[gk] || '') : '';
         btn.textContent = GRADE_LABELS[gk] || gk;
         btn.title = 'Оценка: ' + (GRADE_LABELS[gk] || gk) + '. Нажмите для смены';
+        /* если это выбранный элемент — синхронизируем карточку */
+        if (String(movieId) === String(_selectedMovieId)) {
+          setCardMovieGradeBadge(g, false);
+        }
         window.loadMovieList();
       }
     })
     .catch(function() { btn.disabled = false; });
   }
 
+  /* ── загрузка списка ── */
   window.loadMovieList = function() {
     var container = document.getElementById('movies-list');
     if (!container) return;
@@ -165,6 +244,7 @@
       });
   };
 
+  /* ── фильтры ── */
   function initFilters() {
     var forApproval   = document.getElementById('movie-filter-for-approval');
     var onlyGood      = document.getElementById('movie-filter-only-good');
@@ -180,14 +260,15 @@
       window.loadMovieList();
     }
 
-    if (forApproval)   forApproval.addEventListener('change',   function() { onFilterChange(forApproval); });
-    if (onlyGood)      onlyGood.addEventListener('change',      function() { onFilterChange(onlyGood); });
-    if (showPublished) showPublished.addEventListener('change',  function() { onFilterChange(showPublished); });
+    if (forApproval)   forApproval.addEventListener('change', function() { onFilterChange(forApproval); });
+    if (onlyGood)      onlyGood.addEventListener('change',    function() { onFilterChange(onlyGood); });
+    if (showPublished) showPublished.addEventListener('change',function() { onFilterChange(showPublished); });
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initFilters);
+    document.addEventListener('DOMContentLoaded', function() { initFilters(); initCardMovieGradeBadge(); });
   } else {
     initFilters();
+    initCardMovieGradeBadge();
   }
 })();
