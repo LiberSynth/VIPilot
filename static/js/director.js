@@ -4,6 +4,8 @@
   var GRADE_TEXT_COLORS = { 'null': '#aaa', 'good': '#6ee7a0', 'bad': '#f87171' };
   var GRADE_CYCLE       = ['good', 'bad', null];
 
+  var _INFO_SVG = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.5"/><line x1="8" y1="7" x2="8" y2="11"/><circle cx="8" cy="5" r=".5" fill="currentColor" stroke="none"/></svg>';
+
   var _selectedMovieId = null;
   var _moviesData      = [];
 
@@ -171,9 +173,11 @@
           + '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">'
           + '<polyline points="2,8 6,12 14,4"/></svg></span>';
       }
+      var infoBtn = '<button class="story-info-btn" data-copy="movie_id: ' + m.id + '" title="movie_id: ' + m.id + '">'
+        + _INFO_SVG + '</button>';
       html += '<div class="story-row" data-id="' + m.id + '">'
         + '<div class="story-title">' + escHtml(m.story_title || '(без названия)') + modelLabel + ' ' + gradeBadge + '</div>'
-        + '<div class="story-row-right">' + publishedIcon + '</div>'
+        + '<div class="story-row-right">' + publishedIcon + infoBtn + '</div>'
         + '</div>';
     }
     container.innerHTML = html;
@@ -186,6 +190,16 @@
       btn.addEventListener('click', function(e) {
         e.stopPropagation();
         cycleMovieGrade(btn);
+      });
+    });
+    container.querySelectorAll('.story-info-btn').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var text = btn.getAttribute('data-copy') || '';
+        navigator.clipboard.writeText(text).then(function() {
+          btn.classList.add('copied');
+          setTimeout(function() { btn.classList.remove('copied'); }, 2000);
+        }).catch(function() {});
       });
     });
     _updateMovieSelection();
