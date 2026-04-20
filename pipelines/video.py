@@ -26,6 +26,7 @@ from db import (
     db_set_batch_video_pending,
     db_set_batch_status,
     db_create_batch_movie,
+    db_copy_movie_for_emulation,
     db_get_random_real_original_video,
     db_set_batch_story_id,
     db_get_movie_from_donor,
@@ -170,9 +171,9 @@ def run(batch_id, log_id):
                 write_log_entry(log_id, msg, level='error')
                 write_log_entry(log_id, f"[video] {msg}")
                 raise AppException(batch_id, 'video', msg, log_id)
-            sample, donor_batch_id, donor_story_id = result
+            donor_movie_id, donor_batch_id, donor_story_id = result
             write_log_entry(log_id, fmt_id_msg("Видео заимствовано из батча: {}", donor_batch_id), level='info')
-            db_create_batch_movie(batch_id, sample, 'emulation://skipped')
+            db_copy_movie_for_emulation(donor_movie_id, batch_id)
             if donor_story_id:
                 db_set_batch_story_id(batch_id, donor_story_id)
                 write_log_entry(log_id, fmt_id_msg("story_id подменён: {} → {}", story_id, donor_story_id), level='info')
