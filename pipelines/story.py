@@ -219,12 +219,12 @@ def run(batch_id, log_id):
 
         batch_data = batch.get("data") or {}
         is_story_probe = batch["type"] == "story_probe"
-        probe_model_id = (
+        pinned_model_id = (
             batch_data.get("story_model_id") if isinstance(batch_data, dict) else None
         )
 
-        if is_story_probe and probe_model_id:
-            probe_model = db_get_text_model_by_id(probe_model_id)
+        if is_story_probe and pinned_model_id:
+            probe_model = db_get_text_model_by_id(pinned_model_id)
             models = [probe_model] if probe_model else []
         else:
             models = db_get_active_text_models()
@@ -293,7 +293,7 @@ def run(batch_id, log_id):
                 )
             return None
 
-        max_passes = 1 if probe_model_id else snap.max_model_passes
+        max_passes = 1 if pinned_model_id else snap.max_model_passes
         iterate_result = iterate_models(
             models, fails_to_next, story_callback, max_passes=max_passes
         )

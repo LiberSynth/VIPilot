@@ -134,7 +134,8 @@ def run(batch_id, log_id):
         if story_id is None:
             raise RuntimeError('story_id отсутствует у батча в статусе story_ready/video_generating — ошибка логики')
         story_id        = str(story_id)
-        pinned_model_id = batch.get('video_model_id')
+        batch_data      = batch.get('data') or {}
+        pinned_model_id = batch_data.get('movie_model_id') if isinstance(batch_data, dict) else None
 
         try:
             video_duration = max(1, min(60, int(db_get('video_duration', '6'))))
