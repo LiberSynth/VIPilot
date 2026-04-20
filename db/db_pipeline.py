@@ -47,7 +47,9 @@ def db_create_adhoc_batch():
 
 
 def db_create_video_batch(batch_type, movie_model_id=None, story_id=None):
-    data = json.dumps({'movie_model_id': str(movie_model_id)}) if movie_model_id else None
+    data = (
+        json.dumps({"movie_model_id": str(movie_model_id)}) if movie_model_id else None
+    )
     with get_db() as conn:
         with conn.cursor() as cur:
             if story_id:
@@ -126,7 +128,7 @@ def db_set_batch_story_probe(batch_id, story_id):
                 "UPDATE batches SET story_id = %s WHERE id = %s",
                 (story_id, batch_id),
             )
-        db_set_batch_status(batch_id, 'story_probe', conn)
+        db_set_batch_status(batch_id, "story_probe", conn)
 
 
 def db_set_batch_story(batch_id, story_id):
@@ -136,7 +138,7 @@ def db_set_batch_story(batch_id, story_id):
                 "UPDATE batches SET story_id = %s WHERE id = %s",
                 (story_id, batch_id),
             )
-        db_set_batch_status(batch_id, 'story_ready', conn)
+        db_set_batch_status(batch_id, "story_ready", conn)
 
 
 def db_set_batch_story_id(batch_id, story_id):
@@ -165,7 +167,6 @@ def db_set_batch_status(batch_id: str, status: str, conn=None):
 
 def db_claim_batch_status(batch_id: str, from_status: str, to_status: str) -> bool:
     _assert_known_status(from_status)
-    _assert_known_status(to_status)
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -201,7 +202,7 @@ def db_cancel_waiting_batches():
             """)
             batch_ids = [str(r[0]) for r in cur.fetchall()]
         for batch_id in batch_ids:
-            db_set_batch_status(batch_id, 'cancelled', conn)
+            db_set_batch_status(batch_id, "cancelled", conn)
     return batch_ids
 
 
@@ -212,11 +213,10 @@ def db_set_batch_pending(batch_id):
                 "UPDATE batches SET story_id = NULL, movie_id = NULL WHERE id = %s",
                 (batch_id,),
             )
-        db_set_batch_status(batch_id, 'pending', conn)
+        db_set_batch_status(batch_id, "pending", conn)
 
 
 def db_claim_unused_story_for_batch(batch_id: str, grade_required: bool) -> dict | None:
-    _assert_known_status("story_ready")
     with get_db() as conn:
         with conn.cursor() as cur:
             if grade_required:
@@ -251,10 +251,10 @@ def db_claim_unused_story_for_batch(batch_id: str, grade_required: bool) -> dict
                 return None
             story_id = row[0]
             cur.execute(
-                "UPDATE batches SET story_id = %s::uuid, status = 'story_ready' WHERE id = %s::uuid",
+                "UPDATE batches SET story_id = %s::uuid WHERE id = %s::uuid",
                 (story_id, batch_id),
             )
-        conn.commit()
+        db_set_batch_status(batch_id, 'story_ready', conn)
     return {"id": story_id, "title": row[1] or "", "content": row[2] or ""}
 
 
@@ -427,14 +427,18 @@ def db_reset_stalled_batches() -> list[dict]:
                 ids = [str(r[0]) for r in cur.fetchall()]
             for batch_id in ids:
                 db_set_batch_status(batch_id, new_status, conn)
-                affected.append({"id": batch_id, "old_status": old_status, "new_status": new_status})
+                affected.append(
+                    {"id": batch_id, "old_status": old_status, "new_status": new_status}
+                )
 
         with conn.cursor() as cur:
-            cur.execute("SELECT DISTINCT status FROM batches WHERE status LIKE '%.posting'")
+            cur.execute(
+                "SELECT DISTINCT status FROM batches WHERE status LIKE '%.posting'"
+            )
             posting_statuses = [r[0] for r in cur.fetchall()]
 
         for posting_status in posting_statuses:
-            pending_status = posting_status[:-len(".posting")] + ".pending"
+            pending_status = posting_status[: -len(".posting")] + ".pending"
             with conn.cursor() as cur:
                 cur.execute(
                     "SELECT id FROM batches WHERE status = %s FOR UPDATE",
@@ -443,7 +447,13 @@ def db_reset_stalled_batches() -> list[dict]:
                 ids = [str(r[0]) for r in cur.fetchall()]
             for batch_id in ids:
                 db_set_batch_status(batch_id, pending_status, conn)
-                affected.append({"id": batch_id, "old_status": posting_status, "new_status": pending_status})
+                affected.append(
+                    {
+                        "id": batch_id,
+                        "old_status": posting_status,
+                        "new_status": pending_status,
+                    }
+                )
 
     return affected
 
@@ -600,17 +610,17 @@ def db_get_video_model_by_id(model_id: str):
             if not row:
                 return None
             durations_map = _fetch_allowed_durations(cur, [row["id"]])
-    platform_url  = row["platform_url"]
+    platform_url = row["platform_url"]
     platform_name = row["platform_name"]
-    model_url     = row["model_url"]
-    mid           = str(row["id"])
+    model_url = row["model_url"]
+    mid = str(row["id"])
     return {
-        "platform_url":  platform_url,
+        "platform_url": platform_url,
         "platform_name": platform_name,
-        "model_url":     model_url,
-        "body_tpl":      row["body"] if isinstance(row["body"], dict) else {},
-        "name":          row["name"],
-        "id":            mid,
-        "submit_url":    f"{platform_url}/{model_url}",
+        "model_url": model_url,
+        "body_tpl": row["body"] if isinstance(row["body"], dict) else {},
+        "name": row["name"],
+        "id": mid,
+        "submit_url": f"{platform_url}/{model_url}",
         "allowed_durations": durations_map.get(mid, [0]),
     }
