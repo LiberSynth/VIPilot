@@ -15,6 +15,7 @@ from db import (
     db_set_batch_story_generating_by_id,
     db_get_active_text_models,
     db_get_text_model_by_id,
+    db_update_batch_story_model_id,
     db_create_story,
     db_set_batch_story,
     db_set_batch_story_probe,
@@ -263,6 +264,7 @@ def run(batch_id, log_id):
             cnt = attempt_counters.get(model_name, 0)
             attempt_counters[model_name] = cnt + 1
             if cnt == 0:
+                db_update_batch_story_model_id(batch_id, m["id"])
                 write_log_entry(log_id, f"Модель: {model_name}")
                 write_log_entry(
                     log_id, f"[story] Запрос к текстовой платформе: модель={model_name}"
