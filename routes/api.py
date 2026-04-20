@@ -38,6 +38,7 @@ from db import (
     db_create_story_generate_batch,
     db_set,
     db_delete_bad_stories,
+    db_delete_bad_movies,
 )
 from log import db_get_monitor, log_batch_planned, write_log_entry
 from utils.auth import is_authenticated
@@ -600,6 +601,18 @@ def api_production_delete_bad_stories():
         return err
     try:
         deleted = db_delete_bad_stories()
+        return jsonify({"ok": True, "deleted": deleted})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@production_bp.route("/production/movies/delete_bad", methods=["POST"])
+def api_production_delete_bad_movies():
+    err = _production_auth_check()
+    if err:
+        return err
+    try:
+        deleted = db_delete_bad_movies()
         return jsonify({"ok": True, "deleted": deleted})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500

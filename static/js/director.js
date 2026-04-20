@@ -290,10 +290,69 @@
     if (showPublished) showPublished.addEventListener('change',function() { onFilterChange(showPublished); });
   }
 
+  function _closeDeleteBadMoviesDialog() {
+    var el = document.getElementById('deleteBadMoviesOverlay');
+    if (el) el.remove();
+  }
+
+  function _openDeleteBadMoviesDialog(btn) {
+    var existing = document.getElementById('deleteBadMoviesOverlay');
+    if (existing) existing.remove();
+    var el = document.createElement('div');
+    el.className = 'confirm-overlay open';
+    el.id = 'deleteBadMoviesOverlay';
+    el.innerHTML =
+      '<div class="confirm-box">' +
+        '<div class="confirm-box-title">Удалить неудачные видео?</div>' +
+        '<div class="confirm-box-text">' +
+          'Будут удалены все видео с оценкой «плохо»,<br>а также связанные с ними батчи и записи лога.<br>Сюжеты затронуты не будут.' +
+        '</div>' +
+        '<div class="confirm-box-btns">' +
+          '<button class="confirm-cancel" id="deleteBadMoviesCancelBtn">Отмена</button>' +
+          '<button class="confirm-confirm" id="deleteBadMoviesConfirmBtn" style="background:#b05820">Удалить</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(el);
+    document.getElementById('deleteBadMoviesCancelBtn').addEventListener('click', _closeDeleteBadMoviesDialog);
+    document.getElementById('deleteBadMoviesConfirmBtn').addEventListener('click', function() {
+      var confirmBtn = document.getElementById('deleteBadMoviesConfirmBtn');
+      if (confirmBtn) { confirmBtn.disabled = true; confirmBtn.textContent = 'Удаление…'; }
+      btn.classList.add('pending');
+      fetch('/production/movies/delete_bad', { method: 'POST' })
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(d) {
+          btn.classList.remove('pending');
+          _closeDeleteBadMoviesDialog();
+          if (d && d.ok) {
+            var n = d.deleted ? (d.deleted.movies || 0) : 0;
+            var mod10 = n % 10, mod100 = n % 100;
+            var word;
+            if (mod100 >= 11 && mod100 <= 14) { word = 'видео'; }
+            else if (mod10 === 1) { word = 'видео'; }
+            else if (mod10 >= 2 && mod10 <= 4) { word = 'видео'; }
+            else { word = 'видео'; }
+            if (typeof window.showToast === 'function') window.showToast('Удалено ' + n + ' ' + word);
+            if (typeof window.loadMovieList === 'function') window.loadMovieList();
+          }
+        })
+        .catch(function() { btn.classList.remove('pending'); _closeDeleteBadMoviesDialog(); });
+    });
+  }
+
+  function initDeleteBadMoviesButton() {
+    var btn = document.getElementById('btn-delete-bad-movies');
+    if (!btn) return;
+    btn.addEventListener('click', function() {
+      if (btn.classList.contains('pending')) return;
+      _openDeleteBadMoviesDialog(btn);
+    });
+  }
+
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function() { initFilters(); initCardMovieGradeBadge(); });
+    document.addEventListener('DOMContentLoaded', function() { initFilters(); initCardMovieGradeBadge(); initDeleteBadMoviesButton(); });
   } else {
     initFilters();
     initCardMovieGradeBadge();
+    initDeleteBadMoviesButton();
   }
 })();
