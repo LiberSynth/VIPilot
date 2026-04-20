@@ -113,9 +113,6 @@ def run(batch_id, log_id):
             batch_data = batch.get('data') or {}
             donor_batch_id = batch_data.get('donor_batch_id') if isinstance(batch_data, dict) else None
             if donor_batch_id:
-                if batch.get('movie_id') is not None:
-                    write_log_entry(log_id, fmt_id_msg("[video] Батч {} — из пула, movie_id уже перенесён (возобновление)", batch_id))
-                    return
                 if not check_cancelled('video', batch_id, batch, log_id):
                     write_log_entry(log_id, fmt_id_msg("[video] Батч {} — режим пула, переносим видео из пула {}", batch_id, donor_batch_id))
                     db_log_update(log_id, 'Видео получено из пула', 'running')
