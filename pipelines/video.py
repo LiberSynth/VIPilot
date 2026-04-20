@@ -15,7 +15,6 @@ import time
 import common.environment as environment
 from utils.prompt_params import apply_prompt_params
 from db import (
-    db_set_batch_video_model,
     db_get,
     db_get_batch_by_id,
     db_get_active_targets,
@@ -28,7 +27,7 @@ from db import (
     db_set_batch_video_ready,
     db_set_batch_status,
     db_set_batch_story_ready_from_error,
-    db_set_batch_original_video,
+    db_create_batch_movie,
     db_get_random_real_original_video,
     db_set_batch_story_id,
     db_get_movie_from_donor,
@@ -178,11 +177,11 @@ def run(batch_id, log_id):
                 raise AppException(batch_id, 'video', msg, log_id)
             sample, donor_batch_id, donor_story_id = result
             write_log_entry(log_id, fmt_id_msg("Видео заимствовано из батча: {}", donor_batch_id), level='info')
-            db_set_batch_original_video(batch_id, sample)
+            db_create_batch_movie(batch_id, sample, 'emulation://skipped')
             if donor_story_id:
                 db_set_batch_story_id(batch_id, donor_story_id)
                 write_log_entry(log_id, fmt_id_msg("story_id подменён: {} → {}", story_id, donor_story_id), level='info')
-            db_set_batch_video_ready(batch_id, 'emulation://skipped')
+            db_set_batch_video_ready(batch_id)
             db_log_update(log_id, 'Видео [эмуляция]', 'ok')
             return
 
@@ -388,7 +387,7 @@ def run(batch_id, log_id):
         try:
             original_data = falai.download_video(log_id, video_url)
             orig_mb = round(len(original_data) / 1024 / 1024, 1)
-            db_set_batch_original_video(batch_id, original_data)
+            db_create_batch_movie(batch_id, original_data, video_url, used_model_id)
             write_log_entry(log_id, f"Оригинал сохранён ({orig_mb} МБ)")
             write_log_entry(log_id, f"[video] Оригинал сохранён в БД ({orig_mb} МБ)")
         except Exception as e:
@@ -398,9 +397,7 @@ def run(batch_id, log_id):
             write_log_entry(log_id, f"[video] {msg}")
             raise AppException(batch_id, 'video', msg, log_id)
 
-        db_set_batch_video_ready(batch_id, video_url)
-        if used_model_id:
-            db_set_batch_video_model(batch_id, used_model_id)
+        db_set_batch_video_ready(batch_id)
         msg = f'Видео сгенерировано ({used_model})' if used_model else 'Видео сгенерировано'
         db_log_update(log_id, msg, 'ok')
         write_log_entry(log_id, f"URL: {video_url}")

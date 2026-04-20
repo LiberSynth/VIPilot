@@ -26,27 +26,18 @@ from common.statuses import _assert_known_status
 # при значительном росте объёма видеоданных.
 
 
-def db_set_batch_original_video(batch_id, video_data: bytes):
+def db_create_batch_movie(batch_id, video_data: bytes, video_url: str, model_id=None):
     with get_db() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT movie_id FROM batches WHERE id = %s", (batch_id,))
-            row = cur.fetchone()
-            movie_id = row[0] if row else None
-            if movie_id is None:
-                cur.execute(
-                    "INSERT INTO movies (raw_data) VALUES (%s) RETURNING id",
-                    (psycopg2.Binary(video_data),),
-                )
-                movie_id = cur.fetchone()[0]
-                cur.execute(
-                    "UPDATE batches SET movie_id = %s WHERE id = %s",
-                    (movie_id, batch_id),
-                )
-            else:
-                cur.execute(
-                    "UPDATE movies SET raw_data = %s WHERE id = %s",
-                    (psycopg2.Binary(video_data), movie_id),
-                )
+            cur.execute(
+                "INSERT INTO movies (raw_data, url, model_id) VALUES (%s, %s, %s) RETURNING id",
+                (psycopg2.Binary(video_data), video_url, model_id),
+            )
+            movie_id = cur.fetchone()[0]
+            cur.execute(
+                "UPDATE batches SET movie_id = %s WHERE id = %s",
+                (movie_id, batch_id),
+            )
         conn.commit()
     return True
 
@@ -65,17 +56,10 @@ def db_get_batch_original_video(batch_id) -> bytes | None:
     return None
 
 
-def db_set_batch_video_ready(batch_id, video_url):
+def db_set_batch_video_ready(batch_id):
     _assert_known_status('video_ready')
     with get_db() as conn:
         with conn.cursor() as cur:
-            cur.execute(
-                """UPDATE movies m
-                      SET url = %s
-                     FROM batches b
-                    WHERE b.id = %s AND b.movie_id = m.id""",
-                (video_url, batch_id),
-            )
             cur.execute(
                 "UPDATE batches SET status = 'video_ready' WHERE id = %s",
                 (batch_id,),
@@ -95,20 +79,6 @@ def db_set_batch_video_pending(batch_id, job_data):
                        data   = COALESCE(data::jsonb, '{}'::jsonb) || %s::jsonb
                    WHERE id = %s""",
                 (json.dumps(job_data), batch_id),
-            )
-        conn.commit()
-    return True
-
-
-def db_set_batch_video_model(batch_id, model_id):
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """UPDATE movies m
-                      SET model_id = %s
-                     FROM batches b
-                    WHERE b.id = %s AND b.movie_id = m.id""",
-                (model_id, batch_id),
             )
         conn.commit()
     return True
