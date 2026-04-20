@@ -21,9 +21,6 @@ from db import (
     db_get_batch_video_data,
     db_get_batch_original_video,
     db_get_story_title,
-    db_set_batch_movie_probe,
-    db_set_batch_published,
-    db_set_batch_published_partially,
     db_set_batch_status,
     db_claim_batch_status,
 )
@@ -166,7 +163,7 @@ def run(batch_id, log_id):
             if batch['type'] == 'movie_probe':
                 db_log_update(log_id, 'Публикация (пробный)…', 'running')
                 write_log_entry(log_id, 'Пробный батч — публикация на платформу не выполняется')
-                db_set_batch_movie_probe(batch_id)
+                db_set_batch_status(batch_id, 'movie_probe')
                 db_log_update(log_id, 'Без публикации (пробный батч)', 'ok')
                 write_log_entry(log_id, fmt_id_msg("[publish] Батч {} пробный — публикация пропущена", batch_id))
                 return
@@ -249,7 +246,7 @@ def run(batch_id, log_id):
                     resume_from = (ns, nm)
                     write_log_entry(log_id, fmt_id_msg("[publish] Батч {} resume с шага {}.{}", batch_id, ns, nm))
                 else:
-                    saved = db_set_batch_published(batch_id)
+                    saved = db_set_batch_status(batch_id, 'published')
                     if saved:
                         db_log_update(log_id, 'Опубликовано (возобновление — все шаги завершены)', 'ok')
                         write_log_entry(log_id, fmt_id_msg("[publish] Батч {} опубликован (возобновление)", batch_id))
@@ -316,7 +313,7 @@ def run(batch_id, log_id):
         if any_ok:
             if failed_steps:
                 fail_list = ', '.join(failed_steps)
-                saved = db_set_batch_published_partially(batch_id)
+                saved = db_set_batch_status(batch_id, 'published_partially')
                 if saved:
                     db_log_update(log_id, f'Частично опубликовано ({target_names}); ошибки: {fail_list}', 'ok')
                     write_log_entry(log_id, fmt_id_msg("[publish] Батч {} частично опубликован (ошибки: {})", batch_id, fail_list))
@@ -333,7 +330,7 @@ def run(batch_id, log_id):
                     write_log_entry(log_id, fmt_id_msg("[publish] Батч {} ошибка записи published_partially в БД", batch_id))
                     raise AppException(batch_id, 'publish', abt_msg, log_id)
             else:
-                saved = db_set_batch_published(batch_id)
+                saved = db_set_batch_status(batch_id, 'published')
                 if saved:
                     db_log_update(log_id, f'Опубликовано ({target_names})', 'ok')
                     write_log_entry(log_id, fmt_id_msg("[publish] Батч {} опубликован", batch_id))

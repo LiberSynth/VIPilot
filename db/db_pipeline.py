@@ -124,7 +124,7 @@ def db_set_batch_story_probe(batch_id, story_id):
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "UPDATE batches SET status = 'story_probe', story_id = %s, completed_at = now() WHERE id = %s",
+                "UPDATE batches SET status = 'story_probe', story_id = %s WHERE id = %s",
                 (story_id, batch_id),
             )
         conn.commit()
@@ -217,42 +217,6 @@ def db_set_batch_pending(batch_id):
                    SET status = 'pending', story_id = NULL,
                        movie_id = NULL
                    WHERE id = %s""",
-                (batch_id,),
-            )
-        conn.commit()
-    return True
-
-
-def db_set_batch_movie_probe(batch_id):
-    _assert_known_status("movie_probe")
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "UPDATE batches SET status = 'movie_probe', completed_at = now() WHERE id = %s",
-                (batch_id,),
-            )
-        conn.commit()
-    return True
-
-
-def db_set_batch_published(batch_id):
-    _assert_known_status("published")
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "UPDATE batches SET status = 'published', completed_at = now() WHERE id = %s",
-                (batch_id,),
-            )
-        conn.commit()
-    return True
-
-
-def db_set_batch_published_partially(batch_id):
-    _assert_known_status("published_partially")
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "UPDATE batches SET status = 'published_partially', completed_at = now() WHERE id = %s",
                 (batch_id,),
             )
         conn.commit()

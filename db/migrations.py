@@ -1474,7 +1474,6 @@ def _m045_add_indexes(cur):
         ("idx_batches_movie_id",      "batches",     "movie_id"),
         ("idx_batches_scheduled_at",  "batches",     "scheduled_at"),
         ("idx_batches_type",          "batches",     "type"),
-        ("idx_batches_completed_at",  "batches",     "completed_at"),
         ("idx_batches_created_at",    "batches",     "created_at"),
         ("idx_stories_grade",         "stories",     "grade"),
         ("idx_stories_created_at",    "stories",     "created_at"),
@@ -1970,6 +1969,16 @@ def _m069_rename_movie_model_id_in_batches_data(cur):
     """)
 
 
+def _m070_drop_completed_at(cur):
+    """
+    Удаляет колонку batches.completed_at и индекс по ней.
+    Сборщик мусора (db_service.py) ориентируется по created_at — completed_at не нужен.
+    Idempotent: DROP INDEX/COLUMN IF EXISTS.
+    """
+    cur.execute("DROP INDEX IF EXISTS idx_batches_completed_at")
+    cur.execute("ALTER TABLE batches DROP COLUMN IF EXISTS completed_at")
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -2040,6 +2049,7 @@ MIGRATIONS = [
     (67, _m067_grok_video_durations),
     (68, _m068_movies_grade),
     (69, _m069_rename_movie_model_id_in_batches_data),
+    (70, _m070_drop_completed_at),
 ]
 
 

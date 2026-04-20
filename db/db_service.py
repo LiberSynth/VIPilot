@@ -227,7 +227,7 @@ def db_cleanup_video_data(file_lifetime_days: int) -> int:
                 WHERE id IN (
                     SELECT movie_id FROM batches
                     WHERE status = ANY(%s)
-                      AND completed_at < now() - make_interval(days => %s)
+                      AND created_at < now() - make_interval(days => %s)
                       AND movie_id IS NOT NULL
                 )
                   AND COALESCE(transcoded_data, raw_data) IS NOT NULL
@@ -299,7 +299,7 @@ def db_cleanup_batches(batch_lifetime_days: int) -> int:
                     OR (type = 'movie_probe' AND status = 'movie_probe')
                     OR (type = 'story_probe' AND status = 'story_probe')
                 )
-                  AND completed_at < now() - make_interval(days => %s)
+                  AND created_at < now() - make_interval(days => %s)
             """, (batch_lifetime_days,))
             rows = cur.fetchall()
             if not rows:
