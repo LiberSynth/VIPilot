@@ -286,6 +286,14 @@
           </div>
           <div class="hint" style="margin-top:5px">Сколько батчей обрабатывается одновременно. По умолчанию: 2.</div>
         </div>
+        <div style="margin-top:14px">
+          <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block">Проходов по коллекции моделей</label>
+          <div class="lead-row">
+            <input type="number" name="max_model_passes" id="max_model_passes" value="{{ max_model_passes }}" min="1" max="20" step="1">
+            <span class="lead-unit">шт</span>
+          </div>
+          <div class="hint" style="margin-top:5px">Сколько раз пайплайн обходит весь список моделей при неудаче. По умолчанию: 5.</div>
+        </div>
       </div>
 
       <div class="card">

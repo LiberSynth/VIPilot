@@ -81,11 +81,12 @@ def get_active_batch_ids() -> set:
 
 
 class EnvSnapshot(NamedTuple):
-    deep_logging:   bool
-    emulation_mode: bool
-    use_donor:      bool
-    loop_interval:  int
-    max_threads:    int
+    deep_logging:     bool
+    emulation_mode:   bool
+    use_donor:        bool
+    loop_interval:    int
+    max_threads:      int
+    max_model_passes: int
 
 
 _current: EnvSnapshot = EnvSnapshot(
@@ -94,13 +95,15 @@ _current: EnvSnapshot = EnvSnapshot(
     use_donor=True,
     loop_interval=15,
     max_threads=5,
+    max_model_passes=5,
 )
 
-deep_logging:   bool = _current.deep_logging
-emulation_mode: bool = _current.emulation_mode
-use_donor:      bool = _current.use_donor
-loop_interval:  int  = _current.loop_interval
-max_threads:    int  = _current.max_threads
+deep_logging:     bool = _current.deep_logging
+emulation_mode:   bool = _current.emulation_mode
+use_donor:        bool = _current.use_donor
+loop_interval:    int  = _current.loop_interval
+max_threads:      int  = _current.max_threads
+max_model_passes: int  = _current.max_model_passes
 
 
 def snapshot() -> EnvSnapshot:
@@ -111,20 +114,22 @@ def snapshot() -> EnvSnapshot:
 
 def refresh_environment() -> EnvSnapshot:
     """Читает актуальные параметры окружения из БД и обновляет снимок."""
-    global deep_logging, emulation_mode, use_donor, loop_interval, max_threads, _current
+    global deep_logging, emulation_mode, use_donor, loop_interval, max_threads, max_model_passes, _current
     snap = EnvSnapshot(
-        deep_logging   = db_get('deep_debugging',    '0') == '1',
-        emulation_mode = env_get('emulation_mode',   '0') == '1',
-        use_donor      = env_get('use_donor',        '1') == '1',
-        loop_interval  = max(1, min(3600, int(db_get('loop_interval',     '15')))),
-        max_threads    = max(1, min(32,   int(db_get('max_batch_threads', '5')))),
+        deep_logging     = db_get('deep_debugging',    '0') == '1',
+        emulation_mode   = env_get('emulation_mode',   '0') == '1',
+        use_donor        = env_get('use_donor',        '1') == '1',
+        loop_interval    = max(1, min(3600, int(db_get('loop_interval',     '15')))),
+        max_threads      = max(1, min(32,   int(db_get('max_batch_threads', '5')))),
+        max_model_passes = max(1, min(20,   int(db_get('max_model_passes',  '5')))),
     )
-    _current       = snap
-    deep_logging   = snap.deep_logging
-    emulation_mode = snap.emulation_mode
-    use_donor      = snap.use_donor
-    loop_interval  = snap.loop_interval
-    max_threads    = snap.max_threads
+    _current         = snap
+    deep_logging     = snap.deep_logging
+    emulation_mode   = snap.emulation_mode
+    use_donor        = snap.use_donor
+    loop_interval    = snap.loop_interval
+    max_threads      = snap.max_threads
+    max_model_passes = snap.max_model_passes
     return snap
 
 

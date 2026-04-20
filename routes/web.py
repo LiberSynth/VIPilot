@@ -146,6 +146,7 @@ def root_page():
     buffer_hours       = max(1, min(720, int(db_get("buffer_hours", "24"))))
     loop_interval       = environment.loop_interval
     max_batch_threads   = environment.max_threads
+    max_model_passes    = environment.max_model_passes
     story_fails_to_next = max(1, int(db_get("story_fails_to_next", "3")))
     video_fails_to_next = max(1, int(db_get("video_fails_to_next", "3")))
     approve_stories     = db_get("approve_stories", "0") == "1"
@@ -187,6 +188,7 @@ def root_page():
         buffer_hours=buffer_hours,
         loop_interval=loop_interval,
         max_batch_threads=max_batch_threads,
+        max_model_passes=max_model_passes,
         story_fails_to_next=story_fails_to_next,
         video_fails_to_next=video_fails_to_next,
         approve_stories=approve_stories,
@@ -363,6 +365,13 @@ def save():
     if max_threads_str:
         try:
             db_set("max_batch_threads", str(max(1, min(32, int(max_threads_str)))))
+        except (ValueError, TypeError):
+            pass
+
+    max_model_passes_str = request.form.get("max_model_passes", "").strip()
+    if max_model_passes_str:
+        try:
+            db_set("max_model_passes", str(max(1, min(20, int(max_model_passes_str)))))
         except (ValueError, TypeError):
             pass
 

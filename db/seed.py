@@ -33,6 +33,7 @@ def seed_db():
                         ('buffer_hours',      '24'),
                         ('loop_interval',     '15'),
                         ('max_batch_threads', '5'),
+                        ('max_model_passes',  '5'),
                         ('approve_stories',   '0'),
                         ('deep_debugging',    '0')
                     ON CONFLICT (key) DO NOTHING
