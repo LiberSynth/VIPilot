@@ -19,7 +19,7 @@ from db import (
     db_get_batch_by_id,
     db_get_active_targets,
     db_update_batch_current_movie_model_id,
-    db_set_batch_video_generating_by_id,
+    db_claim_batch_status,
     db_get_story_text,
     db_get_active_video_models,
     db_get_video_model_by_id,
@@ -72,7 +72,7 @@ def run(batch_id, log_id):
         elif status in ('story_ready', 'video_generating'):
             resumed = False
             if status == 'story_ready':
-                if not db_set_batch_video_generating_by_id(batch_id):
+                if not db_claim_batch_status(batch_id, 'story_ready', 'video_generating'):
                     return
         else:
             return

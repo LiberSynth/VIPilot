@@ -182,54 +182,6 @@ def db_claim_batch_status(batch_id: str, from_status: str, to_status: str) -> bo
     return row is not None
 
 
-def db_set_batch_story_generating_by_id(batch_id):
-    _assert_known_status("story_generating")
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                UPDATE batches SET status = 'story_generating'
-                WHERE id = %s AND status = 'pending'
-            """,
-                (batch_id,),
-            )
-            n = cur.rowcount
-        conn.commit()
-    return n > 0
-
-
-def db_set_batch_video_generating_by_id(batch_id):
-    _assert_known_status("video_generating")
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                UPDATE batches SET status = 'video_generating'
-                WHERE id = %s AND status = 'story_ready'
-            """,
-                (batch_id,),
-            )
-            n = cur.rowcount
-        conn.commit()
-    return n > 0
-
-
-def db_set_batch_transcoding_by_id(batch_id):
-    _assert_known_status("transcoding")
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                UPDATE batches SET status = 'transcoding'
-                WHERE id = %s AND status = 'video_ready'
-            """,
-                (batch_id,),
-            )
-            n = cur.rowcount
-        conn.commit()
-    return n > 0
-
-
 def db_cancel_waiting_batches():
     with get_db() as conn:
         with conn.cursor() as cur:

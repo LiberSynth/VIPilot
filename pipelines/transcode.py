@@ -25,7 +25,7 @@ from db import (
     db_get,
     db_get_batch_by_id,
     db_get_active_targets,
-    db_set_batch_transcoding_by_id,
+    db_claim_batch_status,
     db_get_batch_original_video,
     db_set_batch_transcode_ready,
     db_set_batch_status,
@@ -95,7 +95,7 @@ def run(batch_id, log_id):
             return
 
         if batch['status'] == 'video_ready':
-            if not db_set_batch_transcoding_by_id(batch_id):
+            if not db_claim_batch_status(batch_id, 'video_ready', 'transcoding'):
                 return
 
         is_probe = batch['type'] == 'movie_probe'

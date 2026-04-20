@@ -12,7 +12,7 @@ from db import (
     db_get,
     db_get_batch_by_id,
     db_get_active_targets,
-    db_set_batch_story_generating_by_id,
+    db_claim_batch_status,
     db_get_active_text_models,
     db_get_text_model_by_id,
     db_create_story,
@@ -46,7 +46,7 @@ def run(batch_id, log_id):
             return
 
         if batch["status"] == "pending":
-            if not db_set_batch_story_generating_by_id(batch_id):
+            if not db_claim_batch_status(batch_id, 'pending', 'story_generating'):
                 return
 
         # is_probe: батч создан вручную (story_probe — тест текстовой модели,
