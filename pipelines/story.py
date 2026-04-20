@@ -18,7 +18,6 @@ from db import (
     db_create_story,
     db_set_batch_story,
     db_set_batch_story_probe,
-    db_set_batch_status,
     db_claim_donor_batch,
     db_set_batch_story_ready_from_donor,
     db_claim_unused_story_for_batch,
@@ -302,10 +301,10 @@ def run(batch_id, log_id):
         if not iterate_result:
             if is_story_probe:
                 msg = f"Модель не ответила после {fails_to_next} попыток — пробный сюжет не получен"
-                db_log_update(log_id, msg, "warn")
-                write_log_entry(log_id, msg, level='warn')
-                db_set_batch_status(batch_id, 'error')
-                return
+                db_log_update(log_id, msg, "error")
+                write_log_entry(log_id, msg, level='error')
+                write_log_entry(log_id, f"[story] {msg}")
+                raise AppException(batch_id, "story", msg, log_id)
             msg = f"Все активные модели не дали результата после {max_passes} проходов"
             db_log_update(log_id, msg, "error")
             write_log_entry(log_id, msg, level="error")
