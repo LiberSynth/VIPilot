@@ -1952,6 +1952,11 @@ def _m067_grok_video_durations(cur):
     """)
 
 
+def _m068_movies_grade(cur):
+    """Добавляет поле grade в таблицу movies для оценки сгенерированных видео."""
+    cur.execute("ALTER TABLE movies ADD COLUMN IF NOT EXISTS grade TEXT")
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -2020,6 +2025,7 @@ MIGRATIONS = [
     (65, _m065_ai_models_note),
     (66, _m066_grok_video_model),
     (67, _m067_grok_video_durations),
+    (68, _m068_movies_grade),
 ]
 
 

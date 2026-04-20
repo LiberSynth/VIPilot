@@ -19,6 +19,7 @@ from .db_simple import (
     db_get_target_session_context_saved_at,
     db_create_story,
     db_set_story_grade,
+    db_set_movie_grade,
     db_set_story_top_quality,
     db_get_story_text,
     db_get_story_title,
@@ -91,6 +92,7 @@ from .db_ui import (
     db_get_models,
     db_get_user_by_login,
     db_get_role_modules,
+    db_get_movies_list,
 )
 from .db_service import (
     db_cleanup_log_entries,

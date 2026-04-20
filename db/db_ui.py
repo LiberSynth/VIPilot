@@ -129,6 +129,58 @@ def db_get_stories_list(show_used=True, show_bad=True, for_approval=False, pin_i
     ]
 
 
+def db_get_movies_list(show_published=True, show_bad=True, for_approval=False):
+    _published_check = """EXISTS (
+        SELECT 1 FROM batches b2
+        WHERE b2.movie_id = m.id
+          AND (b2.status IN ('published', 'published_partially')
+               OR b2.status LIKE '%%.published')
+    )"""
+    filter_conditions = []
+    if for_approval:
+        filter_conditions.append("m.grade IS NULL")
+        filter_conditions.append(f"NOT ({_published_check})")
+    else:
+        if not show_published:
+            filter_conditions.append(f"NOT ({_published_check})")
+        if not show_bad:
+            filter_conditions.append("m.grade = 'good'")
+    where_clause = ("WHERE " + " AND ".join(filter_conditions)) if filter_conditions else ""
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(f"""
+                SELECT
+                    m.id::text,
+                    m.grade,
+                    m.created_at,
+                    (
+                        SELECT s.title
+                        FROM batches b
+                        JOIN stories s ON s.id = b.story_id
+                        WHERE b.movie_id = m.id AND b.story_id IS NOT NULL
+                        LIMIT 1
+                    ) AS story_title,
+                    vm.name AS model_name,
+                    {_published_check} AS published
+                FROM movies m
+                LEFT JOIN ai_models vm ON vm.id = m.model_id
+                {where_clause}
+                ORDER BY m.created_at DESC
+            """)
+            rows = cur.fetchall()
+    return [
+        {
+            "id": row[0],
+            "grade": row[1],
+            "created_at": row[2].isoformat() if row[2] else None,
+            "story_title": row[3] or "",
+            "model_name": row[4] or "",
+            "published": bool(row[5]),
+        }
+        for row in rows
+    ]
+
+
 def db_get_stories_pool(grade_required: bool = True) -> list:
     with get_db() as conn:
         with conn.cursor() as cur:

@@ -151,7 +151,7 @@
     </div>
 
     <div class="card" style="margin-top:0">
-      <div class="card-title">Видео</div>
+      <div class="card-title">Ролик</div>
       <div style="display:flex; align-items:center; gap:10px">
         <button type="button" id="btn-director-generate" class="btn-run-now">Сгенерировать</button>
         <input type="number" id="director-video-count" class="story-generate-count" value="1" min="1" max="50">
@@ -174,6 +174,33 @@
       </div>
       <div id="director-generate-hint" class="story-generate-hint">Вы можете сгенерировать ролик при помощи AI-модели</div>
       <div id="director-video-wrap" style="display:none"></div>
+    </div>
+
+    <div class="card" style="margin-top:0">
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:4px">
+        <div class="card-title" style="margin-bottom:0">Видео</div>
+        <span id="movies-count" style="font-size:12px; color:#888; background:rgba(255,255,255,.07); border-radius:10px; padding:1px 8px;"></span>
+        <button id="btn-delete-bad-movies" class="cycle-float-btn" title="Удалить неудачные" style="margin-left:auto">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="2,4 14,4"/><path d="M6 4V2h4v2"/><rect x="3" y="4" width="10" height="10" rx="1.5"/><line x1="6" y1="7" x2="6" y2="11"/><line x1="10" y1="7" x2="10" y2="11"/>
+          </svg>
+        </button>
+      </div>
+      <label class="sw-filter-row" style="margin-top:7px; margin-bottom:6px" for="movie-filter-for-approval">
+        <span class="sw-filter-label">На утверждение</span>
+        <input class="sw-filter-check" type="checkbox" id="movie-filter-for-approval">
+      </label>
+      <label class="sw-filter-row" style="margin-bottom:6px" for="movie-filter-only-good">
+        <span class="sw-filter-label">Только хорошие</span>
+        <input class="sw-filter-check" type="checkbox" id="movie-filter-only-good">
+      </label>
+      <label class="sw-filter-row" style="margin-bottom:10px" for="movie-filter-show-published">
+        <span class="sw-filter-label">Опубликованные</span>
+        <input class="sw-filter-check" type="checkbox" id="movie-filter-show-published" checked>
+      </label>
+      <div id="movies-list" class="stories-list">
+        <div class="stories-loading">Загрузка...</div>
+      </div>
     </div>
   </div>
 
@@ -198,6 +225,7 @@
 <script src="/static/js/controls/memo.js"></script>
 <script src="/static/js/controls/export-story.js"></script>
 <script src="/static/js/screenwriter.js"></script>
+<script src="/static/js/director.js"></script>
 <script src="/static/js/workflow.js"></script>
 <script src="/static/js/settings.js"></script>
 <script src="/static/js/monitor.js"></script>
@@ -278,7 +306,7 @@
   var _origSwitchPanel = window.switchPanel;
   window.switchPanel = function(name) {
     if (_origSwitchPanel) _origSwitchPanel(name);
-    if (name === 'director') { loadDirectorStoryPool(); loadDirectorVideoModels(); }
+    if (name === 'director') { loadDirectorStoryPool(); loadDirectorVideoModels(); if (typeof window.loadMovieList === 'function') window.loadMovieList(); }
   };
 
   var btn = document.getElementById('director-story-btn');

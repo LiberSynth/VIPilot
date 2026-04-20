@@ -260,6 +260,18 @@ def db_set_story_top_quality(story_id, value: bool):
     return updated > 0
 
 
+def db_set_movie_grade(movie_id, grade):
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE movies SET grade = %s WHERE id = %s::uuid",
+                (grade, movie_id),
+            )
+            updated = cur.rowcount
+        conn.commit()
+    return updated > 0
+
+
 def db_get_story_text(story_id):
     with get_db() as conn:
         with conn.cursor() as cur:

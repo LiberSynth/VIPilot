@@ -68,7 +68,7 @@ var getDraftStoryId;
           setDraftCardState('new');
           if (typeof window.onDraftStoryFirstSaved === 'function') window.onDraftStoryFirstSaved();
         }
-        if (typeof loadStoriesList === 'function') loadStoriesList();
+        if (typeof loadStoryList === 'function') loadStoryList();
       }
       _draftSaving = false;
       if (_draftPendingRetry) {
@@ -229,7 +229,7 @@ var getDraftStoryId;
       row.addEventListener('click', function() {
         if (typeof setDraftStoryFromRecord === 'function') setDraftStoryFromRecord(storyObj);
         _updateSelectedRow();
-        if (typeof window.loadStoriesList === 'function') window.loadStoriesList();
+        if (typeof window.loadStoryList === 'function') window.loadStoryList();
       });
     });
     _updateSelectedRow();
@@ -301,7 +301,7 @@ var getDraftStoryId;
           window.setCardGradeBadge(grade, false);
         }
         if (grade !== null) { _storyGradedAway = true; }
-        window.loadStoriesList();
+        window.loadStoryList();
       }
     })
     .catch(function() { btn.disabled = false; });
@@ -323,7 +323,7 @@ var getDraftStoryId;
     return params.toString();
   }
 
-  window.loadStoriesList = function() {
+  window.loadStoryList = function() {
     var container = document.getElementById('stories-list');
     if (!container) return;
     var hasContent = container.querySelector('.story-row');
@@ -354,7 +354,7 @@ var getDraftStoryId;
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key: key, value: value }),
       }).then(function() {
-        window.loadStoriesList();
+        window.loadStoryList();
       });
     }
     if (forApproval) {
@@ -418,16 +418,16 @@ var getDraftStoryId;
       .then(function(d) {
         btn.disabled = false;
         if (d && d.ok) {
-          if (typeof window.loadStoriesList === 'function') window.loadStoriesList();
+          if (typeof window.loadStoryList === 'function') window.loadStoryList();
         }
       })
       .catch(function() { btn.disabled = false; });
     });
   }
 
-  var _origLoadStoriesList = window.loadStoriesList;
-  window.loadStoriesList = function() {
-    if (_origLoadStoriesList) _origLoadStoriesList();
+  var _origLoadStoryList = window.loadStoryList;
+  window.loadStoryList = function() {
+    if (_origLoadStoryList) _origLoadStoryList();
     if (typeof loadGoodPoolCount === 'function') loadGoodPoolCount();
   };
 
@@ -499,8 +499,8 @@ var getDraftStoryId;
                   if (typeof setDraftStoryFromRecord === 'function') {
                     setDraftStoryFromRecord({ id: storyId, title: s.title || '', content: s.text || '' });
                   }
-                  if (typeof loadStoriesList === 'function') {
-                    loadStoriesList();
+                  if (typeof loadStoryList === 'function') {
+                    loadStoryList();
                     setTimeout(function() {
                       var container = document.getElementById('stories-list');
                       if (container) {
@@ -509,19 +509,23 @@ var getDraftStoryId;
                       }
                     }, 400);
                   }
+                  if (typeof window.loadMovieList === 'function') window.loadMovieList();
                   pollNext();
                 })
                 .catch(function() {
-                  if (typeof loadStoriesList === 'function') loadStoriesList();
+                  if (typeof loadStoryList === 'function') loadStoryList();
+                  if (typeof window.loadMovieList === 'function') window.loadMovieList();
                   pollNext();
                 });
             } else {
-              if (typeof loadStoriesList === 'function') loadStoriesList();
+              if (typeof loadStoryList === 'function') loadStoryList();
+              if (typeof window.loadMovieList === 'function') window.loadMovieList();
               pollNext();
             }
           } else if (status === 'error' || status === 'cancelled' || status === 'fatal_error') {
             _batchDone++;
-            if (typeof loadStoriesList === 'function') loadStoriesList();
+            if (typeof loadStoryList === 'function') loadStoryList();
+            if (typeof window.loadMovieList === 'function') window.loadMovieList();
             pollNext();
           } else {
             _pollTimer = setTimeout(poll, 700);
@@ -646,7 +650,7 @@ var getDraftStoryId;
           var grade = d.grade !== undefined ? d.grade : null;
           setCardGradeBadge(grade, false);
           if (grade !== null && typeof window.markGradedAway === 'function') window.markGradedAway();
-          if (typeof window.loadStoriesList === 'function') window.loadStoriesList();
+          if (typeof window.loadStoryList === 'function') window.loadStoryList();
         }
       })
       .catch(function() { btn.disabled = false; });
@@ -722,7 +726,7 @@ var getDraftStoryId;
             else if (mod10 >= 2 && mod10 <= 4) { word = 'сюжета'; }
             else { word = 'сюжетов'; }
             if (typeof window.showToast === 'function') window.showToast('Удалено ' + n + ' ' + word);
-            if (typeof window.loadStoriesList === 'function') window.loadStoriesList();
+            if (typeof window.loadStoryList === 'function') window.loadStoryList();
           }
         })
         .catch(function() { btn.classList.remove('pending'); _closeDeleteBadDialog(); });

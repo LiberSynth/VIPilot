@@ -31,6 +31,8 @@ from db import (
     db_get_stories_pool,
     db_count_good_pool,
     db_set_story_grade,
+    db_get_movies_list,
+    db_set_movie_grade,
     db_upsert_story_draft,
     db_create_story_generate_batch,
     db_create_video_generate_batch,
@@ -496,6 +498,37 @@ def api_production_env_set():
 
 
 _PRODUCTION_GRADE_CYCLE = ["good", "bad", None]
+
+
+@production_bp.route("/production/movies", methods=["GET"])
+def api_production_movies():
+    err = _production_auth_check()
+    if err:
+        return err
+    for_approval = request.args.get("for_approval") == "1"
+    show_published = request.args.get("show_published", "1") != "0"
+    show_bad = request.args.get("show_bad", "1") != "0"
+    movies = db_get_movies_list(
+        show_published=show_published,
+        show_bad=show_bad,
+        for_approval=for_approval,
+    )
+    return jsonify(movies)
+
+
+@production_bp.route("/production/movie/<movie_id>/grade", methods=["POST"])
+def api_production_movie_grade(movie_id):
+    err = _production_auth_check()
+    if err:
+        return err
+    data = request.get_json(silent=True) or {}
+    grade = data.get("grade", "good")
+    if grade not in _PRODUCTION_GRADE_CYCLE:
+        return jsonify({"error": "invalid_grade"}), 400
+    ok = db_set_movie_grade(movie_id, grade)
+    if not ok:
+        return jsonify({"error": "not_found"}), 404
+    return jsonify({"ok": True, "grade": grade})
 
 
 @production_bp.route("/production/story/<story_id>/grade", methods=["POST"])
