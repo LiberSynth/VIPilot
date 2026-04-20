@@ -293,7 +293,7 @@ def run(batch_id, log_id):
                 )
             return None
 
-        max_passes = 1 if is_story_probe else 5
+        max_passes = 1 if is_story_probe else snap.max_model_passes
         iterate_result = iterate_models(
             models, fails_to_next, story_callback, max_passes=max_passes
         )
