@@ -194,7 +194,10 @@ def db_get_stories_pool(grade_required: bool = True) -> list:
                 WHERE {grade_clause}
                   AND NOT EXISTS (
                       SELECT 1 FROM batches b
-                      WHERE b.story_id = stories.id AND b.movie_id IS NOT NULL
+                      JOIN movies m ON m.id = b.movie_id
+                      WHERE b.story_id = stories.id
+                        AND b.movie_id IS NOT NULL
+                        AND (m.grade IS NULL OR m.grade != 'bad')
                   )
                 ORDER BY created_at DESC
             """)
