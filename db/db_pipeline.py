@@ -130,15 +130,13 @@ def db_set_batch_story_probe(batch_id, story_id):
 
 
 def db_set_batch_story(batch_id, story_id):
-    _assert_known_status("story_ready")
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "UPDATE batches SET story_id = %s, status = 'story_ready' WHERE id = %s",
+                "UPDATE batches SET story_id = %s WHERE id = %s",
                 (story_id, batch_id),
             )
-        conn.commit()
-    return True
+        db_set_batch_status(batch_id, 'story_ready', conn)
 
 
 def db_set_batch_story_id(batch_id, story_id):
