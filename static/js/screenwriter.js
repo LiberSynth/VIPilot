@@ -185,8 +185,11 @@ var getDraftStoryId;
           '<path d="M8 1 L9.3 6.7 L15 8 L9.3 9.3 L8 15 L6.7 9.3 L1 8 L6.7 6.7 Z"/></svg></span>';
       }
       var modelLabel = s.model_name ? ' <span class="story-model-name">(' + escapeHtml(s.model_name) + ')</span>' : '';
+      var inlineStyle = gk !== 'null'
+        ? 'style="background:' + bg + ';color:' + tc + '" '
+        : '';
       var gradeBadge = '<button class="story-grade-badge" data-id="' + s.id + '" data-grade="' + gk + '" ' +
-        'style="background:' + bg + ';color:' + tc + '" ' +
+        inlineStyle +
         'title="Оценка: ' + label + '. Нажмите для смены">' +
         label + '</button>';
       var exportBtn = '<button class="story-icon story-export-btn" data-id="' + s.id + '" title="Выгрузить">' +
@@ -291,8 +294,8 @@ var getDraftStoryId;
         var grade = d.grade !== undefined ? d.grade : null;
         var gk = gradeKey(grade);
         btn.setAttribute('data-grade', gk);
-        btn.style.background = GRADE_COLORS[gk] || 'rgba(255,255,255,.07)';
-        btn.style.color = GRADE_TEXT_COLORS[gk] || '#aaa';
+        btn.style.background = gk !== 'null' ? (GRADE_COLORS[gk] || '') : '';
+        btn.style.color = gk !== 'null' ? (GRADE_TEXT_COLORS[gk] || '') : '';
         btn.textContent = GRADE_LABELS[gk] || gk;
         btn.title = 'Оценка: ' + (GRADE_LABELS[gk] || gk) + '. Нажмите для смены';
 
@@ -618,8 +621,8 @@ var getDraftStoryId;
     btn.hidden = false;
     btn.disabled = false;
     btn.setAttribute('data-grade', gk);
-    btn.style.background = GRADE_COLORS[gk] || 'rgba(255,255,255,.07)';
-    btn.style.color = GRADE_TEXT_COLORS[gk] || '#aaa';
+    btn.style.background = gk !== 'null' ? (GRADE_COLORS[gk] || '') : '';
+    btn.style.color = gk !== 'null' ? (GRADE_TEXT_COLORS[gk] || '') : '';
     btn.textContent = GRADE_LABELS[gk] || gk;
     btn.title = 'Оценка: ' + (GRADE_LABELS[gk] || gk) + '. Нажмите для смены';
   }

@@ -1004,6 +1004,12 @@
     opacity: .85;
   }
   .story-grade-badge[hidden] { display: none; }
+  .story-grade-badge[data-grade="null"] {
+    background: none !important; border-radius: 0;
+    font-size: 11px; font-weight: 400; color: #7878a0 !important;
+    padding: 0 4px; opacity: 1;
+  }
+  .story-grade-badge[data-grade="null"]:hover { filter: none; color: #a0a0c0 !important; opacity: 1; }
   .story-grade-badge:hover { filter: brightness(1.2); opacity: 1; }
   .story-grade-badge:active { filter: brightness(0.85); }
   .story-grade-badge:disabled { opacity: .5; cursor: default; }

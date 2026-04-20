@@ -52,11 +52,12 @@
       var grade = m.grade !== undefined ? m.grade : null;
       var gk = gradeKey(grade);
       var label = GRADE_LABELS[gk] || gk;
-      var bg = GRADE_COLORS[gk] || 'rgba(255,255,255,.07)';
-      var tc = GRADE_TEXT_COLORS[gk] || '#aaa';
+      var inlineStyle = gk !== 'null'
+        ? 'style="background:' + (GRADE_COLORS[gk] || '') + ';color:' + (GRADE_TEXT_COLORS[gk] || '') + '" '
+        : '';
       var modelLabel = m.model_name ? ' <span class="story-model-name">(' + escHtml(m.model_name) + ')</span>' : '';
       var gradeBadge = '<button class="story-grade-badge" data-id="' + m.id + '" data-grade="' + gk + '" '
-        + 'style="background:' + bg + ';color:' + tc + '" '
+        + inlineStyle
         + 'title="Оценка: ' + label + '. Нажмите для смены">'
         + label + '</button>';
       var publishedIcon = '';
@@ -98,8 +99,8 @@
         var g = d.grade !== undefined ? d.grade : null;
         var gk = gradeKey(g);
         btn.setAttribute('data-grade', gk);
-        btn.style.background = GRADE_COLORS[gk] || 'rgba(255,255,255,.07)';
-        btn.style.color = GRADE_TEXT_COLORS[gk] || '#aaa';
+        btn.style.background = gk !== 'null' ? (GRADE_COLORS[gk] || '') : '';
+        btn.style.color = gk !== 'null' ? (GRADE_TEXT_COLORS[gk] || '') : '';
         btn.textContent = GRADE_LABELS[gk] || gk;
         btn.title = 'Оценка: ' + (GRADE_LABELS[gk] || gk) + '. Нажмите для смены';
         window.loadMovieList();
