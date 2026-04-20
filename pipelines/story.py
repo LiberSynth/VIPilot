@@ -81,10 +81,7 @@ def run(batch_id, log_id):
                     preset_story_id,
                 ),
             )
-            if not db_set_batch_story(batch_id, preset_story_id):
-                msg = fmt_id_msg("Ошибка записи story_id={} в БД", preset_story_id)
-                write_log_entry(log_id, msg, level="error")
-                raise AppException(batch_id, "story", msg, log_id)
+            db_set_batch_story(batch_id, preset_story_id)
             return
 
         # Проверка отмены: только для slot/adhoc.
