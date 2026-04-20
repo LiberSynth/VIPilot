@@ -55,8 +55,8 @@ def db_create_video_batch(batch_type, movie_model_id=None, story_id=None):
             if story_id:
                 cur.execute(
                     """
-                    INSERT INTO batches (status, type, story_id, data)
-                    VALUES ('pending', %s, %s, %s)
+                    INSERT INTO batches (type, story_id, data)
+                    VALUES (%s, %s, %s)
                     RETURNING id
                     """,
                     (batch_type, story_id, data),
@@ -64,15 +64,16 @@ def db_create_video_batch(batch_type, movie_model_id=None, story_id=None):
             else:
                 cur.execute(
                     """
-                    INSERT INTO batches (status, type, data)
-                    VALUES ('pending', %s, %s)
+                    INSERT INTO batches (type, data)
+                    VALUES (%s, %s)
                     RETURNING id
                     """,
                     (batch_type, data),
                 )
             row = cur.fetchone()
-        conn.commit()
-    return str(row[0]) if row else None
+        batch_id = str(row[0])
+        db_set_batch_status(batch_id, 'pending', conn)
+    return batch_id
 
 
 def db_create_story_probe_batch(text_model_id):
@@ -80,30 +81,30 @@ def db_create_story_probe_batch(text_model_id):
         with conn.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO batches
-                    (status, type, data)
-                VALUES ('pending', 'story_probe', %s)
+                INSERT INTO batches (type, data)
+                VALUES ('story_probe', %s)
                 RETURNING id
-            """,
+                """,
                 (json.dumps({"story_model_id": str(text_model_id)}),),
             )
             row = cur.fetchone()
-        conn.commit()
-    return str(row[0]) if row else None
+        batch_id = str(row[0])
+        db_set_batch_status(batch_id, 'pending', conn)
+    return batch_id
 
 
 def db_create_story_generate_batch():
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute("""
-                INSERT INTO batches
-                    (status, type)
-                VALUES ('pending', 'story_probe')
+                INSERT INTO batches (type)
+                VALUES ('story_probe')
                 RETURNING id
             """)
             row = cur.fetchone()
-        conn.commit()
-    return str(row[0]) if row else None
+        batch_id = str(row[0])
+        db_set_batch_status(batch_id, 'pending', conn)
+    return batch_id
 
 
 def db_update_batch_current_movie_model_id(batch_id, model_id):
