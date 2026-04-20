@@ -27,7 +27,7 @@ from db import (
     db_get_active_targets,
     db_claim_batch_status,
     db_get_batch_original_video,
-    db_set_batch_transcode_ready,
+    db_save_transcoded_data,
     db_set_batch_status,
 )
 from log import db_log_update, write_log_entry
@@ -170,7 +170,8 @@ def run(batch_id, log_id):
         msg = f'Транскодировано (H.264, {out_mb} МБ)'
         db_log_update(log_id, msg, 'ok')
         write_log_entry(log_id, msg)
-        db_set_batch_transcode_ready(batch_id, video_data)
+        db_save_transcoded_data(batch_id, video_data)
+        db_set_batch_status(batch_id, 'transcode_ready')
         write_log_entry(log_id, f"[transcode] Готово: {out_mb} МБ → БД")
 
     except AppException:

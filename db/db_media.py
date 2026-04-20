@@ -72,8 +72,7 @@ def db_set_batch_video_pending(batch_id, job_data):
     return True
 
 
-def db_set_batch_transcode_ready(batch_id, video_data: bytes):
-    _assert_known_status('transcode_ready')
+def db_save_transcoded_data(batch_id, video_data: bytes):
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -83,12 +82,7 @@ def db_set_batch_transcode_ready(batch_id, video_data: bytes):
                     WHERE b.id = %s AND b.movie_id = m.id""",
                 (psycopg2.Binary(video_data), batch_id),
             )
-            cur.execute(
-                "UPDATE batches SET status = 'transcode_ready' WHERE id = %s",
-                (batch_id,),
-            )
         conn.commit()
-    return True
 
 
 def db_get_batch_video_data(batch_id) -> bytes | None:
