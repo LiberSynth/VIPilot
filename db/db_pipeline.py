@@ -208,18 +208,13 @@ def db_cancel_waiting_batches():
 
 
 def db_set_batch_pending(batch_id):
-    _assert_known_status("pending")
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                """UPDATE batches
-                   SET status = 'pending', story_id = NULL,
-                       movie_id = NULL
-                   WHERE id = %s""",
+                "UPDATE batches SET story_id = NULL, movie_id = NULL WHERE id = %s",
                 (batch_id,),
             )
-        conn.commit()
-    return True
+        db_set_batch_status(batch_id, 'pending', conn)
 
 
 def db_claim_unused_story_for_batch(batch_id: str, grade_required: bool) -> dict | None:
