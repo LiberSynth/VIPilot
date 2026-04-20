@@ -1029,14 +1029,14 @@
   .story-export-btn.copied { opacity: 1; }
 
   .story-info-btn {
-    background: rgba(255,255,255,.1); border: none; cursor: pointer;
-    color: #ccc; font-size: 11px; font-weight: 600; letter-spacing: .03em;
-    padding: 2px 8px; border-radius: 10px; flex-shrink: 0;
-    transition: background .15s, color .15s;
-    white-space: nowrap;
+    background: none; border: none; padding: 0; cursor: pointer;
+    opacity: .65; transition: opacity .15s;
   }
-  .story-info-btn:hover { background: rgba(255,255,255,.2); color: #fff; }
-  .story-info-btn.copied { background: rgba(62,207,142,.25); color: #3ecf8e; }
+  .story-info-btn:hover { opacity: 1; }
+  .story-info-btn:active { opacity: 1; }
+  .story-info-btn.copied { opacity: 1; }
+  .story-info-btn.copied svg { stroke: #3ecf8e; }
+  .story-info-btn.copied circle[fill] { fill: #3ecf8e; }
 
   .btn-story-return {
     width: 26px; height: 26px;
