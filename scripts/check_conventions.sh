@@ -63,6 +63,17 @@ for f in $THREAD_PIPELINES; do
     fi
 done
 
+# ── Конвенция: статус батча только через db_set_batch_status ─────────────────
+# UPDATE batches SET status = 'literal' — нарушение (db_set_batch_status использует %s)
+FOUND=$(grep -rn --include="*.py" "SET status = '" $PROJECT_DIRS \
+    | grep -v "UPDATE log SET status")
+[ -n "$FOUND" ] && fail "Конвенция: прямой SET status с литералом (использовать db_set_batch_status)" "$FOUND"
+
+# INSERT INTO batches с явным полем status — нарушение (DB default = 'pending')
+FOUND=$(grep -rn --include="*.py" "INSERT INTO batches" $PROJECT_DIRS \
+    | grep "\bstatus\b")
+[ -n "$FOUND" ] && fail "Конвенция: INSERT INTO batches с явным полем status (убрать, DB default = 'pending')" "$FOUND"
+
 # ── Итог ──────────────────────────────────────────────────────────────────────
 echo ""
 if [ "$ERRORS" -eq 0 ]; then
