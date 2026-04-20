@@ -151,13 +151,30 @@
     </div>
 
     <div class="card" style="margin-top:0">
-      <div class="card-title">Ролик</div>
-      <div class="hint" id="director-video-hint">Вы можете сгенерировать ролик, нажав кнопку «Создать» на нужной модели.</div>
+      <div class="card-title">Видео</div>
+      <div style="display:flex; align-items:center; gap:10px">
+        <button type="button" id="btn-director-generate" class="btn-run-now">Сгенерировать</button>
+        <input type="number" id="director-video-count" class="story-generate-count" value="1" min="1" max="50">
+        <span class="story-generate-count-label">штук</span>
+      </div>
+      <div style="margin-top:8px">
+        <div class="hint" style="margin-bottom:4px">Модель</div>
+        <div class="cust-select" id="director-video-model-wrap">
+          <button type="button" class="cust-select-btn" id="director-video-model-btn">
+            <span id="director-video-model-label">Подобрать</span>
+            <svg class="cust-select-arrow" xmlns="http://www.w3.org/2000/svg" width="12" height="7" viewBox="0 0 12 7" fill="none">
+              <path d="M1 1l5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <div class="cust-select-list" id="director-video-model-list" hidden>
+            <div class="cust-select-option selected" data-value="">Подобрать</div>
+          </div>
+        </div>
+        <input type="hidden" id="director-video-model-id" value="">
+      </div>
+      <div id="director-generate-hint" class="story-generate-hint">Вы можете сгенерировать ролик при помощи AI-модели</div>
       <div id="director-video-wrap" style="display:none"></div>
     </div>
-
-    {% from 'common/panel_video.html' import model_list_block %}
-    {{ model_list_block('director-model-list', show_attempts=False, show_hint=False) }}
   </div>
 
   <!-- ══ ИНФОРМАЦИЯ ══ -->
@@ -261,7 +278,7 @@
   var _origSwitchPanel = window.switchPanel;
   window.switchPanel = function(name) {
     if (_origSwitchPanel) _origSwitchPanel(name);
-    if (name === 'director') { loadDirectorStoryPool(); if (window.loadDirectorModels) loadDirectorModels(); }
+    if (name === 'director') { loadDirectorStoryPool(); loadDirectorVideoModels(); }
   };
 
   var btn = document.getElementById('director-story-btn');
@@ -286,6 +303,129 @@
   }
 
   document.addEventListener('click', function() { closeList(); });
+
+  /* ── Комбобокс видеомодели ── */
+  function loadDirectorVideoModels() {
+    fetch('/api/models')
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        var list = document.getElementById('director-video-model-list');
+        if (!list) return;
+        var active = (data || []).filter(function(m) { return m.active; });
+        var existing = list.querySelectorAll('.cust-select-option:not([data-value=""])');
+        existing.forEach(function(el) { el.remove(); });
+        active.forEach(function(m) {
+          var opt = document.createElement('div');
+          opt.className = 'cust-select-option';
+          opt.dataset.value = m.id;
+          opt.textContent = m.name;
+          opt.addEventListener('click', function() {
+            selectVideoModel(m.id, m.name);
+            closeVideoModelList();
+          });
+          list.appendChild(opt);
+        });
+      });
+  }
+
+  function selectVideoModel(id, label) {
+    var lbl = document.getElementById('director-video-model-label');
+    var hid = document.getElementById('director-video-model-id');
+    var list = document.getElementById('director-video-model-list');
+    if (lbl) lbl.textContent = label;
+    if (hid) hid.value = id;
+    if (list) {
+      list.querySelectorAll('.cust-select-option').forEach(function(o) {
+        o.classList.toggle('selected', o.dataset.value === id);
+      });
+    }
+  }
+
+  function closeVideoModelList() {
+    var list = document.getElementById('director-video-model-list');
+    var btn  = document.getElementById('director-video-model-btn');
+    if (list) list.hidden = true;
+    if (btn)  btn.classList.remove('open');
+  }
+
+  var vmBtn = document.getElementById('director-video-model-btn');
+  if (vmBtn) {
+    vmBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var list = document.getElementById('director-video-model-list');
+      if (!list) return;
+      if (list.hidden) {
+        list.hidden = false;
+        vmBtn.classList.add('open');
+      } else {
+        closeVideoModelList();
+      }
+    });
+  }
+
+  var vmDefaultOpt = document.querySelector('#director-video-model-list .cust-select-option[data-value=""]');
+  if (vmDefaultOpt) {
+    vmDefaultOpt.addEventListener('click', function() {
+      selectVideoModel('', 'Подобрать');
+      closeVideoModelList();
+    });
+  }
+
+  document.addEventListener('click', function() { closeVideoModelList(); });
+
+  /* ── Кнопка Сгенерировать (видео) ── */
+  (function() {
+    var btn = document.getElementById('btn-director-generate');
+    if (!btn) return;
+    var _hint_default = 'Вы можете сгенерировать ролик при помощи AI-модели';
+    function setHint(text) {
+      var el = document.getElementById('director-generate-hint');
+      if (el) el.textContent = text;
+    }
+    function resetHint() { setHint(_hint_default); }
+    btn.addEventListener('click', function() {
+      if (btn.disabled) return;
+      var countInput = document.getElementById('director-video-count');
+      var count = Math.max(1, Math.min(50, parseInt((countInput && countInput.value) || '1') || 1));
+      var modelId = (document.getElementById('director-video-model-id') || {}).value || '';
+      var storyId = (document.getElementById('director-story-id') || {}).value || '';
+      btn.disabled = true;
+      setHint(count > 1 ? 'Создаю ' + count + ' батчей…' : 'Запускаю генерацию…');
+      var body = JSON.stringify(
+        Object.assign(
+          modelId ? { model_id: modelId } : {},
+          storyId ? { story_id: storyId } : {}
+        )
+      );
+      var remaining = count;
+      var created = 0;
+      for (var i = 0; i < count; i++) {
+        fetch('/production/video/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: body,
+        })
+          .then(function(r) { return r.json(); })
+          .then(function(d) {
+            if (d.batch_id) created++;
+            remaining--;
+            if (remaining === 0) {
+              btn.disabled = false;
+              setHint(created > 0 ? 'Запущено батчей: ' + created : 'Не удалось создать батчи');
+              setTimeout(resetHint, 3000);
+            }
+          })
+          .catch(function() {
+            remaining--;
+            if (remaining === 0) {
+              btn.disabled = false;
+              setHint(created > 0 ? 'Запущено батчей: ' + created : 'Ошибка запроса');
+              setTimeout(resetHint, 4000);
+            }
+          });
+      }
+    });
+  })();
 
   (function() {
     var ta = document.getElementById('director-story-content');

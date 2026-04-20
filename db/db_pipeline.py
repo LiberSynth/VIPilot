@@ -84,6 +84,37 @@ def db_create_probe_batch(video_model_id, story_id=None):
     return str(row[0]) if row else None
 
 
+def db_create_video_generate_batch(story_id=None):
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("INSERT INTO movies DEFAULT VALUES RETURNING id")
+            movie_row = cur.fetchone()
+            movie_id = movie_row[0]
+            if story_id:
+                cur.execute(
+                    """
+                    INSERT INTO batches
+                        (status, type, movie_id, story_id)
+                    VALUES ('pending', 'movie_probe', %s, %s)
+                    RETURNING id
+                """,
+                    (movie_id, story_id),
+                )
+            else:
+                cur.execute(
+                    """
+                    INSERT INTO batches
+                        (status, type, movie_id)
+                    VALUES ('pending', 'movie_probe', %s)
+                    RETURNING id
+                """,
+                    (movie_id,),
+                )
+            row = cur.fetchone()
+        conn.commit()
+    return str(row[0]) if row else None
+
+
 def db_create_story_probe_batch(text_model_id):
     with get_db() as conn:
         with conn.cursor() as cur:

@@ -332,7 +332,6 @@ window.createDirectorVideo = function(modelId, modelName, btn) {
     durationEl.addEventListener('input', function() {
       var duration = getVideoDuration();
       refreshDurationIndicators('model-list', duration);
-      refreshDurationIndicators('director-model-list', duration);
     });
   }
 
@@ -344,14 +343,6 @@ window.createDirectorVideo = function(modelId, modelName, btn) {
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({ids: ids})
     }).catch(function(e) { console.error('reorder error', e); loadModels(); });
-  }
-
-  function saveDirectorOrder(ids) {
-    fetch('/api/models/reorder', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ids: ids})
-    }).catch(function(e) { console.error('reorder error', e); loadDirectorModels(); });
   }
 
   function toggleVideoModelActive(containerId, id) {
@@ -366,12 +357,6 @@ window.createDirectorVideo = function(modelId, modelName, btn) {
     toggleVideoModelActive('model-list', id);
     fetch('/api/models/' + id + '/activate', {method: 'POST'})
       .catch(function(e) { console.error('activate error', e); loadModels(); });
-  };
-
-  window.activateDirectorModel = function(id) {
-    toggleVideoModelActive('director-model-list', id);
-    fetch('/api/models/' + id + '/activate', {method: 'POST'})
-      .catch(function(e) { console.error('activate error', e); loadDirectorModels(); });
   };
 
   function getVideoDuration() {
@@ -401,28 +386,6 @@ window.createDirectorVideo = function(modelId, modelName, btn) {
   }
 
   window.loadModels = loadModels;
-
-  function loadDirectorModels() {
-    fetch('/api/models')
-      .then(function(r) { return r.json(); })
-      .then(function(data) {
-        window.renderModelList('director-model-list', data, {
-          gradeFn: 'cycleVideoGrade',
-          saveOrderFn: saveDirectorOrder,
-          activateFn: 'activateDirectorModel',
-          actionTitle: 'Создать',
-          actionFn: 'createDirectorVideo',
-          videoDuration: getVideoDuration()
-        });
-        attachVideoDurationListener();
-      })
-      .catch(function() {
-        const c = document.getElementById('director-model-list');
-        if (c) c.innerHTML = '<div class="model-loading">Ошибка загрузки</div>';
-      });
-  }
-
-  window.loadDirectorModels = loadDirectorModels;
 
   (function() {
     const panel = document.getElementById('panel-request');

@@ -38,6 +38,7 @@ from .db_pipeline import (
     db_ensure_batch,
     db_create_adhoc_batch,
     db_create_probe_batch,
+    db_create_video_generate_batch,
     db_create_story_probe_batch,
     db_create_story_generate_batch,
     db_set_batch_story_probe,

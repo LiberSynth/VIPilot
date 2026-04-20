@@ -33,6 +33,7 @@ from db import (
     db_set_story_grade,
     db_upsert_story_draft,
     db_create_story_generate_batch,
+    db_create_video_generate_batch,
     db_set,
     db_delete_bad_stories,
 )
@@ -537,6 +538,25 @@ def api_production_delete_bad_stories():
         return jsonify({"ok": True, "deleted": deleted})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@production_bp.route("/production/video/generate", methods=["POST"])
+def api_production_video_generate():
+    err = _production_auth_check()
+    if err:
+        return err
+    data = request.get_json(silent=True) or {}
+    model_id = data.get("model_id") or None
+    story_id = data.get("story_id") or None
+    if model_id:
+        batch_id = db_create_probe_batch(model_id, story_id=story_id)
+    else:
+        batch_id = db_create_video_generate_batch(story_id=story_id)
+    if not batch_id:
+        return jsonify({"error": "db_error"}), 500
+    environment.wakeup_loop()
+    log_batch_planned(batch_id, "Генерация видео вручную", "Запуск по запросу пользователя")
+    return jsonify({"batch_id": batch_id})
 
 
 @production_bp.route("/production/story/generate", methods=["POST"])
