@@ -24,7 +24,6 @@ from db import (
     db_get_active_video_models,
     db_get_video_model_by_id,
     db_set_batch_video_pending,
-    db_set_batch_video_ready,
     db_set_batch_status,
     db_set_batch_story_ready_from_error,
     db_create_batch_movie,
@@ -181,7 +180,7 @@ def run(batch_id, log_id):
             if donor_story_id:
                 db_set_batch_story_id(batch_id, donor_story_id)
                 write_log_entry(log_id, fmt_id_msg("story_id подменён: {} → {}", story_id, donor_story_id), level='info')
-            db_set_batch_video_ready(batch_id)
+            db_set_batch_status(batch_id, 'video_ready')
             db_log_update(log_id, 'Видео [эмуляция]', 'ok')
             return
 
@@ -397,7 +396,7 @@ def run(batch_id, log_id):
             write_log_entry(log_id, f"[video] {msg}")
             raise AppException(batch_id, 'video', msg, log_id)
 
-        db_set_batch_video_ready(batch_id)
+        db_set_batch_status(batch_id, 'video_ready')
         msg = f'Видео сгенерировано ({used_model})' if used_model else 'Видео сгенерировано'
         db_log_update(log_id, msg, 'ok')
         write_log_entry(log_id, f"URL: {video_url}")

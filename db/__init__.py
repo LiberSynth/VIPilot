@@ -76,7 +76,6 @@ from .db_pipeline import (
 from .db_media import (
     db_create_batch_movie,
     db_get_batch_original_video,
-    db_set_batch_video_ready,
     db_set_batch_video_pending,
     db_set_batch_transcode_ready,
     db_set_batch_transcode_skip,

@@ -56,18 +56,6 @@ def db_get_batch_original_video(batch_id) -> bytes | None:
     return None
 
 
-def db_set_batch_video_ready(batch_id):
-    _assert_known_status('video_ready')
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "UPDATE batches SET status = 'video_ready' WHERE id = %s",
-                (batch_id,),
-            )
-        conn.commit()
-    return True
-
-
 def db_set_batch_video_pending(batch_id, job_data):
     import json
     _assert_known_status('video_pending')
