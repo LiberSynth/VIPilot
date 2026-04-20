@@ -27,8 +27,8 @@ from db import (
     db_get_active_targets,
     db_set_batch_transcoding_by_id,
     db_get_batch_original_video,
-    db_set_batch_transcode_skip,
     db_set_batch_transcode_ready,
+    db_set_batch_status,
 )
 from log import db_log_update, write_log_entry
 from pipelines.base import check_cancelled
@@ -113,7 +113,7 @@ def run(batch_id, log_id):
             do_transcode = bool(tgt.get('transcode', True))
 
         if not do_transcode:
-            db_set_batch_transcode_skip(batch_id)
+            db_set_batch_status(batch_id, 'transcode_ready')
             write_log_entry(log_id, fmt_id_msg("[transcode] Батч {} ({}) — транскод отключен, пропускаю", batch_id, target))
             return
 
@@ -157,7 +157,7 @@ def run(batch_id, log_id):
             msg = 'Ошибка ffmpeg — транскод пропущен, публикация использует оригинал'
             db_log_update(log_id, msg, 'warn')
             write_log_entry(log_id, msg, level='warn')
-            db_set_batch_transcode_skip(batch_id)
+            db_set_batch_status(batch_id, 'transcode_ready')
             write_log_entry(log_id, f"[transcode] {msg}")
             notify_failure(fmt_id_msg("transcode: ffmpeg сбой (некритично) — батч {}", batch_id), partial=True)
             return

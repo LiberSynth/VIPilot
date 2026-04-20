@@ -91,17 +91,6 @@ def db_set_batch_transcode_ready(batch_id, video_data: bytes):
     return True
 
 
-def db_set_batch_transcode_skip(batch_id):
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "UPDATE batches SET status = 'transcode_ready' WHERE id = %s",
-                (batch_id,),
-            )
-        conn.commit()
-    return True
-
-
 def db_get_batch_video_data(batch_id) -> bytes | None:
     with get_db() as conn:
         with conn.cursor() as cur:
