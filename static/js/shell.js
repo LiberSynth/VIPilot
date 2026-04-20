@@ -64,7 +64,7 @@ function switchPanel(name) {
   if (name === 'screenwriter') {
     var draftCard = document.getElementById('card-story-draft');
     if (draftCard) draftCard.classList.remove('card--editing-new', 'card--editing-existing');
-    if (typeof loadStoriesList === 'function') loadStoriesList();
+    if (typeof loadStoryList === 'function') loadStoryList();
   }
 }
 
