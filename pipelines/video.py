@@ -309,7 +309,7 @@ def run(batch_id, log_id):
             })
             return None
 
-        max_passes = 1 if is_probe else snap.max_model_passes
+        max_passes = 1 if pinned_model_id else snap.max_model_passes
         video_url = iterate_models(models, fails_to_next, video_callback, max_passes=max_passes)
 
         if not video_url:
