@@ -185,8 +185,7 @@ def db_cancel_waiting_batches():
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute("""
-                UPDATE batches
-                SET status = 'cancelled'
+                SELECT id FROM batches
                 WHERE (
                     status = 'transcode_ready'
                     OR status LIKE '%.published'
@@ -200,11 +199,12 @@ def db_cancel_waiting_batches():
                           batches.scheduled_at AT TIME ZONE 'UTC', 'HH24:MI'
                       )
                   )
-                RETURNING id
+                FOR UPDATE
             """)
-            rows = cur.fetchall()
-        conn.commit()
-    return [str(r[0]) for r in rows]
+            batch_ids = [str(r[0]) for r in cur.fetchall()]
+        for batch_id in batch_ids:
+            db_set_batch_status(batch_id, 'cancelled', conn)
+    return batch_ids
 
 
 def db_set_batch_pending(batch_id):
