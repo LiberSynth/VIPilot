@@ -737,3 +737,82 @@ var getDraftStoryId;
     initDeleteBadStoriesButton();
   }
 })();
+
+/* ── Комбобокс выбора текстовой модели в блоке Сценарий ── */
+(function() {
+  var _models = [];
+
+  function selectModel(id, label) {
+    var lbl = document.getElementById('screenwriter-model-label');
+    var hid = document.getElementById('screenwriter-model-id');
+    if (lbl) lbl.textContent = label;
+    if (hid) hid.value = id;
+    document.querySelectorAll('#screenwriter-model-list .cust-select-option').forEach(function(o) {
+      o.classList.toggle('selected', o.dataset.value === String(id));
+    });
+  }
+
+  function closeList() {
+    var list = document.getElementById('screenwriter-model-list');
+    var btn  = document.getElementById('screenwriter-model-btn');
+    if (list) list.hidden = true;
+    if (btn)  btn.classList.remove('open');
+  }
+
+  function buildList() {
+    var list = document.getElementById('screenwriter-model-list');
+    if (!list) return;
+    list.innerHTML = '';
+    _models.forEach(function(m) {
+      var opt = document.createElement('div');
+      opt.className = 'cust-select-option';
+      opt.dataset.value = String(m.id);
+      opt.textContent = m.name;
+      opt.addEventListener('click', function() {
+        selectModel(m.id, m.name);
+        closeList();
+      });
+      list.appendChild(opt);
+    });
+    if (_models.length > 0) {
+      selectModel(_models[0].id, _models[0].name);
+    }
+  }
+
+  function loadScreenwriterModels() {
+    fetch('/api/text-models')
+      .then(function(r) { return r.ok ? r.json() : []; })
+      .then(function(models) {
+        _models = (models || []).filter(function(m) { return m.grade === 'good'; });
+        buildList();
+      })
+      .catch(function() {});
+  }
+
+  function initModelCombobox() {
+    var btn = document.getElementById('screenwriter-model-btn');
+    if (!btn) return;
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var list = document.getElementById('screenwriter-model-list');
+      if (!list) return;
+      if (list.hidden) {
+        list.hidden = false;
+        btn.classList.add('open');
+      } else {
+        closeList();
+      }
+    });
+    document.addEventListener('click', function(e) {
+      var wrap = document.getElementById('screenwriter-model-wrap');
+      if (wrap && !wrap.contains(e.target)) closeList();
+    });
+    loadScreenwriterModels();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initModelCombobox);
+  } else {
+    initModelCombobox();
+  }
+})();

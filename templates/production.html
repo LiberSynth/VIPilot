@@ -50,6 +50,18 @@
         <input type="number" id="story-generate-count" class="story-generate-count" value="1" min="1" max="50">
         <span class="story-generate-count-label">штук</span>
       </div>
+      <div style="margin-top:8px">
+        <div class="cust-select" id="screenwriter-model-wrap">
+          <button type="button" class="cust-select-btn" id="screenwriter-model-btn">
+            <span id="screenwriter-model-label">Загрузка...</span>
+            <svg class="cust-select-arrow" xmlns="http://www.w3.org/2000/svg" width="12" height="7" viewBox="0 0 12 7" fill="none">
+              <path d="M1 1l5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <div class="cust-select-list" id="screenwriter-model-list" hidden></div>
+        </div>
+        <input type="hidden" id="screenwriter-model-id" value="">
+      </div>
       <div id="story-generate-hint" class="story-generate-hint">Вы можете сгенерировать сюжет при помощи AI-модели</div>
     </div>
     <div class="card" id="card-story-draft">
