@@ -20,7 +20,6 @@ from db import (
     db_get_batch_by_id,
     db_get_active_targets,
     db_update_batch_current_movie_model_id,
-    db_update_batch_movie_model_id,
     db_set_batch_video_generating_by_id,
     db_get_story_text,
     db_get_active_video_models,
@@ -332,11 +331,6 @@ def run(batch_id, log_id):
                 'response_url': None,
             })
             return None
-
-        # Для pinned-модели фиксируем movie_model_id в batches.data (один раз).
-        # При подхвате значение уже лежит там — вызов идемпотентен.
-        if pinned_model_id:
-            db_update_batch_movie_model_id(batch_id, pinned_model_id)
 
         # Подхват при переборе моделей (slot/adhoc, not pinned):
         # current_movie_model_id в batches.data хранит модель, на которой
