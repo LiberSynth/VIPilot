@@ -69,28 +69,17 @@ def db_set_batch_video_ready(batch_id, video_url):
     _assert_known_status('video_ready')
     with get_db() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT movie_id FROM batches WHERE id = %s", (batch_id,))
-            row = cur.fetchone()
-            movie_id = row[0] if row else None
-            if movie_id is None:
-                cur.execute(
-                    "INSERT INTO movies (url) VALUES (%s) RETURNING id",
-                    (video_url,),
-                )
-                movie_id = cur.fetchone()[0]
-                cur.execute(
-                    "UPDATE batches SET status = 'video_ready', movie_id = %s WHERE id = %s",
-                    (movie_id, batch_id),
-                )
-            else:
-                cur.execute(
-                    "UPDATE movies SET url = %s WHERE id = %s",
-                    (video_url, movie_id),
-                )
-                cur.execute(
-                    "UPDATE batches SET status = 'video_ready' WHERE id = %s",
-                    (batch_id,),
-                )
+            cur.execute(
+                """UPDATE movies m
+                      SET url = %s
+                     FROM batches b
+                    WHERE b.id = %s AND b.movie_id = m.id""",
+                (video_url, batch_id),
+            )
+            cur.execute(
+                "UPDATE batches SET status = 'video_ready' WHERE id = %s",
+                (batch_id,),
+            )
         conn.commit()
     return True
 
@@ -114,24 +103,13 @@ def db_set_batch_video_pending(batch_id, job_data):
 def db_set_batch_video_model(batch_id, model_id):
     with get_db() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT movie_id FROM batches WHERE id = %s", (batch_id,))
-            row = cur.fetchone()
-            movie_id = row[0] if row else None
-            if movie_id is None:
-                cur.execute(
-                    "INSERT INTO movies (model_id) VALUES (%s) RETURNING id",
-                    (model_id,),
-                )
-                movie_id = cur.fetchone()[0]
-                cur.execute(
-                    "UPDATE batches SET movie_id = %s WHERE id = %s",
-                    (movie_id, batch_id),
-                )
-            else:
-                cur.execute(
-                    "UPDATE movies SET model_id = %s WHERE id = %s",
-                    (model_id, movie_id),
-                )
+            cur.execute(
+                """UPDATE movies m
+                      SET model_id = %s
+                     FROM batches b
+                    WHERE b.id = %s AND b.movie_id = m.id""",
+                (model_id, batch_id),
+            )
         conn.commit()
     return True
 
@@ -140,28 +118,17 @@ def db_set_batch_transcode_ready(batch_id, video_data: bytes):
     _assert_known_status('transcode_ready')
     with get_db() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT movie_id FROM batches WHERE id = %s", (batch_id,))
-            row = cur.fetchone()
-            movie_id = row[0] if row else None
-            if movie_id is None:
-                cur.execute(
-                    "INSERT INTO movies (transcoded_data) VALUES (%s) RETURNING id",
-                    (psycopg2.Binary(video_data),),
-                )
-                movie_id = cur.fetchone()[0]
-                cur.execute(
-                    "UPDATE batches SET status = 'transcode_ready', movie_id = %s WHERE id = %s",
-                    (movie_id, batch_id),
-                )
-            else:
-                cur.execute(
-                    "UPDATE movies SET transcoded_data = %s WHERE id = %s",
-                    (psycopg2.Binary(video_data), movie_id),
-                )
-                cur.execute(
-                    "UPDATE batches SET status = 'transcode_ready' WHERE id = %s",
-                    (batch_id,),
-                )
+            cur.execute(
+                """UPDATE movies m
+                      SET transcoded_data = %s
+                     FROM batches b
+                    WHERE b.id = %s AND b.movie_id = m.id""",
+                (psycopg2.Binary(video_data), batch_id),
+            )
+            cur.execute(
+                "UPDATE batches SET status = 'transcode_ready' WHERE id = %s",
+                (batch_id,),
+            )
         conn.commit()
     return True
 
