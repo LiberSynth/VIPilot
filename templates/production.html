@@ -51,14 +51,17 @@
         <span class="story-generate-count-label">штук</span>
       </div>
       <div style="margin-top:8px">
+        <div class="hint" style="margin-bottom:4px">Модель</div>
         <div class="cust-select" id="screenwriter-model-wrap">
           <button type="button" class="cust-select-btn" id="screenwriter-model-btn">
-            <span id="screenwriter-model-label">Загрузка...</span>
+            <span id="screenwriter-model-label">Подобрать</span>
             <svg class="cust-select-arrow" xmlns="http://www.w3.org/2000/svg" width="12" height="7" viewBox="0 0 12 7" fill="none">
               <path d="M1 1l5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           </button>
-          <div class="cust-select-list" id="screenwriter-model-list" hidden></div>
+          <div class="cust-select-list" id="screenwriter-model-list" hidden>
+            <div class="cust-select-option selected" data-value="">Подобрать</div>
+          </div>
         </div>
         <input type="hidden" id="screenwriter-model-id" value="">
       </div>

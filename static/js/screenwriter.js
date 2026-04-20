@@ -539,14 +539,21 @@ var getDraftStoryId;
       if (btn.disabled) return;
       var countInput = document.getElementById('story-generate-count');
       var count = Math.max(1, Math.min(50, parseInt((countInput && countInput.value) || '1') || 1));
+      var modelIdEl = document.getElementById('screenwriter-model-id');
+      var modelId = modelIdEl ? (modelIdEl.value || '') : '';
       btn.disabled = true;
       _batchQueue = [];
       _batchTotal = count;
       _batchDone  = 0;
       setHint(count > 1 ? 'Создаю ' + count + ' батчей…' : 'Запускаю генерацию…');
+      var body = modelId ? JSON.stringify({ model_id: modelId }) : null;
       var remaining = count;
       for (var i = 0; i < count; i++) {
-        fetch('/production/story/generate', { method: 'POST' })
+        fetch('/production/story/generate', {
+          method: 'POST',
+          headers: body ? { 'Content-Type': 'application/json' } : {},
+          body: body,
+        })
           .then(function(r) { return r.json(); })
           .then(function(d) {
             if (d.batch_id) _batchQueue.push(d.batch_id);
@@ -763,6 +770,12 @@ var getDraftStoryId;
     var list = document.getElementById('screenwriter-model-list');
     if (!list) return;
     list.innerHTML = '';
+    var defaultOpt = document.createElement('div');
+    defaultOpt.className = 'cust-select-option selected';
+    defaultOpt.dataset.value = '';
+    defaultOpt.textContent = 'Подобрать';
+    defaultOpt.addEventListener('click', function() { selectModel('', 'Подобрать'); closeList(); });
+    list.appendChild(defaultOpt);
     _models.forEach(function(m) {
       var opt = document.createElement('div');
       opt.className = 'cust-select-option';
@@ -774,9 +787,7 @@ var getDraftStoryId;
       });
       list.appendChild(opt);
     });
-    if (_models.length > 0) {
-      selectModel(_models[0].id, _models[0].name);
-    }
+    selectModel('', 'Подобрать');
   }
 
   function loadScreenwriterModels() {

@@ -544,7 +544,12 @@ def api_production_story_generate():
     err = _production_auth_check()
     if err:
         return err
-    batch_id = db_create_story_generate_batch()
+    data = request.get_json(silent=True) or {}
+    model_id = data.get("model_id") or None
+    if model_id:
+        batch_id = db_create_story_probe_batch(model_id)
+    else:
+        batch_id = db_create_story_generate_batch()
     if not batch_id:
         return jsonify({"error": "db_error"}), 500
     environment.wakeup_loop()
