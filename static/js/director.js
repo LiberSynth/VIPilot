@@ -132,7 +132,8 @@
     if (titleEl) {
       var title = (rec && rec.story_title) ? rec.story_title : '';
       var model = (rec && rec.model_name)  ? rec.model_name  : '';
-      titleEl.textContent  = title + (model ? ' (' + model + ')' : '');
+      var modelLabel = model ? ' <span class="story-model-name">(' + escHtml(model) + ')</span>' : '';
+      titleEl.innerHTML = escHtml(title) + modelLabel;
       titleEl.style.display = (title || model) ? '' : 'none';
     }
     var src = '/production/movie/' + encodeURIComponent(movieId) + '/video';
