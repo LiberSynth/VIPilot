@@ -1,5 +1,5 @@
 (function() {
-  var GRADE_LABELS      = { 'null': '—', 'good': 'Хорошо', 'bad': 'Плохо' };
+  var GRADE_LABELS      = { 'null': 'не указано', 'good': 'хорошо', 'bad': 'плохо' };
   var GRADE_COLORS      = { 'null': 'rgba(255,255,255,.07)', 'good': 'rgba(80,200,120,.25)', 'bad': 'rgba(200,80,80,.25)' };
   var GRADE_TEXT_COLORS = { 'null': '#aaa', 'good': '#6ee7a0', 'bad': '#f87171' };
   var GRADE_CYCLE       = ['good', 'bad', null];
