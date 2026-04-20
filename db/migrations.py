@@ -1957,6 +1957,19 @@ def _m068_movies_grade(cur):
     cur.execute("ALTER TABLE movies ADD COLUMN IF NOT EXISTS grade TEXT")
 
 
+def _m069_rename_movie_model_id_in_batches_data(cur):
+    """
+    Переименовывает ключ batches.data.movie_model_id → current_movie_model_id.
+    Idempotent: обновляет только строки, где старый ключ присутствует.
+    """
+    cur.execute("""
+        UPDATE batches
+           SET data = (data - 'movie_model_id')
+                   || jsonb_build_object('current_movie_model_id', data->>'movie_model_id')
+         WHERE data ? 'movie_model_id'
+    """)
+
+
 MIGRATIONS = [
     (1, _m001_baseline_schema),
     (2, _m002_model_grades_and_batch_models),
@@ -2026,6 +2039,7 @@ MIGRATIONS = [
     (66, _m066_grok_video_model),
     (67, _m067_grok_video_durations),
     (68, _m068_movies_grade),
+    (69, _m069_rename_movie_model_id_in_batches_data),
 ]
 
 

@@ -225,7 +225,7 @@ def run(batch_id, log_id):
             - Если None — обычный submit через falai.submit().
 
             При любом неуспехе безусловно сбрасывает все четыре поля
-            (request_id, status_url, response_url, movie_model_id) в batch.data,
+            (request_id, status_url, response_url, current_movie_model_id) в batch.data,
             чтобы следующая попытка шла через submit() заново.
 
             Возвращает video_url при успехе или None при неудаче.
@@ -240,7 +240,7 @@ def run(batch_id, log_id):
             saved_request_id   = current_data.get('request_id')
             saved_status_url   = current_data.get('status_url')
             saved_response_url = current_data.get('response_url')
-            saved_model_id     = current_data.get('movie_model_id')
+            saved_model_id     = current_data.get('current_movie_model_id')
 
             client = _video_client(m.get('platform_name', ''))
 
@@ -255,7 +255,7 @@ def run(batch_id, log_id):
                     'request_id':   None,
                     'status_url':   None,
                     'response_url': None,
-                    'movie_model_id': None,
+                    'current_movie_model_id': None,
                 })
                 return None
 
@@ -289,7 +289,7 @@ def run(batch_id, log_id):
                 'request_id':   req_id,
                 'status_url':   s_url,
                 'response_url': r_url,
-                'movie_model_id': m_id,
+                'current_movie_model_id': m_id,
             })
             write_log_entry(log_id, fmt_id_msg("Запрос принят ({}): {}", model_name, req_id))
             write_log_entry(log_id, fmt_id_msg("[video] Генерация запущена: request_id={}", req_id))
@@ -305,7 +305,7 @@ def run(batch_id, log_id):
                 'request_id':   None,
                 'status_url':   None,
                 'response_url': None,
-                'movie_model_id': None,
+                'current_movie_model_id': None,
             })
             return None
 
