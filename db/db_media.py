@@ -1,7 +1,9 @@
+import json
+
 import psycopg2
 
 from .connection import get_db
-from common.statuses import _assert_known_status
+from .db_pipeline import db_set_batch_status
 
 # АРХИТЕКТУРНОЕ РЕШЕНИЕ: хранение видеофайлов в PostgreSQL (BYTEA)
 #
@@ -57,19 +59,15 @@ def db_get_batch_original_video(batch_id) -> bytes | None:
 
 
 def db_set_batch_video_pending(batch_id, job_data):
-    import json
-    _assert_known_status('video_pending')
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """UPDATE batches
-                   SET status = 'video_pending',
-                       data   = COALESCE(data::jsonb, '{}'::jsonb) || %s::jsonb
+                   SET data = COALESCE(data::jsonb, '{}'::jsonb) || %s::jsonb
                    WHERE id = %s""",
                 (json.dumps(job_data), batch_id),
             )
-        conn.commit()
-    return True
+        db_set_batch_status(batch_id, 'video_pending', conn)
 
 
 def db_save_transcoded_data(batch_id, video_data: bytes):
