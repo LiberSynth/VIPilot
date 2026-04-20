@@ -25,7 +25,6 @@ from db import (
     db_get_video_model_by_id,
     db_set_batch_video_pending,
     db_set_batch_status,
-    db_set_batch_story_ready_from_error,
     db_create_batch_movie,
     db_get_random_real_original_video,
     db_set_batch_story_id,
@@ -378,7 +377,7 @@ def run(batch_id, log_id):
                 db_log_update(log_id, msg, 'error')
                 write_log_entry(log_id, msg, level='error')
                 write_log_entry(log_id, f"[video] {msg}")
-                db_set_batch_story_ready_from_error(batch_id)
+                db_set_batch_status(batch_id, 'story_ready')
                 return
 
         write_log_entry(log_id, f"Скачиваю оригинал: {video_url}")

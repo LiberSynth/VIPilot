@@ -48,7 +48,6 @@ from .db_pipeline import (
     db_set_batch_status,
     db_claim_batch_status,
     db_cancel_waiting_batches,
-    db_set_batch_story_ready_from_error,
     db_set_batch_pending,
     db_set_batch_movie_probe,
     db_set_batch_published,

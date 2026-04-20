@@ -208,18 +208,6 @@ def db_cancel_waiting_batches():
     return [str(r[0]) for r in rows]
 
 
-def db_set_batch_story_ready_from_error(batch_id):
-    _assert_known_status("story_ready")
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "UPDATE batches SET status = 'story_ready' WHERE id = %s",
-                (batch_id,),
-            )
-        conn.commit()
-    return True
-
-
 def db_set_batch_pending(batch_id):
     _assert_known_status("pending")
     with get_db() as conn:
