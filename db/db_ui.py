@@ -165,7 +165,7 @@ def db_get_movies_list(show_published=True, show_bad=True, for_approval=False):
                 FROM movies m
                 LEFT JOIN ai_models vm ON vm.id = m.model_id
                 {where_clause}
-                ORDER BY m.created_at DESC
+                ORDER BY published ASC, m.created_at DESC
             """)
             rows = cur.fetchall()
     return [
