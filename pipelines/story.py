@@ -26,7 +26,7 @@ from db import (
 from log import db_log_update, write_log_entry
 from pipelines.base import check_cancelled, iterate_models
 from common.exceptions import AppException
-from clients import openrouter
+from clients import text_client
 from utils.utils import fmt_id_msg
 
 
@@ -210,7 +210,7 @@ def run(batch_id, log_id):
 
         db_log_update(log_id, "Генерация сюжета…", "running")
 
-        if not openrouter.is_configured():
+        if not text_client.is_configured():
             msg = "API-ключ текстовой платформы не задан — генерация невозможна"
             db_log_update(log_id, msg, "error")
             write_log_entry(log_id, msg, level="error")
@@ -267,7 +267,7 @@ def run(batch_id, log_id):
                 write_log_entry(
                     log_id, f"[story] Запрос к текстовой платформе: модель={model_name}"
                 )
-            raw = openrouter.generate(log_id, model_name, m, format_prompt, user_prompt)
+            raw = text_client.generate(log_id, model_name, m, format_prompt, user_prompt)
             if raw:
                 first_line = raw.split("\n")[0]
                 if "." not in first_line:

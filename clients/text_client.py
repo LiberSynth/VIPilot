@@ -1,8 +1,7 @@
 """
-OpenRouter API client.
-Отвечает за HTTP-взаимодействие с OpenRouter/DeepSeek и совместимыми API —
-отправку промптов и получение текста.
-Пайплайн импортирует только этот клиент, не зная об OpenRouter напрямую.
+Клиент для текстовых платформ (OpenAI-совместимый Chat API).
+Поддерживает OpenRouter, DeepSeek и любой совместимый провайдер —
+координаты берутся из записи модели (platform_url, key_env).
 """
 
 import os
@@ -50,7 +49,7 @@ def _build_body(body_tpl, model_url, system_prompt, user_prompt):
 
 def generate(log_id, model_name: str, model: dict, system_prompt: str, user_prompt: str):
     """
-    Выполняет один запрос к платформе (OpenRouter, DeepSeek или совместимой).
+    Выполняет один запрос к текстовой платформе.
     Возвращает строку с текстом или None при любой ошибке.
 
     :param log_id: идентификатор записи лога
