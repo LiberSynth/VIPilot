@@ -39,6 +39,7 @@ from db import (
     db_delete_bad_stories,
     db_delete_bad_movies,
     db_set_model_grade,
+    db_delete_batch,
 )
 from log import db_get_monitor, log_batch_planned, write_log_entry
 from utils.auth import is_authenticated
@@ -372,6 +373,20 @@ def api_workflow_emulation():
     label = "включена" if val == "1" else "выключена"
     write_log_entry(None, f"[api] Эмуляция {label}")
     return jsonify({"ok": True, "emulation_mode": val})
+
+
+@bp.route("/monitor/batch/<batch_id>/delete", methods=["POST"])
+def api_delete_batch(batch_id):
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    try:
+        ok = db_delete_batch(batch_id)
+        if not ok:
+            return jsonify({"error": "not found"}), 404
+        return jsonify({"ok": True})
+    except Exception as e:
+        write_log_entry(None, f"[api] Ошибка удаления батча: {e}", level='silent')
+        return jsonify({"ok": False, "error": "internal error"}), 500
 
 
 @bp.route("/batch/<batch_id>/reset/<pipeline>", methods=["POST"])

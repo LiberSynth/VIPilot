@@ -334,6 +334,33 @@ def db_delete_bad_movies() -> dict:
     return {"movies": ml_count, "batches": bl_count, "logs": ll_count, "log_entries": le_count}
 
 
+def db_delete_batch(batch_id: str) -> bool:
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                DELETE FROM log_entries
+                WHERE log_id IN (
+                    SELECT id FROM log WHERE batch_id = %s
+                )
+                """,
+                (batch_id,),
+            )
+            cur.execute("DELETE FROM log WHERE batch_id = %s", (batch_id,))
+            cur.execute(
+                "SELECT movie_id FROM batches WHERE id = %s AND movie_id IS NOT NULL",
+                (batch_id,),
+            )
+            row = cur.fetchone()
+            movie_id = row[0] if row else None
+            cur.execute("DELETE FROM batches WHERE id = %s", (batch_id,))
+            deleted = cur.rowcount
+            if movie_id:
+                cur.execute("DELETE FROM movies WHERE id = %s", (movie_id,))
+        conn.commit()
+    return deleted > 0
+
+
 def db_cleanup_batches(batch_lifetime_days: int) -> int:
     with get_db() as conn:
         with conn.cursor() as cur:

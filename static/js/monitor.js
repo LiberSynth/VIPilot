@@ -78,6 +78,7 @@
   const MON_SVG_EYE      = `<svg viewBox="0 0 16 16"><rect x="3" y="2" width="10" height="12" rx="1.5"/><line x1="5.5" y1="5.5" x2="10.5" y2="5.5"/><line x1="5.5" y1="8" x2="10.5" y2="8"/><line x1="5.5" y1="10.5" x2="8.5" y2="10.5"/></svg>`;
   const MON_SVG_PLAY     = `<svg viewBox="0 0 16 16"><polygon points="4,2 13,8 4,14"/></svg>`;
   const MON_SVG_INFO     = `<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.2"/><line x1="8" y1="5.5" x2="8" y2="5.5"/><line x1="8" y1="7.5" x2="8" y2="11"/></svg>`;
+  const MON_SVG_DELETE   = `<svg viewBox="0 0 16 16"><polyline points="2,4 14,4"/><path d="M5 4V2h6v2"/><rect x="3" y="4" width="10" height="10" rx="1.5"/><line x1="6" y1="7" x2="6" y2="11"/><line x1="10" y1="7" x2="10" y2="11"/></svg>`;
   const MON_SVG_EXPORT   = `<svg viewBox="0 0 16 16"><path d="M8 2v7M5 6l3 3 3-3"/><path d="M3 11v2a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-2"/></svg>`;
 
   function renderLogItem(log, batchId, storyId, hasVideoData, textModelName, videoModelName, batchStatus) {
@@ -228,6 +229,7 @@
         batchVideoBtn +
         '<button class="cycle-float-btn" title="Скопировать логи" onclick="monitorCopy(this)">'          + MON_SVG_COPY + '</button>' +
         '<button class="cycle-float-btn" title="Скопировать инфо" onclick="monitorBatchCopyInfo(this)">' + MON_SVG_INFO + '</button>' +
+        '<button class="cycle-float-btn" title="Удалить батч" onclick="monitorDeleteBatch(\'' + esc(batch.batch_id) + '\',this)">' + MON_SVG_DELETE + '</button>' +
       '</div>';
 
     return '<div class="monitor-batch bs-' + esc(bs) + '" data-bid="' + esc(batch.batch_id) +
@@ -750,6 +752,58 @@
 
   window.groupLogsByPipeline = groupLogsByPipeline;
   window.renderLogItem       = renderLogItem;
+
+  function _buildDeleteBatchOverlay(batchId) {
+    var el = document.createElement('div');
+    el.className = 'confirm-overlay open';
+    el.id = 'deleteBatchOverlay';
+    el.innerHTML =
+      '<div class="confirm-box">' +
+        '<div class="confirm-box-title">Удалить батч?</div>' +
+        '<div class="confirm-box-text">' +
+          'Батч и все связанные данные (логи, видео) будут удалены без возможности восстановления.<br><br>' +
+          'Сюжеты (stories) не затрагиваются.' +
+        '</div>' +
+        '<div class="confirm-box-btns">' +
+          '<button class="confirm-cancel" onclick="monitorCloseDeleteBatch()">Отмена</button>' +
+          '<button class="confirm-confirm" id="deleteBatchConfirmBtn" onclick="monitorConfirmDeleteBatch(\'' + batchId + '\')">Удалить</button>' +
+        '</div>' +
+      '</div>';
+    return el;
+  }
+
+  window.monitorDeleteBatch = function(batchId, _btn) {
+    var existing = document.getElementById('deleteBatchOverlay');
+    if (existing) existing.remove();
+    document.body.appendChild(_buildDeleteBatchOverlay(batchId));
+  };
+
+  window.monitorCloseDeleteBatch = function() {
+    var el = document.getElementById('deleteBatchOverlay');
+    if (el) el.remove();
+  };
+
+  window.monitorConfirmDeleteBatch = function(batchId) {
+    var btn = document.getElementById('deleteBatchConfirmBtn');
+    btn.disabled    = true;
+    btn.textContent = 'Удаляем…';
+    fetch('/api/monitor/batch/' + encodeURIComponent(batchId) + '/delete', { method: 'POST' })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        monitorCloseDeleteBatch();
+        if (data.ok) {
+          var batchEl = document.querySelector('.monitor-batch[data-bid="' + batchId + '"]');
+          if (batchEl) batchEl.remove();
+          showToast('Батч удалён', 'success');
+        } else {
+          showToast('Ошибка: ' + (data.error || 'неизвестная ошибка'), 'error');
+        }
+      })
+      .catch(function() {
+        monitorCloseDeleteBatch();
+        showToast('Ошибка соединения', 'error');
+      });
+  };
 
   refreshMonitor();
   setInterval(refreshMonitor, 5000);
