@@ -240,13 +240,19 @@ def db_cleanup_video_data(file_lifetime_days: int) -> int:
 def db_delete_bad_stories() -> dict:
     with get_db() as conn:
         with conn.cursor() as cur:
-            cur.execute("""
+            final_statuses_sql = ', '.join(f"'{s}'" for s in FINAL_BATCH_STATUSES)
+            cur.execute(f"""
                 SELECT id FROM stories
                 WHERE (grade IS NULL OR grade = 'bad')
                   AND NOT pinned
                   AND id NOT IN (
                       SELECT DISTINCT story_id FROM batches
                       WHERE story_id IS NOT NULL AND movie_id IS NOT NULL
+                  )
+                  AND id NOT IN (
+                      SELECT DISTINCT story_id FROM batches
+                      WHERE story_id IS NOT NULL
+                        AND status NOT IN ({final_statuses_sql})
                   )
             """)
             story_ids = [r[0] for r in cur.fetchall()]
