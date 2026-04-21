@@ -190,10 +190,7 @@
     var headerBottom = header ? header.getBoundingClientRect().bottom : 0;
     var cardPad = 15;
     var avail = window.innerHeight - headerBottom - cardPad * 2;
-    var h = Math.round(avail / 1.618);
-    wrap.style.height = h + 'px';
-    var video = wrap.querySelector('video');
-    if (video) video.style.height = h + 'px';
+    wrap.style.height = Math.round(avail / 1.618) + 'px';
   }
 
   /* ── плеер ── */
