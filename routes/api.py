@@ -48,7 +48,7 @@ from utils.auth import is_authenticated
 from utils.prompt_params import apply_prompt_params
 from utils.utils import parse_hhmm, to_msk, to_utc_from_msk
 import common.environment as environment
-from common.statuses import ACTIVE_BATCH_STATUSES
+from common.statuses import batch_is_active
 
 bp = Blueprint("api", __name__, url_prefix="/api")
 
@@ -385,7 +385,7 @@ def api_delete_batch(batch_id):
     if batch_id in environment.get_active_batch_ids():
         return jsonify({"ok": False, "error": "Батч сейчас активно обрабатывается пайплайном"}), 409
     batch_status = db_get_batch_status(batch_id)
-    if batch_status in ACTIVE_BATCH_STATUSES:
+    if batch_is_active(batch_status):
         return jsonify({"ok": False, "error": "Нельзя удалить батч в активном статусе"}), 409
     try:
         ok = db_delete_batch(batch_id)

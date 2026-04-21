@@ -9,10 +9,6 @@ KNOWN_BATCH_STATUSES = frozenset({
     'published_partially', 'fatal_error',
 })
 
-ACTIVE_BATCH_STATUSES = (
-    'pending', 'story_generating', 'video_pending', 'video_ready', 'transcode_ready',
-)
-
 FINAL_BATCH_STATUSES = (
     'published', 'published_partially', 'movie_probe', 'story_probe',
     'cancelled', 'error', 'fatal_error',
@@ -30,6 +26,11 @@ PIPELINE_RESET_STATUS = {
 COMPOSITE_BATCH_STATUS_SUFFIXES = frozenset({'.posting', '.published', '.pending', '.failed'})
 
 PUBLISH_ROUTING_SUFFIXES = ('.pending', '.published')
+
+
+def batch_is_active(status: str) -> bool:
+    """Возвращает True если батч находится в активном (не финальном) статусе."""
+    return status not in FINAL_BATCH_STATUSES
 
 
 def _assert_known_status(status: str) -> None:
