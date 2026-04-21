@@ -45,7 +45,7 @@ def _m073_add_wan27(cur):
             TRUE,
             'good',
             'text-to-video',
-            '$0.10/s',
+            '1.000 $/10сек',
             p.id
         FROM ai_platforms p
         WHERE p.name = 'fal.ai'
