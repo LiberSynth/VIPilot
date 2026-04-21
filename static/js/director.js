@@ -182,8 +182,13 @@
     }
   }
 
-  /* ── плеер: высота управляется CSS (max-height: 55vh) ── */
-  function updateVideoWrapHeight() { }
+  /* ── плеер: высота рамки ── */
+  function updateVideoWrapHeight() {
+    var wrap = document.getElementById('director-video-wrap');
+    if (!wrap) return;
+    var h = Math.min(wrap.offsetWidth / 9 * 16, window.innerHeight / 1.618);
+    wrap.style.height = Math.round(h) + 'px';
+  }
 
   /* ── плеер ── */
   function loadMovieInPlayer(movieId) {
