@@ -114,18 +114,24 @@
     }
   }
 
+  /* ── плеер: высота рамки ── */
+  function updateVideoWrapHeight() {
+    var wrap = document.getElementById('director-video-wrap');
+    if (!wrap) return;
+    var h = Math.min(wrap.offsetWidth / 9 * 16, window.innerHeight / 1.618);
+    wrap.style.height = Math.round(h) + 'px';
+  }
+
   /* ── плеер ── */
   function loadMovieInPlayer(movieId) {
-    var wrap     = document.getElementById('director-video-wrap');
-    var empty    = document.getElementById('director-movie-empty');
-    var titleEl  = document.getElementById('director-movie-title');
+    var wrap    = document.getElementById('director-video-wrap');
+    var titleEl = document.getElementById('director-movie-title');
     if (!wrap) return;
     if (!movieId) {
-      wrap.innerHTML = '';
-      wrap.style.display = 'none';
-      if (empty)   empty.style.display   = '';
+      wrap.innerHTML = '<video class="probe-video" controls></video>';
       if (titleEl) { titleEl.textContent = ''; titleEl.style.display = 'none'; }
       setCardMovieGradeBadge(null, true);
+      updateVideoWrapHeight();
       return;
     }
     var rec = _moviesData.filter(function(m) { return String(m.id) === String(movieId); })[0];
@@ -138,9 +144,8 @@
     }
     var src = '/production/movie/' + encodeURIComponent(movieId) + '/video';
     wrap.innerHTML = '<video class="probe-video" controls src="' + src + '"></video>';
-    wrap.style.display = 'block';
-    if (empty) empty.style.display = 'none';
     setCardMovieGradeBadge(rec ? rec.grade : null, false);
+    updateVideoWrapHeight();
   }
 
   function selectMovie(movieId) {
@@ -348,11 +353,19 @@
     });
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function() { initFilters(); initCardMovieGradeBadge(); initDeleteBadMoviesButton(); });
-  } else {
+  window.directorUpdateVideoWrapHeight = updateVideoWrapHeight;
+
+  function initDirector() {
     initFilters();
     initCardMovieGradeBadge();
     initDeleteBadMoviesButton();
+    loadMovieInPlayer(null);
+    window.addEventListener('resize', updateVideoWrapHeight);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initDirector);
+  } else {
+    initDirector();
   }
 })();

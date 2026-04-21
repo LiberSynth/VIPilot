@@ -157,19 +157,14 @@
         <input type="number" id="director-video-count" class="story-generate-count" value="1" min="1" max="50">
         <span class="story-generate-count-label">штук</span>
       </div>
-      <div id="director-generate-hint" class="story-generate-hint">Вы можете сгенерировать ролик при помощи AI-модели</div>
-    </div>
-
-    <div class="card" style="margin-top:0">
-      <div class="card-draft-header">
-        <div class="card-title" style="margin-bottom:0">Видео</div>
-        <div class="card-top-actions">
+      <div id="director-generate-hint" class="story-generate-hint">Вы можете сгенерировать ролик при помощи AI-модели.</div>
+      <div class="card-draft-header" style="margin-top:8px">
+        <div class="card-top-actions" style="margin-left:auto">
           <button id="card-movie-grade" class="story-grade-badge" hidden data-grade="null" title="Оценка. Нажмите для смены"></button>
         </div>
       </div>
       <div id="director-movie-title" style="display:none; font-size:13px; color:#ccc; margin-bottom:8px; font-weight:500"></div>
-      <div id="director-video-wrap" style="display:none"></div>
-      <div id="director-movie-empty" class="story-generate-hint">Выберите видео из списка</div>
+      <div id="director-video-wrap"></div>
     </div>
 
     <div class="card" style="margin-top:0">
@@ -302,7 +297,7 @@
   var _origSwitchPanel = window.switchPanel;
   window.switchPanel = function(name) {
     if (_origSwitchPanel) _origSwitchPanel(name);
-    if (name === 'director') { loadDirectorStoryPool(); loadDirectorVideoModels(); if (typeof window.loadMovieList === 'function') window.loadMovieList(); }
+    if (name === 'director') { loadDirectorStoryPool(); loadDirectorVideoModels(); if (typeof window.loadMovieList === 'function') window.loadMovieList(); if (typeof window.directorUpdateVideoWrapHeight === 'function') window.directorUpdateVideoWrapHeight(); }
   };
 
   var btn = document.getElementById('director-story-btn');
@@ -401,7 +396,7 @@
   (function() {
     var btn = document.getElementById('btn-director-generate');
     if (!btn) return;
-    var _hint_default = 'Вы можете сгенерировать ролик при помощи AI-модели';
+    var _hint_default = 'Вы можете сгенерировать ролик при помощи AI-модели.';
     function setHint(text) {
       var el = document.getElementById('director-generate-hint');
       if (el) el.textContent = text;
