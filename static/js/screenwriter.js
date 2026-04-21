@@ -706,6 +706,81 @@ var getDraftStoryId;
   }
 })();
 
+/* ── Кнопка pin в карточке сюжета ── */
+(function() {
+  var PIN_SVG_FILLED  = '<svg viewBox="0 0 16 16" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="10" x2="8" y2="15"/><path d="M5 2 L5 7 L2 10 L14 10 L11 7 L11 2 Z"/><line x1="5" y1="2" x2="11" y2="2"/></svg>';
+  var PIN_SVG_OUTLINE = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="10" x2="8" y2="15"/><path d="M5 2 L5 7 L2 10 L14 10 L11 7 L11 2 Z"/><line x1="5" y1="2" x2="11" y2="2"/></svg>';
+
+  function setCardPinBtn(pinned, hidden) {
+    var btn = document.getElementById('card-story-pin');
+    if (!btn) return;
+    if (hidden) {
+      btn.hidden = true;
+      btn.disabled = true;
+      return;
+    }
+    var p = !!pinned;
+    btn.hidden = false;
+    btn.disabled = false;
+    btn.setAttribute('data-pinned', p ? '1' : '0');
+    btn.title = p ? 'Закреплён' : 'Закрепить';
+    btn.innerHTML = p ? PIN_SVG_FILLED : PIN_SVG_OUTLINE;
+    btn.classList.toggle('story-pin-btn--active', p);
+  }
+
+  window.setCardPinBtn = setCardPinBtn;
+
+  function initCardPinBtn() {
+    var btn = document.getElementById('card-story-pin');
+    if (!btn) return;
+    btn.addEventListener('click', function() {
+      if (btn.disabled) return;
+      var storyId = typeof getDraftStoryId === 'function' ? getDraftStoryId() : null;
+      if (!storyId) return;
+      var newPinned = btn.getAttribute('data-pinned') !== '1';
+      btn.disabled = true;
+      fetch('/production/story/' + storyId + '/pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pinned: newPinned }),
+      })
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(d) {
+        btn.disabled = false;
+        if (d && d.ok) {
+          setCardPinBtn(newPinned, false);
+          if (typeof window.loadStoryList === 'function') window.loadStoryList();
+        }
+      })
+      .catch(function() { btn.disabled = false; });
+    });
+  }
+
+  var _origSetDraft = window.setDraftStoryFromRecord;
+  window.setDraftStoryFromRecord = function(story) {
+    if (_origSetDraft) _origSetDraft(story);
+    setCardPinBtn(story.pinned || false, false);
+  };
+
+  var _origResetDraft = window.resetDraftStoryId;
+  window.resetDraftStoryId = function() {
+    if (_origResetDraft) _origResetDraft();
+    setCardPinBtn(false, true);
+  };
+
+  var _origFirstSaved = window.onDraftStoryFirstSaved;
+  window.onDraftStoryFirstSaved = function() {
+    if (_origFirstSaved) _origFirstSaved();
+    setCardPinBtn(false, false);
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initCardPinBtn);
+  } else {
+    initCardPinBtn();
+  }
+})();
+
 /* ── Кнопка «Очистить» сюжеты ── */
 (function() {
   function _closeDeleteBadDialog() {
