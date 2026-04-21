@@ -1038,6 +1038,13 @@
   }
   .story-export-btn:hover { opacity: 1; }
   .story-export-btn.copied { opacity: 1; }
+  .story-delete-btn {
+    background: none; border: none; padding: 0; cursor: pointer;
+    color: #ff6060; opacity: 0; transition: opacity .15s;
+  }
+  .story-row:hover .story-delete-btn:not(:disabled) { opacity: .55; }
+  .story-delete-btn:not(:disabled):hover { opacity: 1; }
+  .story-delete-btn:disabled { opacity: 0; cursor: default; }
 
   .story-info-btn {
     background: none; border: none; padding: 0; cursor: pointer;
