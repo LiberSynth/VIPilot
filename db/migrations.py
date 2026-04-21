@@ -30,7 +30,34 @@ from log.log import write_log_entry
 # ---------------------------------------------------------------------------
 
 # Миграции 1–70 удалены: задеплоены на prod 2026-04-20, db_version = 70.
-# Следующая миграция: _m073_...
+# Следующая миграция: _m074_...
+
+
+def _m073_add_wan27(cur):
+    """Добавляет модель Wan 2.7 в ai_models и её допустимые длительности."""
+    cur.execute("""
+        INSERT INTO ai_models (name, url, body, "order", active, grade, type, platform_id)
+        SELECT
+            'Wan 2.7',
+            'fal-ai/wan/v2.7/text-to-video',
+            '{"prompt": "{}", "duration": "{:int}", "aspect_ratio": "{:d}:{:d}", "resolution": "720p"}'::jsonb,
+            17,
+            TRUE,
+            'good',
+            'text-to-video',
+            p.id
+        FROM ai_platforms p
+        WHERE p.name = 'fal.ai'
+        ON CONFLICT DO NOTHING
+    """)
+    cur.execute("""
+        INSERT INTO model_durations (model_id, duration)
+        SELECT m.id, d.duration
+        FROM ai_models m
+        CROSS JOIN (VALUES (2),(3),(4),(5),(6),(7),(8),(9),(10),(11),(12),(13),(14),(15)) AS d(duration)
+        WHERE m.name = 'Wan 2.7'
+        ON CONFLICT DO NOTHING
+    """)
 
 
 def _m072_stories_pinned(cur):
@@ -96,6 +123,7 @@ def _m071_donor_good_only(cur):
 MIGRATIONS = [
     (71, _m071_donor_good_only),
     (72, _m072_stories_pinned),
+    (73, _m073_add_wan27),
 ]
 
 
