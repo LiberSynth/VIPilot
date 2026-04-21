@@ -190,10 +190,10 @@
     var headerBottom = header ? header.getBoundingClientRect().bottom : 0;
     var cardPad = 15;
     var avail = window.innerHeight - headerBottom - cardPad * 2;
-    var h = avail / 1.618;
-    wrap.style.height = Math.round(h) + 'px';
-    var hint = document.getElementById('director-generate-hint');
-    if (hint) hint.title = 'innerH=' + window.innerHeight + ' hdrBottom=' + Math.round(headerBottom) + ' avail=' + Math.round(avail) + ' h=' + Math.round(h);
+    var h = Math.round(avail / 1.618);
+    wrap.style.height = h + 'px';
+    var video = wrap.querySelector('video');
+    if (video) video.style.height = h + 'px';
   }
 
   /* ── плеер ── */
