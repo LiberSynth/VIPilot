@@ -91,7 +91,7 @@ from .db_service import (
     db_cleanup_batches,
     db_cleanup_video_data,
     db_clear_all_history,
-    db_delete_bad_stories,
+    db_clear_stories,
     db_delete_bad_movies,
     db_delete_batch,
     db_get_batch_status,

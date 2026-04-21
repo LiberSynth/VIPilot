@@ -237,7 +237,7 @@ def db_cleanup_video_data(file_lifetime_days: int) -> int:
     return count
 
 
-def db_delete_bad_stories() -> dict:
+def db_clear_stories() -> dict:
     with get_db() as conn:
         with conn.cursor() as cur:
             final_statuses_sql = ', '.join(f"'{s}'" for s in FINAL_BATCH_STATUSES)

@@ -37,7 +37,7 @@ from db import (
     db_upsert_story_draft,
     db_create_story_generate_batch,
     db_set,
-    db_delete_bad_stories,
+    db_clear_stories,
     db_delete_bad_movies,
     db_set_model_grade,
     db_delete_batch,
@@ -629,7 +629,7 @@ def api_production_delete_bad_stories():
     if err:
         return err
     try:
-        deleted = db_delete_bad_stories()
+        deleted = db_clear_stories()
         return jsonify({"ok": True, "deleted": deleted})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
