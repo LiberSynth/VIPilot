@@ -930,3 +930,52 @@ var getDraftStoryId;
     initModelCombobox();
   }
 })();
+
+/* ── Счётчик слов в карточке сюжета ── */
+(function() {
+  function countWords(text) {
+    return text.trim() === '' ? 0 : text.trim().split(/\s+/).length;
+  }
+
+  function updateWordCount() {
+    var textarea = document.getElementById('draft-story-content');
+    var wrap = document.getElementById('draft-story-wc-wrap');
+    var counter = document.getElementById('draft-story-wc');
+    if (!textarea || !wrap || !counter) return;
+    var n = countWords(textarea.value);
+    if (n > 0) {
+      counter.textContent = n;
+      wrap.style.display = '';
+    } else {
+      wrap.style.display = 'none';
+    }
+  }
+
+  window.updateDraftWordCount = updateWordCount;
+
+  function initWordCount() {
+    var textarea = document.getElementById('draft-story-content');
+    if (!textarea) return;
+    textarea.addEventListener('input', updateWordCount);
+    updateWordCount();
+  }
+
+  var _origSetDraft = window.setDraftStoryFromRecord;
+  window.setDraftStoryFromRecord = function(story) {
+    if (_origSetDraft) _origSetDraft(story);
+    updateWordCount();
+  };
+
+  var _origResetDraft = window.resetDraftStoryId;
+  window.resetDraftStoryId = function() {
+    if (_origResetDraft) _origResetDraft();
+    var wrap = document.getElementById('draft-story-wc-wrap');
+    if (wrap) wrap.style.display = 'none';
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initWordCount);
+  } else {
+    initWordCount();
+  }
+})();
