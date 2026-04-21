@@ -237,6 +237,7 @@ def production_page():
     screenwriter_show_used = env_get("screenwriter_show_used", "0") == "1"
     screenwriter_only_good = env_get("screenwriter_only_good", "0") == "1"
     screenwriter_for_approval = env_get("screenwriter_for_approval", "0") == "1"
+    autoplay_movie = db_get("producer_autoplay_movie", "0") == "1"
     resp = make_response(render_template(
         "production.html",
         format_prompt=format_prompt,
@@ -253,6 +254,7 @@ def production_page():
         screenwriter_show_used=screenwriter_show_used,
         screenwriter_only_good=screenwriter_only_good,
         screenwriter_for_approval=screenwriter_for_approval,
+        autoplay_movie=autoplay_movie,
     ))
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     resp.headers["Pragma"] = "no-cache"
@@ -365,6 +367,9 @@ def save():
 
     if "approve_stories" in request.form:
         db_set("approve_stories", "1" if request.form.get("approve_stories") == "1" else "0")
+
+    if "producer_autoplay_movie" in request.form:
+        db_set("producer_autoplay_movie", "1" if request.form.get("producer_autoplay_movie") == "1" else "0")
 
     max_threads_str = request.form.get("max_batch_threads", "").strip()
     if max_threads_str:

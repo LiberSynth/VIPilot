@@ -30,7 +30,8 @@ def seed_db():
                         ('max_batch_threads', '5'),
                         ('max_model_passes',  '5'),
                         ('approve_stories',   '0'),
-                        ('deep_debugging',    '0')
+                        ('deep_debugging',    '0'),
+                        ('producer_autoplay_movie', '0')
                     ON CONFLICT (key) DO NOTHING
                 """)
 

@@ -211,7 +211,9 @@
       titleEl.style.display = (title || model) ? '' : 'none';
     }
     var src = '/production/movie/' + encodeURIComponent(movieId) + '/video';
-    wrap.innerHTML = '<video class="probe-video" controls src="' + src + '"></video>';
+    var autoplayChk = document.getElementById('director-autoplay-check');
+    var autoplayAttr = (autoplayChk && autoplayChk.checked) ? ' autoplay' : '';
+    wrap.innerHTML = '<video class="probe-video" controls' + autoplayAttr + ' src="' + src + '"></video>';
     setCardMovieGradeBadge(rec ? rec.grade : null, false);
     updateVideoWrapHeight();
   }
@@ -431,10 +433,21 @@
 
   window.directorUpdateVideoWrapHeight = updateVideoWrapHeight;
 
+  function initAutoplayToggle() {
+    var chk = document.getElementById('director-autoplay-check');
+    if (!chk) return;
+    chk.addEventListener('change', function() {
+      var fd = new FormData();
+      fd.append('producer_autoplay_movie', chk.checked ? '1' : '0');
+      fetch('/save', { method: 'POST', body: fd });
+    });
+  }
+
   function initDirector() {
     initFilters();
     initCardMovieGradeBadge();
     initDeleteBadMoviesButton();
+    initAutoplayToggle();
     loadMovieInPlayer(null);
     window.addEventListener('resize', updateVideoWrapHeight);
   }
