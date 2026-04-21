@@ -122,7 +122,8 @@
     {{ modes_card(approve_stories, use_donor, approve_movies) }}
 
     <div class="card" style="margin-top:0">
-      <div class="card-title">Сюжет</div>
+      <div class="card-title">Ролик</div>
+      <div class="hint" style="margin-bottom:4px">Сюжет</div>
       <div class="cust-select" id="director-story-wrap">
         <button type="button" class="cust-select-btn" id="director-story-btn">
           <span id="director-story-label">Сгенерировать</span>
@@ -136,15 +137,6 @@
       </div>
       <input type="hidden" id="director-story-id" value="">
       <textarea id="director-story-content" readonly style="min-height:100px; width:100%; box-sizing:border-box; resize:vertical"></textarea>
-    </div>
-
-    <div class="card" style="margin-top:0">
-      <div class="card-title">Ролик</div>
-      <div style="display:flex; align-items:center; gap:10px">
-        <button type="button" id="btn-director-generate" class="btn-run-now">Сгенерировать</button>
-        <input type="number" id="director-video-count" class="story-generate-count" value="1" min="1" max="50">
-        <span class="story-generate-count-label">штук</span>
-      </div>
       <div style="margin-top:8px">
         <div class="hint" style="margin-bottom:4px">Модель</div>
         <div class="cust-select" id="director-video-model-wrap">
@@ -159,6 +151,11 @@
           </div>
         </div>
         <input type="hidden" id="director-video-model-id" value="">
+      </div>
+      <div style="display:flex; align-items:center; gap:10px; margin-top:8px">
+        <button type="button" id="btn-director-generate" class="btn-run-now">Сгенерировать</button>
+        <input type="number" id="director-video-count" class="story-generate-count" value="1" min="1" max="50">
+        <span class="story-generate-count-label">штук</span>
       </div>
       <div id="director-generate-hint" class="story-generate-hint">Вы можете сгенерировать ролик при помощи AI-модели</div>
     </div>
