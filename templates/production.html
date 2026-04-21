@@ -412,6 +412,7 @@
       var count = Math.max(1, Math.min(50, parseInt((countInput && countInput.value) || '1') || 1));
       var modelId = (document.getElementById('director-video-model-id') || {}).value || '';
       var storyId = (document.getElementById('director-story-id') || {}).value || '';
+      var movieId = window._directorApi ? window._directorApi.getSelectedMovieId() : null;
       btn.disabled = true;
       setHint(count > 1 ? 'Создаю ' + count + ' батчей…' : 'Запускаю генерацию…');
       var body = JSON.stringify(
@@ -422,6 +423,7 @@
       );
       var remaining = count;
       var created = 0;
+      var pollingStarted = false;
       for (var i = 0; i < count; i++) {
         fetch('/production/video/generate', {
           method: 'POST',
@@ -430,20 +432,30 @@
         })
           .then(function(r) { return r.json(); })
           .then(function(d) {
-            if (d.batch_id) created++;
+            if (d.batch_id) {
+              created++;
+              if (!pollingStarted && window._directorApi) {
+                pollingStarted = true;
+                window._directorApi.startBatchPoll(d.batch_id, movieId);
+              }
+            }
             remaining--;
             if (remaining === 0) {
               btn.disabled = false;
-              setHint(created > 0 ? 'Запущено батчей: ' + created : 'Не удалось создать батчи');
-              setTimeout(resetHint, 3000);
+              if (!pollingStarted) {
+                setHint('Не удалось создать батчи');
+                setTimeout(resetHint, 3000);
+              }
             }
           })
           .catch(function() {
             remaining--;
             if (remaining === 0) {
               btn.disabled = false;
-              setHint(created > 0 ? 'Запущено батчей: ' + created : 'Ошибка запроса');
-              setTimeout(resetHint, 4000);
+              if (!pollingStarted) {
+                setHint('Ошибка запроса');
+                setTimeout(resetHint, 4000);
+              }
             }
           });
       }

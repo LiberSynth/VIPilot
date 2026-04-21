@@ -455,6 +455,11 @@
     window.addEventListener('resize', updateVideoWrapHeight);
   }
 
+  window._directorApi = {
+    startBatchPoll: _startActiveBatchPoll,
+    getSelectedMovieId: function() { return _selectedMovieId; },
+  };
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initDirector);
   } else {
