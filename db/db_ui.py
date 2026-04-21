@@ -176,7 +176,24 @@ def db_get_movies_list(show_published=True, show_bad=True, for_approval=False):
                         LIMIT 1
                     ) AS story_title,
                     vm.name AS model_name,
-                    {_published_check} AS published
+                    {_published_check} AS published,
+                    (
+                        SELECT b2.id::text
+                        FROM batches b2
+                        WHERE b2.story_id = (
+                            SELECT b3.story_id FROM batches b3
+                            WHERE b3.movie_id = m.id
+                              AND b3.story_id IS NOT NULL
+                            LIMIT 1
+                        )
+                          AND b2.type != 'story_probe'
+                          AND b2.status IN (
+                              'pending', 'story_generating', 'story_ready',
+                              'video_generating', 'video_pending'
+                          )
+                        ORDER BY b2.created_at DESC
+                        LIMIT 1
+                    ) AS active_batch_id
                 FROM movies m
                 LEFT JOIN ai_models vm ON vm.id = m.model_id
                 {where_clause}
@@ -191,6 +208,7 @@ def db_get_movies_list(show_published=True, show_bad=True, for_approval=False):
             "story_title": row[3] or "",
             "model_name": row[4] or "",
             "published": bool(row[5]),
+            "active_batch_id": row[6],
         }
         for row in rows
     ]

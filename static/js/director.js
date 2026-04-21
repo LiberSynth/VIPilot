@@ -7,6 +7,74 @@
 
   var _selectedMovieId = null;
   var _moviesData      = [];
+  var _pollTimer       = null;
+  var _pollVersion     = 0;
+
+  var _FINAL_STATUSES = [
+    'published', 'published_partially', 'movie_probe', 'story_probe',
+    'cancelled', 'error', 'fatal_error',
+    'video_error', 'transcode_error', 'publish_error', 'donated',
+  ];
+  var _HINT_DEFAULT = 'Вы можете сгенерировать ролик при помощи AI-модели.';
+
+  function _setHint(text) {
+    var el = document.getElementById('director-generate-hint');
+    if (el) el.textContent = text;
+  }
+
+  function _stopActiveBatchPoll() {
+    if (_pollTimer !== null) {
+      clearTimeout(_pollTimer);
+      _pollTimer = null;
+    }
+    _pollVersion++;
+  }
+
+  function _startActiveBatchPoll(batchId, movieId) {
+    _stopActiveBatchPoll();
+    var myVersion = _pollVersion;
+    function poll() {
+      fetch('/api/batch/' + encodeURIComponent(batchId) + '/logs')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (_pollVersion !== myVersion) return;
+          if (!data || data.error) {
+            _pollTimer = setTimeout(poll, 2500);
+            return;
+          }
+          var logs = data.logs || [];
+          var lastLog = logs.length ? logs[logs.length - 1] : null;
+          var lastEntry = lastLog && lastLog.entries && lastLog.entries.length
+            ? lastLog.entries[lastLog.entries.length - 1]
+            : null;
+          if (lastEntry && lastEntry.message) {
+            _setHint(lastEntry.message);
+          }
+          var status = data.batch_status || '';
+          if (_FINAL_STATUSES.indexOf(status) !== -1) {
+            _stopActiveBatchPoll();
+            if (data.has_video_data) {
+              loadMovieInPlayer(movieId);
+            } else {
+              _setHint('Генерация завершилась без видео');
+              var resetVersion = _pollVersion;
+              setTimeout(function() {
+                if (_pollVersion === resetVersion) {
+                  _setHint(_HINT_DEFAULT);
+                }
+              }, 3000);
+            }
+            return;
+          }
+          _pollTimer = setTimeout(poll, 2500);
+        })
+        .catch(function() {
+          if (_pollVersion !== myVersion) return;
+          _pollTimer = setTimeout(poll, 2500);
+        });
+    }
+    poll();
+  }
 
   function gradeKey(g) { return (g === null || g === undefined) ? 'null' : String(g); }
 
@@ -149,9 +217,17 @@
   }
 
   function selectMovie(movieId) {
+    _stopActiveBatchPoll();
+    _setHint(_HINT_DEFAULT);
     _selectedMovieId = movieId || null;
     _updateMovieSelection();
     loadMovieInPlayer(_selectedMovieId);
+    if (_selectedMovieId) {
+      var rec = _moviesData.filter(function(m) { return String(m.id) === String(_selectedMovieId); })[0];
+      if (rec && rec.active_batch_id) {
+        _startActiveBatchPoll(rec.active_batch_id, _selectedMovieId);
+      }
+    }
   }
 
   /* ── рендер списка ── */
