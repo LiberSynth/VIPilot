@@ -335,6 +335,15 @@ def db_delete_bad_movies() -> dict:
     return {"movies": ml_count, "batches": bl_count, "logs": ll_count, "log_entries": le_count}
 
 
+def db_get_batch_status(batch_id: str) -> str | None:
+    """Возвращает текущий статус батча или None если не найден."""
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT status FROM batches WHERE id = %s", (batch_id,))
+            row = cur.fetchone()
+            return row[0] if row else None
+
+
 def db_delete_batch(batch_id: str) -> bool:
     with get_db() as conn:
         with conn.cursor() as cur:

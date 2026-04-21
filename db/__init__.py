@@ -94,5 +94,6 @@ from .db_service import (
     db_delete_bad_stories,
     db_delete_bad_movies,
     db_delete_batch,
+    db_get_batch_status,
 )
 from common.statuses import KNOWN_BATCH_STATUSES

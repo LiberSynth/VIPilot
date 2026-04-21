@@ -41,12 +41,14 @@ from db import (
     db_delete_bad_movies,
     db_set_model_grade,
     db_delete_batch,
+    db_get_batch_status,
 )
 from log import db_get_monitor, log_batch_planned, write_log_entry
 from utils.auth import is_authenticated
 from utils.prompt_params import apply_prompt_params
 from utils.utils import parse_hhmm, to_msk, to_utc_from_msk
 import common.environment as environment
+from common.statuses import ACTIVE_BATCH_STATUSES
 
 bp = Blueprint("api", __name__, url_prefix="/api")
 
@@ -380,6 +382,11 @@ def api_workflow_emulation():
 def api_delete_batch(batch_id):
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
+    if batch_id in environment.get_active_batch_ids():
+        return jsonify({"ok": False, "error": "Батч сейчас активно обрабатывается пайплайном"}), 409
+    batch_status = db_get_batch_status(batch_id)
+    if batch_status in ACTIVE_BATCH_STATUSES:
+        return jsonify({"ok": False, "error": "Нельзя удалить батч в активном статусе"}), 409
     try:
         ok = db_delete_batch(batch_id)
         if not ok:

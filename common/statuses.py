@@ -9,6 +9,10 @@ KNOWN_BATCH_STATUSES = frozenset({
     'published_partially', 'fatal_error',
 })
 
+ACTIVE_BATCH_STATUSES = (
+    'pending', 'story_generating', 'video_pending', 'video_ready', 'transcode_ready',
+)
+
 FINAL_BATCH_STATUSES = (
     'published', 'published_partially', 'movie_probe', 'story_probe',
     'cancelled', 'error', 'fatal_error',

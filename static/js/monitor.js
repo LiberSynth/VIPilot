@@ -70,6 +70,7 @@
 
   const PIPELINE_RESTARTABLE    = ['story', 'video', 'transcode', 'publish'];
   const PIPELINE_ERROR_STATUSES = ['error', 'video_error', 'transcode_error', 'publish_error'];
+  const ACTIVE_BATCH_STATUSES   = ['pending', 'story_generating', 'video_pending', 'video_ready', 'transcode_ready'];
 
   const MON_SVG_EXPAND   = `<svg viewBox="0 0 16 16"><polyline points="2,6 2,2 6,2"/><polyline points="10,2 14,2 14,6"/><polyline points="14,10 14,14 10,14"/><polyline points="6,14 2,14 2,10"/></svg>`;
   const MON_SVG_COLLAPSE = `<svg viewBox="0 0 16 16"><polyline points="6,2 6,6 2,6"/><polyline points="10,2 10,6 14,6"/><polyline points="14,10 10,10 10,14"/><polyline points="2,10 6,10 6,14"/></svg>`;
@@ -229,7 +230,9 @@
         batchVideoBtn +
         '<button class="cycle-float-btn" title="Скопировать логи" onclick="monitorCopy(this)">'          + MON_SVG_COPY + '</button>' +
         '<button class="cycle-float-btn" title="Скопировать инфо" onclick="monitorBatchCopyInfo(this)">' + MON_SVG_INFO + '</button>' +
-        '<button class="cycle-float-btn" title="Удалить батч" onclick="monitorDeleteBatch(\'' + esc(batch.batch_id) + '\',this)">' + MON_SVG_DELETE + '</button>' +
+        (isActive || ACTIVE_BATCH_STATUSES.indexOf(bs) >= 0
+          ? '<button class="cycle-float-btn btn-blocked" title="Удалить батч" data-warn="1" onclick="monitorDeleteBatch(\'' + esc(batch.batch_id) + '\',this)">' + MON_SVG_DELETE + '</button>'
+          : '<button class="cycle-float-btn" title="Удалить батч" onclick="monitorDeleteBatch(\'' + esc(batch.batch_id) + '\',this)">' + MON_SVG_DELETE + '</button>') +
       '</div>';
 
     return '<div class="monitor-batch bs-' + esc(bs) + '" data-bid="' + esc(batch.batch_id) +
@@ -753,29 +756,44 @@
   window.groupLogsByPipeline = groupLogsByPipeline;
   window.renderLogItem       = renderLogItem;
 
-  function _buildDeleteBatchOverlay(batchId) {
+  function _buildDeleteBatchOverlay(batchId, isBlocked) {
     var el = document.createElement('div');
     el.className = 'confirm-overlay open';
     el.id = 'deleteBatchOverlay';
-    el.innerHTML =
-      '<div class="confirm-box">' +
-        '<div class="confirm-box-title">Удалить батч?</div>' +
-        '<div class="confirm-box-text">' +
-          'Батч и все связанные данные (логи, видео) будут удалены без возможности восстановления.<br><br>' +
-          'Сюжеты (stories) не затрагиваются.' +
-        '</div>' +
-        '<div class="confirm-box-btns">' +
-          '<button class="confirm-cancel" onclick="monitorCloseDeleteBatch()">Отмена</button>' +
-          '<button class="confirm-confirm" id="deleteBatchConfirmBtn" onclick="monitorConfirmDeleteBatch(\'' + batchId + '\')">Удалить</button>' +
-        '</div>' +
-      '</div>';
+    if (isBlocked) {
+      el.innerHTML =
+        '<div class="confirm-box">' +
+          '<div class="confirm-box-title">Удаление невозможно</div>' +
+          '<div class="confirm-box-text">' +
+            '<div class="confirm-box-warn">Батч находится в активном статусе. Удаление заблокировано — дождитесь завершения обработки.</div>' +
+            'Сюжеты (stories) не затрагиваются.' +
+          '</div>' +
+          '<div class="confirm-box-btns">' +
+            '<button class="confirm-cancel" onclick="monitorCloseDeleteBatch()">Закрыть</button>' +
+          '</div>' +
+        '</div>';
+    } else {
+      el.innerHTML =
+        '<div class="confirm-box">' +
+          '<div class="confirm-box-title">Удалить батч?</div>' +
+          '<div class="confirm-box-text">' +
+            'Батч и все связанные данные (логи, видео) будут удалены без возможности восстановления.<br><br>' +
+            'Сюжеты (stories) не затрагиваются.' +
+          '</div>' +
+          '<div class="confirm-box-btns">' +
+            '<button class="confirm-cancel" onclick="monitorCloseDeleteBatch()">Отмена</button>' +
+            '<button class="confirm-confirm" id="deleteBatchConfirmBtn" onclick="monitorConfirmDeleteBatch(\'' + batchId + '\')">Удалить</button>' +
+          '</div>' +
+        '</div>';
+    }
     return el;
   }
 
-  window.monitorDeleteBatch = function(batchId, _btn) {
+  window.monitorDeleteBatch = function(batchId, btn) {
     var existing = document.getElementById('deleteBatchOverlay');
     if (existing) existing.remove();
-    document.body.appendChild(_buildDeleteBatchOverlay(batchId));
+    var isBlocked = !!(btn && btn.dataset && btn.dataset.warn);
+    document.body.appendChild(_buildDeleteBatchOverlay(batchId, isBlocked));
   };
 
   window.monitorCloseDeleteBatch = function() {
