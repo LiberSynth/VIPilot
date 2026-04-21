@@ -74,16 +74,30 @@ def db_get_batch_logs(batch_id):
     }
 
 
-def db_get_stories_list(show_used=True, show_bad=True, for_approval=False, pin_id=None):
+def db_get_stories_list(show_used=True, show_bad=True, for_approval=False, pin_id=None, approve_movies: bool = True):
     from common.statuses import FINAL_BATCH_STATUSES
     final_statuses_sql = ', '.join(f"'{s}'" for s in FINAL_BATCH_STATUSES)
+    if approve_movies:
+        used_expr = """EXISTS (
+                        SELECT 1 FROM batches b
+                        JOIN movies m ON m.id = b.movie_id
+                        WHERE b.story_id = s.id AND b.movie_id IS NOT NULL
+                          AND m.grade = 'good'
+                    )"""
+    else:
+        used_expr = """EXISTS (
+                        SELECT 1 FROM batches b
+                        JOIN movies m ON m.id = b.movie_id
+                        WHERE b.story_id = s.id AND b.movie_id IS NOT NULL
+                          AND (m.grade IS NULL OR m.grade != 'bad')
+                    )"""
     filter_conditions = []
     if for_approval:
         filter_conditions.append("s.grade IS NULL")
-        filter_conditions.append("NOT EXISTS (SELECT 1 FROM batches b WHERE b.story_id = s.id AND b.movie_id IS NOT NULL)")
+        filter_conditions.append(f"NOT ({used_expr})")
     else:
         if not show_used:
-            filter_conditions.append("NOT EXISTS (SELECT 1 FROM batches b WHERE b.story_id = s.id AND b.movie_id IS NOT NULL)")
+            filter_conditions.append(f"NOT ({used_expr})")
         if not show_bad:
             filter_conditions.append("s.grade = 'good'")
     params = []
@@ -105,16 +119,9 @@ def db_get_stories_list(show_used=True, show_bad=True, for_approval=False, pin_i
                     s.grade,
                     s.manual_changed,
                     s.model_id IS NOT NULL AS ai_generated,
-                    EXISTS (
-                        SELECT 1 FROM batches b
-                        WHERE b.story_id = s.id AND b.movie_id IS NOT NULL
-                    ) AS used,
+                    {used_expr} AS used,
                     am.name AS model_name,
                     s.pinned,
-                    EXISTS (
-                        SELECT 1 FROM batches b
-                        WHERE b.story_id = s.id AND b.movie_id IS NOT NULL
-                    ) AS has_movie,
                     EXISTS (
                         SELECT 1 FROM batches b
                         WHERE b.story_id = s.id
@@ -137,8 +144,7 @@ def db_get_stories_list(show_used=True, show_bad=True, for_approval=False, pin_i
             "used": bool(row[6]),
             "model_name": row[7] or "",
             "pinned": bool(row[8]),
-            "has_movie": bool(row[9]),
-            "has_active_batch": bool(row[10]),
+            "has_active_batch": bool(row[9]),
         }
         for row in rows
     ]
@@ -214,13 +220,17 @@ def db_get_movies_list(show_published=True, show_bad=True, for_approval=False):
     ]
 
 
-def db_get_stories_pool(grade_required: bool = True) -> list:
+def db_get_stories_pool(grade_required: bool = True, approve_movies: bool = True) -> list:
     with get_db() as conn:
         with conn.cursor() as cur:
             if grade_required:
                 grade_clause = "grade = 'good'"
             else:
                 grade_clause = "(grade IS NULL OR grade != 'bad')"
+            if approve_movies:
+                busy_clause = "m.grade = 'good'"
+            else:
+                busy_clause = "(m.grade IS NULL OR m.grade != 'bad')"
             cur.execute(f"""
                 SELECT id::text, title, content
                 FROM stories
@@ -230,7 +240,7 @@ def db_get_stories_pool(grade_required: bool = True) -> list:
                       JOIN movies m ON m.id = b.movie_id
                       WHERE b.story_id = stories.id
                         AND b.movie_id IS NOT NULL
-                        AND (m.grade IS NULL OR m.grade != 'bad')
+                        AND {busy_clause}
                   )
                 ORDER BY created_at DESC
             """)
@@ -238,15 +248,20 @@ def db_get_stories_pool(grade_required: bool = True) -> list:
     return [{"id": row[0], "title": row[1] or "", "content": row[2] or ""} for row in rows]
 
 
-def db_count_good_pool() -> int:
+def db_count_good_pool(grade_required: bool = True) -> int:
     with get_db() as conn:
         with conn.cursor() as cur:
-            cur.execute("""
+            if grade_required:
+                grade_clause = "grade = 'good' AND"
+            else:
+                grade_clause = ""
+            cur.execute(f"""
                 SELECT COUNT(*) FROM stories
-                WHERE grade = 'good'
-                  AND NOT EXISTS (
+                WHERE {grade_clause}
+                  NOT EXISTS (
                       SELECT 1 FROM batches b
-                      WHERE b.story_id = stories.id AND b.movie_id IS NOT NULL
+                      WHERE b.story_id = stories.id
+                        AND b.type != 'story_probe'
                   )
             """)
             row = cur.fetchone()

@@ -497,7 +497,8 @@ def api_production_stories():
     show_bad = request.args.get("show_bad", "1") != "0"
     for_approval = request.args.get("for_approval", "0") == "1"
     pin_id = request.args.get("pin_id") or None
-    stories = db_get_stories_list(show_used=show_used, show_bad=show_bad, for_approval=for_approval, pin_id=pin_id)
+    approve_movies = db_get("approve_movies", "0") == "1"
+    stories = db_get_stories_list(show_used=show_used, show_bad=show_bad, for_approval=for_approval, pin_id=pin_id, approve_movies=approve_movies)
     return jsonify(stories)
 
 
@@ -522,7 +523,8 @@ def api_production_stories_pool():
     if err:
         return err
     approve_stories = db_get("approve_stories", "0") == "1"
-    stories = db_get_stories_pool(grade_required=approve_stories)
+    approve_movies = db_get("approve_movies", "0") == "1"
+    stories = db_get_stories_pool(grade_required=approve_stories, approve_movies=approve_movies)
     return jsonify(stories)
 
 
@@ -531,7 +533,8 @@ def api_production_good_pool_count():
     err = _production_auth_check()
     if err:
         return err
-    return jsonify({"count": db_count_good_pool()})
+    approve_stories = db_get("approve_stories", "0") == "1"
+    return jsonify({"count": db_count_good_pool(grade_required=approve_stories)})
 
 
 @production_bp.route("/production/env", methods=["POST"])
