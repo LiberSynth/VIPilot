@@ -242,18 +242,14 @@ def db_clear_stories() -> dict:
         with conn.cursor() as cur:
             final_statuses_sql = ', '.join(f"'{s}'" for s in FINAL_BATCH_STATUSES)
             cur.execute(f"""
-                SELECT id FROM stories
-                WHERE (grade IS NULL OR grade = 'bad')
-                  AND NOT pinned
-                  AND id NOT IN (
-                      SELECT DISTINCT story_id FROM batches
-                      WHERE story_id IS NOT NULL AND movie_id IS NOT NULL
-                  )
-                  AND id NOT IN (
-                      SELECT DISTINCT story_id FROM batches
-                      WHERE story_id IS NOT NULL
-                        AND status NOT IN ({final_statuses_sql})
-                  )
+                SELECT DISTINCT s.id
+                FROM stories s
+                LEFT JOIN batches b
+                       ON b.story_id = s.id
+                      AND (b.movie_id IS NOT NULL OR b.status NOT IN ({final_statuses_sql}))
+                WHERE (s.grade IS NULL OR s.grade = 'bad')
+                  AND NOT s.pinned
+                  AND b.id IS NULL
             """)
             story_ids = [r[0] for r in cur.fetchall()]
 
