@@ -107,11 +107,12 @@ def db_get_stories_list(show_used=True, show_bad=True, for_approval=False, pin_i
                         SELECT 1 FROM batches b
                         WHERE b.story_id = s.id AND b.movie_id IS NOT NULL
                     ) AS used,
-                    am.name AS model_name
+                    am.name AS model_name,
+                    s.pinned
                 FROM stories s
                 LEFT JOIN ai_models am ON am.id = s.model_id
                 {where_clause}
-                ORDER BY used ASC, s.created_at DESC
+                ORDER BY s.pinned DESC, used ASC, s.created_at DESC
             """, params or None)
             rows = cur.fetchall()
     return [
@@ -124,6 +125,7 @@ def db_get_stories_list(show_used=True, show_bad=True, for_approval=False, pin_i
             "ai_generated": bool(row[5]),
             "used": bool(row[6]),
             "model_name": row[7] or "",
+            "pinned": bool(row[8]),
         }
         for row in rows
     ]

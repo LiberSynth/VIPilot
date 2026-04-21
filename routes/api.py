@@ -31,6 +31,7 @@ from db import (
     db_get_stories_pool,
     db_count_good_pool,
     db_set_story_grade,
+    db_set_story_pinned,
     db_get_movies_list,
     db_set_movie_grade,
     db_upsert_story_draft,
@@ -490,6 +491,21 @@ def api_production_stories():
     pin_id = request.args.get("pin_id") or None
     stories = db_get_stories_list(show_used=show_used, show_bad=show_bad, for_approval=for_approval, pin_id=pin_id)
     return jsonify(stories)
+
+
+@production_bp.route("/production/story/<story_id>/pin", methods=["POST"])
+def api_production_story_pin(story_id):
+    err = _production_auth_check()
+    if err:
+        return err
+    data = request.get_json(silent=True) or {}
+    value = data.get("pinned")
+    if not isinstance(value, bool):
+        return jsonify({"error": "pinned must be boolean"}), 400
+    ok = db_set_story_pinned(story_id, value)
+    if not ok:
+        return jsonify({"error": "not found"}), 404
+    return jsonify({"ok": True})
 
 
 @production_bp.route("/production/stories/pool", methods=["GET"])

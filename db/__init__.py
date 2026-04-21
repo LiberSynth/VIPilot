@@ -20,6 +20,7 @@ from .db_simple import (
     db_create_story,
     db_set_story_grade,
     db_set_movie_grade,
+    db_set_story_pinned,
     db_set_story_top_quality,
     db_get_story_text,
     db_get_story_title,

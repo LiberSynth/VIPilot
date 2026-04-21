@@ -30,7 +30,12 @@ from log.log import write_log_entry
 # ---------------------------------------------------------------------------
 
 # Миграции 1–70 удалены: задеплоены на prod 2026-04-20, db_version = 70.
-# Следующая миграция: _m072_...
+# Следующая миграция: _m073_...
+
+
+def _m072_stories_pinned(cur):
+    """Добавляет поле pinned в таблицу stories."""
+    cur.execute("ALTER TABLE stories ADD COLUMN IF NOT EXISTS pinned BOOL NOT NULL DEFAULT FALSE")
 
 
 def _m071_donor_good_only(cur):
@@ -90,6 +95,7 @@ def _m071_donor_good_only(cur):
 
 MIGRATIONS = [
     (71, _m071_donor_good_only),
+    (72, _m072_stories_pinned),
 ]
 
 

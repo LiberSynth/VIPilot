@@ -194,9 +194,16 @@ var getDraftStoryId;
         label + '</button>';
       var exportBtn = '<button class="story-icon story-export-btn" data-id="' + s.id + '" title="Выгрузить">' +
         (window.EXPORT_STORY_SVG || '') + '</button>';
+      var pinTitle = s.pinned ? 'Закреплён' : 'Закрепить';
+      var pinBtn = '<button class="story-icon story-pin-btn' + (s.pinned ? ' story-pin-btn--active' : '') + '" data-id="' + s.id + '" data-pinned="' + (s.pinned ? '1' : '0') + '" title="' + pinTitle + '">' +
+        '<svg viewBox="0 0 16 16" fill="' + (s.pinned ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
+        '<line x1="8" y1="10" x2="8" y2="15"/>' +
+        '<path d="M5 2 L5 7 L2 10 L14 10 L11 7 L11 2 Z"/>' +
+        '<line x1="5" y1="2" x2="11" y2="2"/>' +
+        '</svg></button>';
       html += '<div class="story-row" data-id="' + s.id + '" data-used="' + (s.used ? '1' : '0') + '">' +
         '<div class="story-title">' + escapeHtml(s.title || '(без названия)') + modelLabel + ' ' + gradeBadge + '</div>' +
-        '<div class="story-row-right">' + icons + exportBtn + '</div>' +
+        '<div class="story-row-right">' + icons + pinBtn + exportBtn + '</div>' +
       '</div>';
     }
     container.innerHTML = html;
@@ -213,6 +220,20 @@ var getDraftStoryId;
         }
         _updateSelectedRow();
         cycleGrade(btn);
+      });
+    });
+    container.querySelectorAll('.story-pin-btn').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var storyId = btn.getAttribute('data-id');
+        var currentPinned = btn.getAttribute('data-pinned') === '1';
+        fetch('/production/story/' + storyId + '/pin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pinned: !currentPinned })
+        }).then(function() {
+          if (typeof window.loadStoryList === 'function') window.loadStoryList();
+        });
       });
     });
     container.querySelectorAll('.story-export-btn').forEach(function(btn) {

@@ -248,6 +248,18 @@ def db_set_story_grade(story_id, grade):
     return updated > 0
 
 
+def db_set_story_pinned(story_id, value: bool):
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE stories SET pinned = %s WHERE id = %s::uuid",
+                (value, story_id),
+            )
+            updated = cur.rowcount
+        conn.commit()
+    return updated > 0
+
+
 def db_set_story_top_quality(story_id, value: bool):
     with get_db() as conn:
         with conn.cursor() as cur:
