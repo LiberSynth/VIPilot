@@ -201,9 +201,17 @@ var getDraftStoryId;
         '<path d="M5 2 L5 7 L2 10 L14 10 L11 7 L11 2 Z"/>' +
         '<line x1="5" y1="2" x2="11" y2="2"/>' +
         '</svg></button>';
+      var deleteDisabled = s.pinned || s.has_movie || s.has_active_batch;
+      var deleteTitle = deleteDisabled
+        ? (s.pinned ? 'Нельзя удалить: сюжет закреплён' : (s.has_movie ? 'Нельзя удалить: есть готовое видео' : 'Нельзя удалить: есть активный батч'))
+        : 'Удалить сюжет';
+      var deleteBtn = '<button class="story-icon story-delete-btn" data-id="' + s.id + '" title="' + deleteTitle + '"' + (deleteDisabled ? ' disabled' : '') + '>' +
+        '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
+        '<polyline points="2,4 14,4"/><path d="M6 4V2h4v2"/><rect x="3" y="4" width="10" height="10" rx="1.5"/><line x1="6" y1="7" x2="6" y2="11"/><line x1="10" y1="7" x2="10" y2="11"/>' +
+        '</svg></button>';
       html += '<div class="story-row" data-id="' + s.id + '" data-used="' + (s.used ? '1' : '0') + '">' +
         '<div class="story-title">' + escapeHtml(s.title || '(без названия)') + modelLabel + ' ' + gradeBadge + '</div>' +
-        '<div class="story-row-right">' + icons + pinBtn + exportBtn + '</div>' +
+        '<div class="story-row-right">' + icons + pinBtn + deleteBtn + exportBtn + '</div>' +
       '</div>';
     }
     container.innerHTML = html;
@@ -241,6 +249,14 @@ var getDraftStoryId;
         e.stopPropagation();
         var storyId = btn.getAttribute('data-id');
         if (typeof window.exportStory === 'function') window.exportStory(storyId, btn);
+      });
+    });
+    container.querySelectorAll('.story-delete-btn').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        if (btn.disabled) return;
+        var storyId = btn.getAttribute('data-id');
+        _openDeleteStoryDialog(storyId, btn);
       });
     });
     container.querySelectorAll('.story-row').forEach(function(row) {
@@ -294,6 +310,49 @@ var getDraftStoryId;
       var sel = container.querySelector('.story-row[data-id="' + currentId + '"]');
       if (sel) sel.classList.add('story-row--selected');
     }
+  }
+
+  function _openDeleteStoryDialog(storyId, triggerBtn) {
+    var existing = document.getElementById('deleteStoryOverlay');
+    if (existing) existing.remove();
+    var el = document.createElement('div');
+    el.className = 'confirm-overlay open';
+    el.id = 'deleteStoryOverlay';
+    el.innerHTML =
+      '<div class="confirm-box">' +
+        '<div class="confirm-box-title">Удалить сюжет?</div>' +
+        '<div class="confirm-box-text">' +
+          'Сюжет и все связанные батчи, лог и записи лога будут удалены безвозвратно.' +
+        '</div>' +
+        '<div class="confirm-box-btns">' +
+          '<button class="confirm-cancel" id="deleteStoryCancelBtn">Отмена</button>' +
+          '<button class="confirm-confirm" id="deleteStoryConfirmBtn" style="background:#b05820">Удалить</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(el);
+    document.getElementById('deleteStoryCancelBtn').addEventListener('click', function() {
+      var overlay = document.getElementById('deleteStoryOverlay');
+      if (overlay) overlay.remove();
+    });
+    document.getElementById('deleteStoryConfirmBtn').addEventListener('click', function() {
+      var confirmBtn = document.getElementById('deleteStoryConfirmBtn');
+      if (confirmBtn) { confirmBtn.disabled = true; confirmBtn.textContent = 'Удаление…'; }
+      fetch('/production/story/' + encodeURIComponent(storyId) + '/delete', { method: 'DELETE' })
+        .then(function(r) { return r.ok ? r.json() : r.json().then(function(d) { throw d; }); })
+        .then(function() {
+          var overlay = document.getElementById('deleteStoryOverlay');
+          if (overlay) overlay.remove();
+          var row = document.querySelector('.story-row[data-id="' + storyId + '"]');
+          if (row) row.remove();
+          if (typeof window.loadStoryList === 'function') window.loadStoryList();
+        })
+        .catch(function(d) {
+          var overlay = document.getElementById('deleteStoryOverlay');
+          if (overlay) overlay.remove();
+          var msg = (d && d.error) ? d.error : 'Ошибка удаления';
+          if (typeof window.showToast === 'function') window.showToast(msg);
+        });
+    });
   }
 
   function cycleGrade(btn) {

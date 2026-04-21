@@ -1,6 +1,7 @@
 from .connection import get_db
 from common.statuses import FINAL_BATCH_STATUSES
 from log.log import write_log_entry
+from utils.utils import fmt_id_msg
 
 
 def db_log_update(log_id, message, status):
@@ -371,6 +372,41 @@ def db_delete_batch(batch_id: str) -> bool:
                 cur.execute("DELETE FROM movies WHERE id = %s", (movie_id,))
         conn.commit()
     return deleted > 0
+
+
+def db_delete_story(story_id: str) -> dict:
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM batches WHERE story_id = %s", (story_id,))
+            batch_ids = [r[0] for r in cur.fetchall()]
+
+            le_count = 0
+            ll_count = 0
+            bl_count = 0
+
+            if batch_ids:
+                bfmt = ','.join(['%s'] * len(batch_ids))
+                cur.execute(f"""
+                    DELETE FROM log_entries
+                    WHERE log_id IN (
+                        SELECT id FROM log WHERE batch_id IN ({bfmt})
+                    )
+                """, batch_ids)
+                le_count = cur.rowcount
+
+                cur.execute(f"DELETE FROM log WHERE batch_id IN ({bfmt})", batch_ids)
+                ll_count = cur.rowcount
+
+                cur.execute(f"DELETE FROM batches WHERE id IN ({bfmt})", batch_ids)
+                bl_count = cur.rowcount
+
+            cur.execute("DELETE FROM stories WHERE id = %s", (story_id,))
+            sl_count = cur.rowcount
+
+        conn.commit()
+
+    write_log_entry(None, fmt_id_msg("[DB] Удалён сюжет {}: batches=" + str(bl_count) + ", log=" + str(ll_count) + ", log_entries=" + str(le_count), story_id), level='silent')
+    return {"stories": sl_count, "batches": bl_count, "logs": ll_count, "log_entries": le_count}
 
 
 def db_cleanup_batches(batch_lifetime_days: int) -> int:

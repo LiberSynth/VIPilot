@@ -75,6 +75,8 @@ def db_get_batch_logs(batch_id):
 
 
 def db_get_stories_list(show_used=True, show_bad=True, for_approval=False, pin_id=None):
+    from common.statuses import FINAL_BATCH_STATUSES
+    final_statuses_sql = ', '.join(f"'{s}'" for s in FINAL_BATCH_STATUSES)
     filter_conditions = []
     if for_approval:
         filter_conditions.append("s.grade IS NULL")
@@ -108,7 +110,16 @@ def db_get_stories_list(show_used=True, show_bad=True, for_approval=False, pin_i
                         WHERE b.story_id = s.id AND b.movie_id IS NOT NULL
                     ) AS used,
                     am.name AS model_name,
-                    s.pinned
+                    s.pinned,
+                    EXISTS (
+                        SELECT 1 FROM batches b
+                        WHERE b.story_id = s.id AND b.movie_id IS NOT NULL
+                    ) AS has_movie,
+                    EXISTS (
+                        SELECT 1 FROM batches b
+                        WHERE b.story_id = s.id
+                          AND b.status NOT IN ({final_statuses_sql})
+                    ) AS has_active_batch
                 FROM stories s
                 LEFT JOIN ai_models am ON am.id = s.model_id
                 {where_clause}
@@ -126,6 +137,8 @@ def db_get_stories_list(show_used=True, show_bad=True, for_approval=False, pin_i
             "used": bool(row[6]),
             "model_name": row[7] or "",
             "pinned": bool(row[8]),
+            "has_movie": bool(row[9]),
+            "has_active_batch": bool(row[10]),
         }
         for row in rows
     ]

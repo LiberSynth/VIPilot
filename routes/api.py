@@ -42,6 +42,7 @@ from db import (
     db_set_model_grade,
     db_delete_batch,
     db_get_batch_status,
+    db_delete_story,
 )
 from log import db_get_monitor, log_batch_planned, write_log_entry
 from utils.auth import is_authenticated
@@ -606,6 +607,48 @@ def api_production_story_grade(story_id):
     if ok is None or ok is False:
         return jsonify({"error": "not_found"}), 404
     return jsonify({"ok": True, "grade": grade})
+
+
+@production_bp.route("/production/story/<story_id>/delete", methods=["DELETE"])
+def api_production_story_delete(story_id):
+    err = _production_auth_check()
+    if err:
+        return err
+    from db.connection import get_db
+    from common.statuses import FINAL_BATCH_STATUSES
+    final_statuses_sql = ', '.join(f"'{s}'" for s in FINAL_BATCH_STATUSES)
+    conflict_error = None
+    not_found = False
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT pinned FROM stories WHERE id = %s", (story_id,))
+            row = cur.fetchone()
+            if not row:
+                not_found = True
+            elif row[0]:
+                conflict_error = "Сюжет закреплён и не может быть удалён"
+            else:
+                cur.execute(
+                    "SELECT 1 FROM batches WHERE story_id = %s AND movie_id IS NOT NULL LIMIT 1",
+                    (story_id,),
+                )
+                if cur.fetchone():
+                    conflict_error = "К сюжету привязано готовое видео"
+                else:
+                    cur.execute(
+                        f"SELECT 1 FROM batches WHERE story_id = %s AND status NOT IN ({final_statuses_sql}) LIMIT 1",
+                        (story_id,),
+                    )
+                    if cur.fetchone():
+                        conflict_error = "Сюжет участвует в активном батче"
+    if not_found:
+        return jsonify({"error": "not found"}), 404
+    if conflict_error:
+        return jsonify({"error": conflict_error}), 409
+    result = db_delete_story(story_id)
+    if result["stories"] == 0:
+        return jsonify({"error": "not found"}), 404
+    return jsonify({"ok": True, "deleted": result})
 
 
 @production_bp.route("/production/story/draft", methods=["POST"])
