@@ -242,7 +242,8 @@ def db_delete_bad_stories() -> dict:
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT id FROM stories
-                WHERE grade = 'bad'
+                WHERE (grade IS NULL OR grade = 'bad')
+                  AND NOT pinned
                   AND id NOT IN (
                       SELECT DISTINCT story_id FROM batches
                       WHERE story_id IS NOT NULL AND movie_id IS NOT NULL
@@ -252,7 +253,7 @@ def db_delete_bad_stories() -> dict:
 
             if not story_ids:
                 conn.commit()
-                write_log_entry(None, "[DB] Удалены неудачные сюжеты: stories=0, batches=0, log=0, log_entries=0", level='silent')
+                write_log_entry(None, "[DB] Очистка сюжетов: stories=0, batches=0, log=0, log_entries=0", level='silent')
                 return {"stories": 0, "batches": 0, "logs": 0, "log_entries": 0}
 
             fmt = ','.join(['%s'] * len(story_ids))
@@ -285,7 +286,7 @@ def db_delete_bad_stories() -> dict:
 
         conn.commit()
 
-    write_log_entry(None, f"[DB] Удалены неудачные сюжеты: stories={sl_count}, batches={bl_count}, log={ll_count}, log_entries={le_count}", level='silent')
+    write_log_entry(None, f"[DB] Очистка сюжетов: stories={sl_count}, batches={bl_count}, log={ll_count}, log_entries={le_count}", level='silent')
     return {"stories": sl_count, "batches": bl_count, "logs": ll_count, "log_entries": le_count}
 
 

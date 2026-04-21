@@ -706,7 +706,7 @@ var getDraftStoryId;
   }
 })();
 
-/* ── Кнопка «Удалить неудачные» сюжеты ── */
+/* ── Кнопка «Очистить» сюжеты ── */
 (function() {
   function _closeDeleteBadDialog() {
     var el = document.getElementById('deleteBadStoriesOverlay');
@@ -721,9 +721,9 @@ var getDraftStoryId;
     el.id = 'deleteBadStoriesOverlay';
     el.innerHTML =
       '<div class="confirm-box">' +
-        '<div class="confirm-box-title">Удалить неудачные сюжеты?</div>' +
+        '<div class="confirm-box-title">Очистить сюжеты?</div>' +
         '<div class="confirm-box-text">' +
-          'Будут удалены все сюжеты с оценкой «плохо», по которым не создавалось видео,<br>а также связанные с ними батчи и записи лога.' +
+          'Будут удалены все незакреплённые сюжеты без оценки или с оценкой «плохо», по которым не создавалось видео,<br>а также связанные с ними батчи и записи лога.' +
         '</div>' +
         '<div class="confirm-box-btns">' +
           '<button class="confirm-cancel" id="deleteBadCancelBtn">Отмена</button>' +
