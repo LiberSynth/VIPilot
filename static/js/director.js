@@ -53,6 +53,7 @@
           var status = data.batch_status || '';
           if (_FINAL_STATUSES.indexOf(status) !== -1) {
             _stopActiveBatchPoll();
+            if (typeof window.loadMovieList === 'function') window.loadMovieList();
             if (data.has_video_data) {
               loadMovieInPlayer(movieId);
             } else {
