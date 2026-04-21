@@ -186,7 +186,8 @@
   function updateVideoWrapHeight() {
     var wrap = document.getElementById('director-video-wrap');
     if (!wrap) return;
-    wrap.style.height = Math.round(window.innerHeight / 1.618) + 'px';
+    var h = Math.min(wrap.offsetWidth / 9 * 16, window.innerHeight / 1.618);
+    wrap.style.height = Math.round(h) + 'px';
   }
 
   /* ── плеер ── */
