@@ -112,7 +112,7 @@ def db_get_stories_list(show_used=True, show_bad=True, for_approval=False, pin_i
                 FROM stories s
                 LEFT JOIN ai_models am ON am.id = s.model_id
                 {where_clause}
-                ORDER BY s.pinned DESC, used ASC, s.created_at DESC
+                ORDER BY used ASC, s.created_at DESC
             """, params or None)
             rows = cur.fetchall()
     return [
