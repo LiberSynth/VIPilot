@@ -26,10 +26,10 @@ from db import (
 import common.environment as environment
 from utils.auth import is_authenticated
 from utils.limiter import limiter
+from services.dzen_browser import get_session_saved_at as _dzen_saved_at
 from utils.utils import (
     parse_batch_lifetime,
-    parse_entries_lifetime,
-    parse_log_lifetime,
+    parse_long_lifetime,
     parse_file_lifetime,
 )
 
@@ -129,8 +129,8 @@ def root_page():
     text_prompt     = db_get("text_prompt", "")
     format_prompt   = db_get("format_prompt", "")
     batch_lifetime     = parse_batch_lifetime(db_get("batch_lifetime", "7"))
-    log_lifetime       = parse_log_lifetime(db_get("log_lifetime", "365"))
-    entries_lifetime   = parse_entries_lifetime(db_get("entries_lifetime", "30"))
+    log_lifetime       = parse_long_lifetime(db_get("log_lifetime", "365"))
+    entries_lifetime   = parse_long_lifetime(db_get("entries_lifetime", "30"), default=30)
     file_lifetime      = parse_file_lifetime(db_get("file_lifetime", "7"))
     emulation_mode     = environment.emulation_mode
     use_donor          = environment.use_donor
@@ -160,7 +160,6 @@ def root_page():
     dzen_publisher_id = dzen_config.get("publisher_id", "")
     dzen_target_id = dzen_target["id"] if dzen_target else None
     dzen_active    = bool(dzen_target.get("active")) if dzen_target else False
-    from services.dzen_browser import get_session_saved_at as _dzen_saved_at
     dzen_session_saved_at = _dzen_saved_at()
 
     active_targets  = db_get_active_targets()
@@ -285,8 +284,8 @@ def save():
     file_lifetime_raw    = request.form.get("file_lifetime",    "").strip()
 
     if entries_lifetime_raw or log_lifetime_raw or batch_lifetime_raw:
-        el  = parse_entries_lifetime(entries_lifetime_raw or db_get("entries_lifetime", "30"))
-        ll  = parse_log_lifetime(log_lifetime_raw         or db_get("log_lifetime",     "365"))
+        el  = parse_long_lifetime(entries_lifetime_raw or db_get("entries_lifetime", "30"), default=30)
+        ll  = parse_long_lifetime(log_lifetime_raw     or db_get("log_lifetime",     "365"))
         bl  = parse_batch_lifetime(batch_lifetime_raw     or db_get("batch_lifetime",   "7"))
         if el <= ll <= bl:
             db_set("entries_lifetime", str(el))
@@ -411,7 +410,6 @@ def module_page(slug):
             return redirect(url_for("web.select_module"))
         return redirect(url_for("web.login"))
     from jinja2 import TemplateNotFound
-    from utils.version import VERSION as APP_VERSION
     try:
         resp = make_response(render_template(f"{slug}.html", app_version=APP_VERSION, nav_modules=_nav_modules(slug)))
     except TemplateNotFound:

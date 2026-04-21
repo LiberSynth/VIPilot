@@ -399,8 +399,6 @@ def run(batch_id, log_id):
         write_log_entry(log_id, f"URL: {video_url}")
         write_log_entry(log_id, f"[video] Готово: batch → video_ready, url={video_url[:60]}…")
 
-    except AppException:
-        raise
     except AspectRatioConflictError as e:
         msg = str(e)
         db_log_update(log_id, msg, 'error')

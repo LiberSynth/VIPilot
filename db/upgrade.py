@@ -17,7 +17,8 @@ import subprocess
 
 from utils._build import BUILD
 from db import env_get, env_set
-from db.init import _bootstrap, run_migrations, seed_db
+from db.init import bootstrap, run_migrations, seed_db
+from common.exceptions import FatalError
 from log.log import write_log_entry
 
 _BUILD_KEY = 'build_number'
@@ -114,10 +115,6 @@ def _check_chromium() -> tuple[bool, str]:
         return False, f'chromium: {e}'
 
 
-class FatalError(RuntimeError):
-    """Фатальная ошибка апгрейда — приложение не должно запускаться."""
-
-
 def _check_model_durations() -> tuple[bool, str]:
     try:
         from db.connection import get_db
@@ -197,14 +194,14 @@ def check_upgrade() -> bool:
     """
     Инициализирует БД и возвращает True если приложение обновилось с последнего запуска.
 
-    _bootstrap() и seed_db() вызываются только если база совсем новая (build_number отсутствует).
+    bootstrap() и seed_db() вызываются только если база совсем новая (build_number отсутствует).
     run_migrations() вызывается при каждом старте — и на деве, и на проде.
     На проде дополнительно: проверка окружения, пост-миграционные проверки, запись build_number.
     """
     if os.environ.get('REPLIT_DEPLOYMENT') != '1':
         stored = env_get(_BUILD_KEY, '')
         if not stored:
-            _bootstrap()
+            bootstrap()
             seed_db()
         run_migrations()
         _run_post_migration_checks()
@@ -212,7 +209,7 @@ def check_upgrade() -> bool:
 
     stored = env_get(_BUILD_KEY, '')
     if not stored:
-        _bootstrap()
+        bootstrap()
 
     if stored == BUILD:
         return False

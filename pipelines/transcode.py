@@ -86,93 +86,89 @@ def _ffmpeg(src, dst, log_id):
 
 def run(batch_id, log_id):
     snap = environment.snapshot()
-    try:
-        batch = db_get_batch_by_id(batch_id)
-        if not batch:
+    batch = db_get_batch_by_id(batch_id)
+    if not batch:
+        return
+
+    if batch['status'] not in ('video_ready', 'transcoding'):
+        return
+
+    if batch['status'] == 'video_ready':
+        if not db_claim_batch_status(batch_id, 'video_ready', 'transcoding'):
             return
 
-        if batch['status'] not in ('video_ready', 'transcoding'):
-            return
+    is_probe = batch['type'] == 'movie_probe'
 
-        if batch['status'] == 'video_ready':
-            if not db_claim_batch_status(batch_id, 'video_ready', 'transcoding'):
-                return
+    if not is_probe and check_cancelled('transcode', batch_id, batch, log_id):
+        return
 
-        is_probe = batch['type'] == 'movie_probe'
+    if is_probe:
+        target       = 'пробный'
+        do_transcode = True
+    else:
+        active_targets = db_get_active_targets()
+        tgt          = active_targets[0] if active_targets else {}
+        target       = tgt.get('name') or 'adhoc'
+        do_transcode = bool(tgt.get('transcode', True))
 
-        if not is_probe and check_cancelled('transcode', batch_id, batch, log_id):
-            return
-
-        if is_probe:
-            target       = 'пробный'
-            do_transcode = True
-        else:
-            active_targets = db_get_active_targets()
-            tgt          = active_targets[0] if active_targets else {}
-            target       = tgt.get('name') or 'adhoc'
-            do_transcode = bool(tgt.get('transcode', True))
-
-        if not do_transcode:
-            db_set_batch_status(batch_id, 'transcode_ready')
-            write_log_entry(log_id, fmt_id_msg("[transcode] Батч {} ({}) — транскод отключен, пропускаю", batch_id, target))
-            return
-
-        write_log_entry(log_id, fmt_id_msg("[transcode] Батч {} ({}) — начало транскодирования", batch_id, target))
-
-        db_log_update(log_id, 'Транскодирование…', 'running')
-
-        original_data = db_get_batch_original_video(batch_id)
-        if original_data is None:
-            msg = 'movies.raw_data = NULL у батча в статусе video_ready — ошибка логики'
-            write_log_entry(log_id, msg, level='error')
-            raise FatalError(msg)
-
-        src_mb = round(len(original_data) / 1024 / 1024, 1)
-        write_log_entry(log_id, f'Оригинал получен из БД ({src_mb} МБ), запускаю ffmpeg…')
-        write_log_entry(log_id, f"[transcode] Оригинал {src_mb} МБ, запускаю ffmpeg…")
-
-        tmp_src_path = None
-        tmp_out_path = None
-        try:
-            with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as tmp_src:
-                tmp_src_path = tmp_src.name
-                tmp_src.write(original_data)
-
-            with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as tmp_out:
-                tmp_out_path = tmp_out.name
-
-            ok = _ffmpeg(tmp_src_path, tmp_out_path, log_id)
-        finally:
-            if tmp_src_path:
-                try:
-                    os.unlink(tmp_src_path)
-                except Exception as e:
-                    write_log_entry(log_id, f"Не удалось удалить временный файл {tmp_src_path}: {e}", level='warn')
-
-        if not ok:
-            try:
-                os.unlink(tmp_out_path)
-            except Exception as e:
-                write_log_entry(log_id, f"Не удалось удалить временный файл {tmp_out_path}: {e}", level='warn')
-            msg = 'Ошибка ffmpeg — транскод пропущен, публикация использует оригинал'
-            db_log_update(log_id, msg, 'warn')
-            write_log_entry(log_id, msg, level='warn')
-            db_set_batch_status(batch_id, 'transcode_ready')
-            write_log_entry(log_id, f"[transcode] {msg}")
-            notify_failure(fmt_id_msg("transcode: ffmpeg сбой (некритично) — батч {}", batch_id), partial=True)
-            return
-
-        out_mb = round(os.path.getsize(tmp_out_path) / 1024 / 1024, 1)
-        with open(tmp_out_path, 'rb') as f:
-            video_data = f.read()
-        os.unlink(tmp_out_path)
-
-        msg = f'Транскодировано (H.264, {out_mb} МБ)'
-        db_log_update(log_id, msg, 'ok')
-        write_log_entry(log_id, msg)
-        db_save_transcoded_data(batch_id, video_data)
+    if not do_transcode:
         db_set_batch_status(batch_id, 'transcode_ready')
-        write_log_entry(log_id, f"[transcode] Готово: {out_mb} МБ → БД")
+        write_log_entry(log_id, fmt_id_msg("[transcode] Батч {} ({}) — транскод отключен, пропускаю", batch_id, target))
+        return
 
-    except AppException:
-        raise
+    write_log_entry(log_id, fmt_id_msg("[transcode] Батч {} ({}) — начало транскодирования", batch_id, target))
+
+    db_log_update(log_id, 'Транскодирование…', 'running')
+
+    original_data = db_get_batch_original_video(batch_id)
+    if original_data is None:
+        msg = 'movies.raw_data = NULL у батча в статусе video_ready — ошибка логики'
+        write_log_entry(log_id, msg, level='error')
+        raise FatalError(msg)
+
+    src_mb = round(len(original_data) / 1024 / 1024, 1)
+    write_log_entry(log_id, f'Оригинал получен из БД ({src_mb} МБ), запускаю ffmpeg…')
+    write_log_entry(log_id, f"[transcode] Оригинал {src_mb} МБ, запускаю ffmpeg…")
+
+    tmp_src_path = None
+    tmp_out_path = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as tmp_src:
+            tmp_src_path = tmp_src.name
+            tmp_src.write(original_data)
+
+        with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as tmp_out:
+            tmp_out_path = tmp_out.name
+
+        ok = _ffmpeg(tmp_src_path, tmp_out_path, log_id)
+    finally:
+        if tmp_src_path:
+            try:
+                os.unlink(tmp_src_path)
+            except Exception as e:
+                write_log_entry(log_id, f"Не удалось удалить временный файл {tmp_src_path}: {e}", level='warn')
+
+    if not ok:
+        try:
+            os.unlink(tmp_out_path)
+        except Exception as e:
+            write_log_entry(log_id, f"Не удалось удалить временный файл {tmp_out_path}: {e}", level='warn')
+        msg = 'Ошибка ffmpeg — транскод пропущен, публикация использует оригинал'
+        db_log_update(log_id, msg, 'warn')
+        write_log_entry(log_id, msg, level='warn')
+        db_set_batch_status(batch_id, 'transcode_ready')
+        write_log_entry(log_id, f"[transcode] {msg}")
+        notify_failure(fmt_id_msg("transcode: ffmpeg сбой (некритично) — батч {}", batch_id), partial=True)
+        return
+
+    out_mb = round(os.path.getsize(tmp_out_path) / 1024 / 1024, 1)
+    with open(tmp_out_path, 'rb') as f:
+        video_data = f.read()
+    os.unlink(tmp_out_path)
+
+    msg = f'Транскодировано (H.264, {out_mb} МБ)'
+    db_log_update(log_id, msg, 'ok')
+    write_log_entry(log_id, msg)
+    db_save_transcoded_data(batch_id, video_data)
+    db_set_batch_status(batch_id, 'transcode_ready')
+    write_log_entry(log_id, f"[transcode] Готово: {out_mb} МБ → БД")

@@ -20,7 +20,7 @@ from db import (
     db_cleanup_video_data,
 )
 from log import write_log_entry
-from utils.utils import parse_entries_lifetime, parse_log_lifetime, parse_batch_lifetime, parse_file_lifetime
+from utils.utils import parse_long_lifetime, parse_batch_lifetime, parse_file_lifetime
 
 _thread = None
 
@@ -35,8 +35,8 @@ def tick():
 
 def run():
     try:
-        entries_lifetime    = parse_entries_lifetime(db_get("entries_lifetime", "30"))
-        log_lifetime        = parse_log_lifetime(db_get("log_lifetime", "365"))
+        entries_lifetime    = parse_long_lifetime(db_get("entries_lifetime", "30"), default=30)
+        log_lifetime        = parse_long_lifetime(db_get("log_lifetime", "365"))
         batch_lifetime      = parse_batch_lifetime(db_get("batch_lifetime", "7"))
         file_lifetime       = parse_file_lifetime(db_get("file_lifetime", "7"))
 

@@ -3,17 +3,13 @@
 Последовательность: bootstrap → migrations → seed.
 """
 
-import logging
-import traceback
-
 from .connection import get_db
 from .migrations import run_migrations
 from .seed import seed_db
+from log.log import write_log_entry
 
-logger = logging.getLogger(__name__)
 
-
-def _bootstrap():
+def bootstrap():
     """
     Создаёт environment и settings — минимум, нужный для запуска миграций.
     Idempotent: безопасно вызывать при каждом старте.
@@ -37,9 +33,9 @@ def _bootstrap():
 
 def init_db():
     try:
-        _bootstrap()
+        bootstrap()
         run_migrations()
         seed_db()
     except Exception as e:
-        logger.error("[DB] Ошибка инициализации:\n%s", traceback.format_exc())
+        write_log_entry(None, f"[DB] Ошибка инициализации: {e}", level='silent')
         raise

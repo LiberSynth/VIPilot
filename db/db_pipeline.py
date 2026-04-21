@@ -455,30 +455,6 @@ def db_reset_batch_pipeline(batch_id: str, pipeline: str) -> bool:
     return True
 
 
-def db_get_active_text_model():
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT p.url, m.url, m.body, m.name, m.id
-                FROM ai_models m
-                JOIN ai_platforms p ON p.id = m.platform_id
-                WHERE m.active = TRUE AND m.type = 'text'
-                  AND (m.grade IS NULL OR m.grade != 'rejected')
-                ORDER BY m."order"
-                LIMIT 1
-            """)
-            row = cur.fetchone()
-    if not row:
-        return None, None, None, None, None
-    return (
-        row[0],
-        row[1],
-        row[2] if isinstance(row[2], dict) else {},
-        row[3],
-        str(row[4]),
-    )
-
-
 def db_get_active_text_models():
     with get_db() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:

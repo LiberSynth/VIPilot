@@ -19,20 +19,12 @@ def parse_batch_lifetime(s):
         return 7
 
 
-def parse_log_lifetime(s):
+def parse_long_lifetime(s, default=365):
     try:
         v = int(s)
         return 0 if v == 0 else max(1, min(3650, v))
     except Exception:
-        return 365
-
-
-def parse_entries_lifetime(s):
-    try:
-        v = int(s)
-        return 0 if v == 0 else max(1, min(3650, v))
-    except Exception:
-        return 30
+        return default
 
 
 def parse_file_lifetime(s):

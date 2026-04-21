@@ -8,7 +8,6 @@ from db import (
     db_add_schedule_slot,
     db_delete_schedule_slot,
     db_get_models,
-    db_activate_model,
     db_toggle_model,
     db_reorder_models,
     init_db,
@@ -39,6 +38,7 @@ from db import (
     db_set,
     db_delete_bad_stories,
     db_delete_bad_movies,
+    db_set_model_grade,
 )
 from log import db_get_monitor, log_batch_planned, write_log_entry
 from utils.auth import is_authenticated
@@ -47,6 +47,31 @@ from utils.utils import parse_hhmm, to_msk, to_utc_from_msk
 import common.environment as environment
 
 bp = Blueprint("api", __name__, url_prefix="/api")
+
+
+def _build_video_response(data: bytes) -> Response:
+    """Формирует ответ для видео с поддержкой HTTP Range-запросов."""
+    total = len(data)
+    range_header = request.headers.get("Range")
+    if range_header:
+        try:
+            ranges = range_header.strip().replace("bytes=", "").split("-")
+            start = int(ranges[0])
+            end   = int(ranges[1]) if ranges[1] else total - 1
+        except (IndexError, ValueError):
+            start, end = 0, total - 1
+        end = min(end, total - 1)
+        chunk = data[start:end + 1]
+        resp = Response(chunk, status=206, mimetype="video/mp4", direct_passthrough=True)
+        resp.headers["Content-Range"]  = f"bytes {start}-{end}/{total}"
+        resp.headers["Accept-Ranges"]  = "bytes"
+        resp.headers["Content-Length"] = str(len(chunk))
+    else:
+        resp = Response(data, status=200, mimetype="video/mp4")
+        resp.headers["Accept-Ranges"]  = "bytes"
+        resp.headers["Content-Length"] = str(total)
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
 
 
 @bp.route("/time")
@@ -165,7 +190,6 @@ def api_text_model_grade(model_id):
     grade = data.get("grade", "good")
     if grade not in ("good", "limited", "poor", "fallback", "rejected"):
         return jsonify({"error": "invalid grade"}), 400
-    from db import db_set_model_grade
     ok = db_set_model_grade(model_id, grade)
     return jsonify({"ok": ok})
 
@@ -207,7 +231,6 @@ def api_video_model_grade(model_id):
     grade = data.get("grade", "good")
     if grade not in ("good", "limited", "poor", "fallback", "rejected"):
         return jsonify({"error": "invalid grade"}), 400
-    from db import db_set_model_grade
     ok = db_set_model_grade(model_id, grade)
     return jsonify({"ok": ok})
 
@@ -371,8 +394,8 @@ def api_workflow_restart():
         import time as _time
         import sys as _sys
         _time.sleep(0.8)
-        # Close all inherited file descriptors (including the Flask socket)
-        # so the new process can bind port 5000 cleanly.
+        # Закрываем все унаследованные файловые дескрипторы (в т.ч. сокет Flask),
+        # чтобы новый процесс мог занять порт 5000 без конфликтов.
         try:
             os.closerange(3, 4096)
         except Exception:
@@ -389,33 +412,7 @@ def api_get_batch_video(batch_id):
     data = db_get_batch_video_data(batch_id)
     if data is None:
         return Response("Not found", status=404)
-    data = bytes(data)
-    total = len(data)
-    range_header = request.headers.get("Range")
-    if range_header:
-        try:
-            ranges = range_header.strip().replace("bytes=", "").split("-")
-            start = int(ranges[0])
-            end   = int(ranges[1]) if ranges[1] else total - 1
-        except (IndexError, ValueError):
-            start, end = 0, total - 1
-        end = min(end, total - 1)
-        chunk = data[start:end + 1]
-        resp = Response(
-            chunk,
-            status=206,
-            mimetype="video/mp4",
-            direct_passthrough=True,
-        )
-        resp.headers["Content-Range"]  = f"bytes {start}-{end}/{total}"
-        resp.headers["Accept-Ranges"]  = "bytes"
-        resp.headers["Content-Length"] = str(len(chunk))
-    else:
-        resp = Response(data, status=200, mimetype="video/mp4")
-        resp.headers["Accept-Ranges"]  = "bytes"
-        resp.headers["Content-Length"] = str(total)
-    resp.headers["Cache-Control"] = "no-store"
-    return resp
+    return _build_video_response(bytes(data))
 
 
 @bp.route("/story/<story_id>", methods=["GET"])
@@ -540,28 +537,7 @@ def api_production_movie_video(movie_id):
     data = db_get_movie_video_data(movie_id)
     if data is None:
         return Response("Not found", status=404)
-    data = bytes(data)
-    total = len(data)
-    range_header = request.headers.get("Range")
-    if range_header:
-        try:
-            ranges = range_header.strip().replace("bytes=", "").split("-")
-            start = int(ranges[0])
-            end   = int(ranges[1]) if ranges[1] else total - 1
-        except (IndexError, ValueError):
-            start, end = 0, total - 1
-        end = min(end, total - 1)
-        chunk = data[start:end + 1]
-        resp = Response(chunk, status=206, mimetype="video/mp4", direct_passthrough=True)
-        resp.headers["Content-Range"]  = f"bytes {start}-{end}/{total}"
-        resp.headers["Accept-Ranges"]  = "bytes"
-        resp.headers["Content-Length"] = str(len(chunk))
-    else:
-        resp = Response(data, status=200, mimetype="video/mp4")
-        resp.headers["Accept-Ranges"]  = "bytes"
-        resp.headers["Content-Length"] = str(total)
-    resp.headers["Cache-Control"] = "no-store"
-    return resp
+    return _build_video_response(bytes(data))
 
 
 @production_bp.route("/production/movie/<movie_id>/grade", methods=["POST"])

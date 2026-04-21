@@ -104,8 +104,7 @@ def status():
     target_id = request.args.get("target_id", "")
     info = browser_svc.get_status()
 
-    from services.dzen_browser import get_session_saved_at as _dzen_saved_at
-    saved_at = _dzen_saved_at(target_id or None)
+    saved_at = browser_svc.get_session_saved_at(target_id or None)
 
     return jsonify({
         "browser": info,
