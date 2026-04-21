@@ -439,7 +439,7 @@ def db_get_graded_stories():
         with conn.cursor() as cur:
             cur.execute(
                 "SELECT title, content, grade FROM stories"
-                " WHERE grade IN ('good', 'bad')"
+                " WHERE grade IN ('good', 'bad') AND pinned = TRUE"
                 " ORDER BY CASE WHEN grade = 'good' THEN 0 ELSE 1 END, created_at DESC"
             )
             rows = cur.fetchall()
