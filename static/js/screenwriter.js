@@ -330,25 +330,51 @@ var getDraftStoryId;
         '</div>' +
       '</div>';
     document.body.appendChild(el);
-    document.getElementById('deleteStoryCancelBtn').addEventListener('click', function() {
+
+    var cancelBtn  = document.getElementById('deleteStoryCancelBtn');
+    var confirmBtn = document.getElementById('deleteStoryConfirmBtn');
+
+    function closeDialog() {
       var overlay = document.getElementById('deleteStoryOverlay');
       if (overlay) overlay.remove();
-    });
-    document.getElementById('deleteStoryConfirmBtn').addEventListener('click', function() {
-      var confirmBtn = document.getElementById('deleteStoryConfirmBtn');
+      document.removeEventListener('keydown', onKeyDown);
+      if (triggerBtn) triggerBtn.focus();
+    }
+
+    function onKeyDown(e) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeDialog();
+        return;
+      }
+      if (e.key === 'Tab') {
+        var focusable = [cancelBtn, confirmBtn].filter(function(b) { return b && !b.disabled; });
+        if (focusable.length < 2) return;
+        var first = focusable[0], last = focusable[focusable.length - 1];
+        if (e.shiftKey) {
+          if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+        } else {
+          if (document.activeElement === last)  { e.preventDefault(); first.focus(); }
+        }
+      }
+    }
+
+    document.addEventListener('keydown', onKeyDown);
+    cancelBtn.focus();
+
+    cancelBtn.addEventListener('click', closeDialog);
+    confirmBtn.addEventListener('click', function() {
       if (confirmBtn) { confirmBtn.disabled = true; confirmBtn.textContent = 'Удаление…'; }
       fetch('/production/story/' + encodeURIComponent(storyId) + '/delete', { method: 'DELETE' })
         .then(function(r) { return r.ok ? r.json() : r.json().then(function(d) { throw d; }); })
         .then(function() {
-          var overlay = document.getElementById('deleteStoryOverlay');
-          if (overlay) overlay.remove();
+          closeDialog();
           var row = document.querySelector('.story-row[data-id="' + storyId + '"]');
           if (row) row.remove();
           if (typeof window.loadStoryList === 'function') window.loadStoryList();
         })
         .catch(function(d) {
-          var overlay = document.getElementById('deleteStoryOverlay');
-          if (overlay) overlay.remove();
+          closeDialog();
           var msg = (d && d.error) ? d.error : 'Ошибка удаления';
           if (typeof window.showToast === 'function') window.showToast(msg);
         });
