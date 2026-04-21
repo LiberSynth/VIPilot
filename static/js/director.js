@@ -187,9 +187,9 @@
     var wrap = document.getElementById('director-video-wrap');
     if (!wrap) return;
     var header = document.querySelector('header');
-    var headerH = header ? header.offsetHeight : 0;
-    var cardPad = 16;
-    var h = (window.innerHeight - headerH - cardPad * 2) / 1.618;
+    var headerBottom = header ? header.getBoundingClientRect().bottom : 0;
+    var cardPad = 15;
+    var h = (window.innerHeight - headerBottom - cardPad * 2) / 1.618;
     wrap.style.height = Math.round(h) + 'px';
   }
 
