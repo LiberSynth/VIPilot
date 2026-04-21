@@ -36,7 +36,7 @@ from log.log import write_log_entry
 def _m073_add_wan27(cur):
     """Добавляет модель Wan 2.7 в ai_models и её допустимые длительности."""
     cur.execute("""
-        INSERT INTO ai_models (name, url, body, "order", active, grade, type, platform_id)
+        INSERT INTO ai_models (name, url, body, "order", active, grade, type, price, platform_id)
         SELECT
             'Wan 2.7',
             'fal-ai/wan/v2.7/text-to-video',
@@ -45,6 +45,7 @@ def _m073_add_wan27(cur):
             TRUE,
             'good',
             'text-to-video',
+            '$0.10/s',
             p.id
         FROM ai_platforms p
         WHERE p.name = 'fal.ai'
