@@ -36,13 +36,34 @@ from common.exceptions import AppException, FatalError
 from utils.utils import fmt_id_msg
 
 
+def _has_audio(src):
+    """Возвращает True если файл содержит хотя бы одну аудиодорожку."""
+    try:
+        result = subprocess.run(
+            [
+                'ffprobe', '-v', 'quiet',
+                '-select_streams', 'a:0',
+                '-show_entries', 'stream=codec_type',
+                '-of', 'default=noprint_wrappers=1:nokey=1',
+                src,
+            ],
+            capture_output=True, text=True, timeout=10,
+        )
+        return 'audio' in result.stdout
+    except Exception:
+        return False
+
+
 def _ffmpeg(src, dst, log_id):
     duration = float(db_get('video_duration', '60'))
+    src_has_audio = _has_audio(src)
 
-    cmd = [
-        'ffmpeg', '-y',
-        '-i', src,
-        '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo',
+    cmd = ['ffmpeg', '-y', '-i', src]
+
+    if not src_has_audio:
+        cmd += ['-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo']
+
+    cmd += [
         '-c:v', 'libx264',
         '-profile:v', 'baseline',
         '-preset', 'ultrafast',
@@ -53,6 +74,9 @@ def _ffmpeg(src, dst, log_id):
         '-b:a', '96k',
         '-movflags', '+faststart',
     ]
+
+    if not src_has_audio:
+        cmd += ['-map', '0:v:0', '-map', '1:a:0']
 
     cmd += ['-t', str(duration)]
 
