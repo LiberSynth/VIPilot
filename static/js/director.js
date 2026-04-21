@@ -186,7 +186,11 @@
   function updateVideoWrapHeight() {
     var wrap = document.getElementById('director-video-wrap');
     if (!wrap) return;
-    wrap.style.height = Math.round(window.innerHeight / 1.618) + 'px';
+    var header = document.querySelector('header');
+    var headerH = header ? header.offsetHeight : 0;
+    var cardPad = 16;
+    var h = (window.innerHeight - headerH - cardPad * 2) / 1.618;
+    wrap.style.height = Math.round(h) + 'px';
   }
 
   /* ── плеер ── */
