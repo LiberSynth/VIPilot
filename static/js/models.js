@@ -205,8 +205,7 @@ window.cycleVideoGradeCard = function(el) {
       cardBadge.setAttribute('data-grade-id', '');
       cardBadge.setAttribute('data-grade', '');
       cardBadge.textContent = '';
-      cardBadge.style.background = '#444';
-      cardBadge.style.opacity = '.7';
+      cardBadge.style.display = 'none';
     }
     var noteArea = document.getElementById('model-note-area');
     if (noteArea) { noteArea.value = ''; noteArea.disabled = true; }
@@ -283,6 +282,7 @@ window.cycleVideoGradeCard = function(el) {
           var grade = m.grade || 'good';
           cardBadge.setAttribute('data-grade-id', m.id);
           _applyGrade(cardBadge, grade);
+          cardBadge.style.display = '';
           cardBadge.style.opacity = '1';
         }
         var sharedArea = document.getElementById('model-note-area');
