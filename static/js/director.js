@@ -428,21 +428,26 @@
       confirmLabel: 'Удалить',
       triggerBtn:   btn,
       onConfirm: function(confirmBtn, dlg) {
-        confirmBtn.disabled    = true;
-        confirmBtn.textContent = 'Удаление…';
+        dlg.close();
         btn.classList.add('pending');
+        var deleteDlg = new DeleteMoviesDialog({ triggerBtn: btn });
+        deleteDlg.open();
         fetch('/production/movies/delete_bad', { method: 'POST' })
           .then(function(r) { return r.ok ? r.json() : null; })
           .then(function(d) {
             btn.classList.remove('pending');
-            dlg.close();
             if (d && d.ok) {
               var n = d.deleted ? (d.deleted.movies || 0) : 0;
-              if (typeof window.showToast === 'function') window.showToast('Удалено ' + n + ' видео');
+              deleteDlg.finish(n);
               if (typeof window.loadMovieList === 'function') window.loadMovieList();
+            } else {
+              deleteDlg.error();
             }
           })
-          .catch(function() { btn.classList.remove('pending'); dlg.close(); });
+          .catch(function() {
+            btn.classList.remove('pending');
+            deleteDlg.error();
+          });
       },
     }).open();
   }

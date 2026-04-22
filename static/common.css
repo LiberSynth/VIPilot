@@ -640,6 +640,7 @@
   .cycle-float-btn:disabled { opacity: .35; cursor: not-allowed; pointer-events: auto; }
   .cycle-float-btn.btn-blocked { opacity: .35; }
   @keyframes btn-pending-pulse { 0%,100% { opacity:1; } 50% { opacity:.4; } }
+  @keyframes bar-indeterminate { 0%{left:-40%;width:40%} 60%{left:60%;width:40%} 100%{left:100%;width:0} }
 
   .monitor-log-list {
     border-top: 1px solid #111118;
