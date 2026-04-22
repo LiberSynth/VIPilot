@@ -34,7 +34,7 @@ from db import (
 from log import write_log, db_log_update, write_log_entry
 from pipelines.base import check_cancelled, iterate_models
 from common.exceptions import AppException
-from clients import falai, grok
+from clients import falai, grok, skyreels
 from clients.falai import ProviderFatalError
 from utils.utils import fmt_id_msg, nearest_allowed_duration
 
@@ -43,6 +43,8 @@ def _video_client(platform_name: str):
     """Возвращает клиент нужной платформы по имени."""
     if platform_name == 'Grok':
         return grok
+    if platform_name == 'SkyReels':
+        return skyreels
     return falai
 
 
