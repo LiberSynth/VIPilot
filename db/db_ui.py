@@ -126,7 +126,12 @@ def db_get_stories_list(show_used=True, show_bad=True, for_approval=False, pin_i
                         SELECT 1 FROM batches b
                         WHERE b.story_id = s.id
                           AND b.status NOT IN ({final_statuses_sql})
-                    ) AS has_active_batch
+                    ) AS has_active_batch,
+                    EXISTS (
+                        SELECT 1 FROM batches b
+                        WHERE b.story_id = s.id
+                          AND b.movie_id IS NOT NULL
+                    ) AS has_movie
                 FROM stories s
                 LEFT JOIN ai_models am ON am.id = s.model_id
                 {where_clause}
@@ -145,6 +150,7 @@ def db_get_stories_list(show_used=True, show_bad=True, for_approval=False, pin_i
             "model_name": row[7] or "",
             "pinned": bool(row[8]),
             "has_active_batch": bool(row[9]),
+            "has_movie": bool(row[10]),
         }
         for row in rows
     ]

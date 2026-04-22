@@ -201,12 +201,12 @@ var getDraftStoryId;
         '<path d="M5 2 L5 7 L2 10 L14 10 L11 7 L11 2 Z"/>' +
         '<line x1="5" y1="2" x2="11" y2="2"/>' +
         '</svg></button>';
-      var deleteDisabled = s.pinned || s.used || s.has_active_batch;
+      var deleteDisabled = s.pinned || s.has_movie || s.has_active_batch;
       var deleteBlockReason = deleteDisabled
-        ? (s.pinned ? 'Сюжет закреплён' : (s.used ? 'Сюжет уже использован в производстве' : 'У сюжета есть активный батч'))
+        ? (s.pinned ? 'Сюжет закреплён' : (s.has_movie ? 'К сюжету привязано готовое видео' : 'У сюжета есть активный батч'))
         : '';
       var deleteTitle = deleteDisabled
-        ? (s.pinned ? 'Нельзя удалить: сюжет закреплён' : (s.used ? 'Нельзя удалить: сюжет использован в производстве' : 'Нельзя удалить: есть активный батч'))
+        ? (s.pinned ? 'Нельзя удалить: сюжет закреплён' : (s.has_movie ? 'Нельзя удалить: к сюжету привязано видео' : 'Нельзя удалить: есть активный батч'))
         : 'Удалить сюжет';
       var storyTitleEsc = escapeHtml(s.title || '(без названия)');
       var deleteBtn = '<button class="story-icon story-delete-btn' + (deleteDisabled ? ' btn-blocked' : '') + '" data-id="' + s.id + '" data-title="' + storyTitleEsc + '"' + (deleteDisabled ? ' data-block-reason="' + escapeHtml(deleteBlockReason) + '"' : '') + ' title="' + deleteTitle + '">' +
