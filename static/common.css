@@ -263,6 +263,7 @@
   textarea:focus { border-color: #4a7cf7; }
   #ta_formatprompt { height: 100px; }
   #ta { height: 300px; }
+  #model-note-area { font-size: 11px; border-radius: 3px; padding: 4px 6px; min-height: 48px; line-height: 1.4; margin-bottom: 10px; }
   .char-count { font-size: 11px; color: #666; text-align: right; margin-top: 6px; }
 
   .flash {

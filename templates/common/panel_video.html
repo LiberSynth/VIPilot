@@ -7,15 +7,13 @@
       <input type="number" name="video_fails_to_next" id="video_fails_to_next" value="{{ video_fails_to_next }}" min="1" max="99" step="1" style="max-width:120px">
     </div>
     {% endif %}
+    <div class="hint" style="margin-bottom:2px">Заметки</div>
+    <textarea id="model-note-area" disabled rows="2" placeholder='Наблюдения и ограничения, например: "слишком много брака", "лимит промпта 1024 символа"'></textarea>
     {% if show_hint %}
     <div class="hint" style="margin-bottom:8px">Активируйте одну или несколько. Порядок задаёт очерёдность перебора при сбое.</div>
     {% endif %}
     <div class="model-list" id="{{ container_id }}">
       <div class="model-loading">Загрузка...</div>
-    </div>
-    <div style="margin-top:10px">
-      <div class="hint" style="margin-bottom:2px">Заметки</div>
-      <textarea id="model-note-area" disabled rows="2" placeholder='Наблюдения и ограничения, например: "слишком много брака", "лимит промпта 1024 символа"' style="width:100%;box-sizing:border-box;font-size:11px;color:#c8c8e0;background:#080810;border:1px solid #1e1e2e;border-radius:3px;padding:4px 6px;resize:vertical;min-height:48px;line-height:1.4;display:block"></textarea>
     </div>
   </div>
 {% endmacro %}
