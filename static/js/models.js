@@ -187,6 +187,13 @@ window.cycleVideoGrade = function(el) {
       return;
     }
     container.innerHTML = '';
+    var _sharedNoteArea = document.getElementById('model-note-area');
+    if (_sharedNoteArea) {
+      _sharedNoteArea.value = '';
+      _sharedNoteArea.disabled = true;
+      _sharedNoteArea._selectedModelId = null;
+      _sharedNoteArea._selectedModel = null;
+    }
     list.forEach(function(m) {
       const item = document.createElement('div');
       item.className = 'model-item' + (m.active ? ' model-active' : '');
@@ -218,39 +225,45 @@ window.cycleVideoGrade = function(el) {
           item.insertBefore(durationIndicator, probeBtn);
         }
       }
-      item.style.flexWrap = 'wrap';
-      var noteWrap = document.createElement('div');
-      noteWrap.style.cssText = 'flex-basis:100%;padding:4px 0 2px 0;box-sizing:border-box';
-      var noteLabel = document.createElement('div');
-      noteLabel.className = 'hint';
-      noteLabel.style.cssText = 'margin-bottom:2px;font-size:10px';
-      noteLabel.textContent = 'Заметки';
-      var noteArea = document.createElement('textarea');
-      noteArea.style.cssText = 'width:100%;box-sizing:border-box;font-size:11px;color:#c8c8e0;background:#080810;border:1px solid #1e1e2e;border-radius:3px;padding:4px 6px;resize:vertical;min-height:48px;line-height:1.4;display:block';
-      noteArea.rows = 2;
-      noteArea.placeholder = 'Наблюдения и ограничения, например: "слишком много брака", "лимит промпта 1024 символа"';
-      noteArea.value = m.note || '';
-      noteArea.addEventListener('click', function(e) { e.stopPropagation(); });
-      var _noteTimer = null;
-      noteArea.addEventListener('input', function() {
-        var val = noteArea.value;
-        var mid = m.id;
-        clearTimeout(_noteTimer);
-        _noteTimer = setTimeout(function() {
-          fetch('/api/video-models/' + encodeURIComponent(mid) + '/note', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ note: val })
-          });
-        }, 800);
+      item.addEventListener('click', function() {
+        container.querySelectorAll('.model-item').forEach(function(el) { el.classList.remove('model-item--active'); });
+        item.classList.add('model-item--active');
+        var sharedArea = document.getElementById('model-note-area');
+        if (sharedArea) {
+          sharedArea.value = m.note || '';
+          sharedArea.disabled = false;
+          sharedArea._selectedModelId = m.id;
+          sharedArea._selectedModel = m;
+        }
       });
-      noteWrap.appendChild(noteLabel);
-      noteWrap.appendChild(noteArea);
-      item.appendChild(noteWrap);
       makeDragHandlers(item, containerId, m, saveOrderFn);
       container.appendChild(item);
     });
+    _attachModelNoteAreaListener();
   };
+
+  var _modelNoteAreaListenerAdded = false;
+  function _attachModelNoteAreaListener() {
+    if (_modelNoteAreaListenerAdded) return;
+    var sharedArea = document.getElementById('model-note-area');
+    if (!sharedArea) return;
+    _modelNoteAreaListenerAdded = true;
+    var _noteTimer = null;
+    sharedArea.addEventListener('input', function() {
+      var val = sharedArea.value;
+      var mid = sharedArea._selectedModelId;
+      if (!mid) return;
+      if (sharedArea._selectedModel) sharedArea._selectedModel.note = val;
+      clearTimeout(_noteTimer);
+      _noteTimer = setTimeout(function() {
+        fetch('/api/video-models/' + encodeURIComponent(mid) + '/note', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ note: val })
+        });
+      }, 800);
+    });
+  }
 
   function refreshDurationIndicators(containerId, videoDuration) {
     var container = document.getElementById(containerId);

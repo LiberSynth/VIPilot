@@ -785,6 +785,7 @@
     transition: border-color .15s;
   }
   .model-item.model-active { border-color: rgba(62,207,142,.35); }
+  .model-item.model-item--active { border-color: rgba(74,124,247,.55); background: #0f0f1a; }
   .model-radio {
     width: 18px; height: 18px; border-radius: 4px;
     border: 2px solid #2a2a38; flex-shrink: 0; cursor: pointer;
