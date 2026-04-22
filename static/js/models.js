@@ -17,13 +17,38 @@ window.cycleGrade = function(el) {
   });
 };
 
+function _applyGrade(el, grade) {
+  el.setAttribute('data-grade', grade);
+  el.textContent = _gradeLabels[grade] || grade;
+  el.style.background = _gradeColors[grade] || '#555';
+}
+
 window.cycleVideoGrade = function(el) {
   var id   = el.getAttribute('data-grade-id');
   var cur  = el.getAttribute('data-grade') || 'good';
   var next = _gradeSequence[(_gradeSequence.indexOf(cur) + 1) % _gradeSequence.length];
-  el.setAttribute('data-grade', next);
-  el.textContent = _gradeLabels[next] || next;
-  el.style.background = _gradeColors[next] || '#555';
+  _applyGrade(el, next);
+  var cardBadge = document.getElementById('model-card-grade');
+  if (cardBadge && cardBadge.getAttribute('data-grade-id') === id) {
+    _applyGrade(cardBadge, next);
+  }
+  if (window._syncModelCardGrade) window._syncModelCardGrade(id, next);
+  fetch('/api/video-models/' + encodeURIComponent(id) + '/grade', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ grade: next })
+  });
+};
+
+window.cycleVideoGradeCard = function(el) {
+  var id   = el.getAttribute('data-grade-id');
+  if (!id) return;
+  var cur  = el.getAttribute('data-grade') || 'good';
+  var next = _gradeSequence[(_gradeSequence.indexOf(cur) + 1) % _gradeSequence.length];
+  _applyGrade(el, next);
+  var listSpan = document.querySelector('[data-grade-id="' + id + '"]:not(#model-card-grade)');
+  if (listSpan) _applyGrade(listSpan, next);
+  if (window._syncModelCardGrade) window._syncModelCardGrade(id, next);
   fetch('/api/video-models/' + encodeURIComponent(id) + '/grade', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -174,6 +199,27 @@ window.cycleVideoGrade = function(el) {
   var _noteModelId = null;
   var _noteModel   = null;
 
+  function _resetModelCard() {
+    var cardBadge = document.getElementById('model-card-grade');
+    if (cardBadge) {
+      cardBadge.setAttribute('data-grade-id', '');
+      cardBadge.setAttribute('data-grade', '');
+      cardBadge.textContent = '';
+      cardBadge.style.background = '#444';
+      cardBadge.style.opacity = '.7';
+    }
+    var noteArea = document.getElementById('model-note-area');
+    if (noteArea) { noteArea.value = ''; noteArea.disabled = true; }
+    var bodyArea = document.getElementById('model-body-area');
+    if (bodyArea) {
+      bodyArea.value = '';
+      bodyArea.disabled = true;
+      bodyArea.classList.remove('input-error');
+    }
+    var errEl = document.getElementById('model-body-error');
+    if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+  }
+
   window.renderModelList = function(containerId, list, opts) {
     opts = opts || {};
     var gradeFn     = opts.gradeFn     || 'cycleVideoGrade';
@@ -187,16 +233,15 @@ window.cycleVideoGrade = function(el) {
     if (!container) return;
     if (!list || list.length === 0) {
       container.innerHTML = '<div class="model-loading">Нет моделей</div>';
+      _noteModelId = null;
+      _noteModel   = null;
+      _resetModelCard();
       return;
     }
     container.innerHTML = '';
     _noteModelId = null;
     _noteModel   = null;
-    var _sharedNoteArea = document.getElementById('model-note-area');
-    if (_sharedNoteArea) {
-      _sharedNoteArea.value = '';
-      _sharedNoteArea.disabled = true;
-    }
+    _resetModelCard();
     list.forEach(function(m) {
       const item = document.createElement('div');
       item.className = 'model-item' + (m.active ? ' model-active' : '');
@@ -233,16 +278,33 @@ window.cycleVideoGrade = function(el) {
         item.classList.add('model-item--active');
         _noteModelId = m.id;
         _noteModel   = m;
+        var cardBadge = document.getElementById('model-card-grade');
+        if (cardBadge) {
+          var grade = m.grade || 'good';
+          cardBadge.setAttribute('data-grade-id', m.id);
+          _applyGrade(cardBadge, grade);
+          cardBadge.style.opacity = '1';
+        }
         var sharedArea = document.getElementById('model-note-area');
         if (sharedArea) {
           sharedArea.value = m.note || '';
           sharedArea.disabled = false;
+        }
+        var bodyArea = document.getElementById('model-body-area');
+        if (bodyArea) {
+          var bodyVal = m.body && typeof m.body === 'object' ? JSON.stringify(m.body, null, 2) : (m.body || '');
+          bodyArea.value = bodyVal;
+          bodyArea.disabled = false;
+          bodyArea.classList.remove('input-error');
+          var errEl = document.getElementById('model-body-error');
+          if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
         }
       });
       makeDragHandlers(item, containerId, m, saveOrderFn);
       container.appendChild(item);
     });
     _attachModelNoteAreaListener();
+    _attachModelBodyAreaListener();
   };
 
   var _modelNoteAreaListenerAdded = false;
@@ -266,6 +328,57 @@ window.cycleVideoGrade = function(el) {
       }, 800);
     });
   }
+
+  var _modelBodyAreaListenerAdded = false;
+  var _bodyTimer = null;
+  function _saveBodyIfValid(bodyArea, modelId, val) {
+    if (val === undefined) val = bodyArea.value;
+    var errEl = document.getElementById('model-body-error');
+    var parsed;
+    try {
+      parsed = JSON.parse(val);
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) throw new Error('not an object');
+    } catch (e) {
+      bodyArea.classList.add('input-error');
+      if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'Невалидный JSON'; }
+      return;
+    }
+    bodyArea.classList.remove('input-error');
+    if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+    if (_noteModel && String(_noteModel.id) === String(modelId)) _noteModel.body = parsed;
+    fetch('/api/video-models/' + encodeURIComponent(modelId) + '/body', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ body: parsed })
+    });
+  }
+  function _attachModelBodyAreaListener() {
+    if (_modelBodyAreaListenerAdded) return;
+    var bodyArea = document.getElementById('model-body-area');
+    if (!bodyArea) return;
+    _modelBodyAreaListenerAdded = true;
+    bodyArea.addEventListener('input', function() {
+      if (!_noteModelId) return;
+      var capturedId  = _noteModelId;
+      var capturedVal = bodyArea.value;
+      clearTimeout(_bodyTimer);
+      _bodyTimer = setTimeout(function() {
+        if (_noteModelId !== capturedId) return;
+        _saveBodyIfValid(bodyArea, capturedId, capturedVal);
+      }, 800);
+    });
+    bodyArea.addEventListener('blur', function() {
+      if (!_noteModelId) return;
+      clearTimeout(_bodyTimer);
+      _saveBodyIfValid(bodyArea, _noteModelId, bodyArea.value);
+    });
+  }
+
+  window._syncModelCardGrade = function(modelId, grade) {
+    if (_noteModel && String(_noteModel.id) === String(modelId)) {
+      _noteModel.grade = grade;
+    }
+  };
 
   function refreshDurationIndicators(containerId, videoDuration) {
     var container = document.getElementById(containerId);

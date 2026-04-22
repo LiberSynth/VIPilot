@@ -263,6 +263,8 @@
   textarea:focus { border-color: #4a7cf7; }
   #ta_formatprompt { height: 100px; }
   #ta { height: 300px; }
+  #model-body-area { height: 160px; font-family: monospace; font-size: 13px; }
+  #model-body-area.input-error { border-color: #f55; }
   .char-count { font-size: 11px; color: #666; text-align: right; margin-top: 6px; }
 
   .flash {

@@ -416,6 +416,18 @@ def db_set_model_note(model_id: str, note: str):
     return True
 
 
+def db_set_model_body(model_id: str, body: dict):
+    import json
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE ai_models SET body = %s::jsonb WHERE id = %s",
+                (json.dumps(body), model_id),
+            )
+        conn.commit()
+    return True
+
+
 def db_get_distinct_batch_statuses():
     with get_db() as conn:
         with conn.cursor() as cur:
