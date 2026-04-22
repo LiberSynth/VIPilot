@@ -377,7 +377,6 @@
         if (String(movieId) === String(_selectedMovieId)) {
           setCardMovieGradeBadge(g, false);
         }
-        window.loadMovieList();
       } else {
         var prevGk = gradeKey(prevAttr === 'null' ? null : prevAttr);
         btn.setAttribute('data-grade', prevGk);

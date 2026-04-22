@@ -360,7 +360,6 @@ var getDraftStoryId;
         if (_cId && String(_cId) === String(storyId) && typeof window.setCardGradeBadge === 'function') {
           window.setCardGradeBadge(grade, false);
         }
-        window.loadStoryList();
       } else {
         var prevGk = gradeKey(prevAttr === 'null' ? null : prevAttr);
         btn.setAttribute('data-grade', prevGk);
