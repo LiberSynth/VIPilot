@@ -473,31 +473,7 @@
     return _sanitizeFilename(parts.join(' - ')) + '.mp4';
   }
 
-  async function _resolveUniqueFilename(dirHandle, baseName) {
-    var dot = baseName.lastIndexOf('.');
-    var name = dot !== -1 ? baseName.slice(0, dot) : baseName;
-    var ext  = dot !== -1 ? baseName.slice(dot)    : '';
-    var candidate = baseName;
-    var n = 1;
-    while (true) {
-      try {
-        await dirHandle.getFileHandle(candidate);
-        n++;
-        candidate = name + ' (' + n + ')' + ext;
-      } catch (e) {
-        return candidate;
-      }
-    }
-  }
-
   async function _exportMovies(triggerBtn) {
-    var dirHandle;
-    try {
-      dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
-    } catch (e) {
-      return;
-    }
-
     var metaList;
     try {
       var r = await fetch('/production/movies/good_meta');
@@ -509,12 +485,12 @@
     }
 
     if (!Array.isArray(metaList) || metaList.length === 0) {
-      if (typeof window.showToast === 'function') window.showToast('Нет роликов с оценкой «хорошо»');
+      if (typeof window.showToast === 'function') window.showToast('Нет роликов для выгрузки');
       return;
     }
 
     triggerBtn.disabled = true;
-    var dlg = new ExportMoviesDialog({ total: metaList.length, dirHandle: dirHandle, triggerBtn: triggerBtn });
+    var dlg = new ExportMoviesDialog({ total: metaList.length });
     dlg.open();
 
     var done = 0;
@@ -522,16 +498,20 @@
     for (var i = 0; i < metaList.length; i++) {
       if (dlg.isCancelled()) break;
       var meta = metaList[i];
-      var filename = await _resolveUniqueFilename(dirHandle, _buildExportFilename(meta));
+      var filename = _buildExportFilename(meta);
       dlg.setCurrentFile(filename);
       try {
         var resp = await fetch('/production/movies/' + encodeURIComponent(meta.id) + '/download');
         if (!resp.ok) throw new Error('http ' + resp.status);
         var blob = await resp.blob();
-        var fh = await dirHandle.getFileHandle(filename, { create: true });
-        var writable = await fh.createWritable();
-        await writable.write(blob);
-        await writable.close();
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
         done++;
         dlg.setProgress(done, filename);
       } catch (e) {
@@ -547,11 +527,6 @@
   function initExportGoodMoviesButton() {
     var btn = document.getElementById('btn-export-good-movies');
     if (!btn) return;
-    if (!window.showDirectoryPicker) {
-      btn.disabled = true;
-      btn.title = 'Ваш браузер не поддерживает выбор папки';
-      return;
-    }
     btn.addEventListener('click', function() {
       if (btn.disabled) return;
       _exportMovies(btn);

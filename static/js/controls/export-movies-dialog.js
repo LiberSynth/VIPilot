@@ -2,10 +2,9 @@ class ExportMoviesDialog extends Dialog {
   constructor(opts) {
     super(opts);
     opts = opts || {};
-    this._total      = opts.total      || 0;
-    this._dirHandle  = opts.dirHandle  || null;
-    this._cancelled  = false;
-    this._onCancel   = opts.onCancel   || null;
+    this._total    = opts.total    || 0;
+    this._cancelled = false;
+    this._onCancel  = opts.onCancel || null;
   }
 
   overlayClass() { return 'confirm-overlay'; }
