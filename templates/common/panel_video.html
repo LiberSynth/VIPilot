@@ -1,8 +1,10 @@
 {% macro model_list_block(container_id, show_hint=True) %}
   <div class="card" style="margin-top:12px">
-    <div class="card-title">Модель</div>
-    <div style="margin-bottom:8px">
-      <span id="model-card-grade" data-grade-id="" data-grade="" onclick="event.stopPropagation();cycleVideoGradeCard(this)" title="Нажмите для смены" style="cursor:pointer;font-size:11px;padding:2px 9px;border-radius:3px;background:#444;color:#fff;opacity:.7;user-select:none"></span>
+    <div class="card-draft-header">
+      <div class="card-title" style="margin-bottom:0">Модель</div>
+      <div class="card-top-actions">
+        <span id="model-card-grade" data-grade-id="" data-grade="" onclick="event.stopPropagation();cycleVideoGradeCard(this)" title="Нажмите для смены" style="cursor:pointer;font-size:11px;padding:2px 9px;border-radius:3px;background:#444;color:#fff;opacity:.7;user-select:none"></span>
+      </div>
     </div>
     <div class="hint" style="margin-bottom:2px;color:#e8e8f0">Заметки</div>
     <div style="margin-bottom:10px">
