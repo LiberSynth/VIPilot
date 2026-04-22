@@ -237,6 +237,7 @@ def production_page():
     screenwriter_show_used = env_get("screenwriter_show_used", "0") == "1"
     screenwriter_only_good = env_get("screenwriter_only_good", "0") == "1"
     screenwriter_for_approval = env_get("screenwriter_for_approval", "0") == "1"
+    screenwriter_only_pinned = env_get("screenwriter_only_pinned", "0") == "1"
     autoplay_movie = settings_get("producer_autoplay_movie", "0") == "1"
     resp = make_response(render_template(
         "production.html",
@@ -254,6 +255,7 @@ def production_page():
         screenwriter_show_used=screenwriter_show_used,
         screenwriter_only_good=screenwriter_only_good,
         screenwriter_for_approval=screenwriter_for_approval,
+        screenwriter_only_pinned=screenwriter_only_pinned,
         autoplay_movie=autoplay_movie,
     ))
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"

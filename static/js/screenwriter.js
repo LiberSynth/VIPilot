@@ -391,6 +391,7 @@ var getDraftStoryId;
   function getFilterParams() {
     var showUsed = document.getElementById('filter-show-used');
     var onlyGood = document.getElementById('filter-only-good');
+    var onlyPinned = document.getElementById('filter-only-pinned');
     var forApproval = document.getElementById('filter-for-approval');
     var params = new URLSearchParams();
     if (forApproval && forApproval.checked) {
@@ -398,6 +399,7 @@ var getDraftStoryId;
     } else {
       params.set('show_used', (showUsed && showUsed.checked) ? '1' : '0');
       params.set('show_bad', (onlyGood && onlyGood.checked) ? '0' : '1');
+      if (onlyPinned && onlyPinned.checked) params.set('only_pinned', '1');
     }
     var pinId = typeof getDraftStoryId === 'function' ? getDraftStoryId() : null;
     if (pinId) params.set('pin_id', pinId);
@@ -424,6 +426,7 @@ var getDraftStoryId;
   function initFilterCheckboxes() {
     var showUsed = document.getElementById('filter-show-used');
     var onlyGood = document.getElementById('filter-only-good');
+    var onlyPinned = document.getElementById('filter-only-pinned');
     var forApproval = document.getElementById('filter-for-approval');
     function envPost(key, value) {
       fetch('/production/env', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: key, value: value }) });
@@ -443,8 +446,10 @@ var getDraftStoryId;
         if (forApproval.checked) {
           if (onlyGood) onlyGood.checked = false;
           if (showUsed) showUsed.checked = false;
+          if (onlyPinned) onlyPinned.checked = false;
           envPost('screenwriter_only_good', '0');
           envPost('screenwriter_show_used', '0');
+          envPost('screenwriter_only_pinned', '0');
         }
         onFilterChange('screenwriter_for_approval', forApproval);
       });
@@ -465,6 +470,15 @@ var getDraftStoryId;
           envPost('screenwriter_for_approval', '0');
         }
         onFilterChange('screenwriter_only_good', onlyGood);
+      });
+    }
+    if (onlyPinned) {
+      onlyPinned.addEventListener('change', function() {
+        if (onlyPinned.checked && forApproval && forApproval.checked) {
+          forApproval.checked = false;
+          envPost('screenwriter_for_approval', '0');
+        }
+        onFilterChange('screenwriter_only_pinned', onlyPinned);
       });
     }
   }

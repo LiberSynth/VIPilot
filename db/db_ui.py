@@ -74,7 +74,7 @@ def db_get_batch_logs(batch_id):
     }
 
 
-def db_get_stories_list(show_used=True, show_bad=True, for_approval=False, pin_id=None, approve_movies: bool = True):
+def db_get_stories_list(show_used=True, show_bad=True, for_approval=False, pin_id=None, approve_movies: bool = True, only_pinned: bool = False):
     from common.statuses import FINAL_BATCH_STATUSES
     final_statuses_sql = ', '.join(f"'{s}'" for s in FINAL_BATCH_STATUSES)
     if approve_movies:
@@ -98,6 +98,8 @@ def db_get_stories_list(show_used=True, show_bad=True, for_approval=False, pin_i
             filter_conditions.append(f"NOT ({used_expr})")
         if not show_bad:
             filter_conditions.append("s.grade = 'good'")
+        if only_pinned:
+            filter_conditions.append("s.pinned = TRUE")
     params = []
     if pin_id and filter_conditions:
         base_cond = " AND ".join(filter_conditions)
