@@ -368,6 +368,9 @@
           .then(function() {
             dlg.close();
             if (typeof window.showToast === 'function') window.showToast('Видео удалено');
+            if (String(movieId) === String(_selectedMovieId)) {
+              selectMovie(null);
+            }
             window.loadMovieList();
           })
           .catch(function(d) {
