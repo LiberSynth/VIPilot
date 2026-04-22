@@ -539,7 +539,7 @@
     dlg.open();
 
     var done = 0;
-    var failed = 0;
+    var failedItems = [];
     for (var i = 0; i < metaList.length; i++) {
       if (dlg.isCancelled()) break;
       var meta = metaList[i];
@@ -561,12 +561,18 @@
         dlg.setProgress(done, filename);
       } catch (e) {
         if (dlg.isCancelled()) break;
-        failed++;
+        var reason = 'ошибка скачивания';
+        if (e && e.message && e.message.startsWith('http ')) {
+          var code = parseInt(e.message.slice(5), 10);
+          if (code === 404 || code === 410) reason = 'данные очищены после публикации';
+          else if (Number.isFinite(code)) reason = 'ошибка HTTP ' + code;
+        }
+        failedItems.push({ filename: filename, reason: reason });
       }
     }
 
     triggerBtn.disabled = false;
-    dlg.finish(done, dlg.isCancelled(), failed);
+    dlg.finish(done, dlg.isCancelled(), failedItems);
   }
 
   function initExportGoodMoviesButton() {

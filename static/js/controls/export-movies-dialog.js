@@ -1,3 +1,11 @@
+function _emdEscapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 class ExportMoviesDialog extends Dialog {
   constructor(opts) {
     super(opts);
@@ -65,7 +73,10 @@ class ExportMoviesDialog extends Dialog {
     if (fnEl)    fnEl.textContent = filename || '';
   }
 
-  finish(done, cancelled, failed) {
+  finish(done, cancelled, failedItems) {
+    failedItems = failedItems || [];
+    var failed = failedItems.length;
+
     var cancelBtn = document.getElementById('_emd-cancel');
     if (cancelBtn) cancelBtn.remove();
 
@@ -82,7 +93,22 @@ class ExportMoviesDialog extends Dialog {
     }
 
     var fnEl = document.getElementById('_emd-filename');
-    if (fnEl) fnEl.textContent = '';
+    if (fnEl) {
+      if (failed > 0) {
+        var html = '<div style="margin-top:8px;font-size:12px;color:#f87171;font-weight:600">Не удалось выгрузить:</div>' +
+          '<ul style="margin:4px 0 0;padding:0 0 0 16px;max-height:120px;overflow-y:auto;font-size:12px;color:#f87171">';
+        for (var i = 0; i < failedItems.length; i++) {
+          var item = failedItems[i];
+          html += '<li style="margin-bottom:3px"><span style="color:#fca5a5">' +
+            _emdEscapeHtml(item.filename) + '</span>' +
+            ' — ' + _emdEscapeHtml(item.reason) + '</li>';
+        }
+        html += '</ul>';
+        fnEl.innerHTML = html;
+      } else {
+        fnEl.textContent = '';
+      }
+    }
 
     var btns = this._el ? this._el.querySelector('.confirm-box-btns') : null;
     if (btns) {
