@@ -230,7 +230,7 @@ def db_claim_unused_story_for_batch(batch_id: str, grade_required: bool) -> dict
                         WHERE story_id IS NOT NULL AND type != 'story_probe'
                     )
                       AND grade = 'good'
-                    ORDER BY created_at ASC
+                    ORDER BY created_at ASC, id ASC
                     LIMIT 1
                     FOR UPDATE SKIP LOCKED
                 """)
@@ -243,7 +243,7 @@ def db_claim_unused_story_for_batch(batch_id: str, grade_required: bool) -> dict
                         FROM batches
                         WHERE story_id IS NOT NULL AND type != 'story_probe'
                     )
-                    ORDER BY created_at ASC
+                    ORDER BY created_at ASC, id ASC
                     LIMIT 1
                     FOR UPDATE SKIP LOCKED
                 """)
@@ -356,7 +356,7 @@ def db_get_actionable_batches():
                 )
                 OR status LIKE '%.pending'
                 OR status LIKE '%.published'
-                ORDER BY created_at ASC
+                ORDER BY created_at ASC, id ASC
             """)
             rows = cur.fetchall()
     return [dict(r) for r in rows]
