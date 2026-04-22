@@ -320,13 +320,26 @@ var getDraftStoryId;
     }).open();
   }
 
+  var _storyGradeReqCounters = {};
   function cycleGrade(btn) {
     var storyId = btn.getAttribute('data-id');
     var currentGradeAttr = btn.getAttribute('data-grade');
     var currentGrade = currentGradeAttr === 'null' ? null : currentGradeAttr;
     var idx = GRADE_CYCLE.indexOf(currentGrade);
     var nextGrade = GRADE_CYCLE[(idx + 1) % GRADE_CYCLE.length];
-    btn.disabled = true;
+    var prevAttr = currentGradeAttr;
+    _storyGradeReqCounters[storyId] = (_storyGradeReqCounters[storyId] || 0) + 1;
+    var myReqId = _storyGradeReqCounters[storyId];
+    var nextGk = gradeKey(nextGrade);
+    btn.setAttribute('data-grade', nextGk);
+    btn.style.background = nextGk !== 'null' ? (GRADE_COLORS[nextGk] || '') : '';
+    btn.style.color = nextGk !== 'null' ? (GRADE_TEXT_COLORS[nextGk] || '') : '';
+    btn.textContent = GRADE_LABELS[nextGk] || nextGk;
+    btn.title = 'Оценка: ' + (GRADE_LABELS[nextGk] || nextGk) + '. Нажмите для смены';
+    var _cardId = typeof getDraftStoryId === 'function' ? getDraftStoryId() : null;
+    if (_cardId && String(_cardId) === String(storyId) && typeof window.setCardGradeBadge === 'function') {
+      window.setCardGradeBadge(nextGrade, false);
+    }
     fetch('/production/story/' + storyId + '/grade', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -334,7 +347,7 @@ var getDraftStoryId;
     })
     .then(function(r) { return r.ok ? r.json() : null; })
     .then(function(d) {
-      btn.disabled = false;
+      if (myReqId !== _storyGradeReqCounters[storyId]) return;
       if (d && d.ok) {
         var grade = d.grade !== undefined ? d.grade : null;
         var gk = gradeKey(grade);
@@ -343,15 +356,37 @@ var getDraftStoryId;
         btn.style.color = gk !== 'null' ? (GRADE_TEXT_COLORS[gk] || '') : '';
         btn.textContent = GRADE_LABELS[gk] || gk;
         btn.title = 'Оценка: ' + (GRADE_LABELS[gk] || gk) + '. Нажмите для смены';
-
-        var _cardId = typeof getDraftStoryId === 'function' ? getDraftStoryId() : null;
-        if (_cardId && String(_cardId) === String(storyId) && typeof window.setCardGradeBadge === 'function') {
+        var _cId = typeof getDraftStoryId === 'function' ? getDraftStoryId() : null;
+        if (_cId && String(_cId) === String(storyId) && typeof window.setCardGradeBadge === 'function') {
           window.setCardGradeBadge(grade, false);
         }
         window.loadStoryList();
+      } else {
+        var prevGk = gradeKey(prevAttr === 'null' ? null : prevAttr);
+        btn.setAttribute('data-grade', prevGk);
+        btn.style.background = prevGk !== 'null' ? (GRADE_COLORS[prevGk] || '') : '';
+        btn.style.color = prevGk !== 'null' ? (GRADE_TEXT_COLORS[prevGk] || '') : '';
+        btn.textContent = GRADE_LABELS[prevGk] || prevGk;
+        btn.title = 'Оценка: ' + (GRADE_LABELS[prevGk] || prevGk) + '. Нажмите для смены';
+        var _cId2 = typeof getDraftStoryId === 'function' ? getDraftStoryId() : null;
+        if (_cId2 && String(_cId2) === String(storyId) && typeof window.setCardGradeBadge === 'function') {
+          window.setCardGradeBadge(prevAttr === 'null' ? null : prevAttr, false);
+        }
       }
     })
-    .catch(function() { btn.disabled = false; });
+    .catch(function() {
+      if (myReqId !== _storyGradeReqCounters[storyId]) return;
+      var prevGk = gradeKey(prevAttr === 'null' ? null : prevAttr);
+      btn.setAttribute('data-grade', prevGk);
+      btn.style.background = prevGk !== 'null' ? (GRADE_COLORS[prevGk] || '') : '';
+      btn.style.color = prevGk !== 'null' ? (GRADE_TEXT_COLORS[prevGk] || '') : '';
+      btn.textContent = GRADE_LABELS[prevGk] || prevGk;
+      btn.title = 'Оценка: ' + (GRADE_LABELS[prevGk] || prevGk) + '. Нажмите для смены';
+      var _cId3 = typeof getDraftStoryId === 'function' ? getDraftStoryId() : null;
+      if (_cId3 && String(_cId3) === String(storyId) && typeof window.setCardGradeBadge === 'function') {
+        window.setCardGradeBadge(prevAttr === 'null' ? null : prevAttr, false);
+      }
+    });
   }
 
   function getFilterParams() {
@@ -648,9 +683,23 @@ var getDraftStoryId;
 
   window.setCardGradeBadge = setCardGradeBadge;
 
+  function _syncStoryListGrade(storyId, grade) {
+    var container = document.getElementById('stories-list');
+    if (!container) return;
+    var listBtn = container.querySelector('.story-grade-badge[data-id="' + storyId + '"]');
+    if (!listBtn) return;
+    var gk = gradeKey(grade);
+    listBtn.setAttribute('data-grade', gk);
+    listBtn.style.background = gk !== 'null' ? (GRADE_COLORS[gk] || '') : '';
+    listBtn.style.color = gk !== 'null' ? (GRADE_TEXT_COLORS[gk] || '') : '';
+    listBtn.textContent = GRADE_LABELS[gk] || gk;
+    listBtn.title = 'Оценка: ' + (GRADE_LABELS[gk] || gk) + '. Нажмите для смены';
+  }
+
   function initCardGradeBadge() {
     var btn = document.getElementById('card-story-grade');
     if (!btn) return;
+    var _cardReqId = 0;
     btn.addEventListener('click', function() {
       if (btn.disabled) return;
       var storyId = typeof getDraftStoryId === 'function' ? getDraftStoryId() : null;
@@ -659,7 +708,10 @@ var getDraftStoryId;
       var currentGrade = currentGradeAttr === 'null' ? null : currentGradeAttr;
       var idx = GRADE_CYCLE.indexOf(currentGrade);
       var nextGrade = GRADE_CYCLE[(idx + 1) % GRADE_CYCLE.length];
-      btn.disabled = true;
+      var prevAttr = currentGradeAttr;
+      var myReqId = ++_cardReqId;
+      setCardGradeBadge(nextGrade, false);
+      _syncStoryListGrade(storyId, nextGrade);
       fetch('/production/story/' + storyId + '/grade', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -667,14 +719,24 @@ var getDraftStoryId;
       })
       .then(function(r) { return r.ok ? r.json() : null; })
       .then(function(d) {
-        btn.disabled = false;
+        if (myReqId !== _cardReqId) return;
         if (d && d.ok) {
           var grade = d.grade !== undefined ? d.grade : null;
           setCardGradeBadge(grade, false);
+          _syncStoryListGrade(storyId, grade);
           if (typeof window.loadStoryList === 'function') window.loadStoryList();
+        } else {
+          var prev = prevAttr === 'null' ? null : prevAttr;
+          setCardGradeBadge(prev, false);
+          _syncStoryListGrade(storyId, prev);
         }
       })
-      .catch(function() { btn.disabled = false; });
+      .catch(function() {
+        if (myReqId !== _cardReqId) return;
+        var prev = prevAttr === 'null' ? null : prevAttr;
+        setCardGradeBadge(prev, false);
+        _syncStoryListGrade(storyId, prev);
+      });
     });
   }
 

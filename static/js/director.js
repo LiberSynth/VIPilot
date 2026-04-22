@@ -130,29 +130,43 @@
   function initCardMovieGradeBadge() {
     var btn = document.getElementById('card-movie-grade');
     if (!btn) return;
+    var _cardReqId = 0;
     btn.addEventListener('click', function() {
       if (btn.disabled || !_selectedMovieId) return;
+      var movieId = _selectedMovieId;
       var currentAttr = btn.getAttribute('data-grade');
       var current = currentAttr === 'null' ? null : currentAttr;
       var idx = GRADE_CYCLE.indexOf(current);
       var next = GRADE_CYCLE[(idx + 1) % GRADE_CYCLE.length];
-      btn.disabled = true;
-      fetch('/production/movie/' + _selectedMovieId + '/grade', {
+      var prevAttr = currentAttr;
+      var myReqId = ++_cardReqId;
+      setCardMovieGradeBadge(next, false);
+      _syncListRowGrade(movieId, next);
+      fetch('/production/movie/' + movieId + '/grade', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ grade: next }),
       })
       .then(function(r) { return r.ok ? r.json() : null; })
       .then(function(d) {
-        btn.disabled = false;
+        if (myReqId !== _cardReqId) return;
         if (d && d.ok) {
           var g = d.grade !== undefined ? d.grade : null;
-          setCardMovieGradeBadge(g, false);
-          _syncListRowGrade(_selectedMovieId, g);
+          _syncListRowGrade(movieId, g);
+          if (String(movieId) === String(_selectedMovieId)) setCardMovieGradeBadge(g, false);
           window.loadMovieList();
+        } else {
+          var prev = prevAttr === 'null' ? null : prevAttr;
+          _syncListRowGrade(movieId, prev);
+          if (String(movieId) === String(_selectedMovieId)) setCardMovieGradeBadge(prev, false);
         }
       })
-      .catch(function() { btn.disabled = false; });
+      .catch(function() {
+        if (myReqId !== _cardReqId) return;
+        var prev = prevAttr === 'null' ? null : prevAttr;
+        _syncListRowGrade(movieId, prev);
+        if (String(movieId) === String(_selectedMovieId)) setCardMovieGradeBadge(prev, false);
+      });
     });
   }
 
@@ -325,13 +339,25 @@
   }
 
   /* ── цикл grade в строке списка ── */
+  var _movieGradeReqCounters = {};
   function cycleMovieGrade(btn) {
     var movieId = btn.getAttribute('data-id');
     var currentAttr = btn.getAttribute('data-grade');
     var current = currentAttr === 'null' ? null : currentAttr;
     var idx = GRADE_CYCLE.indexOf(current);
     var next = GRADE_CYCLE[(idx + 1) % GRADE_CYCLE.length];
-    btn.disabled = true;
+    var prevAttr = currentAttr;
+    _movieGradeReqCounters[movieId] = (_movieGradeReqCounters[movieId] || 0) + 1;
+    var myReqId = _movieGradeReqCounters[movieId];
+    var nextGk = gradeKey(next);
+    btn.setAttribute('data-grade', nextGk);
+    btn.style.background = nextGk !== 'null' ? (GRADE_COLORS[nextGk] || '') : '';
+    btn.style.color      = nextGk !== 'null' ? (GRADE_TEXT_COLORS[nextGk] || '') : '';
+    btn.textContent = GRADE_LABELS[nextGk] || nextGk;
+    btn.title = 'Оценка: ' + (GRADE_LABELS[nextGk] || nextGk) + '. Нажмите для смены';
+    if (String(movieId) === String(_selectedMovieId)) {
+      setCardMovieGradeBadge(next, false);
+    }
     fetch('/production/movie/' + movieId + '/grade', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -339,7 +365,7 @@
     })
     .then(function(r) { return r.ok ? r.json() : null; })
     .then(function(d) {
-      btn.disabled = false;
+      if (myReqId !== _movieGradeReqCounters[movieId]) return;
       if (d && d.ok) {
         var g = d.grade !== undefined ? d.grade : null;
         var gk = gradeKey(g);
@@ -348,14 +374,34 @@
         btn.style.color      = gk !== 'null' ? (GRADE_TEXT_COLORS[gk] || '') : '';
         btn.textContent = GRADE_LABELS[gk] || gk;
         btn.title = 'Оценка: ' + (GRADE_LABELS[gk] || gk) + '. Нажмите для смены';
-        /* если это выбранный элемент — синхронизируем карточку */
         if (String(movieId) === String(_selectedMovieId)) {
           setCardMovieGradeBadge(g, false);
         }
         window.loadMovieList();
+      } else {
+        var prevGk = gradeKey(prevAttr === 'null' ? null : prevAttr);
+        btn.setAttribute('data-grade', prevGk);
+        btn.style.background = prevGk !== 'null' ? (GRADE_COLORS[prevGk] || '') : '';
+        btn.style.color      = prevGk !== 'null' ? (GRADE_TEXT_COLORS[prevGk] || '') : '';
+        btn.textContent = GRADE_LABELS[prevGk] || prevGk;
+        btn.title = 'Оценка: ' + (GRADE_LABELS[prevGk] || prevGk) + '. Нажмите для смены';
+        if (String(movieId) === String(_selectedMovieId)) {
+          setCardMovieGradeBadge(prevAttr === 'null' ? null : prevAttr, false);
+        }
       }
     })
-    .catch(function() { btn.disabled = false; });
+    .catch(function() {
+      if (myReqId !== _movieGradeReqCounters[movieId]) return;
+      var prevGk = gradeKey(prevAttr === 'null' ? null : prevAttr);
+      btn.setAttribute('data-grade', prevGk);
+      btn.style.background = prevGk !== 'null' ? (GRADE_COLORS[prevGk] || '') : '';
+      btn.style.color      = prevGk !== 'null' ? (GRADE_TEXT_COLORS[prevGk] || '') : '';
+      btn.textContent = GRADE_LABELS[prevGk] || prevGk;
+      btn.title = 'Оценка: ' + (GRADE_LABELS[prevGk] || prevGk) + '. Нажмите для смены';
+      if (String(movieId) === String(_selectedMovieId)) {
+        setCardMovieGradeBadge(prevAttr === 'null' ? null : prevAttr, false);
+      }
+    });
   }
 
   function _openDeleteMovieDialog(movieId, movieTitle, triggerBtn) {
