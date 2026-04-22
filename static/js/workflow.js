@@ -31,6 +31,7 @@ function _pluralThread(n) {
 }
 
 function refreshWorkflowState() {
+  if (!document.getElementById('wf-dot')) return;
   fetch('/api/workflow/state')
     .then(function(r) { return r.json(); })
     .then(function(d) {
@@ -172,6 +173,7 @@ function wfApproveMovies(checked) {
 }
 
 function refreshDonorCount() {
+  if (!document.getElementById('donor-count')) return;
   fetch('/api/donors/count')
     .then(function(r) { return r.json(); })
     .then(function(d) {
@@ -182,6 +184,7 @@ function refreshDonorCount() {
 }
 
 function refreshMoviePoolCount() {
+  if (!document.getElementById('movie-pool-count')) return;
   fetch('/api/donors/count?good_only=1')
     .then(function(r) { return r.json(); })
     .then(function(d) {
