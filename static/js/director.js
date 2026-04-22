@@ -523,7 +523,7 @@
       if (dlg.isCancelled()) break;
       var meta = metaList[i];
       var filename = await _resolveUniqueFilename(dirHandle, _buildExportFilename(meta));
-      dlg.setProgress(done, filename);
+      dlg.setCurrentFile(filename);
       try {
         var resp = await fetch('/production/movies/' + encodeURIComponent(meta.id) + '/download');
         if (!resp.ok) throw new Error('http ' + resp.status);

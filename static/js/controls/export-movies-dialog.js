@@ -51,6 +51,11 @@ class ExportMoviesDialog extends Dialog {
     return this._cancelled;
   }
 
+  setCurrentFile(filename) {
+    var fnEl = document.getElementById('_emd-filename');
+    if (fnEl) fnEl.textContent = filename || '';
+  }
+
   setProgress(done, filename) {
     var bar     = document.getElementById('_emd-bar');
     var counter = document.getElementById('_emd-counter');
