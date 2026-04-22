@@ -30,7 +30,19 @@ from log.log import write_log_entry
 # ---------------------------------------------------------------------------
 
 # Миграции 1–70 удалены: задеплоены на prod 2026-04-20, db_version = 70.
-# Следующая миграция: _m078_...
+# Следующая миграция: _m079_...
+
+
+def _m078_skyreels_durations(cur):
+    """Добавляет допустимые длительности для моделей SkyReels V4 (5–15 сек)."""
+    cur.execute("""
+        INSERT INTO model_durations (model_id, duration)
+        SELECT m.id, d.duration
+        FROM ai_models m
+        CROSS JOIN (VALUES (5),(6),(7),(8),(9),(10),(11),(12),(13),(14),(15)) AS d(duration)
+        WHERE m.name IN ('SkyReels V4 Fast', 'SkyReels V4 Std')
+        ON CONFLICT DO NOTHING
+    """)
 
 
 def _m077_skyreels_sound_false(cur):
@@ -201,6 +213,7 @@ MIGRATIONS = [
     (75, _m075_add_skyreels),
     (76, _m076_skyreels_body_update),
     (77, _m077_skyreels_sound_false),
+    (78, _m078_skyreels_durations),
 ]
 
 
