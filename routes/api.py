@@ -40,6 +40,7 @@ from db import (
     db_clear_stories,
     db_delete_bad_movies,
     db_set_model_grade,
+    db_set_model_note,
     db_delete_batch,
     db_get_batch_status,
     db_delete_story,
@@ -238,6 +239,16 @@ def api_video_model_grade(model_id):
     if grade not in ("good", "limited", "poor", "fallback", "rejected"):
         return jsonify({"error": "invalid grade"}), 400
     ok = db_set_model_grade(model_id, grade)
+    return jsonify({"ok": ok})
+
+
+@bp.route("/video-models/<model_id>/note", methods=["POST"])
+def api_video_model_note(model_id):
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    data = request.get_json(silent=True) or {}
+    note = data.get("note", "") or ""
+    ok = db_set_model_note(model_id, str(note))
     return jsonify({"ok": ok})
 
 

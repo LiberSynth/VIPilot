@@ -30,6 +30,7 @@ from .db_simple import (
     db_toggle_model,
     db_reorder_models,
     db_set_model_grade,
+    db_set_model_note,
     db_get_distinct_batch_statuses,
     db_get_last_pipeline_run,
     db_get_top_quality_stories,

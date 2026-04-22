@@ -405,6 +405,17 @@ def db_set_model_grade(model_id: str, grade: str):
     return True
 
 
+def db_set_model_note(model_id: str, note: str):
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE ai_models SET note = %s WHERE id = %s",
+                (note, model_id),
+            )
+        conn.commit()
+    return True
+
+
 def db_get_distinct_batch_statuses():
     with get_db() as conn:
         with conn.cursor() as cur:
