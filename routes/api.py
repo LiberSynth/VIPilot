@@ -46,6 +46,8 @@ from db import (
     db_get_batch_status,
     db_delete_story,
     db_delete_movie,
+    db_get_good_movies_meta,
+    db_get_good_movie_video_data,
 )
 from log import db_get_monitor, log_batch_planned, write_log_entry
 from utils.auth import is_authenticated
@@ -727,6 +729,25 @@ def api_production_delete_bad_movies():
         return jsonify({"ok": True, "deleted": deleted})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@production_bp.route("/production/movies/good_meta", methods=["GET"])
+def api_production_good_movies_meta():
+    err = _production_auth_check()
+    if err:
+        return err
+    return jsonify(db_get_good_movies_meta())
+
+
+@production_bp.route("/production/movies/<movie_id>/download", methods=["GET"])
+def api_production_movie_download(movie_id):
+    err = _production_auth_check()
+    if err:
+        return err
+    data = db_get_good_movie_video_data(movie_id)
+    if data is None:
+        return jsonify({"error": "not_found"}), 404
+    return Response(data, mimetype="video/mp4")
 
 
 @production_bp.route("/production/video/generate", methods=["POST"])

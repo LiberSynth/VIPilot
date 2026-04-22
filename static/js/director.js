@@ -456,6 +456,109 @@
     });
   }
 
+  function _sanitizeFilename(name) {
+    return String(name || '').replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, ' ').trim();
+  }
+
+  function _buildExportFilename(meta) {
+    var model = (meta.model_name || '').trim();
+    var story = (meta.story_title || '').trim();
+    var raw;
+    if (model && story) {
+      raw = model + ' - ' + story;
+    } else if (story) {
+      raw = story;
+    } else {
+      raw = String(meta.id);
+    }
+    return _sanitizeFilename(raw) + '.mp4';
+  }
+
+  async function _resolveUniqueFilename(dirHandle, baseName) {
+    var dot = baseName.lastIndexOf('.');
+    var name = dot !== -1 ? baseName.slice(0, dot) : baseName;
+    var ext  = dot !== -1 ? baseName.slice(dot)    : '';
+    var candidate = baseName;
+    var n = 1;
+    while (true) {
+      try {
+        await dirHandle.getFileHandle(candidate);
+        n++;
+        candidate = name + ' (' + n + ')' + ext;
+      } catch (e) {
+        return candidate;
+      }
+    }
+  }
+
+  async function _exportGoodMovies(triggerBtn) {
+    var dirHandle;
+    try {
+      dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+    } catch (e) {
+      return;
+    }
+
+    var metaList;
+    try {
+      var r = await fetch('/production/movies/good_meta');
+      if (!r.ok) throw new Error('http ' + r.status);
+      metaList = await r.json();
+    } catch (e) {
+      if (typeof window.showToast === 'function') window.showToast('Ошибка получения списка роликов');
+      return;
+    }
+
+    if (!Array.isArray(metaList) || metaList.length === 0) {
+      if (typeof window.showToast === 'function') window.showToast('Нет роликов с оценкой «хорошо»');
+      return;
+    }
+
+    triggerBtn.disabled = true;
+    var dlg = new ExportMoviesDialog({ total: metaList.length, dirHandle: dirHandle, triggerBtn: triggerBtn });
+    dlg.open();
+
+    var done = 0;
+    var failed = 0;
+    for (var i = 0; i < metaList.length; i++) {
+      if (dlg.isCancelled()) break;
+      var meta = metaList[i];
+      var filename = await _resolveUniqueFilename(dirHandle, _buildExportFilename(meta));
+      dlg.setProgress(done, filename);
+      try {
+        var resp = await fetch('/production/movies/' + encodeURIComponent(meta.id) + '/download');
+        if (!resp.ok) throw new Error('http ' + resp.status);
+        var blob = await resp.blob();
+        var fh = await dirHandle.getFileHandle(filename, { create: true });
+        var writable = await fh.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        done++;
+        dlg.setProgress(done, filename);
+      } catch (e) {
+        if (dlg.isCancelled()) break;
+        failed++;
+      }
+    }
+
+    triggerBtn.disabled = false;
+    dlg.finish(done, dlg.isCancelled(), failed);
+  }
+
+  function initExportGoodMoviesButton() {
+    var btn = document.getElementById('btn-export-good-movies');
+    if (!btn) return;
+    if (!window.showDirectoryPicker) {
+      btn.disabled = true;
+      btn.title = 'Ваш браузер не поддерживает выбор папки';
+      return;
+    }
+    btn.addEventListener('click', function() {
+      if (btn.disabled) return;
+      _exportGoodMovies(btn);
+    });
+  }
+
   window.directorUpdateVideoWrapHeight = updateVideoWrapHeight;
 
   function initAutoplayToggle() {
@@ -472,6 +575,7 @@
     initFilters();
     initCardMovieGradeBadge();
     initDeleteBadMoviesButton();
+    initExportGoodMoviesButton();
     initAutoplayToggle();
     loadMovieInPlayer(null);
     window.addEventListener('resize', updateVideoWrapHeight);

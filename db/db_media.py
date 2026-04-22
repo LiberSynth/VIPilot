@@ -116,6 +116,23 @@ def db_get_movie_video_data(movie_id) -> bytes | None:
     return None
 
 
+def db_get_good_movie_video_data(movie_id) -> bytes | None:
+    """Возвращает видеоданные только если grade = 'good'."""
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT transcoded_data, raw_data FROM movies
+                WHERE id = %s AND grade = 'good'
+            """, (movie_id,))
+            row = cur.fetchone()
+    if row:
+        if row[0] is not None:
+            return bytes(row[0])
+        if row[1] is not None:
+            return bytes(row[1])
+    return None
+
+
 def db_get_random_real_original_video() -> tuple[str, str, str | None] | None:
     with get_db() as conn:
         with conn.cursor() as cur:
