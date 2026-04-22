@@ -188,6 +188,17 @@ DROP TABLE IF EXISTS t;
 
 ---
 
+## Правило 11: Стили `<textarea>` — через тег-селектор, без инлайна и класса
+
+Все многострочные поля ввода стилизуются через тег-селектор `textarea` в `static/common.css`. Дополнительный CSS-класс не нужен.
+
+- Базовые стили (фон, рамка, отступы, шрифт, `resize`, `min-height`) — только в блоке `textarea { … }` в `common.css`.
+- Индивидуальная высота — через ID-селектор в `common.css` (`#ta { height: 300px; }`).
+- Инлайновые атрибуты `style` на `<textarea>` **запрещены**, кроме `width`/`box-sizing`/`resize`, если они нужны для конкретного контекста вёрстки (например, readonly-блок в карточке).
+- `min-height` в инлайне **запрещён** — базовое значение уже задано в `common.css`.
+
+---
+
 ## Сводная таблица
 
 | Ситуация | Механизм |
@@ -204,3 +215,4 @@ DROP TABLE IF EXISTS t;
 | Вставка в миграции | `INSERT ... SELECT ... WHERE NOT EXISTS (...)` |
 | DDL в миграции | `ADD COLUMN IF NOT EXISTS`, `DROP COLUMN IF EXISTS`, `CREATE INDEX IF NOT EXISTS` и т.д. |
 | Диалог подтверждения или модал в JS | `new ConfirmDialog({...}).open()` или класс, наследующий `Dialog` |
+| Стили `<textarea>` | Тег-селектор в `common.css`; инлайн `style` и `min-height` запрещены |
