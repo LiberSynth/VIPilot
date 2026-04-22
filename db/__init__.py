@@ -21,7 +21,6 @@ from .db_simple import (
     db_set_story_grade,
     db_set_movie_grade,
     db_set_story_pinned,
-    db_set_story_top_quality,
     db_get_story_text,
     db_get_story_title,
     db_get_story_model_info,
@@ -34,7 +33,6 @@ from .db_simple import (
     db_set_model_body,
     db_get_distinct_batch_statuses,
     db_get_last_pipeline_run,
-    db_get_top_quality_stories,
     db_get_graded_stories,
 )
 from .db_pipeline import (

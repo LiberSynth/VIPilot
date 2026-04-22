@@ -260,18 +260,6 @@ def db_set_story_pinned(story_id, value: bool):
     return updated > 0
 
 
-def db_set_story_top_quality(story_id, value: bool):
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "UPDATE stories SET top_quality = %s WHERE id = %s::uuid",
-                (value, story_id),
-            )
-            updated = cur.rowcount
-        conn.commit()
-    return updated > 0
-
-
 def db_set_movie_grade(movie_id, grade):
     with get_db() as conn:
         with conn.cursor() as cur:
@@ -445,16 +433,6 @@ def db_get_last_pipeline_run(pipeline):
             )
             row = cur.fetchone()
     return row[0] if row and row[0] is not None else None
-
-
-def db_get_top_quality_stories():
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT title, content FROM stories WHERE top_quality = TRUE ORDER BY created_at DESC, id DESC"
-            )
-            rows = cur.fetchall()
-    return [{"title": row[0], "content": row[1]} for row in rows]
 
 
 def db_get_graded_stories():

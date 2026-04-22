@@ -30,7 +30,14 @@ from log.log import write_log_entry
 # ---------------------------------------------------------------------------
 
 # Миграции 1–70 удалены: задеплоены на prod 2026-04-20, db_version = 70.
-# Следующая миграция: _m080_...
+# Следующая миграция: _m081_...
+
+
+def _m080_drop_stories_top_quality(cur):
+    """Удаляет колонку stories.top_quality — поле не использовалось нигде в коде.
+    Deployed: —
+    """
+    cur.execute("ALTER TABLE stories DROP COLUMN IF EXISTS top_quality")
 
 
 def _m079_created_at_clock_timestamp(cur):
@@ -235,6 +242,7 @@ MIGRATIONS = [
     (77, _m077_skyreels_sound_false),
     (78, _m078_skyreels_durations),
     (79, _m079_created_at_clock_timestamp),
+    (80, _m080_drop_stories_top_quality),
 ]
 
 
