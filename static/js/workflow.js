@@ -116,48 +116,26 @@ function wfEmulation(checked) {
     .catch(function() { showToast('Ошибка соединения', 'error'); });
 }
 
-function _buildRestartOverlay() {
-  var el = document.createElement('div');
-  el.className = 'confirm-overlay open';
-  el.id = 'restartOverlay';
-  el.innerHTML =
-    '<div class="confirm-box">' +
-      '<div class="confirm-box-title">Перезапустить движок?</div>' +
-      '<div class="confirm-box-text">' +
-        'Приложение будет остановлено и автоматически перезапущено.<br><br>' +
-        'Текущие задачи будут прерваны. Состояние движка (работает/приостановлен) сохранится.' +
-      '</div>' +
-      '<div class="confirm-box-btns">' +
-        '<button class="confirm-cancel" onclick="closeRestartDialog()">Отмена</button>' +
-        '<button class="confirm-confirm" id="restartConfirmBtn" onclick="confirmRestart()" style="background:#b05820">Перезапустить</button>' +
-      '</div>' +
-    '</div>';
-  return el;
-}
-
 function openRestartDialog() {
-  var existing = document.getElementById('restartOverlay');
-  if (existing) existing.remove();
-  document.body.appendChild(_buildRestartOverlay());
-}
-
-function closeRestartDialog() {
-  var el = document.getElementById('restartOverlay');
-  if (el) el.remove();
-}
-
-function confirmRestart() {
-  var btn = document.getElementById('restartConfirmBtn');
-  btn.disabled    = true;
-  btn.textContent = 'Перезапуск…';
-  fetch('/api/workflow/restart', { method: 'POST' })
-    .then(function(r) { return r.json(); })
-    .then(function() {
-      closeRestartDialog();
-      showToast('Перезапуск… страница обновится автоматически', 'success');
-      setTimeout(function() { location.reload(); }, 4000);
-    })
-    .catch(function() { closeRestartDialog(); showToast('Ошибка соединения', 'error'); });
+  new ConfirmDialog({
+    title: 'Перезапустить движок?',
+    text:
+      'Приложение будет остановлено и автоматически перезапущено.<br><br>' +
+      'Текущие задачи будут прерваны. Состояние движка (работает/приостановлен) сохранится.',
+    confirmLabel: 'Перезапустить',
+    onConfirm: function(btn, dlg) {
+      btn.disabled    = true;
+      btn.textContent = 'Перезапуск…';
+      fetch('/api/workflow/restart', { method: 'POST' })
+        .then(function(r) { return r.json(); })
+        .then(function() {
+          dlg.close();
+          showToast('Перезапуск… страница обновится автоматически', 'success');
+          setTimeout(function() { location.reload(); }, 4000);
+        })
+        .catch(function() { dlg.close(); showToast('Ошибка соединения', 'error'); });
+    },
+  }).open();
 }
 
 function _syncUseDonorDisabled() {
@@ -179,7 +157,7 @@ function wfApproveMovies(checked) {
       var on    = d.approve_movies === '1';
       if (badge) badge.style.display = on ? '' : 'none';
       if (on) {
-        var useDonorChk  = document.getElementById('use_donor_check');
+        var useDonorChk   = document.getElementById('use_donor_check');
         var useDonorBadge = document.getElementById('use-donor-badge');
         if (useDonorChk && !useDonorChk.checked) {
           useDonorChk.checked = true;
@@ -221,59 +199,35 @@ function refreshMoviePoolCount() {
   setInterval(refreshMoviePoolCount, 10000);
 })();
 
-function _buildClearHistoryOverlay() {
-  var el = document.createElement('div');
-  el.className = 'confirm-overlay open';
-  el.id = 'clearHistoryOverlay';
-  el.innerHTML =
-    '<div class="confirm-box">' +
-      '<div class="confirm-box-title">Очистить всю историю?</div>' +
-      '<div class="confirm-box-text">' +
-        'Будут удалены все логи (краткие и подробные) и все завершённые батчи со связанными сюжетами.<br><br>' +
-        'Активные батчи (в очереди, в процессе генерации) не затрагиваются.<br><br>' +
-        'Действие нельзя отменить.' +
-      '</div>' +
-      '<div class="confirm-box-btns">' +
-        '<button class="confirm-cancel" onclick="closeClearHistoryDialog()">Отмена</button>' +
-        '<button class="confirm-confirm" id="clearHistoryConfirmBtn" onclick="confirmClearHistory()">Очистить</button>' +
-      '</div>' +
-    '</div>';
-  return el;
-}
-
 function openClearHistoryDialog() {
-  var existing = document.getElementById('clearHistoryOverlay');
-  if (existing) existing.remove();
-  document.body.appendChild(_buildClearHistoryOverlay());
-}
-
-function closeClearHistoryDialog() {
-  var el = document.getElementById('clearHistoryOverlay');
-  if (el) el.remove();
-}
-
-function confirmClearHistory() {
-  var btn = document.getElementById('clearHistoryConfirmBtn');
-  btn.disabled    = true;
-  btn.textContent = 'Удаляем…';
-  fetch('/api/clear_history', { method: 'POST' })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      closeClearHistoryDialog();
-      if (data.ok) {
-        var d     = data.deleted || {};
-        var parts = [];
-        if (d.logs)        parts.push('логов: '   + d.logs);
-        if (d.log_entries) parts.push('записей: ' + d.log_entries);
-        if (d.batches)     parts.push('батчей: '  + d.batches);
-        if (d.stories)     parts.push('сюжетов: ' + d.stories);
-        showToast('История очищена' + (parts.length ? ': ' + parts.join(', ') : ''), 'success');
-      } else {
-        showToast('Ошибка: ' + (data.error || 'неизвестная ошибка'), 'error');
-      }
-    })
-    .catch(function() {
-      closeClearHistoryDialog();
-      showToast('Ошибка соединения', 'error');
-    });
+  new ConfirmDialog({
+    title: 'Очистить всю историю?',
+    text:
+      'Будут удалены все логи (краткие и подробные) и все завершённые батчи со связанными сюжетами.<br><br>' +
+      'Активные батчи (в очереди, в процессе генерации) не затрагиваются.<br><br>' +
+      'Действие нельзя отменить.',
+    confirmLabel: 'Очистить',
+    confirmStyle: 'background:#b05820',
+    onConfirm: function(btn, dlg) {
+      btn.disabled    = true;
+      btn.textContent = 'Удаляем…';
+      fetch('/api/clear_history', { method: 'POST' })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          dlg.close();
+          if (data.ok) {
+            var d     = data.deleted || {};
+            var parts = [];
+            if (d.logs)        parts.push('логов: '   + d.logs);
+            if (d.log_entries) parts.push('записей: ' + d.log_entries);
+            if (d.batches)     parts.push('батчей: '  + d.batches);
+            if (d.stories)     parts.push('сюжетов: ' + d.stories);
+            showToast('История очищена' + (parts.length ? ': ' + parts.join(', ') : ''), 'success');
+          } else {
+            showToast('Ошибка: ' + (data.error || 'неизвестная ошибка'), 'error');
+          }
+        })
+        .catch(function() { dlg.close(); showToast('Ошибка соединения', 'error'); });
+    },
+  }).open();
 }

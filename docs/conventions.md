@@ -174,6 +174,20 @@ DROP TABLE IF EXISTS t;
 
 ---
 
+## Правило 10: Все JS-диалоги и модалы наследуются от `Dialog`
+
+Любой диалог подтверждения или модальное окно в клиентском JavaScript **обязано** быть реализовано через классовую иерархию из `static/js/controls/`:
+
+- **`Dialog`** (`controls/dialog.js`) — базовый класс: управляет ловушкой фокуса (Tab/Shift+Tab), закрытием по Esc, восстановлением фокуса на `triggerBtn` после закрытия.
+- **`ConfirmDialog extends Dialog`** (`controls/confirm-dialog.js`) — готовый диалог подтверждения с заголовком, текстом и кнопками. Принимает `{ title, text, confirmLabel, cancelLabel, confirmStyle, onConfirm(btn, dlg), onCancel, triggerBtn }`.
+- Полноценные модалы (видео, зонд, сюжет и т.п.) **расширяют `Dialog`** и переопределяют `open()`, `close()` и `onClose()` под свою специфику.
+
+**Прямое создание DOM-элементов с классом `confirm-overlay` запрещено** — только через `new ConfirmDialog({...}).open()` или наследника `Dialog`.
+
+Оба файла подключаются в `templates/root.html` и `templates/production.html` **перед** остальными скриптами приложения, что делает `Dialog` и `ConfirmDialog` доступными глобально.
+
+---
+
 ## Сводная таблица
 
 | Ситуация | Механизм |
@@ -189,3 +203,4 @@ DROP TABLE IF EXISTS t;
 | Чтение окружения внутри потока | `snap = environment.snapshot()` — первая строка `run()` |
 | Вставка в миграции | `INSERT ... SELECT ... WHERE NOT EXISTS (...)` |
 | DDL в миграции | `ADD COLUMN IF NOT EXISTS`, `DROP COLUMN IF EXISTS`, `CREATE INDEX IF NOT EXISTS` и т.д. |
+| Диалог подтверждения или модал в JS | `new ConfirmDialog({...}).open()` или класс, наследующий `Dialog` |

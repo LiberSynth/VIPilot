@@ -313,72 +313,29 @@ var getDraftStoryId;
   }
 
   function _openDeleteStoryDialog(storyId, triggerBtn) {
-    var existing = document.getElementById('deleteStoryOverlay');
-    if (existing) existing.remove();
-    var el = document.createElement('div');
-    el.className = 'confirm-overlay open';
-    el.id = 'deleteStoryOverlay';
-    el.innerHTML =
-      '<div class="confirm-box">' +
-        '<div class="confirm-box-title">Удалить сюжет?</div>' +
-        '<div class="confirm-box-text">' +
-          'Сюжет и все связанные батчи, лог и записи лога будут удалены безвозвратно.' +
-        '</div>' +
-        '<div class="confirm-box-btns">' +
-          '<button class="confirm-cancel" id="deleteStoryCancelBtn">Отмена</button>' +
-          '<button class="confirm-confirm" id="deleteStoryConfirmBtn" style="background:#b05820">Удалить</button>' +
-        '</div>' +
-      '</div>';
-    document.body.appendChild(el);
-
-    var cancelBtn  = document.getElementById('deleteStoryCancelBtn');
-    var confirmBtn = document.getElementById('deleteStoryConfirmBtn');
-
-    function closeDialog() {
-      var overlay = document.getElementById('deleteStoryOverlay');
-      if (overlay) overlay.remove();
-      document.removeEventListener('keydown', onKeyDown);
-      if (triggerBtn) triggerBtn.focus();
-    }
-
-    function onKeyDown(e) {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        closeDialog();
-        return;
-      }
-      if (e.key === 'Tab') {
-        var focusable = [cancelBtn, confirmBtn].filter(function(b) { return b && !b.disabled; });
-        if (focusable.length < 2) return;
-        var first = focusable[0], last = focusable[focusable.length - 1];
-        if (e.shiftKey) {
-          if (document.activeElement === first) { e.preventDefault(); last.focus(); }
-        } else {
-          if (document.activeElement === last)  { e.preventDefault(); first.focus(); }
-        }
-      }
-    }
-
-    document.addEventListener('keydown', onKeyDown);
-    cancelBtn.focus();
-
-    cancelBtn.addEventListener('click', closeDialog);
-    confirmBtn.addEventListener('click', function() {
-      if (confirmBtn) { confirmBtn.disabled = true; confirmBtn.textContent = 'Удаление…'; }
-      fetch('/production/story/' + encodeURIComponent(storyId) + '/delete', { method: 'DELETE' })
-        .then(function(r) { return r.ok ? r.json() : r.json().then(function(d) { throw d; }); })
-        .then(function() {
-          closeDialog();
-          var row = document.querySelector('.story-row[data-id="' + storyId + '"]');
-          if (row) row.remove();
-          if (typeof window.loadStoryList === 'function') window.loadStoryList();
-        })
-        .catch(function(d) {
-          closeDialog();
-          var msg = (d && d.error) ? d.error : 'Ошибка удаления';
-          if (typeof window.showToast === 'function') window.showToast(msg);
-        });
-    });
+    new ConfirmDialog({
+      title:        'Удалить сюжет?',
+      text:         'Сюжет и все связанные батчи, лог и записи лога будут удалены безвозвратно.',
+      confirmLabel: 'Удалить',
+      triggerBtn:   triggerBtn,
+      onConfirm: function(btn, dlg) {
+        btn.disabled    = true;
+        btn.textContent = 'Удаление…';
+        fetch('/production/story/' + encodeURIComponent(storyId) + '/delete', { method: 'DELETE' })
+          .then(function(r) { return r.ok ? r.json() : r.json().then(function(d) { throw d; }); })
+          .then(function() {
+            dlg.close();
+            var row = document.querySelector('.story-row[data-id="' + storyId + '"]');
+            if (row) row.remove();
+            if (typeof window.loadStoryList === 'function') window.loadStoryList();
+          })
+          .catch(function(d) {
+            dlg.close();
+            var msg = (d && d.error) ? d.error : 'Ошибка удаления';
+            if (typeof window.showToast === 'function') window.showToast(msg);
+          });
+      },
+    }).open();
   }
 
   function cycleGrade(btn) {
@@ -868,53 +825,36 @@ var getDraftStoryId;
 
 /* ── Кнопка «Очистить» сюжеты ── */
 (function() {
-  function _closeDeleteBadDialog() {
-    var el = document.getElementById('deleteBadStoriesOverlay');
-    if (el) el.remove();
-  }
-
   function _openDeleteBadDialog(btn) {
-    var existing = document.getElementById('deleteBadStoriesOverlay');
-    if (existing) existing.remove();
-    var el = document.createElement('div');
-    el.className = 'confirm-overlay open';
-    el.id = 'deleteBadStoriesOverlay';
-    el.innerHTML =
-      '<div class="confirm-box">' +
-        '<div class="confirm-box-title">Очистить сюжеты?</div>' +
-        '<div class="confirm-box-text">' +
-          'Будут удалены все незакреплённые сюжеты без оценки или с оценкой «плохо», по которым не создавалось видео,<br>а также связанные с ними батчи и записи лога.' +
-        '</div>' +
-        '<div class="confirm-box-btns">' +
-          '<button class="confirm-cancel" id="deleteBadCancelBtn">Отмена</button>' +
-          '<button class="confirm-confirm" id="deleteBadConfirmBtn" style="background:#b05820">Удалить</button>' +
-        '</div>' +
-      '</div>';
-    document.body.appendChild(el);
-    document.getElementById('deleteBadCancelBtn').addEventListener('click', _closeDeleteBadDialog);
-    document.getElementById('deleteBadConfirmBtn').addEventListener('click', function() {
-      var confirmBtn = document.getElementById('deleteBadConfirmBtn');
-      if (confirmBtn) { confirmBtn.disabled = true; confirmBtn.textContent = 'Удаление…'; }
-      btn.classList.add('pending');
-      fetch('/production/stories/delete_bad', { method: 'POST' })
-        .then(function(r) { return r.ok ? r.json() : null; })
-        .then(function(d) {
-          btn.classList.remove('pending');
-          _closeDeleteBadDialog();
-          if (d && d.ok) {
-            var n = d.deleted ? (d.deleted.stories || 0) : 0;
-            var mod10 = n % 10, mod100 = n % 100;
-            var word;
-            if (mod100 >= 11 && mod100 <= 14) { word = 'сюжетов'; }
-            else if (mod10 === 1) { word = 'сюжет'; }
-            else if (mod10 >= 2 && mod10 <= 4) { word = 'сюжета'; }
-            else { word = 'сюжетов'; }
-            if (typeof window.showToast === 'function') window.showToast('Удалено ' + n + ' ' + word);
-            if (typeof window.loadStoryList === 'function') window.loadStoryList();
-          }
-        })
-        .catch(function() { btn.classList.remove('pending'); _closeDeleteBadDialog(); });
-    });
+    new ConfirmDialog({
+      title:        'Очистить сюжеты?',
+      text:         'Будут удалены все незакреплённые сюжеты без оценки или с оценкой «плохо», по которым не создавалось видео,<br>а также связанные с ними батчи и записи лога.',
+      confirmLabel: 'Удалить',
+      triggerBtn:   btn,
+      onConfirm: function(confirmBtn, dlg) {
+        confirmBtn.disabled    = true;
+        confirmBtn.textContent = 'Удаление…';
+        btn.classList.add('pending');
+        fetch('/production/stories/delete_bad', { method: 'POST' })
+          .then(function(r) { return r.ok ? r.json() : null; })
+          .then(function(d) {
+            btn.classList.remove('pending');
+            dlg.close();
+            if (d && d.ok) {
+              var n = d.deleted ? (d.deleted.stories || 0) : 0;
+              var mod10 = n % 10, mod100 = n % 100;
+              var word;
+              if (mod100 >= 11 && mod100 <= 14) { word = 'сюжетов'; }
+              else if (mod10 === 1)              { word = 'сюжет'; }
+              else if (mod10 >= 2 && mod10 <= 4) { word = 'сюжета'; }
+              else                               { word = 'сюжетов'; }
+              if (typeof window.showToast === 'function') window.showToast('Удалено ' + n + ' ' + word);
+              if (typeof window.loadStoryList === 'function') window.loadStoryList();
+            }
+          })
+          .catch(function() { btn.classList.remove('pending'); dlg.close(); });
+      },
+    }).open();
   }
 
   function initDeleteBadStoriesButton() {

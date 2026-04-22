@@ -756,71 +756,42 @@
   window.groupLogsByPipeline = groupLogsByPipeline;
   window.renderLogItem       = renderLogItem;
 
-  function _buildDeleteBatchOverlay(batchId, isBlocked) {
-    var el = document.createElement('div');
-    el.className = 'confirm-overlay open';
-    el.id = 'deleteBatchOverlay';
-    if (isBlocked) {
-      el.innerHTML =
-        '<div class="confirm-box">' +
-          '<div class="confirm-box-title">Удаление невозможно</div>' +
-          '<div class="confirm-box-text">' +
-            '<div class="confirm-box-warn">Батч находится в активном статусе. Удаление заблокировано — дождитесь завершения обработки.</div>' +
-            'Сюжеты (stories) не затрагиваются.' +
-          '</div>' +
-          '<div class="confirm-box-btns">' +
-            '<button class="confirm-cancel" onclick="monitorCloseDeleteBatch()">Закрыть</button>' +
-          '</div>' +
-        '</div>';
-    } else {
-      el.innerHTML =
-        '<div class="confirm-box">' +
-          '<div class="confirm-box-title">Удалить батч?</div>' +
-          '<div class="confirm-box-text">' +
-            'Батч и все связанные данные (логи, видео) будут удалены без возможности восстановления.<br><br>' +
-            'Сюжеты (stories) не затрагиваются.' +
-          '</div>' +
-          '<div class="confirm-box-btns">' +
-            '<button class="confirm-cancel" onclick="monitorCloseDeleteBatch()">Отмена</button>' +
-            '<button class="confirm-confirm" id="deleteBatchConfirmBtn" onclick="monitorConfirmDeleteBatch(\'' + batchId + '\')">Удалить</button>' +
-          '</div>' +
-        '</div>';
-    }
-    return el;
-  }
-
   window.monitorDeleteBatch = function(batchId, btn) {
-    var existing = document.getElementById('deleteBatchOverlay');
-    if (existing) existing.remove();
     var isBlocked = !!(btn && btn.dataset && btn.dataset.warn);
-    document.body.appendChild(_buildDeleteBatchOverlay(batchId, isBlocked));
-  };
-
-  window.monitorCloseDeleteBatch = function() {
-    var el = document.getElementById('deleteBatchOverlay');
-    if (el) el.remove();
-  };
-
-  window.monitorConfirmDeleteBatch = function(batchId) {
-    var btn = document.getElementById('deleteBatchConfirmBtn');
-    btn.disabled    = true;
-    btn.textContent = 'Удаляем…';
-    fetch('/api/monitor/batch/' + encodeURIComponent(batchId) + '/delete', { method: 'POST' })
-      .then(function(r) { return r.json(); })
-      .then(function(data) {
-        monitorCloseDeleteBatch();
-        if (data.ok) {
-          var batchEl = document.querySelector('.monitor-batch[data-bid="' + batchId + '"]');
-          if (batchEl) batchEl.remove();
-          showToast('Батч удалён', 'success');
-        } else {
-          showToast('Ошибка: ' + (data.error || 'неизвестная ошибка'), 'error');
-        }
-      })
-      .catch(function() {
-        monitorCloseDeleteBatch();
-        showToast('Ошибка соединения', 'error');
-      });
+    if (isBlocked) {
+      new ConfirmDialog({
+        title:       'Удаление невозможно',
+        text:
+          '<div class="confirm-box-warn">Батч находится в активном статусе. Удаление заблокировано — дождитесь завершения обработки.</div>' +
+          'Сюжеты (stories) не затрагиваются.',
+        cancelLabel: 'Закрыть',
+      }).open();
+    } else {
+      new ConfirmDialog({
+        title:        'Удалить батч?',
+        text:
+          'Батч и все связанные данные (логи, видео) будут удалены без возможности восстановления.<br><br>' +
+          'Сюжеты (stories) не затрагиваются.',
+        confirmLabel: 'Удалить',
+        onConfirm: function(confirmBtn, dlg) {
+          confirmBtn.disabled    = true;
+          confirmBtn.textContent = 'Удаляем…';
+          fetch('/api/monitor/batch/' + encodeURIComponent(batchId) + '/delete', { method: 'POST' })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+              dlg.close();
+              if (data.ok) {
+                var batchEl = document.querySelector('.monitor-batch[data-bid="' + batchId + '"]');
+                if (batchEl) batchEl.remove();
+                showToast('Батч удалён', 'success');
+              } else {
+                showToast('Ошибка: ' + (data.error || 'неизвестная ошибка'), 'error');
+              }
+            })
+            .catch(function() { dlg.close(); showToast('Ошибка соединения', 'error'); });
+        },
+      }).open();
+    }
   };
 
   refreshMonitor();
