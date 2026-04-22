@@ -30,7 +30,16 @@ from log.log import write_log_entry
 # ---------------------------------------------------------------------------
 
 # Миграции 1–70 удалены: задеплоены на prod 2026-04-20, db_version = 70.
-# Следующая миграция: _m077_...
+# Следующая миграция: _m078_...
+
+
+def _m077_skyreels_sound_false(cur):
+    """Устанавливает sound: false в body обеих моделей SkyReels V4."""
+    cur.execute("""
+        UPDATE ai_models
+        SET body = body || '{"sound": false}'::jsonb
+        WHERE name IN ('SkyReels V4 Fast', 'SkyReels V4 Std')
+    """)
 
 
 def _m076_skyreels_body_update(cur):
@@ -191,6 +200,7 @@ MIGRATIONS = [
     (74, _m074_rename_key_env),
     (75, _m075_add_skyreels),
     (76, _m076_skyreels_body_update),
+    (77, _m077_skyreels_sound_false),
 ]
 
 
