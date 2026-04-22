@@ -636,7 +636,7 @@
   .cycle-float-btn.pending { border-color: rgba(255,180,0,.5); animation: btn-pending-pulse 1s ease-in-out infinite; }
   .cycle-float-btn.pending svg * { stroke: #ffb400; }
   .cycle-float-btn:disabled { opacity: .35; cursor: not-allowed; pointer-events: auto; }
-  .cycle-float-btn.btn-blocked { opacity: .35; cursor: not-allowed; }
+  .cycle-float-btn.btn-blocked { opacity: .35; }
   @keyframes btn-pending-pulse { 0%,100% { opacity:1; } 50% { opacity:.4; } }
 
   .monitor-log-list {
@@ -1043,7 +1043,8 @@
     color: #aaa; opacity: .55; transition: opacity .15s;
   }
   .story-delete-btn:hover { opacity: 1; }
-  .story-delete-btn:disabled { opacity: .25; cursor: default; }
+  .story-delete-btn:disabled { opacity: .25; }
+  .story-delete-btn.btn-blocked { opacity: .25; }
 
   .story-info-btn {
     background: none; border: none; padding: 0; cursor: pointer;

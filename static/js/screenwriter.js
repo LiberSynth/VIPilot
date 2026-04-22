@@ -202,10 +202,14 @@ var getDraftStoryId;
         '<line x1="5" y1="2" x2="11" y2="2"/>' +
         '</svg></button>';
       var deleteDisabled = s.pinned || s.used || s.has_active_batch;
+      var deleteBlockReason = deleteDisabled
+        ? (s.pinned ? 'Сюжет закреплён' : (s.used ? 'Сюжет уже использован в производстве' : 'У сюжета есть активный батч'))
+        : '';
       var deleteTitle = deleteDisabled
         ? (s.pinned ? 'Нельзя удалить: сюжет закреплён' : (s.used ? 'Нельзя удалить: сюжет использован в производстве' : 'Нельзя удалить: есть активный батч'))
         : 'Удалить сюжет';
-      var deleteBtn = '<button class="story-icon story-delete-btn" data-id="' + s.id + '" title="' + deleteTitle + '"' + (deleteDisabled ? ' disabled' : '') + '>' +
+      var storyTitleEsc = escapeHtml(s.title || '(без названия)');
+      var deleteBtn = '<button class="story-icon story-delete-btn' + (deleteDisabled ? ' btn-blocked' : '') + '" data-id="' + s.id + '" data-title="' + storyTitleEsc + '"' + (deleteDisabled ? ' data-block-reason="' + escapeHtml(deleteBlockReason) + '"' : '') + ' title="' + deleteTitle + '">' +
         '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
         '<polyline points="2,4 14,4"/><path d="M6 4V2h4v2"/><rect x="3" y="4" width="10" height="10" rx="1.5"/><line x1="6" y1="7" x2="6" y2="11"/><line x1="10" y1="7" x2="10" y2="11"/>' +
         '</svg></button>';
@@ -254,9 +258,18 @@ var getDraftStoryId;
     container.querySelectorAll('.story-delete-btn').forEach(function(btn) {
       btn.addEventListener('click', function(e) {
         e.stopPropagation();
-        if (btn.disabled) return;
+        if (btn.classList.contains('btn-blocked')) {
+          var reason = btn.getAttribute('data-block-reason') || 'Удаление невозможно';
+          new ConfirmDialog({
+            title:       'Удаление невозможно',
+            text:        reason,
+            cancelLabel: 'Закрыть',
+          }).open();
+          return;
+        }
         var storyId = btn.getAttribute('data-id');
-        _openDeleteStoryDialog(storyId, btn);
+        var storyTitle = btn.getAttribute('data-title') || '(без названия)';
+        _openDeleteStoryDialog(storyId, storyTitle, btn);
       });
     });
     container.querySelectorAll('.story-row').forEach(function(row) {
@@ -312,10 +325,10 @@ var getDraftStoryId;
     }
   }
 
-  function _openDeleteStoryDialog(storyId, triggerBtn) {
+  function _openDeleteStoryDialog(storyId, storyTitle, triggerBtn) {
     new ConfirmDialog({
       title:        'Удалить сюжет?',
-      text:         'Сюжет и все связанные батчи, лог и записи лога будут удалены безвозвратно.',
+      text:         'Сюжет «' + escapeHtml(storyTitle) + '» и все связанные батчи, лог и записи лога будут удалены безвозвратно.',
       confirmLabel: 'Удалить',
       triggerBtn:   triggerBtn,
       onConfirm: function(btn, dlg) {
@@ -828,7 +841,7 @@ var getDraftStoryId;
   function _openDeleteBadDialog(btn) {
     new ConfirmDialog({
       title:        'Очистить сюжеты?',
-      text:         'Будут удалены все незакреплённые сюжеты без оценки или с оценкой «плохо», по которым не создавалось видео,<br>а также связанные с ними батчи и записи лога.',
+      text:         'Будут удалены все незакреплённые сюжеты без оценки или с оценкой «плохо», по которым не создавалось видео и нет незавершённых батчей,<br>а также связанные с ними батчи и записи лога.',
       confirmLabel: 'Удалить',
       triggerBtn:   btn,
       onConfirm: function(confirmBtn, dlg) {
