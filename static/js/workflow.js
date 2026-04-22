@@ -173,8 +173,15 @@ function wfApproveMovies(checked) {
     .catch(function() { showToast('Ошибка соединения', 'error'); });
 }
 
+function _isDonorPanelActive() {
+  var el = document.getElementById('donor-count');
+  if (!el) return false;
+  var panel = el.closest('.tab-panel');
+  return panel ? panel.classList.contains('active') : false;
+}
+
 function refreshDonorCount() {
-  if (!document.getElementById('donor-count')) return;
+  if (!_isDonorPanelActive()) return;
   fetch('/api/donors/count')
     .then(function(r) { return r.json(); })
     .then(function(d) {
@@ -185,7 +192,7 @@ function refreshDonorCount() {
 }
 
 function refreshMoviePoolCount() {
-  if (!document.getElementById('movie-pool-count')) return;
+  if (!_isDonorPanelActive()) return;
   fetch('/api/donors/count?good_only=1')
     .then(function(r) { return r.json(); })
     .then(function(d) {
