@@ -30,7 +30,27 @@ from log.log import write_log_entry
 # ---------------------------------------------------------------------------
 
 # Миграции 1–70 удалены: задеплоены на prod 2026-04-20, db_version = 70.
-# Следующая миграция: _m079_...
+# Следующая миграция: _m080_...
+
+
+def _m079_created_at_clock_timestamp(cur):
+    """Меняет DEFAULT created_at с now() на clock_timestamp() во всех таблицах.
+
+    now() = TRANSACTION_TIMESTAMP() — одно значение на всю транзакцию.
+    clock_timestamp() — реальное время в момент выполнения каждого INSERT.
+    Это гарантирует уникальность created_at даже при пакетных вставках
+    внутри одной транзакции.
+    Deployed: —
+    """
+    tables = [
+        'movies', 'batches', 'stories', 'log',
+        'log_entries', 'schedule', 'ai_models',
+    ]
+    for table in tables:
+        cur.execute(
+            f"ALTER TABLE {table} ALTER COLUMN created_at"
+            f" SET DEFAULT clock_timestamp()"
+        )
 
 
 def _m078_skyreels_durations(cur):
@@ -214,6 +234,7 @@ MIGRATIONS = [
     (76, _m076_skyreels_body_update),
     (77, _m077_skyreels_sound_false),
     (78, _m078_skyreels_durations),
+    (79, _m079_created_at_clock_timestamp),
 ]
 
 
