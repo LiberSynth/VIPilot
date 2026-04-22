@@ -463,14 +463,13 @@
   function _buildExportFilename(meta) {
     var model = (meta.model_name || '').trim();
     var story = (meta.story_title || '').trim();
-    var raw;
-    if (model && story) {
-      raw = model + ' - ' + story;
-    } else if (story) {
-      raw = story;
-    } else {
-      raw = String(meta.id);
-    }
+    var gradeRaw = (meta.grade !== null && meta.grade !== undefined) ? String(meta.grade) : null;
+    var grade = gradeRaw ? (GRADE_LABELS[gradeRaw] || '') : '';
+    var parts = [];
+    if (model) parts.push(model);
+    if (story) parts.push(story);
+    if (grade) parts.push(grade);
+    var raw = parts.length ? parts.join(' - ') : String(meta.id);
     return _sanitizeFilename(raw) + '.mp4';
   }
 
