@@ -1065,19 +1065,6 @@
   .story-info-btn.copied svg { stroke: #3ecf8e; }
   .story-info-btn.copied circle[fill] { fill: #3ecf8e; }
 
-  .btn-story-return {
-    width: 26px; height: 26px;
-    background: transparent; border: 1px solid rgba(255,255,255,.1);
-    border-radius: 6px; cursor: pointer; padding: 0;
-    display: flex; align-items: center; justify-content: center;
-    transition: background .15s, border-color .15s;
-  }
-  .btn-story-return[hidden] { display: none; }
-  .btn-story-return:hover { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.2); }
-  .btn-story-return:active { background: rgba(255,255,255,.14); }
-  .btn-story-return:disabled { opacity: .4; cursor: default; }
-  .btn-story-return svg { width: 13px; height: 13px; stroke: #8888b0; }
-  .btn-story-return:hover svg { stroke: #c8c8e8; }
 
   /* ── Тултип долгого нажатия (мобильный) ── */
   #touch-tooltip {

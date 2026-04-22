@@ -24,8 +24,6 @@ var getDraftStoryId;
     _draftPendingRetry = false;
     clearTimeout(_draftTimer);
     setDraftCardState(null);
-    if (typeof window.resetGradedAwayFlag === 'function') window.resetGradedAwayFlag();
-    else if (typeof window.updateReturnButton === 'function') window.updateReturnButton();
   };
 
   setDraftStoryFromRecord = function(story) {
@@ -38,8 +36,6 @@ var getDraftStoryId;
     _draftPendingRetry = false;
     clearTimeout(_draftTimer);
     setDraftCardState('existing');
-    if (typeof window.resetGradedAwayFlag === 'function') window.resetGradedAwayFlag();
-    else if (typeof window.updateReturnButton === 'function') window.updateReturnButton();
   };
 
   function saveDraft() {
@@ -107,8 +103,6 @@ var getDraftStoryId;
 
 /* ── Список сюжетов в панели Сценариста ── */
 (function() {
-  var _storyGradedAway = false;
-
   var GRADE_CYCLE = ['good', 'bad', null];
   var GRADE_LABELS = { good: 'хорошо', bad: 'плохо', 'null': 'не указано' };
   var GRADE_COLORS = {
@@ -150,7 +144,6 @@ var getDraftStoryId;
     if (!stories || stories.length === 0) {
       updateStoriesCount(0);
       container.innerHTML = '<div class="stories-empty">Нет сюжетов</div>';
-      updateReturnButton();
       return;
     }
     updateStoriesCount(stories.length);
@@ -286,31 +279,7 @@ var getDraftStoryId;
       });
     });
     _updateSelectedRow();
-    updateReturnButton();
   }
-
-  function updateReturnButton() {
-    var btn = document.getElementById('btn-story-return');
-    if (!btn) return;
-    var forApproval = document.getElementById('filter-for-approval');
-    if (!forApproval || !forApproval.checked) { btn.hidden = true; return; }
-    if (!_storyGradedAway) { btn.hidden = true; return; }
-    var storyId = typeof getDraftStoryId === 'function' ? getDraftStoryId() : null;
-    if (!storyId) { btn.hidden = true; return; }
-    var container = document.getElementById('stories-list');
-    if (!container) { btn.hidden = true; return; }
-    var inList = container.querySelector('.story-row[data-id="' + storyId + '"]');
-    btn.hidden = !!inList;
-  }
-  window.updateReturnButton = updateReturnButton;
-  window.resetGradedAwayFlag = function() {
-    _storyGradedAway = false;
-    updateReturnButton();
-  };
-  window.markGradedAway = function() {
-    _storyGradedAway = true;
-    updateReturnButton();
-  };
 
   function _updateSelectedRow() {
     var currentId = typeof getDraftStoryId === 'function' ? getDraftStoryId() : null;
@@ -379,7 +348,6 @@ var getDraftStoryId;
         if (_cardId && String(_cardId) === String(storyId) && typeof window.setCardGradeBadge === 'function') {
           window.setCardGradeBadge(grade, false);
         }
-        if (grade !== null) { _storyGradedAway = true; }
         window.loadStoryList();
       }
     })
@@ -444,7 +412,6 @@ var getDraftStoryId;
           envPost('screenwriter_only_good', '0');
           envPost('screenwriter_show_used', '0');
         }
-        updateReturnButton();
         onFilterChange('screenwriter_for_approval', forApproval);
       });
     }
@@ -481,29 +448,6 @@ var getDraftStoryId;
     });
   }
 
-  function initReturnButton() {
-    var btn = document.getElementById('btn-story-return');
-    if (!btn) return;
-    btn.addEventListener('click', function() {
-      var storyId = typeof getDraftStoryId === 'function' ? getDraftStoryId() : null;
-      if (!storyId) return;
-      btn.disabled = true;
-      fetch('/production/story/' + storyId + '/grade', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ grade: null }),
-      })
-      .then(function(r) { return r.ok ? r.json() : null; })
-      .then(function(d) {
-        btn.disabled = false;
-        if (d && d.ok) {
-          if (typeof window.loadStoryList === 'function') window.loadStoryList();
-        }
-      })
-      .catch(function() { btn.disabled = false; });
-    });
-  }
-
   var _origLoadStoryList = window.loadStoryList;
   window.loadStoryList = function() {
     if (_origLoadStoryList) _origLoadStoryList();
@@ -512,7 +456,6 @@ var getDraftStoryId;
 
   function initAll() {
     initNewStoryButton();
-    initReturnButton();
     initFilterCheckboxes();
   }
 
@@ -728,7 +671,6 @@ var getDraftStoryId;
         if (d && d.ok) {
           var grade = d.grade !== undefined ? d.grade : null;
           setCardGradeBadge(grade, false);
-          if (grade !== null && typeof window.markGradedAway === 'function') window.markGradedAway();
           if (typeof window.loadStoryList === 'function') window.loadStoryList();
         }
       })
