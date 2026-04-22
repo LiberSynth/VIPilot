@@ -200,12 +200,13 @@ function refreshMoviePoolCount() {
 })();
 
 function openClearHistoryDialog() {
+  var PHRASE = 'Я осознанно подтверждаю действие';
   new ConfirmDialog({
     title: 'Очистить всю историю?',
     text:
-      'Будут удалены все батчи (включая активные), все логи и записи лога.<br><br>' +
-      'Сюжеты не затрагиваются.<br><br>' +
-      'Действие нельзя отменить.',
+      'Будут удалены все батчи (включая активные), все логи и записи лога. Сюжеты не затрагиваются. Действие нельзя отменить.<br>' +
+      'Для подтверждения действия введите текст "Я осознанно подтверждаю действие" ниже и нажмите кнопку Очистить.<br>' +
+      '<input type="text" id="_cd-guard-input" autocomplete="off">',
     confirmLabel: 'Очистить',
     confirmStyle: 'background:#b05820',
     onConfirm: function(btn, dlg) {
@@ -216,12 +217,12 @@ function openClearHistoryDialog() {
         .then(function(data) {
           dlg.close();
           if (data.ok) {
-            var d     = data.deleted || {};
+            var del   = data.deleted || {};
             var parts = [];
-            if (d.logs)        parts.push('логов: '   + d.logs);
-            if (d.log_entries) parts.push('записей: ' + d.log_entries);
-            if (d.batches)     parts.push('батчей: '  + d.batches);
-            if (d.stories)     parts.push('сюжетов: ' + d.stories);
+            if (del.logs)        parts.push('логов: '   + del.logs);
+            if (del.log_entries) parts.push('записей: ' + del.log_entries);
+            if (del.batches)     parts.push('батчей: '  + del.batches);
+            if (del.stories)     parts.push('сюжетов: ' + del.stories);
             showToast('История очищена' + (parts.length ? ': ' + parts.join(', ') : ''), 'success');
           } else {
             showToast('Ошибка: ' + (data.error || 'неизвестная ошибка'), 'error');
@@ -230,4 +231,10 @@ function openClearHistoryDialog() {
         .catch(function() { dlg.close(); showToast('Ошибка соединения', 'error'); });
     },
   }).open();
+  var inp        = document.getElementById('_cd-guard-input');
+  var confirmBtn = document.getElementById('_cd-confirm');
+  confirmBtn.disabled = true;
+  inp.addEventListener('input', function() {
+    confirmBtn.disabled = inp.value !== PHRASE;
+  });
 }
