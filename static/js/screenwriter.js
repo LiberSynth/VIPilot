@@ -207,7 +207,7 @@ var getDraftStoryId;
         : '';
       var deleteTitle = deleteDisabled
         ? (s.pinned ? 'Нельзя удалить: сюжет закреплён' : (s.has_movie ? 'Нельзя удалить: к сюжету привязано видео' : 'Нельзя удалить: есть активный батч'))
-        : 'Удалить сюжет';
+        : 'Удалить';
       var storyTitleEsc = escapeHtml(s.title || '(без названия)');
       var deleteBtn = '<button class="story-icon story-delete-btn' + (deleteDisabled ? ' btn-blocked' : '') + '" data-id="' + s.id + '" data-title="' + storyTitleEsc + '"' + (deleteDisabled ? ' data-block-reason="' + escapeHtml(deleteBlockReason) + '"' : '') + ' title="' + deleteTitle + '">' +
         '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
@@ -327,7 +327,7 @@ var getDraftStoryId;
 
   function _openDeleteStoryDialog(storyId, storyTitle, triggerBtn) {
     new ConfirmDialog({
-      title:        'Удалить?',
+      title:        'Удалить сюжет?',
       text:         'Сюжет «' + escapeHtml(storyTitle) + '» и все связанные батчи, лог и записи лога будут удалены безвозвратно.',
       confirmLabel: 'Удалить',
       triggerBtn:   triggerBtn,
