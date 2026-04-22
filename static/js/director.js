@@ -535,11 +535,6 @@
       return;
     }
 
-    if (!Array.isArray(metaList) || metaList.length === 0) {
-      if (typeof window.showToast === 'function') window.showToast('Нет роликов для выгрузки');
-      return;
-    }
-
     triggerBtn.disabled = true;
     var dlg = new ExportMoviesDialog({ total: metaList.length });
     dlg.open();
