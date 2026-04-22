@@ -30,7 +30,41 @@ from log.log import write_log_entry
 # ---------------------------------------------------------------------------
 
 # Миграции 1–70 удалены: задеплоены на prod 2026-04-20, db_version = 70.
-# Следующая миграция: _m075_...
+# Следующая миграция: _m076_...
+
+
+def _m075_add_skyreels(cur):
+    """Добавляет платформу SkyReels и модели V4 Fast / V4 Std."""
+    cur.execute("""
+        INSERT INTO ai_platforms (name, url, env_key_name)
+        SELECT 'SkyReels', 'https://api-gateway.skyreels.ai', 'SKYREELS_API_KEY'
+        WHERE NOT EXISTS (SELECT 1 FROM ai_platforms WHERE name = 'SkyReels')
+    """)
+    cur.execute("""
+        INSERT INTO ai_models (name, url, body, "order", active, grade, type, price, platform_id)
+        SELECT
+            m.name, m.url, m.body::jsonb, m.ord, FALSE, 'good', 'text-to-video', m.price,
+            p.id
+        FROM ai_platforms p
+        CROSS JOIN (VALUES
+            (
+                'SkyReels V4 Fast',
+                '/api/v1/video/text2video/submit',
+                '{"model_name": "SkyReels-V4-Fast", "prompt": "{}", "duration": "{:int}", "aspect_ratio": "{:d}:{:d}"}',
+                30,
+                '1.100 $/10сек'
+            ),
+            (
+                'SkyReels V4 Std',
+                '/api/v1/video/text2video/submit',
+                '{"model_name": "SkyReels-V4-Std", "prompt": "{}", "duration": "{:int}", "aspect_ratio": "{:d}:{:d}"}',
+                31,
+                '1.400 $/10сек'
+            )
+        ) AS m(name, url, body, ord, price)
+        WHERE p.name = 'SkyReels'
+        ON CONFLICT DO NOTHING
+    """)
 
 
 def _m074_rename_key_env(cur):
@@ -141,6 +175,7 @@ MIGRATIONS = [
     (72, _m072_stories_pinned),
     (73, _m073_add_wan27),
     (74, _m074_rename_key_env),
+    (75, _m075_add_skyreels),
 ]
 
 
