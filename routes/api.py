@@ -47,7 +47,7 @@ from db import (
     db_delete_story,
     db_delete_movie,
     db_get_good_movies_meta,
-    db_get_good_movie_video_data,
+    db_get_movie_video_data,
 )
 from log import db_get_monitor, log_batch_planned, write_log_entry
 from utils.auth import is_authenticated
@@ -744,7 +744,7 @@ def api_production_movie_download(movie_id):
     err = _production_auth_check()
     if err:
         return err
-    data = db_get_good_movie_video_data(movie_id)
+    data = db_get_movie_video_data(movie_id)
     if data is None:
         return jsonify({"error": "not_found"}), 404
     return Response(data, mimetype="video/mp4")

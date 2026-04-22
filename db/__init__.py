@@ -74,7 +74,6 @@ from .db_media import (
     db_save_transcoded_data,
     db_get_batch_video_data,
     db_get_movie_video_data,
-    db_get_good_movie_video_data,
     db_get_random_real_original_video,
     db_copy_movie_for_emulation,
 )

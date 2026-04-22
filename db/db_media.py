@@ -116,7 +116,7 @@ def db_get_movie_video_data(movie_id) -> bytes | None:
     return None
 
 
-def db_get_good_movie_video_data(movie_id) -> bytes | None:
+def db_get_movie_video_data(movie_id) -> bytes | None:
     """Возвращает видеоданные ролика по id."""
     with get_db() as conn:
         with conn.cursor() as cur:
