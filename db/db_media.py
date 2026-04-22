@@ -117,12 +117,12 @@ def db_get_movie_video_data(movie_id) -> bytes | None:
 
 
 def db_get_good_movie_video_data(movie_id) -> bytes | None:
-    """Возвращает видеоданные только если grade = 'good'."""
+    """Возвращает видеоданные ролика по id."""
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT transcoded_data, raw_data FROM movies
-                WHERE id = %s AND grade = 'good'
+                WHERE id = %s
             """, (movie_id,))
             row = cur.fetchone()
     if row:
