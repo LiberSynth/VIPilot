@@ -1,12 +1,6 @@
-{% macro model_list_block(container_id, show_attempts=True, show_hint=True, video_fails_to_next='') %}
+{% macro model_list_block(container_id, show_hint=True) %}
   <div class="card" style="margin-top:12px">
     <div class="card-title">Модели</div>
-    {% if show_attempts %}
-    <div class="hint" style="margin-bottom:4px">Попыток на модель</div>
-    <div style="margin-bottom:10px">
-      <input type="number" name="video_fails_to_next" id="video_fails_to_next" value="{{ video_fails_to_next }}" min="1" max="99" step="1" style="max-width:120px">
-    </div>
-    {% endif %}
     <div class="hint" style="margin-bottom:2px">Заметки</div>
     <div style="margin-bottom:10px">
       <textarea id="model-note-area" disabled placeholder='Наблюдения и ограничения, например: "слишком много брака", "лимит промпта 1024 символа"'></textarea>
@@ -42,6 +36,6 @@
       </div>
     </div>
 
-    {{ model_list_block('model-list', show_attempts=False, show_hint=True) }}
+    {{ model_list_block('model-list', show_hint=True) }}
   </div>
 {% endmacro %}
