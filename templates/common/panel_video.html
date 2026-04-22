@@ -24,14 +24,24 @@
   <!-- ══ ГЕНЕРАЦИЯ ВИДЕО ══ -->
   <div id="panel-request" class="tab-panel">
     <div class="card" style="margin-top:12px">
-      <div class="card-title">Продолжительность видео</div>
-      <div class="hint">Длина генерируемого видео в секундах.</div>
-      <div class="lead-row">
-        <input type="number" name="video_duration" id="video_duration" value="{{ video_duration }}" min="1" max="60" step="1">
-        <span class="lead-unit">секунд</span>
+      <div class="card-title">Параметры генерации</div>
+      <div style="margin-top:14px">
+        <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block">Длина видео</label>
+        <div class="lead-row">
+          <input type="number" name="video_duration" id="video_duration" value="{{ video_duration }}" min="1" max="60" step="1">
+          <span class="lead-unit">секунд</span>
+        </div>
+        <div class="hint" style="margin-top:5px">Длина генерируемого видео в секундах.</div>
+      </div>
+      <div style="margin-top:14px">
+        <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block">Попыток на модель</label>
+        <div class="lead-row">
+          <input type="number" name="video_fails_to_next" id="video_fails_to_next" value="{{ video_fails_to_next }}" min="1" max="99" step="1">
+        </div>
+        <div class="hint" style="margin-top:5px">Число неудачных попыток перед переходом к следующей модели.</div>
       </div>
     </div>
 
-    {{ model_list_block('model-list', show_attempts=True, show_hint=True, video_fails_to_next=video_fails_to_next) }}
+    {{ model_list_block('model-list', show_attempts=False, show_hint=True) }}
   </div>
 {% endmacro %}
