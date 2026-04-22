@@ -1,7 +1,7 @@
 """
 Клиент для текстовых платформ (OpenAI-совместимый Chat API).
 Поддерживает OpenRouter, DeepSeek и любой совместимый провайдер —
-координаты берутся из записи модели (platform_url, key_env).
+координаты берутся из записи модели (platform_url, env_key_name).
 """
 
 import os
@@ -17,8 +17,8 @@ def is_configured() -> bool:
     )
 
 
-def _headers(key_env: str | None):
-    api_key = os.environ.get(key_env or '', '') if key_env else ''
+def _headers(env_key_name: str | None):
+    api_key = os.environ.get(env_key_name or '', '') if env_key_name else ''
     return {
         'Authorization': f'Bearer {api_key}',
         'Content-Type': 'application/json',
@@ -54,7 +54,7 @@ def generate(log_id, model_name: str, model: dict, system_prompt: str, user_prom
 
     :param log_id: идентификатор записи лога
     :param model_name: отображаемое имя модели для логов
-    :param model: словарь с ключами body_tpl, model_url, platform_url, key_env
+    :param model: словарь с ключами body_tpl, model_url, platform_url, env_key_name
     :param system_prompt: системный промпт
     :param user_prompt: пользовательский промпт
     """
@@ -62,7 +62,7 @@ def generate(log_id, model_name: str, model: dict, system_prompt: str, user_prom
         body = _build_body(model['body_tpl'], model['model_url'], system_prompt, user_prompt)
         resp = requests.post(
             model['platform_url'],
-            headers=_headers(model.get('key_env')),
+            headers=_headers(model.get('env_key_name')),
             json=body,
             timeout=60,
         )

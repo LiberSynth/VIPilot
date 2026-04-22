@@ -139,7 +139,7 @@ raise AppException(batch_id, 'story', msg)
 
 ```sql
 -- ПРАВИЛЬНО
-INSERT INTO ai_platforms (name, url, key_env)
+INSERT INTO ai_platforms (name, url, env_key_name)
 SELECT 'Grok', 'https://api.x.ai/v1', 'XAI_API_KEY'
 WHERE NOT EXISTS (SELECT 1 FROM ai_platforms WHERE name = 'Grok');
 ```
@@ -148,7 +148,7 @@ WHERE NOT EXISTS (SELECT 1 FROM ai_platforms WHERE name = 'Grok');
 
 ```sql
 -- ЗАПРЕЩЕНО (нет UNIQUE на name — конфликт никогда не возникнет)
-INSERT INTO ai_platforms (name, url, key_env)
+INSERT INTO ai_platforms (name, url, env_key_name)
 VALUES ('Grok', 'https://api.x.ai/v1', 'XAI_API_KEY')
 ON CONFLICT DO NOTHING;
 ```

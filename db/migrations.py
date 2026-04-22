@@ -30,7 +30,22 @@ from log.log import write_log_entry
 # ---------------------------------------------------------------------------
 
 # Миграции 1–70 удалены: задеплоены на prod 2026-04-20, db_version = 70.
-# Следующая миграция: _m074_...
+# Следующая миграция: _m075_...
+
+
+def _m074_rename_key_env(cur):
+    """Переименовывает колонку key_env → env_key_name в таблице ai_platforms."""
+    cur.execute("""
+        DO $$
+        BEGIN
+            IF EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'ai_platforms' AND column_name = 'key_env'
+            ) THEN
+                ALTER TABLE ai_platforms RENAME COLUMN key_env TO env_key_name;
+            END IF;
+        END $$
+    """)
 
 
 def _m073_add_wan27(cur):
@@ -125,6 +140,7 @@ MIGRATIONS = [
     (71, _m071_donor_good_only),
     (72, _m072_stories_pinned),
     (73, _m073_add_wan27),
+    (74, _m074_rename_key_env),
 ]
 
 
