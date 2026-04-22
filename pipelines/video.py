@@ -15,7 +15,7 @@ import time
 import common.environment as environment
 from utils.prompt_params import apply_prompt_params
 from db import (
-    db_get,
+    settings_get,
     db_get_batch_by_id,
     db_get_active_targets,
     db_update_batch_current_movie_model_id,
@@ -23,13 +23,13 @@ from db import (
     db_get_story_text,
     db_get_active_video_models,
     db_get_video_model_by_id,
-    db_set_batch_video_pending,
+    db_save_video_job_and_set_pending,
     db_set_batch_status,
     db_create_batch_movie,
     db_copy_movie_for_emulation,
     db_get_random_real_original_video,
-    db_set_batch_story_id,
-    db_get_movie_from_donor,
+    db_link_batch_story_only,
+    db_transfer_donor_movie,
 )
 from log import write_log, db_log_update, write_log_entry
 from pipelines.base import check_cancelled, iterate_models
@@ -119,7 +119,7 @@ def run(batch_id, log_id):
                 if not check_cancelled('video', batch_id, batch, log_id):
                     write_log_entry(log_id, fmt_id_msg("[video] Батч {} — режим пула, переносим видео из пула {}", batch_id, donor_batch_id))
                     db_log_update(log_id, 'Видео получено из пула', 'running')
-                    result_donor_id = db_get_movie_from_donor(donor_batch_id, batch_id)
+                    result_donor_id = db_transfer_donor_movie(donor_batch_id, batch_id)
                     if result_donor_id:
                         updated = db_get_batch_by_id(batch_id)
                         new_status = updated['status'] if updated else None
@@ -152,7 +152,7 @@ def run(batch_id, log_id):
         pinned_model_id = batch_data.get('movie_model_id') if isinstance(batch_data, dict) else None
 
         try:
-            video_duration = max(1, min(60, int(db_get('video_duration', '6'))))
+            video_duration = max(1, min(60, int(settings_get('video_duration', '6'))))
         except (ValueError, TypeError):
             video_duration = 6
 
@@ -177,7 +177,7 @@ def run(batch_id, log_id):
             write_log_entry(log_id, fmt_id_msg("Видео заимствовано из батча: {}", donor_batch_id), level='info')
             db_copy_movie_for_emulation(donor_movie_id, batch_id)
             if donor_story_id:
-                db_set_batch_story_id(batch_id, donor_story_id)
+                db_link_batch_story_only(batch_id, donor_story_id)
                 write_log_entry(log_id, fmt_id_msg("story_id подменён: {} → {}", story_id, donor_story_id), level='info')
             db_set_batch_status(batch_id, 'video_ready')
             db_log_update(log_id, 'Видео [эмуляция]', 'ok')
@@ -193,9 +193,9 @@ def run(batch_id, log_id):
             raise AppException(batch_id, 'video', msg, log_id)
 
         try:
-            fails_to_next = max(1, int(db_get('video_fails_to_next', '3')))
+            max_attempts_per_model = max(1, int(settings_get('video_fails_to_next', '3')))
         except (ValueError, TypeError):
-            fails_to_next = 3
+            max_attempts_per_model = 3
 
         # Выбор набора моделей:
         # - pinned_model_id (из batches.data.movie_model_id): пользователь жёстко
@@ -224,7 +224,7 @@ def run(batch_id, log_id):
             write_log_entry(log_id, f"[video] {msg}")
             raise AppException(batch_id, 'video', msg, log_id)
 
-        video_post_prompt = db_get('video_post_prompt', '').strip()
+        video_post_prompt = settings_get('video_post_prompt', '').strip()
         if video_post_prompt:
             video_post_prompt = apply_prompt_params(video_post_prompt)
             story_text = story_text + '\n\n' + video_post_prompt
@@ -232,9 +232,9 @@ def run(batch_id, log_id):
         db_log_update(log_id, f"Генерация видео… {'(возобновление)' if resumed else ''}".strip(), 'running')
         write_log_entry(log_id, f"Соотношение сторон: {ar_x}:{ar_y}")
         if is_probe:
-            write_log_entry(log_id, f"Пробная модель: {models[0]['name']}, попыток: {fails_to_next}")
+            write_log_entry(log_id, f"Пробная модель: {models[0]['name']}, попыток: {max_attempts_per_model}")
         else:
-            write_log_entry(log_id, f"Моделей: {len(models)}, попыток на модель: {fails_to_next}")
+            write_log_entry(log_id, f"Моделей: {len(models)}, попыток на модель: {max_attempts_per_model}")
 
         used_model    = None
         used_model_id = None
@@ -273,7 +273,7 @@ def run(batch_id, log_id):
                     used_model_id = str(m['id'])
                     return video_url
                 write_log_entry(log_id, f"Поллинг не дал результата, сброс handshake", level='warn')
-                db_set_batch_video_pending(batch_id, {
+                db_save_video_job_and_set_pending(batch_id, {
                     'request_id':   None,
                     'status_url':   None,
                     'response_url': None,
@@ -285,7 +285,7 @@ def run(batch_id, log_id):
                 write_log_entry(log_id, f"Модель: {model_name}")
                 write_log_entry(log_id, f"[video] Запрос к провайдеру: модель={model_name}, ar={ar_x}:{ar_y}")
             else:
-                write_log_entry(log_id, f"[{model_name}] попытка {cnt + 1}/{fails_to_next}", level='warn')
+                write_log_entry(log_id, f"[{model_name}] попытка {cnt + 1}/{max_attempts_per_model}", level='warn')
 
             allowed = m.get('allowed_durations') or [0]
             actual_duration = nearest_allowed_duration(video_duration, allowed)
@@ -307,7 +307,7 @@ def run(batch_id, log_id):
             r_url  = sr['response_url']
             m_id   = str(m['id'])
 
-            db_set_batch_video_pending(batch_id, {
+            db_save_video_job_and_set_pending(batch_id, {
                 'request_id':   req_id,
                 'status_url':   s_url,
                 'response_url': r_url,
@@ -322,7 +322,7 @@ def run(batch_id, log_id):
                 return video_url
 
             write_log_entry(log_id, f"Поллинг не дал результата, сброс handshake", level='warn')
-            db_set_batch_video_pending(batch_id, {
+            db_save_video_job_and_set_pending(batch_id, {
                 'request_id':   None,
                 'status_url':   None,
                 'response_url': None,
@@ -363,11 +363,11 @@ def run(batch_id, log_id):
         # pinned: один проход (модель задана жёстко, повторять нет смысла).
         # перебор: max_model_passes проходов по всему списку.
         max_passes = 1 if pinned_model_id else snap.max_model_passes
-        video_url = iterate_models(models, fails_to_next, cb, max_passes=max_passes)
+        video_url = iterate_models(models, max_attempts_per_model, cb, max_passes=max_passes)
 
         if not video_url:
             if is_probe:
-                msg = f'Пробная модель {models[0]["name"]} не дала результата ({fails_to_next} попыток)'
+                msg = f'Пробная модель {models[0]["name"]} не дала результата ({max_attempts_per_model} попыток)'
                 db_log_update(log_id, msg, 'error')
                 write_log_entry(log_id, msg, level='error')
                 write_log_entry(log_id, f"[video] {msg}")

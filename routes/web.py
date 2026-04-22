@@ -13,8 +13,8 @@ from flask import (
 )
 
 from db import (
-    db_get,
-    db_set,
+    settings_get,
+    settings_set,
     env_get,
     db_get_active_targets,
     db_update_target_aspect_ratio,
@@ -126,32 +126,32 @@ def root_page():
         if non_root:
             return redirect(url_for("web.select_module"))
         return redirect(url_for("web.login"))
-    text_prompt     = db_get("text_prompt", "")
-    format_prompt   = db_get("format_prompt", "")
-    batch_lifetime     = parse_batch_lifetime(db_get("batch_lifetime", "7"))
-    log_lifetime       = parse_long_lifetime(db_get("log_lifetime", "365"))
-    entries_lifetime   = parse_long_lifetime(db_get("entries_lifetime", "30"), default=30)
-    file_lifetime      = parse_file_lifetime(db_get("file_lifetime", "7"))
+    text_prompt     = settings_get("text_prompt", "")
+    format_prompt   = settings_get("format_prompt", "")
+    batch_lifetime     = parse_batch_lifetime(settings_get("batch_lifetime", "7"))
+    log_lifetime       = parse_long_lifetime(settings_get("log_lifetime", "365"))
+    entries_lifetime   = parse_long_lifetime(settings_get("entries_lifetime", "30"), default=30)
+    file_lifetime      = parse_file_lifetime(settings_get("file_lifetime", "7"))
     emulation_mode     = environment.emulation_mode
     use_donor          = environment.use_donor
-    notify_email       = db_get("notify_email", "")
-    notify_phone       = db_get("notify_phone", "")
+    notify_email       = settings_get("notify_email", "")
+    notify_phone       = settings_get("notify_phone", "")
     vk_target  = db_get_target_by_name("VKontakte")
     vk_active  = bool(vk_target.get("active")) if vk_target else False
     _vk_pm     = (vk_target.get("config") or {}).get("publish_method", {}) if vk_target else {}
     vk_publish_story   = bool(_vk_pm.get("story", 1))
     vk_publish_wall    = bool(_vk_pm.get("wall",  1))
-    video_duration     = max(1, min(60, int(db_get("video_duration", "6"))))
-    video_post_prompt  = db_get("video_post_prompt", "")
-    buffer_hours       = max(1, min(720, int(db_get("buffer_hours", "24"))))
+    video_duration     = max(1, min(60, int(settings_get("video_duration", "6"))))
+    video_post_prompt  = settings_get("video_post_prompt", "")
+    buffer_hours       = max(1, min(720, int(settings_get("buffer_hours", "24"))))
     loop_interval       = environment.loop_interval
     max_batch_threads   = environment.max_threads
     max_model_passes    = environment.max_model_passes
-    story_fails_to_next = max(1, int(db_get("story_fails_to_next", "3")))
-    video_fails_to_next = max(1, int(db_get("video_fails_to_next", "3")))
-    approve_stories     = db_get("approve_stories", "0") == "1"
-    approve_movies      = db_get("approve_movies",  "0") == "1"
-    deep_debugging      = environment.deep_logging
+    story_fails_to_next = max(1, int(settings_get("story_fails_to_next", "3")))
+    video_fails_to_next = max(1, int(settings_get("video_fails_to_next", "3")))
+    approve_stories     = settings_get("approve_stories", "0") == "1"
+    approve_movies      = settings_get("approve_movies",  "0") == "1"
+    deep_debugging      = environment.deep_debugging
 
     workflow_state = env_get("workflow_state", "running")
 
@@ -225,19 +225,19 @@ def production_page():
         if other:
             return redirect(url_for("web.select_module"))
         return redirect(url_for("web.login"))
-    format_prompt       = db_get("format_prompt", "")
-    text_prompt         = db_get("text_prompt", "")
-    video_post_prompt   = db_get("video_post_prompt", "")
-    story_fails_to_next = max(1, int(db_get("story_fails_to_next", "3")))
-    video_duration      = max(1, min(60, int(db_get("video_duration", "6"))))
-    video_fails_to_next = max(1, int(db_get("video_fails_to_next", "3")))
-    approve_stories_prod = db_get("approve_stories", "0") == "1"
-    approve_movies_prod  = db_get("approve_movies",  "0") == "1"
+    format_prompt       = settings_get("format_prompt", "")
+    text_prompt         = settings_get("text_prompt", "")
+    video_post_prompt   = settings_get("video_post_prompt", "")
+    story_fails_to_next = max(1, int(settings_get("story_fails_to_next", "3")))
+    video_duration      = max(1, min(60, int(settings_get("video_duration", "6"))))
+    video_fails_to_next = max(1, int(settings_get("video_fails_to_next", "3")))
+    approve_stories_prod = settings_get("approve_stories", "0") == "1"
+    approve_movies_prod  = settings_get("approve_movies",  "0") == "1"
     use_donor_prod       = environment.use_donor
     screenwriter_show_used = env_get("screenwriter_show_used", "0") == "1"
     screenwriter_only_good = env_get("screenwriter_only_good", "0") == "1"
     screenwriter_for_approval = env_get("screenwriter_for_approval", "0") == "1"
-    autoplay_movie = db_get("producer_autoplay_movie", "0") == "1"
+    autoplay_movie = settings_get("producer_autoplay_movie", "0") == "1"
     resp = make_response(render_template(
         "production.html",
         format_prompt=format_prompt,
@@ -269,7 +269,7 @@ def save():
 
     format_prompt_val = request.form.get("format_prompt")
     if format_prompt_val is not None:
-        db_set("format_prompt", format_prompt_val)
+        settings_set("format_prompt", format_prompt_val)
 
     text_prompt = request.form.get("text_prompt", "").strip()
     active_tab = request.form.get("active_tab", "pipeline")
@@ -278,7 +278,7 @@ def save():
             flash("Текстовый промпт не может быть пустым", "error")
             return redirect(url_for("web.root_page"))
     else:
-        db_set("text_prompt", text_prompt)
+        settings_set("text_prompt", text_prompt)
 
     entries_lifetime_raw = request.form.get("entries_lifetime", "").strip()
     log_lifetime_raw     = request.form.get("log_lifetime",     "").strip()
@@ -286,23 +286,23 @@ def save():
     file_lifetime_raw    = request.form.get("file_lifetime",    "").strip()
 
     if entries_lifetime_raw or log_lifetime_raw or batch_lifetime_raw:
-        el  = parse_long_lifetime(entries_lifetime_raw or db_get("entries_lifetime", "30"), default=30)
-        ll  = parse_long_lifetime(log_lifetime_raw     or db_get("log_lifetime",     "365"))
-        bl  = parse_batch_lifetime(batch_lifetime_raw     or db_get("batch_lifetime",   "7"))
+        el  = parse_long_lifetime(entries_lifetime_raw or settings_get("entries_lifetime", "30"), default=30)
+        ll  = parse_long_lifetime(log_lifetime_raw     or settings_get("log_lifetime",     "365"))
+        bl  = parse_batch_lifetime(batch_lifetime_raw     or settings_get("batch_lifetime",   "7"))
         if el <= ll <= bl:
-            db_set("entries_lifetime", str(el))
-            db_set("log_lifetime",     str(ll))
-            db_set("batch_lifetime",   str(bl))
+            settings_set("entries_lifetime", str(el))
+            settings_set("log_lifetime",     str(ll))
+            settings_set("batch_lifetime",   str(bl))
         else:
             flash("Сроки хранения нарушают иерархию: подробный ≤ краткий ≤ история батчей", "error")
 
     if file_lifetime_raw:
-        db_set("file_lifetime", str(parse_file_lifetime(file_lifetime_raw)))
+        settings_set("file_lifetime", str(parse_file_lifetime(file_lifetime_raw)))
 
     if "notify_email" in request.form:
-        db_set("notify_email", request.form.get("notify_email", "").strip())
+        settings_set("notify_email", request.form.get("notify_email", "").strip())
     if "notify_phone" in request.form:
-        db_set("notify_phone", request.form.get("notify_phone", "").strip())
+        settings_set("notify_phone", request.form.get("notify_phone", "").strip())
 
     if "vk_publish_story" in request.form or "vk_publish_wall" in request.form:
         vk_story_raw = request.form.get("vk_publish_story", "0")
@@ -331,57 +331,57 @@ def save():
             vid_dur = max(1, min(60, int(vid_dur_str)))
         except (ValueError, TypeError):
             vid_dur = 6
-        db_set("video_duration", str(vid_dur))
+        settings_set("video_duration", str(vid_dur))
 
     video_post_prompt_val = request.form.get("video_post_prompt")
     if video_post_prompt_val is not None:
-        db_set("video_post_prompt", video_post_prompt_val)
+        settings_set("video_post_prompt", video_post_prompt_val)
 
     buf_str = request.form.get("buffer_hours", "").strip()
     if buf_str:
         try:
-            db_set("buffer_hours", str(max(1, min(720, int(buf_str)))))
+            settings_set("buffer_hours", str(max(1, min(720, int(buf_str)))))
         except (ValueError, TypeError):
             pass
 
     loop_str = request.form.get("loop_interval", "").strip()
     if loop_str:
         try:
-            db_set("loop_interval", str(max(1, min(3600, int(loop_str)))))
+            settings_set("loop_interval", str(max(1, min(3600, int(loop_str)))))
         except (ValueError, TypeError):
             pass
 
     story_fails_str = request.form.get("story_fails_to_next", "").strip()
     if story_fails_str:
         try:
-            db_set("story_fails_to_next", str(max(1, int(story_fails_str))))
+            settings_set("story_fails_to_next", str(max(1, int(story_fails_str))))
         except (ValueError, TypeError):
             pass
 
     video_fails_str = request.form.get("video_fails_to_next", "").strip()
     if video_fails_str:
         try:
-            db_set("video_fails_to_next", str(max(1, int(video_fails_str))))
+            settings_set("video_fails_to_next", str(max(1, int(video_fails_str))))
         except (ValueError, TypeError):
             pass
 
     if "approve_stories" in request.form:
-        db_set("approve_stories", "1" if request.form.get("approve_stories") == "1" else "0")
+        settings_set("approve_stories", "1" if request.form.get("approve_stories") == "1" else "0")
 
     if "producer_autoplay_movie" in request.form:
-        db_set("producer_autoplay_movie", "1" if request.form.get("producer_autoplay_movie") == "1" else "0")
+        settings_set("producer_autoplay_movie", "1" if request.form.get("producer_autoplay_movie") == "1" else "0")
 
     max_threads_str = request.form.get("max_batch_threads", "").strip()
     if max_threads_str:
         try:
-            db_set("max_batch_threads", str(max(1, min(32, int(max_threads_str)))))
+            settings_set("max_batch_threads", str(max(1, min(32, int(max_threads_str)))))
         except (ValueError, TypeError):
             pass
 
     max_model_passes_str = request.form.get("max_model_passes", "").strip()
     if max_model_passes_str:
         try:
-            db_set("max_model_passes", str(max(1, min(20, int(max_model_passes_str)))))
+            settings_set("max_model_passes", str(max(1, min(20, int(max_model_passes_str)))))
         except (ValueError, TypeError):
             pass
 

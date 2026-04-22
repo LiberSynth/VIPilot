@@ -93,7 +93,7 @@ def db_create_story_probe_batch(text_model_id):
     return batch_id
 
 
-def db_create_story_generate_batch():
+def db_create_story_autogenerate_batch():
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute("""
@@ -122,7 +122,7 @@ def db_update_batch_current_movie_model_id(batch_id, model_id):
         conn.commit()
 
 
-def db_set_batch_story_probe(batch_id, story_id):
+def db_finalize_story_probe(batch_id, story_id):
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -142,7 +142,7 @@ def db_set_batch_story(batch_id, story_id):
         db_set_batch_status(batch_id, "story_ready", conn)
 
 
-def db_set_batch_story_id(batch_id, story_id):
+def db_link_batch_story_only(batch_id, story_id):
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -181,7 +181,7 @@ def db_claim_batch_status(batch_id: str, from_status: str, to_status: str) -> bo
     return True
 
 
-def db_cancel_waiting_batches():
+def db_cancel_orphaned_slot_batches():
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute("""
@@ -207,7 +207,7 @@ def db_cancel_waiting_batches():
     return batch_ids
 
 
-def db_set_batch_pending(batch_id):
+def db_reset_batch_to_pending(batch_id):
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -295,7 +295,14 @@ def db_set_batch_story_ready_from_donor(
         db_set_batch_status(batch_id, 'story_ready', conn)
 
 
-def db_get_movie_from_donor(donor_batch_id: str, batch_id: str) -> str | None:
+def db_transfer_donor_movie(donor_batch_id: str, batch_id: str) -> str | None:
+    """Переносит movie_id из батча-донора в целевой батч.
+
+    Побочный эффект: обнуляет movie_id у батча-донора и переводит целевой
+    батч в статус video_ready или transcode_ready.
+
+    Возвращает donor_batch_id: str если перенос выполнен, None если донор не найден.
+    """
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(

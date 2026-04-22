@@ -26,7 +26,7 @@ from db import (
     db_create_video_batch,
     db_create_story_probe_batch,
     db_get_batch_logs,
-    db_get,
+    settings_get,
     db_get_stories_list,
     db_get_stories_pool,
     db_count_good_pool,
@@ -35,9 +35,9 @@ from db import (
     db_get_movies_list,
     db_set_movie_grade,
     db_upsert_story_draft,
-    db_create_story_generate_batch,
-    db_set,
-    db_clear_stories,
+    db_create_story_autogenerate_batch,
+    settings_set,
+    db_purge_unused_stories,
     db_delete_bad_movies,
     db_set_model_grade,
     db_set_model_note,
@@ -46,8 +46,7 @@ from db import (
     db_get_batch_status,
     db_delete_story,
     db_delete_movie,
-    db_get_good_movies_meta,
-    db_get_movie_video_data,
+    db_get_movies_with_video_meta,
 )
 from log import db_get_monitor, log_batch_planned, write_log_entry
 from utils.auth import is_authenticated
@@ -353,7 +352,7 @@ def api_workflow_deep_debugging():
         return jsonify({"error": "unauthorized"}), 401
     body = request.get_json(silent=True) or {}
     val = "1" if body.get("enabled") == "1" else "0"
-    db_set("deep_debugging", val)
+    settings_set("deep_debugging", val)
     label = "включена" if val == "1" else "выключена"
     write_log_entry(None, f"[api] Глубокая отладка {label}")
     return jsonify({"ok": True, "deep_debugging": val})
@@ -386,7 +385,7 @@ def api_workflow_approve_movies():
         return jsonify({"error": "unauthorized"}), 401
     body = request.get_json(silent=True) or {}
     val = "1" if body.get("enabled") == "1" else "0"
-    db_set("approve_movies", val)
+    settings_set("approve_movies", val)
     if val == "1":
         env_set("use_donor", "1")
     label = "включено" if val == "1" else "выключено"
@@ -474,8 +473,8 @@ def api_get_story(story_id):
     if text is None:
         return jsonify({"error": "not found"}), 404
     title = db_get_story_title(story_id) or ''
-    format_prompt = db_get("format_prompt", "") or ""
-    user_prompt = db_get("text_prompt", "") or ""
+    format_prompt = settings_get("format_prompt", "") or ""
+    user_prompt = settings_get("text_prompt", "") or ""
     user_prompt = apply_prompt_params(user_prompt)
     format_prompt = apply_prompt_params(format_prompt)
     model_info = db_get_story_model_info(story_id)
@@ -524,7 +523,7 @@ def api_production_stories():
     show_bad = request.args.get("show_bad", "1") != "0"
     for_approval = request.args.get("for_approval", "0") == "1"
     pin_id = request.args.get("pin_id") or None
-    approve_movies = db_get("approve_movies", "0") == "1"
+    approve_movies = settings_get("approve_movies", "0") == "1"
     stories = db_get_stories_list(show_used=show_used, show_bad=show_bad, for_approval=for_approval, pin_id=pin_id, approve_movies=approve_movies)
     return jsonify(stories)
 
@@ -549,8 +548,8 @@ def api_production_stories_pool():
     err = _production_auth_check()
     if err:
         return err
-    approve_stories = db_get("approve_stories", "0") == "1"
-    approve_movies = db_get("approve_movies", "0") == "1"
+    approve_stories = settings_get("approve_stories", "0") == "1"
+    approve_movies = settings_get("approve_movies", "0") == "1"
     stories = db_get_stories_pool(grade_required=approve_stories, approve_movies=approve_movies)
     return jsonify(stories)
 
@@ -560,7 +559,7 @@ def api_production_good_pool_count():
     err = _production_auth_check()
     if err:
         return err
-    approve_stories = db_get("approve_stories", "0") == "1"
+    approve_stories = settings_get("approve_stories", "0") == "1"
     return jsonify({"count": db_count_good_pool(grade_required=approve_stories)})
 
 
@@ -713,7 +712,7 @@ def api_production_delete_bad_stories():
     if err:
         return err
     try:
-        deleted = db_clear_stories()
+        deleted = db_purge_unused_stories()
         return jsonify({"ok": True, "deleted": deleted})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
@@ -736,7 +735,7 @@ def api_production_good_movies_meta():
     err = _production_auth_check()
     if err:
         return err
-    return jsonify(db_get_good_movies_meta())
+    return jsonify(db_get_movies_with_video_meta())
 
 
 @production_bp.route("/production/movies/<movie_id>/download", methods=["GET"])
@@ -779,7 +778,7 @@ def api_production_story_generate():
     if model_id:
         batch_id = db_create_story_probe_batch(model_id)
     else:
-        batch_id = db_create_story_generate_batch()
+        batch_id = db_create_story_autogenerate_batch()
     if not batch_id:
         return jsonify({"error": "db_error"}), 500
     environment.wakeup_loop()

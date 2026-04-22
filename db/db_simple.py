@@ -58,7 +58,7 @@ def env_set(key, value):
         conn.commit()
 
 
-def db_get(key, default=""):
+def settings_get(key, default=""):
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute("SELECT value FROM settings WHERE key = %s", (key,))
@@ -66,7 +66,7 @@ def db_get(key, default=""):
             return row[0] if row else default
 
 
-def db_set(key, value):
+def settings_set(key, value):
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(

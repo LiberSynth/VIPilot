@@ -44,13 +44,13 @@ def check_cancelled(pipeline_name: str, batch_id: str, batch: dict, log_id=None)
     return False
 
 
-def iterate_models(models, fails_per_model, callback, max_passes=5):
+def iterate_models(models, max_attempts_per_model, callback, max_passes=5):
     """Перебирает модели с повторными проходами до первого успешного результата.
 
     Логика:
     - Внешний цикл: до max_passes проходов по всему списку моделей.
     - Средний цикл: перебор моделей.
-    - Внутренний цикл: до fails_per_model попыток на каждую модель.
+    - Внутренний цикл: до max_attempts_per_model попыток на каждую модель.
     - На каждой итерации вызывается callback(model).
       Коллбек возвращает результат при успехе или None при неудаче.
     - При успешном возврате — выход из всех циклов, возврат результата.
@@ -61,7 +61,7 @@ def iterate_models(models, fails_per_model, callback, max_passes=5):
     """
     for _pass in range(max_passes):
         for m in models:
-            for _attempt in range(fails_per_model):
+            for _attempt in range(max_attempts_per_model):
                 result = callback(m)
                 if result is not None:
                     return result

@@ -1,6 +1,6 @@
 import os
 import requests
-from db import db_get
+from db import settings_get
 from log import write_log_entry
 
 
@@ -14,7 +14,7 @@ def send_failure_email(message: str, log_entries=None, partial: bool = False):
     import smtplib
     from email.mime.text import MIMEText
 
-    to_addr   = db_get("notify_email", "").strip()
+    to_addr   = settings_get("notify_email", "").strip()
     smtp_host = os.environ.get("SMTP_HOST", "").strip()
     smtp_user = os.environ.get("SMTP_USER", "").strip()
     smtp_pass = os.environ.get("SMTP_PASSWORD", "").strip()
@@ -48,7 +48,7 @@ def send_failure_email(message: str, log_entries=None, partial: bool = False):
 
 
 def send_failure_sms(message: str):
-    phone      = db_get("notify_phone", "").strip()
+    phone      = settings_get("notify_phone", "").strip()
     smsc_login = os.environ.get("SMSC_LOGIN", "").strip()
     smsc_pass  = os.environ.get("SMSC_PASS", "").strip()
 

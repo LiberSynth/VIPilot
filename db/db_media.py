@@ -58,7 +58,7 @@ def db_get_batch_original_video(batch_id) -> bytes | None:
     return None
 
 
-def db_set_batch_video_pending(batch_id, job_data):
+def db_save_video_job_and_set_pending(batch_id, job_data):
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -101,23 +101,9 @@ def db_get_batch_video_data(batch_id) -> bytes | None:
 
 
 def db_get_movie_video_data(movie_id) -> bytes | None:
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT transcoded_data, raw_data FROM movies
-                WHERE id = %s
-            """, (movie_id,))
-            row = cur.fetchone()
-    if row:
-        if row[0] is not None:
-            return bytes(row[0])
-        if row[1] is not None:
-            return bytes(row[1])
-    return None
-
-
-def db_get_movie_video_data(movie_id) -> bytes | None:
-    """Возвращает видеоданные ролика по id."""
+    """Возвращает видеоданные ролика по id.
+    Предпочитает transcoded_data; при отсутствии возвращает raw_data.
+    """
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute("""

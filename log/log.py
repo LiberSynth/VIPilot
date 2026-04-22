@@ -44,7 +44,7 @@ def write_log_entry(log_id, message, level="info"):
         f"Допустимые: {_ALLOWED_LOG_LEVELS}."
     )
     print(message)
-    if level == "silent" and not environment.deep_logging:
+    if level == "silent" and not environment.deep_debugging:
         return
     token = environment.asserted_log_entry.set(True)
     try:

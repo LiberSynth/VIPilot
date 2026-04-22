@@ -2,8 +2,8 @@ from datetime import datetime, timezone, timedelta
 
 import common.environment as environment
 from db import (
-    db_get,
-    db_cancel_waiting_batches,
+    settings_get,
+    db_cancel_orphaned_slot_batches,
     db_get_schedule, db_get_active_targets, db_ensure_batch, db_get_last_pipeline_run,
 )
 from log import write_log, log_batch_planned, write_log_entry
@@ -14,7 +14,7 @@ from utils.utils import parse_hhmm, fmt_id_msg
 def run():
     """Планирование: проверяет расписание и создаёт недостающие батчи."""
     try:
-        cancelled = db_cancel_waiting_batches()
+        cancelled = db_cancel_orphaned_slot_batches()
         for bid in cancelled:
             log_id = write_log(
                 'publish',
@@ -31,7 +31,7 @@ def run():
             return
 
         try:
-            buffer_hours = int(db_get('buffer_hours', '24'))
+            buffer_hours = int(settings_get('buffer_hours', '24'))
         except (ValueError, TypeError):
             buffer_hours = 24
 

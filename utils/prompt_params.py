@@ -1,9 +1,9 @@
-from db import db_get, db_get_graded_stories
+from db import settings_get, db_get_graded_stories
 
 
 def _get_video_duration() -> int:
     try:
-        return max(1, min(60, int(db_get('video_duration', '6'))))
+        return max(1, min(60, int(settings_get('video_duration', '6'))))
     except (ValueError, TypeError):
         return 6
 

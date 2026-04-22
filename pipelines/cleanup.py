@@ -13,7 +13,7 @@ Pipeline 6 — Сборщик мусора.
 import threading
 
 from db import (
-    db_get,
+    settings_get,
     db_cleanup_log_entries,
     db_cleanup_logs,
     db_cleanup_batches,
@@ -35,10 +35,10 @@ def tick():
 
 def run():
     try:
-        entries_lifetime    = parse_long_lifetime(db_get("entries_lifetime", "30"), default=30)
-        log_lifetime        = parse_long_lifetime(db_get("log_lifetime", "365"))
-        batch_lifetime      = parse_batch_lifetime(db_get("batch_lifetime", "7"))
-        file_lifetime       = parse_file_lifetime(db_get("file_lifetime", "7"))
+        entries_lifetime    = parse_long_lifetime(settings_get("entries_lifetime", "30"), default=30)
+        log_lifetime        = parse_long_lifetime(settings_get("log_lifetime", "365"))
+        batch_lifetime      = parse_batch_lifetime(settings_get("batch_lifetime", "7"))
+        file_lifetime       = parse_file_lifetime(settings_get("file_lifetime", "7"))
 
         summary = []
 

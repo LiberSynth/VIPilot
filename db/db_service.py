@@ -185,7 +185,7 @@ def db_cleanup_log_entries(log_lifetime_days: int) -> int:
     return count
 
 
-def db_cleanup_logs(short_log_lifetime_days: int) -> int:
+def db_cleanup_logs(log_lifetime_days: int) -> int:
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute("""
@@ -194,11 +194,11 @@ def db_cleanup_logs(short_log_lifetime_days: int) -> int:
                     SELECT id FROM log
                     WHERE created_at < now() - make_interval(days => %s)
                 )
-            """, (short_log_lifetime_days,))
+            """, (log_lifetime_days,))
             cur.execute("""
                 DELETE FROM log
                 WHERE created_at < now() - make_interval(days => %s)
-            """, (short_log_lifetime_days,))
+            """, (log_lifetime_days,))
             count = cur.rowcount
         conn.commit()
     return count
@@ -238,7 +238,7 @@ def db_cleanup_video_data(file_lifetime_days: int) -> int:
     return count
 
 
-def db_clear_stories() -> dict:
+def db_purge_unused_stories() -> dict:
     with get_db() as conn:
         with conn.cursor() as cur:
             final_statuses_sql = ', '.join(f"'{s}'" for s in FINAL_BATCH_STATUSES)
@@ -338,8 +338,8 @@ def db_delete_bad_movies() -> dict:
     return {"movies": ml_count, "batches": bl_count, "logs": ll_count, "log_entries": le_count}
 
 
-def db_get_good_movies_meta() -> list[dict]:
-    """Возвращает список {id, model_name, story_title, grade} для всех movies с ненулевым видео."""
+def db_get_movies_with_video_meta() -> list[dict]:
+    """Возвращает список {id, model_name, story_title, grade} для всех movies с непустым raw_data или transcoded_data (включая grade = bad и NULL)."""
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute("""

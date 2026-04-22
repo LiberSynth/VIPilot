@@ -9,7 +9,7 @@ import common.environment as environment
 from utils.prompt_params import apply_prompt_params
 from db import (
     db_set_story_model,
-    db_get,
+    settings_get,
     db_get_batch_by_id,
     db_get_active_targets,
     db_claim_batch_status,
@@ -17,7 +17,7 @@ from db import (
     db_get_text_model_by_id,
     db_create_story,
     db_set_batch_story,
-    db_set_batch_story_probe,
+    db_finalize_story_probe,
     db_claim_donor_batch,
     db_set_batch_story_ready_from_donor,
     db_claim_unused_story_for_batch,
@@ -95,7 +95,7 @@ def run(batch_id, log_id):
     # минуя генерацию. Если подходящего донора нет — падаем в AI-генерацию.
     # approve_movies: если включено, ищем только доноров с grade = good;
     # если пул пуст — ошибка (AI-генерация запрещена).
-    approve_movies = db_get("approve_movies", "0") == "1"
+    approve_movies = settings_get("approve_movies", "0") == "1"
     if (
         not is_probe
         and not snap.emulation_mode
@@ -166,7 +166,7 @@ def run(batch_id, log_id):
     # Нашли → story_ready без AI. Не нашли → идём в AI-генерацию.
     # Если approve_stories включён и пул пуст — ошибка (AI-генерация запрещена).
     if batch["type"] != "story_probe":
-        approve_stories = db_get("approve_stories", "0") == "1"
+        approve_stories = settings_get("approve_stories", "0") == "1"
         grade_required = approve_stories
         condition_label = (
             "grade = good" if grade_required else "любой grade (включая NULL)"
@@ -265,18 +265,18 @@ def run(batch_id, log_id):
         raise AppException(batch_id, "story", msg, log_id)
 
     try:
-        fails_to_next = max(1, int(db_get("story_fails_to_next", "3")))
+        max_attempts_per_model = max(1, int(settings_get("story_fails_to_next", "3")))
     except (ValueError, TypeError):
-        fails_to_next = 3
+        max_attempts_per_model = 3
 
-    format_prompt = db_get("format_prompt", "")
-    user_prompt = db_get("text_prompt", "")
+    format_prompt = settings_get("format_prompt", "")
+    user_prompt = settings_get("text_prompt", "")
 
     user_prompt = apply_prompt_params(user_prompt)
     format_prompt = apply_prompt_params(format_prompt)
 
     write_log_entry(
-        log_id, f"Моделей: {len(models)}, попыток на модель: {fails_to_next}"
+        log_id, f"Моделей: {len(models)}, попыток на модель: {max_attempts_per_model}"
     )
 
     story_id = None
@@ -316,19 +316,19 @@ def run(batch_id, log_id):
         else:
             write_log_entry(
                 log_id,
-                f"[{model_name}] попытка {attempt_counters[model_name]}/{fails_to_next} не удалась",
+                f"[{model_name}] попытка {attempt_counters[model_name]}/{max_attempts_per_model} не удалась",
                 level="warn",
             )
         return None
 
     max_passes = 1 if pinned_model_id else snap.max_model_passes
     iterate_result = iterate_models(
-        models, fails_to_next, story_callback, max_passes=max_passes
+        models, max_attempts_per_model, story_callback, max_passes=max_passes
     )
 
     if not iterate_result:
         if is_story_probe:
-            msg = f"Модель не ответила после {fails_to_next} попыток — пробный сюжет не получен"
+            msg = f"Модель не ответила после {max_attempts_per_model} попыток — пробный сюжет не получен"
             db_log_update(log_id, msg, "error")
             write_log_entry(log_id, msg, level='error')
             write_log_entry(log_id, f"[story] {msg}")
@@ -349,7 +349,7 @@ def run(batch_id, log_id):
     write_log_entry(log_id, f"Сюжет:\n{result}")
 
     if is_story_probe:
-        db_set_batch_story_probe(batch_id, story_id)
+        db_finalize_story_probe(batch_id, story_id)
         db_set_story_model(story_id, used_model_id)
         msg = f"Сюжет сгенерирован ({used_model_name})"
         db_log_update(log_id, msg, "ok")
