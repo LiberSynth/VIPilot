@@ -506,6 +506,43 @@
     });
   }
 
+  function initImportMovieButton() {
+    var btn   = document.getElementById('btn-import-movie');
+    var input = document.getElementById('input-import-movie');
+    if (!btn || !input) return;
+    btn.addEventListener('click', function() {
+      if (btn.disabled) return;
+      input.value = '';
+      input.click();
+    });
+    input.addEventListener('change', function() {
+      var file = input.files && input.files[0];
+      if (!file) return;
+      var fd = new FormData();
+      fd.append('file', file);
+      btn.disabled = true;
+      btn.classList.add('pending');
+      fetch('/production/movies/upload', { method: 'POST', body: fd })
+        .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+        .then(function(res) {
+          btn.disabled = false;
+          btn.classList.remove('pending');
+          if (res.ok && res.data && res.data.ok) {
+            if (typeof window.showToast === 'function') window.showToast('Ролик загружен');
+            if (typeof window.loadMovieList === 'function') window.loadMovieList();
+          } else {
+            var msg = (res.data && res.data.error) ? res.data.error : 'Ошибка загрузки';
+            if (typeof window.showToast === 'function') window.showToast(msg);
+          }
+        })
+        .catch(function() {
+          btn.disabled = false;
+          btn.classList.remove('pending');
+          if (typeof window.showToast === 'function') window.showToast('Ошибка загрузки файла');
+        });
+    });
+  }
+
   function _sanitizeFilename(name) {
     return String(name || '').replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, ' ').trim();
   }
@@ -600,6 +637,7 @@
     initFilters();
     initCardMovieGradeBadge();
     initDeleteBadMoviesButton();
+    initImportMovieButton();
     initExportGoodMoviesButton();
     initAutoplayToggle();
     loadMovieInPlayer(null);

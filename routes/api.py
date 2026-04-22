@@ -750,6 +750,28 @@ def api_production_movie_download(movie_id):
     return Response(data, mimetype="video/mp4")
 
 
+@production_bp.route("/production/movies/upload", methods=["POST"])
+def api_production_movies_upload():
+    err = _production_auth_check()
+    if err:
+        return err
+    if 'file' not in request.files:
+        return jsonify({"error": "Файл не передан"}), 400
+    f = request.files['file']
+    if not f.filename:
+        return jsonify({"error": "Имя файла пустое"}), 400
+    filename = f.filename
+    if filename.lower().endswith('.mp4'):
+        filename = filename[:-4]
+    words = filename.split()[:4]
+    title = ' '.join(words) or 'Без названия'
+    video_data = f.read()
+    from db import db_create_manual_movie
+    batch_id = db_create_manual_movie(title, video_data)
+    environment.wakeup_loop()
+    return jsonify({"ok": True, "batch_id": batch_id})
+
+
 @production_bp.route("/production/video/generate", methods=["POST"])
 def api_production_video_generate():
     err = _production_auth_check()

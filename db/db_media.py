@@ -133,6 +133,38 @@ def db_get_random_real_original_video() -> tuple[str, str, str | None] | None:
             return (row[0], row[1], row[2]) if row else None
 
 
+def db_create_manual_movie(title: str, video_data: bytes) -> str:
+    """Создаёт сюжет, батч movie_probe и ролик из файла в одной транзакции.
+
+    Батч сразу переводится в статус video_ready, минуя pending.
+    Возвращает batch_id.
+    """
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO stories (model_id, title, content, grade, manual_changed)"
+                " VALUES (NULL, %s, '', 'good', TRUE) RETURNING id",
+                (title,),
+            )
+            story_id = cur.fetchone()[0]
+            cur.execute(
+                "INSERT INTO batches (type, story_id) VALUES ('movie_probe', %s) RETURNING id",
+                (story_id,),
+            )
+            batch_id = str(cur.fetchone()[0])
+            cur.execute(
+                "INSERT INTO movies (raw_data, url, grade) VALUES (%s, NULL, 'good') RETURNING id",
+                (psycopg2.Binary(video_data),),
+            )
+            movie_id = cur.fetchone()[0]
+            cur.execute(
+                "UPDATE batches SET movie_id = %s WHERE id = %s",
+                (movie_id, batch_id),
+            )
+        db_set_batch_status(batch_id, 'video_ready', conn)
+    return batch_id
+
+
 def db_copy_movie_for_emulation(source_movie_id: str, target_batch_id: str):
     with get_db() as conn:
         with conn.cursor() as cur:
