@@ -31,7 +31,8 @@ function _pluralThread(n) {
 }
 
 function refreshWorkflowState() {
-  if (!document.getElementById('wf-dot')) return;
+  var panel = document.getElementById('panel-service');
+  if (!panel || !panel.classList.contains('active')) return;
   fetch('/api/workflow/state')
     .then(function(r) { return r.json(); })
     .then(function(d) {

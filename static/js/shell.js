@@ -49,6 +49,10 @@ function switchPanel(name) {
       var savedScroll = parseInt(_rawScroll, 10) || 0;
       requestAnimationFrame(function() { window.scrollTo(0, savedScroll); });
     }
+    if (typeof window.monitorRefresh === 'function') window.monitorRefresh();
+  }
+  if (name === 'service') {
+    if (typeof refreshWorkflowState === 'function') refreshWorkflowState();
   }
   if (name === 'request') {
     if (typeof loadModels === 'function') loadModels();

@@ -530,11 +530,15 @@
   }
 
   function refreshMonitor() {
+    var panel = document.getElementById('panel-log');
+    if (!panel || !panel.classList.contains('active')) return;
     fetch('/api/monitor')
       .then(function(r) { return r.json(); })
       .then(renderTimeline)
       .catch(function() {});
   }
+
+  window.monitorRefresh = refreshMonitor;
 
   function _monitorCopyText(text, btn) {
     const doFlash = function() {
