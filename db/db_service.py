@@ -409,6 +409,45 @@ def db_delete_story(story_id: str) -> dict:
     return {"stories": sl_count, "batches": bl_count, "logs": ll_count, "log_entries": le_count}
 
 
+def db_delete_movie(movie_id: str) -> dict:
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM movies WHERE id = %s", (movie_id,))
+            if not cur.fetchone():
+                return {}
+
+            cur.execute("SELECT id FROM batches WHERE movie_id = %s", (movie_id,))
+            batch_ids = [r[0] for r in cur.fetchall()]
+
+            le_count = 0
+            ll_count = 0
+            bl_count = 0
+
+            if batch_ids:
+                bfmt = ','.join(['%s'] * len(batch_ids))
+                cur.execute(f"""
+                    DELETE FROM log_entries
+                    WHERE log_id IN (
+                        SELECT id FROM log WHERE batch_id IN ({bfmt})
+                    )
+                """, batch_ids)
+                le_count = cur.rowcount
+
+                cur.execute(f"DELETE FROM log WHERE batch_id IN ({bfmt})", batch_ids)
+                ll_count = cur.rowcount
+
+                cur.execute(f"DELETE FROM batches WHERE id IN ({bfmt})", batch_ids)
+                bl_count = cur.rowcount
+
+            cur.execute("DELETE FROM movies WHERE id = %s", (movie_id,))
+            ml_count = cur.rowcount
+
+        conn.commit()
+
+    write_log_entry(None, fmt_id_msg("[DB] Удалено видео {}: batches=" + str(bl_count) + ", log=" + str(ll_count) + ", log_entries=" + str(le_count), movie_id), level='silent')
+    return {"movies": ml_count, "batches": bl_count, "logs": ll_count, "log_entries": le_count}
+
+
 def db_cleanup_batches(batch_lifetime_days: int) -> int:
     with get_db() as conn:
         with conn.cursor() as cur:

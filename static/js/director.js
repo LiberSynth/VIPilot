@@ -273,9 +273,13 @@
         + '<line x1="8" y1="7.5" x2="8" y2="11"/>'
         + '<circle cx="8" cy="5" r="1.1" fill="#8888b0" stroke="none"/>'
         + '</svg></button>';
+      var deleteBtn = '<button class="story-icon movie-delete-btn" data-id="' + m.id + '" data-title="' + escHtml(m.story_title || '(без названия)') + '" title="Удалить">'
+        + '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">'
+        + '<polyline points="2,4 14,4"/><path d="M6 4V2h4v2"/><rect x="3" y="4" width="10" height="10" rx="1.5"/><line x1="6" y1="7" x2="6" y2="11"/><line x1="10" y1="7" x2="10" y2="11"/>'
+        + '</svg></button>';
       html += '<div class="story-row" data-id="' + m.id + '">'
         + '<div class="story-title">' + escHtml(m.story_title || '(без названия)') + modelLabel + ' ' + gradeBadge + '</div>'
-        + '<div class="story-row-right">' + publishedIcon + infoBtn + '</div>'
+        + '<div class="story-row-right">' + publishedIcon + infoBtn + deleteBtn + '</div>'
         + '</div>';
     }
     container.innerHTML = html;
@@ -298,6 +302,14 @@
           btn.classList.add('copied');
           setTimeout(function() { btn.classList.remove('copied'); }, 2000);
         }).catch(function() {});
+      });
+    });
+    container.querySelectorAll('.movie-delete-btn').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var movieId = btn.getAttribute('data-id');
+        var movieTitle = btn.getAttribute('data-title') || '(без названия)';
+        _openDeleteMovieDialog(movieId, movieTitle, btn);
       });
     });
     _updateMovieSelection();
@@ -340,6 +352,31 @@
       }
     })
     .catch(function() { btn.disabled = false; });
+  }
+
+  function _openDeleteMovieDialog(movieId, movieTitle, triggerBtn) {
+    new ConfirmDialog({
+      title:        'Удалить видео?',
+      text:         'Видео «' + escHtml(movieTitle) + '» и все связанные батчи, лог и записи лога будут удалены безвозвратно. Сюжет останется нетронутым.',
+      confirmLabel: 'Удалить',
+      triggerBtn:   triggerBtn,
+      onConfirm: function(btn, dlg) {
+        btn.disabled    = true;
+        btn.textContent = 'Удаление…';
+        fetch('/production/movie/' + encodeURIComponent(movieId) + '/delete', { method: 'DELETE' })
+          .then(function(r) { return r.ok ? r.json() : r.json().then(function(d) { throw d; }); })
+          .then(function() {
+            dlg.close();
+            if (typeof window.showToast === 'function') window.showToast('Видео удалено');
+            window.loadMovieList();
+          })
+          .catch(function(d) {
+            dlg.close();
+            var msg = (d && d.error) ? d.error : 'Ошибка удаления';
+            if (typeof window.showToast === 'function') window.showToast(msg);
+          });
+      },
+    }).open();
   }
 
   /* ── загрузка списка ── */

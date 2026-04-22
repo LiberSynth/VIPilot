@@ -43,6 +43,7 @@ from db import (
     db_delete_batch,
     db_get_batch_status,
     db_delete_story,
+    db_delete_movie,
 )
 from log import db_get_monitor, log_batch_planned, write_log_entry
 from utils.auth import is_authenticated
@@ -650,6 +651,17 @@ def api_production_story_delete(story_id):
         return jsonify({"error": conflict_error}), 409
     result = db_delete_story(story_id)
     if result["stories"] == 0:
+        return jsonify({"error": "not found"}), 404
+    return jsonify({"ok": True, "deleted": result})
+
+
+@production_bp.route("/production/movie/<movie_id>/delete", methods=["DELETE"])
+def api_production_movie_delete(movie_id):
+    err = _production_auth_check()
+    if err:
+        return err
+    result = db_delete_movie(movie_id)
+    if not result:
         return jsonify({"error": "not found"}), 404
     return jsonify({"ok": True, "deleted": result})
 
