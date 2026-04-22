@@ -343,9 +343,10 @@
           var opt = document.createElement('div');
           opt.className = 'cust-select-option';
           opt.dataset.value = m.id;
-          opt.textContent = m.name;
+          var label = m.price != null ? m.name + ' (' + m.price + ')' : m.name;
+          opt.textContent = label;
           opt.addEventListener('click', function() {
-            selectVideoModel(m.id, m.name);
+            selectVideoModel(m.id, label);
             closeVideoModelList();
           });
           list.appendChild(opt);
