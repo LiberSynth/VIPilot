@@ -30,11 +30,39 @@
     <div class="cp-header-left">
       <span class="cp-title">Разработчику</span>
     </div>
-    <span class="cp-arrow">▾</span>
+    <div style="display:flex;align-items:center;gap:6px">
+      <button class="cycle-float-btn" title="Развернуть все" onclick="event.stopPropagation();devInfoExpandAll()"><svg viewBox="0 0 16 16"><polyline points="2,6 2,2 6,2"/><polyline points="10,2 14,2 14,6"/><polyline points="14,10 14,14 10,14"/><polyline points="6,14 2,14 2,10"/></svg></button>
+      <button class="cycle-float-btn" title="Свернуть все" onclick="event.stopPropagation();devInfoCollapseAll()"><svg viewBox="0 0 16 16"><polyline points="6,2 6,6 2,6"/><polyline points="10,2 10,6 14,6"/><polyline points="14,10 10,10 10,14"/><polyline points="2,10 6,10 6,14"/></svg></button>
+      <span class="cp-arrow">▾</span>
+    </div>
   </div>
   <div class="cp-body">
 
     <div class="dev-sub">
+      <div class="dev-sub-header" onclick="this.parentElement.classList.toggle('open')">
+        <span class="dev-sub-title">Архитектура комплекса</span>
+        <span class="dev-sub-arrow">▾</span>
+      </div>
+      <div class="dev-sub-body">
+        <div style="font-size:13px;color:#c0c0d8;line-height:1.7">
+
+          <p style="margin:0 0 12px"><strong style="color:#e0e0f0">Фронтенд — HTML + JavaScript</strong><br>
+          Пользовательский интерфейс построен на HTML-шаблонах Jinja2 и ванильном JavaScript без фреймворков. Каждый модуль системы имеет собственную страницу: Director, Screenwriter, Producer, Monitor, Operator, Settings. Логика каждой страницы вынесена в отдельный JS-файл; общие компоненты — в переиспользуемые Jinja2-макросы. Взаимодействие с бэкендом — через REST API по JSON.</p>
+
+          <p style="margin:0 0 12px"><strong style="color:#e0e0f0">Веб-сервер — Python (Flask)</strong><br>
+          Flask-приложение обслуживает HTML-страницы и предоставляет REST API для фронтенда. Роуты разделены на blueprints по функциональным областям: веб-интерфейс и API. Веб-сервер запускается в основном потоке; параллельно с ним стартует фоновый поток сервисного слоя.</p>
+
+          <p style="margin:0 0 12px"><strong style="color:#e0e0f0">Сервисный слой — Python</strong><br>
+          Ядро системы: планировщик, пайплайны генерации контента (сценарий → видео → транскодирование → публикация), клиенты внешних API (LLM, видеогенерация, VK, Dzen) и вспомогательные сервисы. Работает в фоновых потоках независимо от веб-сервера. Взаимодействие с веб-сервером — только через состояние в БД.</p>
+
+          <p style="margin:0 0 0"><strong style="color:#e0e0f0">База данных — PostgreSQL</strong><br>
+          Единственный источник истины для всего комплекса. Хранит состояние батчей (машина состояний пайплайна), сгенерированные тексты, бинарные видеофайлы, логи выполнения пайплайнов и всю конфигурацию системы. Веб-сервер и сервисный слой общаются друг с другом исключительно через БД — прямых вызовов между слоями нет.</p>
+
+        </div>
+      </div>
+    </div>
+
+    <div class="dev-sub" style="margin-top:10px">
       <div class="dev-sub-header" onclick="this.parentElement.classList.toggle('open')">
         <span class="dev-sub-title">Главный цикл сервиса</span>
         <span class="dev-sub-arrow">▾</span>
@@ -108,5 +136,18 @@
 
   </div>
 </div>
+<script>
+function devInfoExpandAll() {
+  var card = document.getElementById('dev-info-card');
+  if (!card) return;
+  card.classList.add('open');
+  card.querySelectorAll('.dev-sub').forEach(function(s) { s.classList.add('open'); });
+}
+function devInfoCollapseAll() {
+  var card = document.getElementById('dev-info-card');
+  if (!card) return;
+  card.querySelectorAll('.dev-sub').forEach(function(s) { s.classList.remove('open'); });
+}
+</script>
 {% endif %}
 {% endmacro %}
