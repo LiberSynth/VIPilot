@@ -239,6 +239,10 @@
   /* ── рендер списка ── */
   function renderMovies(movies) {
     _moviesData = movies || [];
+    if (_selectedMovieId) {
+      var stillExists = _moviesData.some(function(m) { return String(m.id) === String(_selectedMovieId); });
+      if (!stillExists) selectMovie(null);
+    }
     var container = document.getElementById('movies-list');
     if (!container) return;
     if (!_moviesData.length) {
