@@ -1046,6 +1046,12 @@
   .story-delete-btn:disabled { opacity: .25; }
   .story-delete-btn.btn-blocked { opacity: .25; }
 
+  .movie-delete-btn {
+    background: none; border: none; padding: 0; cursor: pointer;
+    color: #8888b0; opacity: .65; transition: opacity .15s;
+  }
+  .movie-delete-btn:hover { opacity: 1; }
+
   .story-info-btn {
     background: none; border: none; padding: 0; cursor: pointer;
     opacity: .65; transition: opacity .15s;
