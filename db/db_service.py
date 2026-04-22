@@ -20,7 +20,7 @@ def db_get_log_entries(log_id):
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT message, level, created_at FROM log_entries WHERE log_id = %s ORDER BY created_at",
+                "SELECT message, level, created_at FROM log_entries WHERE log_id = %s ORDER BY created_at, id",
                 (log_id,),
             )
             rows = cur.fetchall()
@@ -65,13 +65,13 @@ def db_get_monitor(batch_limit=50):
                                                 'message',    le.message,
                                                 'level',      le.level,
                                                 'created_at', le.created_at
-                                            ) ORDER BY le.created_at
+                                            ) ORDER BY le.created_at, le.id
                                         ),
                                         '[]'::json
                                     )
                                     FROM log_entries le WHERE le.log_id = l.id
                                 )
-                            ) ORDER BY l.created_at
+                            ) ORDER BY l.created_at, l.id
                         ) FILTER (WHERE l.id IS NOT NULL),
                         '[]'::json
                     ) AS logs,
@@ -90,7 +90,7 @@ def db_get_monitor(batch_limit=50):
                 GROUP BY b.id, b.scheduled_at, b.type, b.status, b.created_at,
                          b.story_id, m.has_video_data,
                          tm.name, vm.name
-                ORDER BY COALESCE(MAX(l.created_at), b.created_at) DESC
+                ORDER BY COALESCE(MAX(l.created_at), b.created_at) DESC, b.id DESC
                 LIMIT %s
                 """,
                 (batch_limit,),
@@ -107,7 +107,7 @@ def db_get_monitor(batch_limit=50):
                                 'message',    le.message,
                                 'level',      le.level,
                                 'created_at', le.created_at
-                            ) ORDER BY le.created_at
+                            ) ORDER BY le.created_at, le.id
                         ) FILTER (WHERE le.id IS NOT NULL),
                         '[]'::json
                     ) AS entries
@@ -115,7 +115,7 @@ def db_get_monitor(batch_limit=50):
                 LEFT JOIN log_entries le ON le.log_id = l.id
                 WHERE l.batch_id IS NULL
                 GROUP BY l.id
-                ORDER BY l.created_at DESC
+                ORDER BY l.created_at DESC, l.id DESC
                 LIMIT 100
                 """
             )
@@ -126,7 +126,7 @@ def db_get_monitor(batch_limit=50):
                 SELECT message, level, created_at
                 FROM log_entries
                 WHERE log_id IS NULL
-                ORDER BY created_at DESC
+                ORDER BY created_at DESC, id DESC
                 LIMIT 500
                 """
             )

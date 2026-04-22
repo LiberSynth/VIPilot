@@ -133,7 +133,7 @@ def db_get_stories_list(show_used=True, show_bad=True, for_approval=False, pin_i
                 FROM stories s
                 LEFT JOIN ai_models am ON am.id = s.model_id
                 {where_clause}
-                ORDER BY s.created_at DESC
+                ORDER BY s.created_at DESC, s.id DESC
             """, params or None)
             rows = cur.fetchall()
     return [
@@ -201,7 +201,7 @@ def db_get_movies_list(show_published=True, show_bad=True, for_approval=False):
                               'pending', 'story_generating', 'story_ready',
                               'video_generating', 'video_pending'
                           )
-                        ORDER BY b2.created_at DESC
+                        ORDER BY b2.created_at DESC, b2.id DESC
                         LIMIT 1
                     ) AS active_batch_id
                 FROM movies m
@@ -246,7 +246,7 @@ def db_get_stories_pool(grade_required: bool = True, approve_movies: bool = True
                         AND b.movie_id IS NOT NULL
                         AND {busy_clause}
                   )
-                ORDER BY created_at DESC
+                ORDER BY created_at DESC, id DESC
             """)
             rows = cur.fetchall()
     return [{"id": row[0], "title": row[1] or "", "content": row[2] or ""} for row in rows]

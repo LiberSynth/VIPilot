@@ -209,7 +209,7 @@ def _m071_donor_good_only(cur):
             WHERE (m.transcoded_data IS NOT NULL OR m.raw_data IS NOT NULL)
               AND b.status IN ('cancelled', 'movie_probe')
               AND (NOT p_good_only OR m.grade = 'good')
-            ORDER BY b.created_at ASC
+            ORDER BY b.created_at ASC, b.id ASC
             LIMIT 1 FOR UPDATE OF b;
             IF v_donor_id IS NULL THEN RETURN; END IF;
             UPDATE batches SET status = v_donated_status WHERE id = v_donor_id;
