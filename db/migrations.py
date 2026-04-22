@@ -30,7 +30,21 @@ from log.log import write_log_entry
 # ---------------------------------------------------------------------------
 
 # Миграции 1–70 удалены: задеплоены на prod 2026-04-20, db_version = 70.
-# Следующая миграция: _m076_...
+# Следующая миграция: _m077_...
+
+
+def _m076_skyreels_body_update(cur):
+    """Обновляет body моделей SkyReels V4: добавляет sound, prompt_optimizer, resolution, mode."""
+    cur.execute("""
+        UPDATE ai_models
+        SET body = '{"model_name": "SkyReels-V4-Fast", "prompt": "{}", "duration": "{:int}", "aspect_ratio": "{:d}:{:d}", "resolution": "720p", "sound": true, "prompt_optimizer": true, "mode": "fast"}'::jsonb
+        WHERE name = 'SkyReels V4 Fast'
+    """)
+    cur.execute("""
+        UPDATE ai_models
+        SET body = '{"model_name": "SkyReels-V4-Std", "prompt": "{}", "duration": "{:int}", "aspect_ratio": "{:d}:{:d}", "resolution": "720p", "sound": true, "prompt_optimizer": true, "mode": "std"}'::jsonb
+        WHERE name = 'SkyReels V4 Std'
+    """)
 
 
 def _m075_add_skyreels(cur):
@@ -176,6 +190,7 @@ MIGRATIONS = [
     (73, _m073_add_wan27),
     (74, _m074_rename_key_env),
     (75, _m075_add_skyreels),
+    (76, _m076_skyreels_body_update),
 ]
 
 
