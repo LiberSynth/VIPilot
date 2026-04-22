@@ -339,7 +339,7 @@ def db_delete_bad_movies() -> dict:
 
 
 def db_get_good_movies_meta() -> list[dict]:
-    """Возвращает список {id, model_name, story_title, grade} для movies с grade='good' и ненулевым видео."""
+    """Возвращает список {id, model_name, story_title, grade} для всех movies с ненулевым видео."""
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute("""
@@ -352,8 +352,7 @@ def db_get_good_movies_meta() -> list[dict]:
                 LEFT JOIN ai_models a ON a.id = m.model_id
                 LEFT JOIN batches b ON b.movie_id = m.id
                 LEFT JOIN stories s ON s.id = b.story_id
-                WHERE m.grade = 'good'
-                  AND COALESCE(m.transcoded_data, m.raw_data) IS NOT NULL
+                WHERE COALESCE(m.transcoded_data, m.raw_data) IS NOT NULL
                 ORDER BY m.id, b.created_at DESC NULLS LAST
             """)
             rows = cur.fetchall()
