@@ -327,7 +327,7 @@ var getDraftStoryId;
 
   function _openDeleteStoryDialog(storyId, storyTitle, triggerBtn) {
     new ConfirmDialog({
-      title:        'Удалить сюжет?',
+      title:        'Удалить?',
       text:         'Сюжет «' + escapeHtml(storyTitle) + '» и все связанные батчи, лог и записи лога будут удалены безвозвратно.',
       confirmLabel: 'Удалить',
       triggerBtn:   triggerBtn,
