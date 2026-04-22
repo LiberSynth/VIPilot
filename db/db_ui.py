@@ -87,9 +87,7 @@ def db_get_stories_list(show_used=True, show_bad=True, for_approval=False, pin_i
     else:
         used_expr = """EXISTS (
                         SELECT 1 FROM batches b
-                        JOIN movies m ON m.id = b.movie_id
                         WHERE b.story_id = s.id AND b.movie_id IS NOT NULL
-                          AND (m.grade IS NULL OR m.grade != 'bad')
                     )"""
     filter_conditions = []
     if for_approval:
