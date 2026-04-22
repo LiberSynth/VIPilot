@@ -171,6 +171,9 @@ window.cycleVideoGrade = function(el) {
     return span;
   }
 
+  var _noteModelId = null;
+  var _noteModel   = null;
+
   window.renderModelList = function(containerId, list, opts) {
     opts = opts || {};
     var gradeFn     = opts.gradeFn     || 'cycleVideoGrade';
@@ -187,12 +190,12 @@ window.cycleVideoGrade = function(el) {
       return;
     }
     container.innerHTML = '';
+    _noteModelId = null;
+    _noteModel   = null;
     var _sharedNoteArea = document.getElementById('model-note-area');
     if (_sharedNoteArea) {
       _sharedNoteArea.value = '';
       _sharedNoteArea.disabled = true;
-      _sharedNoteArea._selectedModelId = null;
-      _sharedNoteArea._selectedModel = null;
     }
     list.forEach(function(m) {
       const item = document.createElement('div');
@@ -228,12 +231,12 @@ window.cycleVideoGrade = function(el) {
       item.addEventListener('click', function() {
         container.querySelectorAll('.model-item').forEach(function(el) { el.classList.remove('model-item--active'); });
         item.classList.add('model-item--active');
+        _noteModelId = m.id;
+        _noteModel   = m;
         var sharedArea = document.getElementById('model-note-area');
         if (sharedArea) {
           sharedArea.value = m.note || '';
           sharedArea.disabled = false;
-          sharedArea._selectedModelId = m.id;
-          sharedArea._selectedModel = m;
         }
       });
       makeDragHandlers(item, containerId, m, saveOrderFn);
@@ -243,20 +246,19 @@ window.cycleVideoGrade = function(el) {
   };
 
   var _modelNoteAreaListenerAdded = false;
+  var _noteTimer = null;
   function _attachModelNoteAreaListener() {
     if (_modelNoteAreaListenerAdded) return;
     var sharedArea = document.getElementById('model-note-area');
     if (!sharedArea) return;
     _modelNoteAreaListenerAdded = true;
-    var _noteTimer = null;
     sharedArea.addEventListener('input', function() {
+      if (!_noteModelId) return;
       var val = sharedArea.value;
-      var mid = sharedArea._selectedModelId;
-      if (!mid) return;
-      if (sharedArea._selectedModel) sharedArea._selectedModel.note = val;
+      if (_noteModel) _noteModel.note = val;
       clearTimeout(_noteTimer);
       _noteTimer = setTimeout(function() {
-        fetch('/api/video-models/' + encodeURIComponent(mid) + '/note', {
+        fetch('/api/video-models/' + encodeURIComponent(_noteModelId) + '/note', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ note: val })
