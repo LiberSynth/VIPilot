@@ -53,6 +53,16 @@
     transition: border-color .2s;
   }
   input[type=text]:focus, input[type=password]:focus { border-color: #4a7cf7; }
+  input[type=text]:-webkit-autofill,
+  input[type=text]:-webkit-autofill:hover,
+  input[type=text]:-webkit-autofill:focus,
+  input[type=password]:-webkit-autofill,
+  input[type=password]:-webkit-autofill:hover,
+  input[type=password]:-webkit-autofill:focus {
+    -webkit-box-shadow: 0 0 0 1000px #0f0f13 inset;
+    -webkit-text-fill-color: #e8e8f0;
+    caret-color: #e8e8f0;
+  }
   .error {
     background: rgba(255,80,80,.12);
     border: 1px solid rgba(255,80,80,.3);
