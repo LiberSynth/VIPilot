@@ -8,7 +8,9 @@
     </div>
     {% endif %}
     <div class="hint" style="margin-bottom:2px">Заметки</div>
-    <textarea id="model-note-area" disabled rows="2" placeholder='Наблюдения и ограничения, например: "слишком много брака", "лимит промпта 1024 символа"'></textarea>
+    <div style="margin-bottom:10px">
+      <textarea id="model-note-area" disabled placeholder='Наблюдения и ограничения, например: "слишком много брака", "лимит промпта 1024 символа"'></textarea>
+    </div>
     {% if show_hint %}
     <div class="hint" style="margin-bottom:8px">Активируйте одну или несколько. Порядок задаёт очерёдность перебора при сбое.</div>
     {% endif %}
