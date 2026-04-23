@@ -10,6 +10,7 @@ from utils.prompt_params import apply_prompt_params
 from db import (
     db_set_story_model,
     settings_get,
+    cycle_config_get,
     db_get_batch_by_id,
     db_get_active_targets,
     db_claim_batch_status,
@@ -95,7 +96,7 @@ def run(batch_id, log_id):
     # минуя генерацию. Если подходящего донора нет — падаем в AI-генерацию.
     # approve_movies: если включено, ищем только доноров с grade = good;
     # если пул пуст — ошибка (AI-генерация запрещена).
-    approve_movies = settings_get("approve_movies", "0") == "1"
+    approve_movies = cycle_config_get()["approve_movies"]
     if (
         not is_probe
         and not snap.emulation_mode
@@ -166,7 +167,7 @@ def run(batch_id, log_id):
     # Нашли → story_ready без AI. Не нашли → идём в AI-генерацию.
     # Если approve_stories включён и пул пуст — ошибка (AI-генерация запрещена).
     if batch["type"] != "story_probe":
-        approve_stories = settings_get("approve_stories", "0") == "1"
+        approve_stories = cycle_config_get()["approve_stories"]
         grade_required = approve_stories
         condition_label = (
             "grade = good" if grade_required else "любой grade (включая NULL)"
@@ -269,8 +270,9 @@ def run(batch_id, log_id):
     except (ValueError, TypeError):
         max_attempts_per_model = 3
 
-    format_prompt = settings_get("format_prompt", "")
-    user_prompt = settings_get("text_prompt", "")
+    cc = cycle_config_get()
+    format_prompt = cc["format_prompt"]
+    user_prompt = cc["text_prompt"]
 
     user_prompt = apply_prompt_params(user_prompt)
     format_prompt = apply_prompt_params(format_prompt)

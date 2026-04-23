@@ -27,7 +27,9 @@ from db import (
     db_create_video_batch,
     db_create_story_probe_batch,
     db_get_batch_logs,
-    settings_get,
+    cycle_config_get,
+    cycle_config_set,
+
     db_get_stories_list,
     db_get_stories_pool,
     db_count_good_pool,
@@ -37,7 +39,6 @@ from db import (
     db_set_movie_grade,
     db_upsert_story_draft,
     db_create_story_autogenerate_batch,
-    settings_set,
     db_purge_unused_stories,
     db_delete_bad_movies,
     db_set_model_grade,
@@ -398,7 +399,7 @@ def api_workflow_approve_movies():
         return jsonify({"error": "unauthorized"}), 401
     body = request.get_json(silent=True) or {}
     val = "1" if body.get("enabled") == "1" else "0"
-    settings_set("approve_movies", val)
+    cycle_config_set(approve_movies=(val == "1"))
     if val == "1":
         env_set("use_donor", "1")
     label = "включено" if val == "1" else "выключено"
@@ -486,8 +487,9 @@ def api_get_story(story_id):
     if text is None:
         return jsonify({"error": "not found"}), 404
     title = db_get_story_title(story_id) or ''
-    format_prompt = settings_get("format_prompt", "") or ""
-    user_prompt = settings_get("text_prompt", "") or ""
+    cc = cycle_config_get()
+    format_prompt = cc["format_prompt"] or ""
+    user_prompt = cc["text_prompt"] or ""
     user_prompt = apply_prompt_params(user_prompt)
     format_prompt = apply_prompt_params(format_prompt)
     model_info = db_get_story_model_info(story_id)
@@ -537,7 +539,7 @@ def api_production_stories():
     for_approval = request.args.get("for_approval", "0") == "1"
     only_pinned = request.args.get("only_pinned", "0") == "1"
     pin_id = request.args.get("pin_id") or None
-    approve_movies = settings_get("approve_movies", "0") == "1"
+    approve_movies = cycle_config_get()["approve_movies"]
     stories = db_get_stories_list(show_used=show_used, show_bad=show_bad, for_approval=for_approval, pin_id=pin_id, approve_movies=approve_movies, only_pinned=only_pinned)
     return jsonify(stories)
 
@@ -562,8 +564,9 @@ def api_production_stories_pool():
     err = _production_auth_check()
     if err:
         return err
-    approve_stories = settings_get("approve_stories", "0") == "1"
-    approve_movies = settings_get("approve_movies", "0") == "1"
+    cc = cycle_config_get()
+    approve_stories = cc["approve_stories"]
+    approve_movies = cc["approve_movies"]
     stories = db_get_stories_pool(grade_required=approve_stories, approve_movies=approve_movies)
     return jsonify(stories)
 
@@ -573,7 +576,7 @@ def api_production_good_pool_count():
     err = _production_auth_check()
     if err:
         return err
-    approve_stories = settings_get("approve_stories", "0") == "1"
+    approve_stories = cycle_config_get()["approve_stories"]
     return jsonify({"count": db_count_good_pool(grade_required=approve_stories)})
 
 

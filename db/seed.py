@@ -23,17 +23,21 @@ def seed_db():
 
                 cur.execute("""
                     INSERT INTO settings (key, value) VALUES
-                        ('text_prompt',        ''),
-                        ('format_prompt',     ''),
                         ('notify_email',      ''),
                         ('notify_phone',      ''),
-                        ('video_duration',    '6'),
                         ('buffer_hours',      '24'),
                         ('loop_interval',     '15'),
                         ('max_batch_threads', '5'),
-                        ('max_model_passes',  '5'),
-                        ('approve_stories',   '0')
+                        ('max_model_passes',  '5')
                     ON CONFLICT (key) DO NOTHING
+                """)
+
+                cur.execute("""
+                    INSERT INTO cycle_config (
+                        id, text_prompt, format_prompt, video_post_prompt,
+                        video_duration, approve_stories, approve_movies
+                    ) VALUES (1, '', '', '', 6, FALSE, FALSE)
+                    ON CONFLICT (id) DO NOTHING
                 """)
 
                 cur.execute("""

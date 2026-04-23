@@ -30,7 +30,55 @@ from log.log import write_log_entry
 # ---------------------------------------------------------------------------
 
 # Миграции 1–70 удалены: задеплоены на prod 2026-04-20, db_version = 70.
-# Следующая миграция: _m083_...
+# Следующая миграция: _m084_...
+
+
+def _m083_create_cycle_config(cur):
+    """Создаёт таблицу cycle_config и переносит в неё 6 ключей из settings.
+    Deployed: —
+    """
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS cycle_config (
+            id               INTEGER PRIMARY KEY DEFAULT 1,
+            text_prompt      TEXT NOT NULL DEFAULT '',
+            format_prompt    TEXT NOT NULL DEFAULT '',
+            video_post_prompt TEXT NOT NULL DEFAULT '',
+            video_duration   INTEGER NOT NULL DEFAULT 6,
+            approve_stories  BOOLEAN NOT NULL DEFAULT FALSE,
+            approve_movies   BOOLEAN NOT NULL DEFAULT FALSE,
+            CONSTRAINT cycle_config_single_row CHECK (id = 1)
+        )
+    """)
+    cur.execute("""
+        INSERT INTO cycle_config (
+            id, text_prompt, format_prompt, video_post_prompt,
+            video_duration, approve_stories, approve_movies
+        )
+        SELECT
+            1,
+            COALESCE((SELECT value FROM settings WHERE key = 'text_prompt'), ''),
+            COALESCE((SELECT value FROM settings WHERE key = 'format_prompt'), ''),
+            COALESCE((SELECT value FROM settings WHERE key = 'video_post_prompt'), ''),
+            COALESCE(
+                NULLIF(
+                    regexp_replace(
+                        COALESCE((SELECT value FROM settings WHERE key = 'video_duration'), ''),
+                        '[^0-9]', '', 'g'
+                    ), ''
+                )::INTEGER,
+                6
+            ),
+            COALESCE((SELECT value FROM settings WHERE key = 'approve_stories'), '0') = '1',
+            COALESCE((SELECT value FROM settings WHERE key = 'approve_movies'), '0') = '1'
+        WHERE NOT EXISTS (SELECT 1 FROM cycle_config WHERE id = 1)
+    """)
+    cur.execute("""
+        DELETE FROM settings
+        WHERE key IN (
+            'text_prompt', 'format_prompt', 'video_post_prompt',
+            'video_duration', 'approve_stories', 'approve_movies'
+        )
+    """)
 
 
 def _m082_redistribute_settings_env(cur):
@@ -276,6 +324,7 @@ MIGRATIONS = [
     (80, _m080_drop_stories_top_quality),
     (81, _m081_add_max_model_passes_setting),
     (82, _m082_redistribute_settings_env),
+    (83, _m083_create_cycle_config),
 ]
 
 

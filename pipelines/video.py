@@ -16,6 +16,7 @@ import common.environment as environment
 from utils.prompt_params import apply_prompt_params
 from db import (
     settings_get,
+    cycle_config_get,
     db_get_batch_by_id,
     db_get_active_targets,
     db_update_batch_current_movie_model_id,
@@ -151,10 +152,7 @@ def run(batch_id, log_id):
         batch_data      = batch.get('data') or {}
         pinned_model_id = batch_data.get('movie_model_id') if isinstance(batch_data, dict) else None
 
-        try:
-            video_duration = max(1, min(60, int(settings_get('video_duration', '6'))))
-        except (ValueError, TypeError):
-            video_duration = 6
+        video_duration = max(1, min(60, cycle_config_get()['video_duration']))
 
         # Проверка отмены: только для slot/adhoc.
         # Probe-батч запускается пользователем явно — отменять его нет смысла.
@@ -224,7 +222,7 @@ def run(batch_id, log_id):
             write_log_entry(log_id, f"[video] {msg}")
             raise AppException(batch_id, 'video', msg, log_id)
 
-        video_post_prompt = settings_get('video_post_prompt', '').strip()
+        video_post_prompt = cycle_config_get()['video_post_prompt'].strip()
         if video_post_prompt:
             video_post_prompt = apply_prompt_params(video_post_prompt)
             story_text = story_text + '\n\n' + video_post_prompt

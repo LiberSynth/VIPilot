@@ -17,6 +17,8 @@ from db import (
     settings_set,
     env_get,
     env_set,
+    cycle_config_get,
+    cycle_config_set,
     db_get_active_targets,
     db_update_target_aspect_ratio,
     db_get_target_by_name,
@@ -127,8 +129,9 @@ def root_page():
         if non_root:
             return redirect(url_for("web.select_module"))
         return redirect(url_for("web.login"))
-    text_prompt     = settings_get("text_prompt", "")
-    format_prompt   = settings_get("format_prompt", "")
+    cc = cycle_config_get()
+    text_prompt     = cc["text_prompt"]
+    format_prompt   = cc["format_prompt"]
     batch_lifetime     = parse_batch_lifetime(settings_get("batch_lifetime", "7"))
     log_lifetime       = parse_long_lifetime(settings_get("log_lifetime", "365"))
     entries_lifetime   = parse_long_lifetime(settings_get("entries_lifetime", "30"), default=30)
@@ -142,16 +145,16 @@ def root_page():
     _vk_pm     = (vk_target.get("config") or {}).get("publish_method", {}) if vk_target else {}
     vk_publish_story   = bool(_vk_pm.get("story", 1))
     vk_publish_wall    = bool(_vk_pm.get("wall",  1))
-    video_duration     = max(1, min(60, int(settings_get("video_duration", "6"))))
-    video_post_prompt  = settings_get("video_post_prompt", "")
+    video_duration     = max(1, min(60, cc["video_duration"]))
+    video_post_prompt  = cc["video_post_prompt"]
     buffer_hours       = max(1, min(720, int(settings_get("buffer_hours", "24"))))
     loop_interval       = environment.loop_interval
     max_batch_threads   = environment.max_threads
     max_model_passes    = environment.max_model_passes
     story_fails_to_next = max(1, int(settings_get("story_fails_to_next", "3")))
     video_fails_to_next = max(1, int(settings_get("video_fails_to_next", "3")))
-    approve_stories     = settings_get("approve_stories", "0") == "1"
-    approve_movies      = settings_get("approve_movies",  "0") == "1"
+    approve_stories     = cc["approve_stories"]
+    approve_movies      = cc["approve_movies"]
     deep_debugging      = environment.deep_debugging
 
     workflow_state = env_get("workflow_state", "running")
@@ -226,14 +229,15 @@ def production_page():
         if other:
             return redirect(url_for("web.select_module"))
         return redirect(url_for("web.login"))
-    format_prompt       = settings_get("format_prompt", "")
-    text_prompt         = settings_get("text_prompt", "")
-    video_post_prompt   = settings_get("video_post_prompt", "")
+    cc = cycle_config_get()
+    format_prompt       = cc["format_prompt"]
+    text_prompt         = cc["text_prompt"]
+    video_post_prompt   = cc["video_post_prompt"]
     story_fails_to_next = max(1, int(settings_get("story_fails_to_next", "3")))
-    video_duration      = max(1, min(60, int(settings_get("video_duration", "6"))))
+    video_duration      = max(1, min(60, cc["video_duration"]))
     video_fails_to_next = max(1, int(settings_get("video_fails_to_next", "3")))
-    approve_stories_prod = settings_get("approve_stories", "0") == "1"
-    approve_movies_prod  = settings_get("approve_movies",  "0") == "1"
+    approve_stories_prod = cc["approve_stories"]
+    approve_movies_prod  = cc["approve_movies"]
     use_donor_prod       = environment.use_donor
     screenwriter_show_used = env_get("screenwriter_show_used", "0") == "1"
     screenwriter_only_good = env_get("screenwriter_only_good", "0") == "1"
@@ -272,7 +276,7 @@ def save():
 
     format_prompt_val = request.form.get("format_prompt")
     if format_prompt_val is not None:
-        settings_set("format_prompt", format_prompt_val)
+        cycle_config_set(format_prompt=format_prompt_val)
 
     text_prompt = request.form.get("text_prompt", "").strip()
     active_tab = request.form.get("active_tab", "pipeline")
@@ -281,7 +285,7 @@ def save():
             flash("Текстовый промпт не может быть пустым", "error")
             return redirect(url_for("web.root_page"))
     else:
-        settings_set("text_prompt", text_prompt)
+        cycle_config_set(text_prompt=text_prompt)
 
     entries_lifetime_raw = request.form.get("entries_lifetime", "").strip()
     log_lifetime_raw     = request.form.get("log_lifetime",     "").strip()
@@ -334,11 +338,11 @@ def save():
             vid_dur = max(1, min(60, int(vid_dur_str)))
         except (ValueError, TypeError):
             vid_dur = 6
-        settings_set("video_duration", str(vid_dur))
+        cycle_config_set(video_duration=vid_dur)
 
     video_post_prompt_val = request.form.get("video_post_prompt")
     if video_post_prompt_val is not None:
-        settings_set("video_post_prompt", video_post_prompt_val)
+        cycle_config_set(video_post_prompt=video_post_prompt_val)
 
     buf_str = request.form.get("buffer_hours", "").strip()
     if buf_str:
@@ -369,7 +373,7 @@ def save():
             pass
 
     if "approve_stories" in request.form:
-        settings_set("approve_stories", "1" if request.form.get("approve_stories") == "1" else "0")
+        cycle_config_set(approve_stories=(request.form.get("approve_stories") == "1"))
 
     if "producer_autoplay_movie" in request.form:
         env_set("producer_autoplay_movie", "1" if request.form.get("producer_autoplay_movie") == "1" else "0")
