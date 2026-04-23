@@ -10,7 +10,7 @@ def _get_duration() -> str:
 
 
 def _get_word_count() -> str:
-    return str(_get_video_duration() * 4)
+    return str(round(_get_video_duration() * cycle_config_get()["words_per_second"]))
 
 
 def _get_sample_list() -> str:

@@ -988,6 +988,19 @@ var getDraftStoryId;
 
 /* ── Счётчик слов в карточке сюжета ── */
 (function() {
+  var _videoDuration = 6;
+  var _wordsPerSecond = 8;
+
+  function _readConfig() {
+    var titleEl = document.querySelector('[data-video-duration]');
+    if (titleEl) {
+      var d = parseInt(titleEl.getAttribute('data-video-duration'), 10);
+      var w = parseInt(titleEl.getAttribute('data-words-per-second'), 10);
+      if (d > 0) _videoDuration = d;
+      if (w > 0) _wordsPerSecond = w;
+    }
+  }
+
   function countWords(text) {
     return text.trim() === '' ? 0 : text.trim().split(/\s+/).length;
   }
@@ -1000,6 +1013,14 @@ var getDraftStoryId;
     var n = countWords(textarea.value);
     if (n > 0) {
       counter.textContent = n;
+      var threshold = _videoDuration * _wordsPerSecond;
+      if (n <= threshold) {
+        counter.style.color = '#4caf50';
+      } else if (n <= threshold * 1.2) {
+        counter.style.color = '#f5a623';
+      } else {
+        counter.style.color = '#e53935';
+      }
       wrap.style.display = '';
     } else {
       wrap.style.display = 'none';
@@ -1008,11 +1029,36 @@ var getDraftStoryId;
 
   window.updateDraftWordCount = updateWordCount;
 
+  var _wpsTimer = null;
+  function _saveWordsPerSecond(value) {
+    clearTimeout(_wpsTimer);
+    _wpsTimer = setTimeout(function() {
+      fetch('/api/cycle-config/words-per-second', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({value: value})
+      });
+    }, 500);
+  }
+
   function initWordCount() {
+    _readConfig();
     var textarea = document.getElementById('draft-story-content');
-    if (!textarea) return;
-    textarea.addEventListener('input', updateWordCount);
-    updateWordCount();
+    if (textarea) {
+      textarea.addEventListener('input', updateWordCount);
+      updateWordCount();
+    }
+    var wpsInput = document.getElementById('words-per-second-input');
+    if (wpsInput) {
+      wpsInput.addEventListener('input', function() {
+        var v = parseInt(wpsInput.value, 10);
+        if (v > 0 && v <= 100) {
+          _wordsPerSecond = v;
+          updateWordCount();
+          _saveWordsPerSecond(v);
+        }
+      });
+    }
   }
 
   var _origSetDraft = window.setDraftStoryFromRecord;

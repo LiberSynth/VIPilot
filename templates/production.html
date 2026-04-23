@@ -65,11 +65,15 @@
         </div>
         <input type="hidden" id="screenwriter-model-id" value="">
       </div>
+      <div style="margin-top:8px">
+        <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block" for="words-per-second-input">Слов в секунду</label>
+        <input type="number" id="words-per-second-input" min="1" max="100" step="1" value="{{ words_per_second | int }}" style="width:80px">
+      </div>
       <div id="story-generate-hint" class="story-generate-hint">Вы можете сгенерировать сюжет при помощи AI-модели</div>
     </div>
     <div class="card" id="card-story-draft">
       <div class="card-draft-header">
-        <div class="card-title" style="margin-bottom:0">Сюжет<span id="draft-story-wc-wrap" style="display:none; text-transform:none; font-weight:400; letter-spacing:0"> (<span id="draft-story-wc" style="color:#f5a623"></span> слов)</span></div>
+        <div class="card-title" style="margin-bottom:0" data-video-duration="{{ video_duration }}" data-words-per-second="{{ words_per_second | int }}">Сюжет<span id="draft-story-wc-wrap" style="display:none; text-transform:none; font-weight:400; letter-spacing:0"> (<span id="draft-story-wc"></span> слов)</span></div>
         <div class="card-top-actions">
           <button id="card-story-grade" class="story-grade-badge" hidden data-grade="null" title="Оценка. Нажмите для смены"></button>
           <button id="card-story-pin" class="story-icon story-pin-btn" hidden data-pinned="0" title="Закрепить">

@@ -407,6 +407,21 @@ def api_workflow_approve_movies():
     return jsonify({"ok": True, "approve_movies": val})
 
 
+@bp.route("/cycle-config/words-per-second", methods=["POST"])
+def api_cycle_config_words_per_second():
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    body = request.get_json(silent=True) or {}
+    try:
+        value = float(body.get("value", 0))
+    except (TypeError, ValueError):
+        return jsonify({"error": "invalid value"}), 400
+    if value <= 0 or value > 100:
+        return jsonify({"error": "value must be > 0 and <= 100"}), 400
+    cycle_config_set(words_per_second=value)
+    return jsonify({"ok": True, "words_per_second": value})
+
+
 @bp.route("/workflow/emulation", methods=["POST"])
 def api_workflow_emulation():
     if not is_authenticated():

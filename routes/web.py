@@ -235,6 +235,7 @@ def production_page():
     video_post_prompt   = cc["video_post_prompt"]
     story_fails_to_next = max(1, int(settings_get("story_fails_to_next", "3")))
     video_duration      = max(1, min(60, cc["video_duration"]))
+    words_per_second    = float(cc.get("words_per_second", 8.0))
     video_fails_to_next = max(1, int(settings_get("video_fails_to_next", "3")))
     approve_stories_prod = cc["approve_stories"]
     approve_movies_prod  = cc["approve_movies"]
@@ -251,6 +252,7 @@ def production_page():
         video_post_prompt=video_post_prompt,
         story_fails_to_next=story_fails_to_next,
         video_duration=video_duration,
+        words_per_second=words_per_second,
         video_fails_to_next=video_fails_to_next,
         approve_stories=approve_stories_prod,
         approve_movies=approve_movies_prod,

@@ -7,6 +7,7 @@ _DEFAULTS = {
     "video_duration": 6,
     "approve_stories": False,
     "approve_movies": False,
+    "words_per_second": 8.0,
 }
 
 _ALLOWED_COLUMNS = frozenset(_DEFAULTS.keys())
@@ -17,7 +18,7 @@ def cycle_config_get() -> dict:
         with conn.cursor() as cur:
             cur.execute(
                 "SELECT text_prompt, format_prompt, video_post_prompt,"
-                " video_duration, approve_stories, approve_movies"
+                " video_duration, approve_stories, approve_movies, words_per_second"
                 " FROM cycle_config WHERE id = 1"
             )
             row = cur.fetchone()
@@ -30,6 +31,7 @@ def cycle_config_get() -> dict:
         "video_duration":    row[3] if row[3] is not None else 6,
         "approve_stories":   bool(row[4]),
         "approve_movies":    bool(row[5]),
+        "words_per_second":  float(row[6]) if row[6] is not None else 8.0,
     }
 
 

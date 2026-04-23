@@ -33,6 +33,15 @@ from log.log import write_log_entry
 # Следующая миграция: _m084_...
 
 
+def _m084_add_words_per_second(cur):
+    """Добавляет колонку words_per_second в таблицу cycle_config.
+    Deployed: —
+    """
+    cur.execute("""
+        ALTER TABLE cycle_config ADD COLUMN IF NOT EXISTS words_per_second NUMERIC(5,2) NOT NULL DEFAULT 8.0
+    """)
+
+
 def _m083_create_cycle_config(cur):
     """Создаёт таблицу cycle_config и переносит в неё 6 ключей из settings.
     Deployed: —
@@ -325,6 +334,7 @@ MIGRATIONS = [
     (81, _m081_add_max_model_passes_setting),
     (82, _m082_redistribute_settings_env),
     (83, _m083_create_cycle_config),
+    (84, _m084_add_words_per_second),
 ]
 
 
