@@ -88,7 +88,7 @@ def _build_row(section, col_names, row_values):
     return record
 
 
-def export(output_path="update_package.yaml"):
+def export(output_path="update_package.yaml", stream=None):
     database_url = os.environ.get("DATABASE_URL")
     if not database_url:
         sys.stderr.write("ERROR: DATABASE_URL is not set\n")
@@ -112,17 +112,26 @@ def export(output_path="update_package.yaml"):
     finally:
         conn.close()
 
-    with open(output_path, "w", encoding="utf-8") as f:
+    if stream is not None:
         yaml.dump(
             package,
-            f,
+            stream,
             Dumper=_PackageDumper,
             allow_unicode=True,
             default_flow_style=False,
             sort_keys=False,
         )
-
-    sys.stdout.write(f"Exported to {output_path}\n")
+    else:
+        with open(output_path, "w", encoding="utf-8") as f:
+            yaml.dump(
+                package,
+                f,
+                Dumper=_PackageDumper,
+                allow_unicode=True,
+                default_flow_style=False,
+                sort_keys=False,
+            )
+        sys.stdout.write(f"Exported to {output_path}\n")
 
 
 if __name__ == "__main__":

@@ -1,7 +1,8 @@
 import os
 import threading
 import time
-from flask import Blueprint, jsonify, request, Response
+import io
+from flask import Blueprint, jsonify, request, Response, send_file
 
 from db import (
     db_get_schedule,
@@ -526,6 +527,22 @@ def api_batch_publish_frame(batch_id):
         img,
         mimetype="image/jpeg",
         headers={"Cache-Control": "no-store, no-cache"},
+    )
+
+
+@bp.route("/export-update-package")
+def api_export_update_package():
+    if not is_authenticated():
+        return Response("Unauthorized", status=401)
+    from utils.export_update_package import export
+    buf = io.StringIO()
+    export(output_path=None, stream=buf)
+    data = buf.getvalue().encode("utf-8")
+    return send_file(
+        io.BytesIO(data),
+        mimetype="application/octet-stream",
+        as_attachment=True,
+        download_name="update_package.yaml",
     )
 
 

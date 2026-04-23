@@ -210,3 +210,14 @@ function validateLifetimes() {
     el.addEventListener('change', () => { if (validateLifetimes()) scheduleServiceSave(); });
   });
 })();
+
+function downloadUpdatePackage(btn) {
+  btn.disabled = true;
+  const a = document.createElement('a');
+  a.href = '/api/export-update-package';
+  a.download = 'update_package.yaml';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => { btn.disabled = false; }, 2000);
+}
