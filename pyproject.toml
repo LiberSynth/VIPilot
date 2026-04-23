@@ -10,5 +10,6 @@ dependencies = [
     "gunicorn>=25.3.0",
     "playwright>=1.58.0",
     "psycopg2-binary>=2.9.11",
+    "pyyaml>=6.0.3",
     "requests>=2.33.1",
 ]
