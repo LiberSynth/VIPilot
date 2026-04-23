@@ -69,7 +69,7 @@ def db_get_monitor(batch_limit=50):
                                         ),
                                         '[]'::json
                                     )
-                                    FROM log_entries le WHERE le.log_id = l.id
+                                    FROM log_entries le WHERE le.log_id = l.id AND le.level != 'silent'
                                 )
                             ) ORDER BY l.created_at, l.id
                         ) FILTER (WHERE l.id IS NOT NULL),
@@ -112,7 +112,7 @@ def db_get_monitor(batch_limit=50):
                         '[]'::json
                     ) AS entries
                 FROM log l
-                LEFT JOIN log_entries le ON le.log_id = l.id
+                LEFT JOIN log_entries le ON le.log_id = l.id AND le.level != 'silent'
                 WHERE l.batch_id IS NULL
                 GROUP BY l.id
                 ORDER BY l.created_at DESC, l.id DESC
@@ -125,7 +125,7 @@ def db_get_monitor(batch_limit=50):
                 """
                 SELECT message, level, created_at
                 FROM log_entries
-                WHERE log_id IS NULL
+                WHERE log_id IS NULL AND level != 'silent'
                 ORDER BY created_at DESC, id DESC
                 LIMIT 500
                 """
