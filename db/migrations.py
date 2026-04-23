@@ -33,6 +33,56 @@ from log.log import write_log_entry
 # Следующая миграция: _m084_...
 
 
+def _m086_user_role_links_pk(cur):
+    """Заменяет составной PK (user_id, role_id) на суррогатный id UUID.
+    Добавляет UNIQUE-ограничение на (user_id, role_id) и отдельные индексы.
+    Deployed: —
+    """
+    cur.execute("""
+        ALTER TABLE user_role_links ADD COLUMN IF NOT EXISTS id UUID NOT NULL DEFAULT gen_random_uuid()
+    """)
+    cur.execute("""
+        DO $$
+        DECLARE
+            v_pk_name TEXT;
+        BEGIN
+            SELECT tc.constraint_name INTO v_pk_name
+            FROM information_schema.table_constraints tc
+            JOIN information_schema.key_column_usage kcu
+                ON kcu.constraint_name = tc.constraint_name
+               AND kcu.table_name = tc.table_name
+            WHERE tc.table_name = 'user_role_links'
+              AND tc.constraint_type = 'PRIMARY KEY'
+              AND kcu.column_name = 'user_id';
+
+            IF v_pk_name IS NOT NULL THEN
+                EXECUTE format('ALTER TABLE user_role_links DROP CONSTRAINT %I', v_pk_name);
+                ALTER TABLE user_role_links ADD PRIMARY KEY (id);
+            END IF;
+        END $$
+    """)
+    cur.execute("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.table_constraints
+                WHERE table_name = 'user_role_links'
+                  AND constraint_type = 'UNIQUE'
+                  AND constraint_name = 'user_role_links_user_id_role_id_key'
+            ) THEN
+                ALTER TABLE user_role_links
+                    ADD CONSTRAINT user_role_links_user_id_role_id_key UNIQUE (user_id, role_id);
+            END IF;
+        END $$
+    """)
+    cur.execute("""
+        CREATE INDEX IF NOT EXISTS idx_user_role_links_user_id ON user_role_links (user_id)
+    """)
+    cur.execute("""
+        CREATE INDEX IF NOT EXISTS idx_user_role_links_role_id ON user_role_links (role_id)
+    """)
+
+
 def _m085_cycle_config_to_kv(cur):
     """Пересоздаёт cycle_config как key-value (key VARCHAR PK, value TEXT).
     Переносит все 7 значений из старых типизированных колонок.
@@ -388,6 +438,7 @@ MIGRATIONS = [
     (83, _m083_create_cycle_config),
     (84, _m084_add_words_per_second),
     (85, _m085_cycle_config_to_kv),
+    (86, _m086_user_role_links_pk),
 ]
 
 
