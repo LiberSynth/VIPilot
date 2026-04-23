@@ -151,6 +151,7 @@ def root_page():
     max_batch_threads   = environment.max_threads
     max_model_passes    = environment.max_model_passes
     story_fails_to_next = max(1, int(settings_get("story_fails_to_next", "3")))
+    words_per_second    = float(cycle_config_get("words_per_second") or 8.0)
     video_fails_to_next = max(1, int(settings_get("video_fails_to_next", "3")))
     approve_stories     = cycle_config_get("approve_stories")
     approve_movies      = cycle_config_get("approve_movies")
@@ -193,6 +194,7 @@ def root_page():
         max_batch_threads=max_batch_threads,
         max_model_passes=max_model_passes,
         story_fails_to_next=story_fails_to_next,
+        words_per_second=words_per_second,
         video_fails_to_next=video_fails_to_next,
         approve_stories=approve_stories,
         approve_movies=approve_movies,

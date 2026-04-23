@@ -74,7 +74,7 @@
 
   <!-- ══ ГЕНЕРАЦИЯ СЮЖЕТА ══ -->
   {% from 'common/panel_story.html' import panel_story %}
-  {{ panel_story(format_prompt, text_prompt, video_post_prompt, story_fails_to_next) }}
+  {{ panel_story(format_prompt, text_prompt, video_post_prompt, story_fails_to_next, words_per_second) }}
 
   <!-- ══ ГЕНЕРАЦИЯ ВИДЕО ══ -->
   {% from 'common/panel_video.html' import panel_video %}

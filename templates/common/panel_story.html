@@ -1,4 +1,4 @@
-{% macro panel_story(format_prompt, text_prompt, video_post_prompt, story_fails_to_next) %}
+{% macro panel_story(format_prompt, text_prompt, video_post_prompt, story_fails_to_next, words_per_second) %}
   <div id="panel-story" class="tab-panel">
     <form id="story-form" style="margin-top:0">
       <div class="card" style="margin-top:12px">
@@ -21,11 +21,21 @@
     </form>
 
     <div class="card" style="margin-top:12px">
-      <div class="card-title">Модели</div>
-      <div class="hint" style="margin-bottom:4px">Попыток на модель</div>
-      <div style="margin-bottom:10px">
-        <input type="number" name="story_fails_to_next" id="story_fails_to_next" value="{{ story_fails_to_next }}" min="1" max="99" step="1" style="max-width:120px">
+      <div class="card-title">Параметры</div>
+      <div style="margin-top:14px">
+        <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block" for="words-per-second-input">Слов в секунду</label>
+        <input type="number" id="words-per-second-input" min="1" max="100" step="1" value="{{ words_per_second | int }}" style="width:80px">
+        <div class="hint" style="margin-top:5px">Используется для оценки длительности сценария.</div>
       </div>
+      <div style="margin-top:14px">
+        <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block" for="story_fails_to_next">Попыток на модель</label>
+        <input type="number" name="story_fails_to_next" id="story_fails_to_next" value="{{ story_fails_to_next }}" min="1" max="99" step="1" style="max-width:120px">
+        <div class="hint" style="margin-top:5px">Число неудачных попыток перед переходом к следующей модели.</div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:12px">
+      <div class="card-title">Модели</div>
       <div class="hint" style="margin-bottom:8px">Активируйте одну или несколько. Порядок задаёт очерёдность перебора при сбое.</div>
       <div class="model-list" id="text-model-list">
         <div class="model-loading">Загрузка...</div>

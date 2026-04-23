@@ -65,10 +65,6 @@
         </div>
         <input type="hidden" id="screenwriter-model-id" value="">
       </div>
-      <div style="margin-top:8px">
-        <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block" for="words-per-second-input">Слов в секунду</label>
-        <input type="number" id="words-per-second-input" min="1" max="100" step="1" value="{{ words_per_second | int }}" style="width:80px">
-      </div>
       <div id="story-generate-hint" class="story-generate-hint">Вы можете сгенерировать сюжет при помощи AI-модели</div>
     </div>
     <div class="card" id="card-story-draft">
@@ -223,7 +219,7 @@
 
   <!-- ══ ГЕНЕРАЦИЯ СЮЖЕТА ══ -->
   {% from 'common/panel_story.html' import panel_story %}
-  {{ panel_story(format_prompt, text_prompt, video_post_prompt, story_fails_to_next) }}
+  {{ panel_story(format_prompt, text_prompt, video_post_prompt, story_fails_to_next, words_per_second) }}
 
   <!-- ══ ГЕНЕРАЦИЯ ВИДЕО ══ -->
   {% from 'common/panel_video.html' import panel_video %}
