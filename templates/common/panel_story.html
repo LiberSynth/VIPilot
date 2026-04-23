@@ -4,19 +4,19 @@
       <div class="card" style="margin-top:12px">
         <div class="card-title">Форматный промпт</div>
         <div class="hint">Инструкция для текстовой модели: формат ответа, стиль, ограничения. Модель получает этот промпт как системное сообщение перед текстовым промптом.</div>
-        <textarea name="format_prompt" id="ta_formatprompt" spellcheck="true">{{ format_prompt }}</textarea>
+        <textarea name="format_prompt" id="ta_formatprompt" spellcheck="true" autocomplete="off">{{ format_prompt }}</textarea>
         <div class="char-count" id="charcount_formatprompt"></div>
       </div>
       <div class="card" style="margin-top:12px">
         <div class="card-title">Текстовый промпт</div>
         <div class="hint">Стиль, тема и характер сценария. Описание для формирования раскадровки.</div>
-        <textarea name="text_prompt" id="ta" spellcheck="true">{{ text_prompt }}</textarea>
+        <textarea name="text_prompt" id="ta" spellcheck="true" autocomplete="off">{{ text_prompt }}</textarea>
         <div class="char-count" id="charcount"></div>
       </div>
       <div class="card" style="margin-top:12px">
         <div class="card-title">Суффикс видео-промпта</div>
         <div class="hint">Текст, добавляемый к сюжету через два переноса строки перед отправкой в видео-модель. Поддерживает тег <code>{продолжительность}</code> — подставляет длительность видео в секундах. Например: «Ролик длится {продолжительность} секунд. Делай конец плавным.»</div>
-        <textarea name="video_post_prompt" id="ta_postprompt" spellcheck="true">{{ video_post_prompt }}</textarea>
+        <textarea name="video_post_prompt" id="ta_postprompt" spellcheck="true" autocomplete="off">{{ video_post_prompt }}</textarea>
       </div>
     </form>
 
@@ -24,12 +24,12 @@
       <div class="card-title">Параметры</div>
       <div style="margin-top:14px">
         <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block" for="words-per-second-input">Слов на секунду</label>
-        <input type="number" id="words-per-second-input" min="1" max="100" step="1" value="{{ words_per_second | int }}" style="width:80px">
+        <input type="number" id="words-per-second-input" min="1" max="100" step="1" value="{{ words_per_second | int }}" style="width:80px" autocomplete="off">
         <div class="hint" style="margin-top:5px">Используется для управления объёмом T2V промпта. Параметр {количество_слов} в промптах вычисляется как произведение длительности ролика (сек) на это значение.</div>
       </div>
       <div style="margin-top:14px">
         <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block" for="story_fails_to_next">Попыток на модель</label>
-        <input type="number" name="story_fails_to_next" id="story_fails_to_next" value="{{ story_fails_to_next }}" min="1" max="99" step="1" style="max-width:120px">
+        <input type="number" name="story_fails_to_next" id="story_fails_to_next" value="{{ story_fails_to_next }}" min="1" max="99" step="1" style="max-width:120px" autocomplete="off">
         <div class="hint" style="margin-top:5px">Число неудачных попыток перед переходом к следующей модели.</div>
       </div>
     </div>

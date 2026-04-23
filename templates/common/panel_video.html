@@ -8,11 +8,11 @@
     </div>
     <div class="hint" style="margin-bottom:2px;color:#e8e8f0">Заметки</div>
     <div style="margin-bottom:10px">
-      <textarea id="model-note-area" disabled placeholder='Наблюдения и ограничения, например: "слишком много брака", "лимит промпта 1024 символа"'></textarea>
+      <textarea id="model-note-area" disabled placeholder='Наблюдения и ограничения, например: "слишком много брака", "лимит промпта 1024 символа"' autocomplete="off"></textarea>
     </div>
     <div class="hint" style="margin-bottom:2px;color:#e8e8f0">Параметры (body)</div>
     <div>
-      <textarea id="model-body-area" disabled placeholder="JSON-параметры запроса к модели (body)"></textarea>
+      <textarea id="model-body-area" disabled placeholder="JSON-параметры запроса к модели (body)" autocomplete="off"></textarea>
       <div id="model-body-error" style="display:none;color:#f55;font-size:12px;margin-top:4px"></div>
     </div>
   </div>
@@ -35,7 +35,7 @@
       <div style="margin-top:14px">
         <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block">Длина видео</label>
         <div class="lead-row">
-          <input type="number" name="video_duration" id="video_duration" value="{{ video_duration }}" min="1" max="60" step="1">
+          <input type="number" name="video_duration" id="video_duration" value="{{ video_duration }}" min="1" max="60" step="1" autocomplete="off">
           <span class="lead-unit">секунд</span>
         </div>
         <div class="hint" style="margin-top:5px">Длина генерируемого видео в секундах.</div>
@@ -43,7 +43,7 @@
       <div style="margin-top:14px">
         <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block">Попыток на модель</label>
         <div class="lead-row">
-          <input type="number" name="video_fails_to_next" id="video_fails_to_next" value="{{ video_fails_to_next }}" min="1" max="99" step="1">
+          <input type="number" name="video_fails_to_next" id="video_fails_to_next" value="{{ video_fails_to_next }}" min="1" max="99" step="1" autocomplete="off">
         </div>
         <div class="hint" style="margin-top:5px">Число неудачных попыток перед переходом к следующей модели.</div>
       </div>
