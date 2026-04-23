@@ -365,7 +365,7 @@ def api_workflow_deep_debugging():
         return jsonify({"error": "unauthorized"}), 401
     body = request.get_json(silent=True) or {}
     val = "1" if body.get("enabled") == "1" else "0"
-    settings_set("deep_debugging", val)
+    env_set("deep_debugging", val)
     label = "включена" if val == "1" else "выключена"
     write_log_entry(None, f"[api] Глубокая отладка {label}")
     return jsonify({"ok": True, "deep_debugging": val})

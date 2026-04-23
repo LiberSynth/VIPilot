@@ -30,7 +30,26 @@ from log.log import write_log_entry
 # ---------------------------------------------------------------------------
 
 # Миграции 1–70 удалены: задеплоены на prod 2026-04-20, db_version = 70.
-# Следующая миграция: _m082_...
+# Следующая миграция: _m083_...
+
+
+def _m082_redistribute_settings_env(cur):
+    """Перемещает producer_autoplay_movie и deep_debugging из settings в environment.
+    Удаляет orphan-ключи screenwriter_show_bad и screenwriter_top_quality из environment.
+    Deployed: —
+    """
+    cur.execute("""
+        INSERT INTO environment (key, value)
+        SELECT key, value FROM settings
+        WHERE key IN ('producer_autoplay_movie', 'deep_debugging')
+        ON CONFLICT (key) DO NOTHING
+    """)
+    cur.execute("""
+        DELETE FROM settings WHERE key IN ('producer_autoplay_movie', 'deep_debugging')
+    """)
+    cur.execute("""
+        DELETE FROM environment WHERE key IN ('screenwriter_show_bad', 'screenwriter_top_quality')
+    """)
 
 
 def _m081_add_max_model_passes_setting(cur):
@@ -256,6 +275,7 @@ MIGRATIONS = [
     (79, _m079_created_at_clock_timestamp),
     (80, _m080_drop_stories_top_quality),
     (81, _m081_add_max_model_passes_setting),
+    (82, _m082_redistribute_settings_env),
 ]
 
 

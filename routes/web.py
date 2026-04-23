@@ -16,6 +16,7 @@ from db import (
     settings_get,
     settings_set,
     env_get,
+    env_set,
     db_get_active_targets,
     db_update_target_aspect_ratio,
     db_get_target_by_name,
@@ -238,7 +239,7 @@ def production_page():
     screenwriter_only_good = env_get("screenwriter_only_good", "0") == "1"
     screenwriter_for_approval = env_get("screenwriter_for_approval", "0") == "1"
     screenwriter_only_pinned = env_get("screenwriter_only_pinned", "0") == "1"
-    autoplay_movie = settings_get("producer_autoplay_movie", "0") == "1"
+    autoplay_movie = env_get("producer_autoplay_movie", "0") == "1"
     resp = make_response(render_template(
         "production.html",
         format_prompt=format_prompt,
@@ -371,7 +372,7 @@ def save():
         settings_set("approve_stories", "1" if request.form.get("approve_stories") == "1" else "0")
 
     if "producer_autoplay_movie" in request.form:
-        settings_set("producer_autoplay_movie", "1" if request.form.get("producer_autoplay_movie") == "1" else "0")
+        env_set("producer_autoplay_movie", "1" if request.form.get("producer_autoplay_movie") == "1" else "0")
 
     max_threads_str = request.form.get("max_batch_threads", "").strip()
     if max_threads_str:

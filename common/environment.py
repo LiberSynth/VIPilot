@@ -116,7 +116,7 @@ def refresh_environment() -> EnvSnapshot:
     """Читает актуальные параметры окружения из БД и обновляет снимок."""
     global deep_debugging, emulation_mode, use_donor, loop_interval, max_threads, max_model_passes, _current
     snap = EnvSnapshot(
-        deep_debugging   = settings_get('deep_debugging',    '0') == '1',
+        deep_debugging   = env_get('deep_debugging',    '0') == '1',
         emulation_mode   = env_get('emulation_mode',   '0') == '1',
         use_donor        = env_get('use_donor',        '1') == '1',
         loop_interval    = max(1, min(3600, int(settings_get('loop_interval',     '15')))),
