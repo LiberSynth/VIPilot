@@ -37,7 +37,7 @@ from utils.utils import fmt_id_msg
 
 
 def _ffmpeg(src, dst, log_id):
-    duration = float(cycle_config_get()['video_duration'])
+    duration = float(cycle_config_get('video_duration'))
 
     cmd = [
         'ffmpeg', '-y',

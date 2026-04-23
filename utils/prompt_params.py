@@ -2,7 +2,7 @@ from db import cycle_config_get, db_get_graded_stories
 
 
 def _get_video_duration() -> int:
-    return max(1, min(60, cycle_config_get()['video_duration']))
+    return max(1, min(60, cycle_config_get('video_duration')))
 
 
 def _get_duration() -> str:
@@ -10,7 +10,7 @@ def _get_duration() -> str:
 
 
 def _get_word_count() -> str:
-    return str(round(_get_video_duration() * cycle_config_get()["words_per_second"]))
+    return str(round(_get_video_duration() * cycle_config_get("words_per_second")))
 
 
 def _get_sample_list() -> str:

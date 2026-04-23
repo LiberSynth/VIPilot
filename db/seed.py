@@ -33,11 +33,15 @@ def seed_db():
                 """)
 
                 cur.execute("""
-                    INSERT INTO cycle_config (
-                        id, text_prompt, format_prompt, video_post_prompt,
-                        video_duration, approve_stories, approve_movies
-                    ) VALUES (1, '', '', '', 6, FALSE, FALSE)
-                    ON CONFLICT (id) DO NOTHING
+                    INSERT INTO cycle_config (key, value) VALUES
+                        ('text_prompt',       ''),
+                        ('format_prompt',     ''),
+                        ('video_post_prompt', ''),
+                        ('video_duration',    '6'),
+                        ('approve_stories',   '0'),
+                        ('approve_movies',    '0'),
+                        ('words_per_second',  '8.0')
+                    ON CONFLICT (key) DO NOTHING
                 """)
 
                 cur.execute("""

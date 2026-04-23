@@ -33,6 +33,58 @@ from log.log import write_log_entry
 # Следующая миграция: _m084_...
 
 
+def _m085_cycle_config_to_kv(cur):
+    """Пересоздаёт cycle_config как key-value (key VARCHAR PK, value TEXT).
+    Переносит все 7 значений из старых типизированных колонок.
+    Deployed: —
+    """
+    cur.execute("""
+        DO $$
+        BEGIN
+            IF EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'cycle_config' AND column_name = 'id'
+            ) THEN
+                CREATE TABLE cycle_config_kv (
+                    key   VARCHAR(100) PRIMARY KEY,
+                    value TEXT NOT NULL
+                );
+
+                INSERT INTO cycle_config_kv (key, value)
+                SELECT 'text_prompt', COALESCE(text_prompt, '')
+                FROM cycle_config WHERE id = 1;
+
+                INSERT INTO cycle_config_kv (key, value)
+                SELECT 'format_prompt', COALESCE(format_prompt, '')
+                FROM cycle_config WHERE id = 1;
+
+                INSERT INTO cycle_config_kv (key, value)
+                SELECT 'video_post_prompt', COALESCE(video_post_prompt, '')
+                FROM cycle_config WHERE id = 1;
+
+                INSERT INTO cycle_config_kv (key, value)
+                SELECT 'video_duration', CAST(video_duration AS TEXT)
+                FROM cycle_config WHERE id = 1;
+
+                INSERT INTO cycle_config_kv (key, value)
+                SELECT 'approve_stories', CASE WHEN approve_stories THEN '1' ELSE '0' END
+                FROM cycle_config WHERE id = 1;
+
+                INSERT INTO cycle_config_kv (key, value)
+                SELECT 'approve_movies', CASE WHEN approve_movies THEN '1' ELSE '0' END
+                FROM cycle_config WHERE id = 1;
+
+                INSERT INTO cycle_config_kv (key, value)
+                SELECT 'words_per_second', CAST(words_per_second AS TEXT)
+                FROM cycle_config WHERE id = 1;
+
+                DROP TABLE cycle_config;
+                ALTER TABLE cycle_config_kv RENAME TO cycle_config;
+            END IF;
+        END $$
+    """)
+
+
 def _m084_add_words_per_second(cur):
     """Добавляет колонку words_per_second в таблицу cycle_config.
     Deployed: —
@@ -335,6 +387,7 @@ MIGRATIONS = [
     (82, _m082_redistribute_settings_env),
     (83, _m083_create_cycle_config),
     (84, _m084_add_words_per_second),
+    (85, _m085_cycle_config_to_kv),
 ]
 
 
