@@ -11,8 +11,8 @@ language = "python3"
 requiredFiles = [".replit", "replit.nix"]
 
 [deployment]
-run = ["gunicorn", "--bind=0.0.0.0:5000", "--reuse-port", "--workers=1", "main:app"]
-deploymentTarget = "autoscale"
+run = ["gunicorn", "--bind=0.0.0.0:5000", "--reuse-port", "--workers=1", "-c", "common/gunicorn.conf.py", "main:app"]
+deploymentTarget = "vm"
 
 [agent]
 expertMode = true
