@@ -530,6 +530,19 @@ def api_batch_publish_frame(batch_id):
     )
 
 
+@bp.route("/import-update-package", methods=["POST"])
+def api_import_update_package():
+    if not is_authenticated():
+        return Response("Unauthorized", status=401)
+    file = request.files.get("file")
+    if not file:
+        return jsonify({"error": "no file"}), 400
+    from utils.import_update_package import import_package
+    stream = io.StringIO(file.read().decode("utf-8"))
+    summary = import_package(stream)
+    return jsonify({"ok": True, "summary": summary})
+
+
 @bp.route("/export-update-package")
 def api_export_update_package():
     if not is_authenticated():

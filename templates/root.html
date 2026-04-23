@@ -326,6 +326,11 @@
       <div class="card-title">Обновление данных</div>
       <button type="button" class="btn-secondary" onclick="downloadUpdatePackage(this)">Выгрузить статический пакет</button>
       <div class="hint" style="margin-top:6px">Скачивает update_package.yaml со всеми справочными данными для переноса на prod.</div>
+      <div style="margin-top:8px;padding-top:8px;border-top:1px solid #1e1e28">
+        <input type="file" id="upload-package-input" accept=".yaml,.yml" style="display:none">
+        <button type="button" class="btn-secondary" onclick="uploadUpdatePackage(this)">Загрузить статический пакет</button>
+        <div class="hint" style="margin-top:6px">Загружает update_package.yaml и синхронизирует справочные таблицы: новые записи добавляются, существующие обновляются, лишние удаляются.</div>
+      </div>
     </div>
 
   </div>

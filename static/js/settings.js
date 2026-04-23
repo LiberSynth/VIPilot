@@ -221,3 +221,31 @@ function downloadUpdatePackage(btn) {
   document.body.removeChild(a);
   setTimeout(() => { btn.disabled = false; }, 2000);
 }
+
+function uploadUpdatePackage(btn) {
+  const input = document.getElementById('upload-package-input');
+  input.value = '';
+  input.onchange = function() {
+    const file = input.files[0];
+    if (!file) return;
+    btn.disabled = true;
+    const fd = new FormData();
+    fd.append('file', file);
+    fetch('/api/import-update-package', { method: 'POST', body: fd })
+      .then(r => r.json())
+      .then(data => {
+        if (data.ok) {
+          const s = data.summary;
+          const lines = Object.entries(s).map(([t, v]) =>
+            `${t}: +${v.inserted} ~${v.updated} -${v.deleted}`
+          );
+          showToast('Пакет загружен:\n' + lines.join('\n'), 'success');
+        } else {
+          showToast('Ошибка: ' + (data.error || 'неизвестная'), 'error');
+        }
+      })
+      .catch(() => showToast('Ошибка загрузки файла', 'error'))
+      .finally(() => { btn.disabled = false; });
+  };
+  input.click();
+}
