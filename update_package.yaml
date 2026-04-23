@@ -1,0 +1,1236 @@
+settings:
+- key: db_version
+  value: '86'
+- key: max_model_passes
+  value: '5'
+- key: entries_lifetime
+  value: '0'
+- key: log_lifetime
+  value: '0'
+- key: batch_lifetime
+  value: '0'
+- key: file_lifetime
+  value: '0'
+- key: notify_email
+  value: vi.pilot.admin@gmail.com
+- key: notify_phone
+  value: ''
+- key: buffer_hours
+  value: '24'
+- key: loop_interval
+  value: '15'
+- key: story_fails_to_next
+  value: '4'
+- key: max_batch_threads
+  value: '10'
+- key: video_fails_to_next
+  value: '1'
+environment:
+- key: build_number
+  value: '1135'
+- key: emulation_mode
+  value: '0'
+- key: use_donor
+  value: '1'
+- key: screenwriter_only_good
+  value: '0'
+- key: screenwriter_for_approval
+  value: '0'
+- key: screenwriter_show_used
+  value: '1'
+- key: workflow_state
+  value: running
+- key: screenwriter_only_pinned
+  value: '1'
+- key: deep_debugging
+  value: '0'
+- key: producer_autoplay_movie
+  value: '1'
+cycle_config:
+- key: approve_movies
+  value: '1'
+- key: words_per_second
+  value: '8.00'
+- key: format_prompt
+  value: |-
+    Ты генерируешь только один короткий промпт для модели text-to-video, чтобы получить вертикальное видео формата Shorts/Reels/Stories. Никаких пояснений, вопросов и заголовков. Первый ответ — только чистый текст промпта с его названием. Без маркдауна, без другой разметки и каких-либо спецсимволов. На русском языке. Знаки препинания и кавычки в прямой речи обязательны.
+
+    Первая строка - название сюжета БЕЗ ТОЧКИ В КОНЦЕ, без кавычек, спецсимволов, знаков и разметки. После нее 2 (ДВА) переноса строки и текст промпта.
+
+    Количество слов в сценарии {количество_слов}. Продолжительность видео {продолжительность} секунд.
+
+    Если герой произносит реплику, обязательно указывай "НА РУССКОМ ЯЗЫКЕ" перед ней. Без пауз в речи.
+- key: text_prompt
+  value: |-
+    Придумай один виральный сюжет для вертикального видео. История НЕ про ремонт. Ремонт или стройка — это фон или случайный элемент. В центре — обычная жизнь, например: отношения, бытовые ситуации, работа, творчество, учёба, хобби, спорт, свидания, семейные дела, праздники, путешествия, утро, вечер, готовка, сон, покупки, общение с друзьями.
+
+    Это ПРИМЕРЫ, а не строгий список. Ты можешь выбрать любое другое действие из обычной жизни.
+
+    Один элемент из стройматериалов или инструментов присутствует в кадре как деталь, но сюжет строится вокруг другого.
+
+    Структура: герой что-то делает из обычной жизни → случайное взаимодействие со стройматериалом или инструментом → нелепая ситуация → короткая смешная или ироничная реплика.
+
+    Опиши: возраст героя в скобках, его одежду, фон, наличие музыки или тишины.
+
+    Все действия должны быть визуально воспроизводимыми.
+
+    Вот примеры хороших сюжетов. Не копируй их, но ориентируйся на стиль и принцип «ремонт как фон»:
+
+    {список_образцов}
+- key: video_duration
+  value: '10'
+- key: video_post_prompt
+  value: |-
+    Генерируй видео ТОЛЬКО СО ЗВУКОМ. Продолжительность ролика {продолжительность} секунд. Любая речь СТРОГО НА РУССКОМ ЯЗЫКЕ, НЕ ЭМУЛЯЦИЯ, НЕ ПОДДЕЛКА ПОД РУССКИЙ ЯЗЫК.
+
+    Будь внимателен к окончанию ролика. Делай конец плавным. Не обрезай конец резко. Не обрезай на незаконченной фразе или незаконченном действии. Последняя секунда видео - хвост последнего события сюжета без каких-либо новых деталей, действий и реплик.
+
+    НИКОГДА НЕ ДУБЛИРУЙ РЕПЛИКИ ИЗ ПРОМПТА! ЕСЛИ В ПРОМПТЕ ФРАЗА НЕ ПОВТОРЯЕТСЯ - НЕ ПОВТОРЯЙ ЕЕ В ВИДЕО!
+    НЕ ДОБАВЛЯЙ РЕПЛИКИ, НЕ ЗАДАННЫЕ В ПРОМПТЕ! ГЕНЕРИРУЙ РЕПЛИКИ ИСКЛЮЧИТЕЛЬНО В СООТВЕТСТВИИ С ПРОМПТОМ!
+    СОБЛЮДАЙ ПОРЯДОК СОБЫТИЙ В ПРОМПТЕ И МЕСТО, ГДЕ ЗВУЧАТ РЕПЛИКИ!
+- key: approve_stories
+  value: '1'
+ai_platforms:
+- id: 1b696238-1fdd-4b95-bff0-86a37be13c78
+  name: OpenRouter
+  url: https://openrouter.ai/api/v1/chat/completions
+  env_key_name: OPENROUTER_API_KEY
+- id: 8be57991-bf7a-4594-b436-a0805e163256
+  name: DeepSeek
+  url: https://api.deepseek.com/chat/completions
+  env_key_name: DEEPSEEK_API_KEY
+- id: 0c8d1e1c-fe65-45d3-a1c3-be69e7941e17
+  name: fal.ai
+  url: https://queue.fal.run
+  env_key_name: FAL_API_KEY
+- id: a19ca46d-0ddf-4735-b400-0c8c18ff5485
+  name: Grok
+  url: https://api.x.ai/v1
+  env_key_name: XAI_API_KEY
+- id: 38df0351-44cb-4249-be63-a067444dc66f
+  name: SkyReels
+  url: https://api-gateway.skyreels.ai
+  env_key_name: SKYREELS_API_KEY
+ai_models:
+- id: 167a3dd2-b2e9-43b4-8e08-2b4df13ba7b5
+  platform_id: 8be57991-bf7a-4594-b436-a0805e163256
+  name: deepseek-chat
+  url: deepseek-chat
+  body:
+    top_p: 0.9
+    messages:
+    - role: system
+      content: '{}'
+    - role: user
+      content: '{}'
+    max_tokens: 300
+    temperature: 0.85
+    presence_penalty: 0.5
+    frequency_penalty: 0.3
+  type: text
+  price: null
+- id: aacc47c3-a8c6-41ce-9237-79373d9712d8
+  platform_id: 0c8d1e1c-fe65-45d3-a1c3-be69e7941e17
+  name: Kling Video v3.0 Standard
+  url: fal-ai/kling-video/v3/standard/text-to-video
+  body:
+    prompt: '{}'
+    duration: '{:d}'
+    aspect_ratio: '{:d}:{:d}'
+  type: text-to-video
+  price: 1.260 $/10сек
+- id: b4a32f01-04f1-4771-aab4-342b97979663
+  platform_id: 1b696238-1fdd-4b95-bff0-86a37be13c78
+  name: Gemma 3n E2B IT
+  url: google/gemma-3n-e2b-it:free
+  body:
+    messages:
+    - role: user
+      content: '{}'
+    max_tokens: 300
+    temperature: 0.9
+  type: text
+  price: null
+- id: d55d6064-d716-4efa-8b2e-f205d01222af
+  platform_id: 1b696238-1fdd-4b95-bff0-86a37be13c78
+  name: openrouter/free
+  url: openrouter/free
+  body:
+    messages:
+    - role: system
+      content: '{}'
+    - role: user
+      content: '{}'
+    max_tokens: 300
+    temperature: 0.9
+  type: text
+  price: null
+- id: b1451084-3409-4763-9023-184f2f9e8d97
+  platform_id: 1b696238-1fdd-4b95-bff0-86a37be13c78
+  name: Trinity Mini
+  url: arcee-ai/trinity-mini
+  body:
+    messages:
+    - role: system
+      content: '{}'
+    - role: user
+      content: '{}'
+    max_tokens: 300
+    temperature: 0.9
+  type: text
+  price: null
+- id: c56b929b-784a-4482-af9c-49c0f462afbe
+  platform_id: 1b696238-1fdd-4b95-bff0-86a37be13c78
+  name: LFM2.5-1.2B-Instruct
+  url: liquid/lfm-2.5-1.2b-instruct:free
+  body:
+    messages:
+    - role: system
+      content: '{}'
+    - role: user
+      content: '{}'
+    max_tokens: 300
+    temperature: 0.9
+  type: text
+  price: null
+- id: 37237097-eee5-49e2-b6eb-954aaf878db4
+  platform_id: 1b696238-1fdd-4b95-bff0-86a37be13c78
+  name: GLM 4.5 Air
+  url: z-ai/glm-4.5-air:free
+  body:
+    messages:
+    - role: system
+      content: '{}'
+    - role: user
+      content: '{}'
+    max_tokens: 300
+    temperature: 0.9
+  type: text
+  price: null
+- id: 20911225-23ca-42e6-9a62-40d87b8b3bb0
+  platform_id: 1b696238-1fdd-4b95-bff0-86a37be13c78
+  name: MiniMax M2.5
+  url: minimax/minimax-m2.5
+  body:
+    messages:
+    - role: system
+      content: '{}'
+    - role: user
+      content: '{}'
+    max_tokens: 300
+    temperature: 0.9
+  type: text
+  price: null
+- id: 89b3324c-1f32-46a2-ad48-550a8b6fe831
+  platform_id: 1b696238-1fdd-4b95-bff0-86a37be13c78
+  name: Step 3.5 Flash
+  url: stepfun/step-3.5-flash
+  body:
+    messages:
+    - role: system
+      content: '{}'
+    - role: user
+      content: '{}'
+    max_tokens: 300
+    temperature: 0.9
+  type: text
+  price: null
+- id: 28d29f45-151a-4836-aff8-53ed29c950f0
+  platform_id: 0c8d1e1c-fe65-45d3-a1c3-be69e7941e17
+  name: Kling Video v3.0 Pro
+  url: fal-ai/kling-video/v3/pro/text-to-video
+  body:
+    prompt: '{}'
+    duration: '{:d}'
+    aspect_ratio: '{:d}:{:d}'
+  type: text-to-video
+  price: 1.680 $/10сек
+- id: e0a39f39-2dec-4673-abb9-c0fdf575481e
+  platform_id: 1b696238-1fdd-4b95-bff0-86a37be13c78
+  name: gpt-oss-120b
+  url: openai/gpt-oss-120b
+  body:
+    messages:
+    - role: system
+      content: '{}'
+    - role: user
+      content: '{}'
+    max_tokens: 300
+    temperature: 0.9
+  type: text
+  price: null
+- id: 6f908a00-5251-4471-8793-751cbc3fe11e
+  platform_id: a19ca46d-0ddf-4735-b400-0c8c18ff5485
+  name: Grok Video
+  url: videos/generations
+  body:
+    fps: 24
+    model: grok-imagine-video
+    prompt: '{}'
+    duration: '{:int}'
+    resolution: 720p
+    aspect_ratio: '{:d}:{:d}'
+  type: text-to-video
+  price: 0.700 $/10сек
+- id: 0378c0c8-da94-4f8d-8a72-a417223b0fb0
+  platform_id: 0c8d1e1c-fe65-45d3-a1c3-be69e7941e17
+  name: Veo 3.1
+  url: fal-ai/veo3.1
+  body:
+    prompt: '{}'
+    duration: '{:d}s'
+    resolution: 1080p
+    aspect_ratio: '{:d}:{:d}'
+    generate_audio: true
+  type: text-to-video
+  price: 4.000 $/10сек
+- id: 4bc53f61-6e14-4951-a8d8-3bfac31d7dbd
+  platform_id: 0c8d1e1c-fe65-45d3-a1c3-be69e7941e17
+  name: Seedance 2.0
+  url: bytedance/seedance-2.0/text-to-video
+  body:
+    prompt: '{}'
+    duration: '{}'
+    resolution: 720p
+    aspect_ratio: '{0}:{1}'
+  type: text-to-video
+  price: 3.040 $/10сек
+- id: 4f59c728-a7f1-45f7-b9d0-8b8657c7db15
+  platform_id: 0c8d1e1c-fe65-45d3-a1c3-be69e7941e17
+  name: Seedance 2.0 Fast
+  url: bytedance/seedance-2.0/fast/text-to-video
+  body:
+    prompt: '{}'
+    duration: '{}'
+    resolution: 720p
+    aspect_ratio: '{0}:{1}'
+  type: text-to-video
+  price: 2.430 $/10сек
+- id: 0b497f50-6509-456f-82bc-f8b77d41026a
+  platform_id: 0c8d1e1c-fe65-45d3-a1c3-be69e7941e17
+  name: Veo 3.1 Fast
+  url: fal-ai/veo3.1/fast
+  body:
+    prompt: '{}'
+    duration: '{:d}s'
+    resolution: 1080p
+    aspect_ratio: '{:d}:{:d}'
+    generate_audio: true
+  type: text-to-video
+  price: 3.075 $/10сек
+- id: b5e3f891-2c4a-4d67-9e8f-1a2b3c4d5e6f
+  platform_id: 0c8d1e1c-fe65-45d3-a1c3-be69e7941e17
+  name: Seedance v1.5 Pro
+  url: fal-ai/bytedance/seedance/v1.5/pro/text-to-video
+  body:
+    prompt: '{}'
+    duration: '{}'
+    resolution: 720p
+    aspect_ratio: '{0}:{1}'
+  type: text-to-video
+  price: 0.520 $/10сек
+- id: e268ac99-2a94-47c1-9e37-b019e6d024be
+  platform_id: 0c8d1e1c-fe65-45d3-a1c3-be69e7941e17
+  name: LTX Video
+  url: fal-ai/ltx-video
+  body:
+    width: '{:int}'
+    height: '{:int}'
+    prompt: '{}'
+    num_frames: '{:int}'
+  type: text-to-video
+  price: 0.02 $/видео
+- id: 224e7552-a2aa-49fe-9d5c-5cb274491cef
+  platform_id: 0c8d1e1c-fe65-45d3-a1c3-be69e7941e17
+  name: Wan 2.6
+  url: wan/v2.6/text-to-video
+  body:
+    prompt: '{}'
+    duration: '{}'
+    resolution: 1080p
+    aspect_ratio: '{0}:{1}'
+  type: text-to-video
+  price: 1.500 $/10сек
+- id: b61cebee-8493-4af2-935c-8a9ecc398825
+  platform_id: 38df0351-44cb-4249-be63-a067444dc66f
+  name: SkyReels V4 Fast
+  url: /api/v1/video/text2video/submit
+  body:
+    mode: fast
+    sound: false
+    prompt: '{}'
+    duration: '{:int}'
+    model_name: SkyReels-V4-Fast
+    resolution: 720p
+    aspect_ratio: '{:d}:{:d}'
+    prompt_optimizer: true
+  type: text-to-video
+  price: 1.100 $/10сек
+- id: 8893a98c-f27f-4bfd-ba3e-596679b36956
+  platform_id: 38df0351-44cb-4249-be63-a067444dc66f
+  name: SkyReels V4 Std
+  url: /api/v1/video/text2video/submit
+  body:
+    mode: std
+    sound: false
+    prompt: '{}'
+    duration: '{:int}'
+    model_name: SkyReels-V4-Std
+    resolution: 720p
+    aspect_ratio: '{:d}:{:d}'
+    prompt_optimizer: true
+  type: text-to-video
+  price: 1.400 $/10сек
+- id: b3c5e604-99f0-4669-8e31-b38cf48dda68
+  platform_id: 1b696238-1fdd-4b95-bff0-86a37be13c78
+  name: Qwen3.6 Plus
+  url: qwen/qwen3.6-plus
+  body:
+    messages:
+    - role: system
+      content: '{}'
+    - role: user
+      content: '{}'
+    max_tokens: 300
+    temperature: 0.9
+  type: text
+  price: null
+- id: 21b6f2c6-c01c-4dfa-9af6-41d2be962400
+  platform_id: 1b696238-1fdd-4b95-bff0-86a37be13c78
+  name: Gemma 3 27B IT
+  url: google/gemma-3-27b-it
+  body:
+    messages:
+    - role: user
+      content: '{}'
+    max_tokens: 300
+    temperature: 0.9
+  type: text
+  price: null
+- id: 7997a651-3522-4bb4-b057-3e3ccef47f81
+  platform_id: 1b696238-1fdd-4b95-bff0-86a37be13c78
+  name: Hermes 3 405B Instruct
+  url: nousresearch/hermes-3-llama-3.1-405b
+  body:
+    messages:
+    - role: system
+      content: '{}'
+    - role: user
+      content: '{}'
+    max_tokens: 300
+    temperature: 0.9
+  type: text
+  price: null
+- id: 3f17aefe-7f11-4ee7-a974-5dc3662041ed
+  platform_id: 1b696238-1fdd-4b95-bff0-86a37be13c78
+  name: Nemotron 3 Super 120B A12B
+  url: nvidia/nemotron-3-super-120b-a12b
+  body:
+    messages:
+    - role: system
+      content: '{}'
+    - role: user
+      content: '{}'
+    max_tokens: 300
+    temperature: 0.9
+  type: text
+  price: null
+- id: 32ee9e71-1cee-4a72-80dd-91a26db2547c
+  platform_id: 1b696238-1fdd-4b95-bff0-86a37be13c78
+  name: Phi-4
+  url: microsoft/phi-4
+  body:
+    messages:
+    - role: system
+      content: '{}'
+    - role: user
+      content: '{}'
+    max_tokens: 300
+    temperature: 0.9
+  type: text
+  price: null
+- id: 6345fd09-349f-4bcf-9b07-37f20fe6bed3
+  platform_id: 1b696238-1fdd-4b95-bff0-86a37be13c78
+  name: Mistral 7B Instruct v0.1
+  url: mistralai/mistral-7b-instruct-v0.1
+  body:
+    messages:
+    - role: system
+      content: '{}'
+    - role: user
+      content: '{}'
+    max_tokens: 300
+    temperature: 0.9
+  type: text
+  price: null
+- id: 4ab3ffe0-2eee-43e5-9d4d-77a576a6e17c
+  platform_id: 0c8d1e1c-fe65-45d3-a1c3-be69e7941e17
+  name: Wan 2.7
+  url: fal-ai/wan/v2.7/text-to-video
+  body:
+    prompt: '{}'
+    duration: '{:int}'
+    resolution: 720p
+    aspect_ratio: '{:d}:{:d}'
+  type: text-to-video
+  price: 1.000 $/10сек
+- id: d3e4f5a6-b7c8-4d91-ae2f-1b2c3d4e5f6a
+  platform_id: 0c8d1e1c-fe65-45d3-a1c3-be69e7941e17
+  name: LTX Video 2.3
+  url: fal-ai/ltx-2.3/text-to-video
+  body:
+    prompt: '{}'
+    duration: '{:int}'
+    resolution: 1080p
+    aspect_ratio: '{}:{}'
+  type: text-to-video
+  price: 0.8 $/10сек
+- id: 08bc220d-a490-4f18-ba93-2ce55ce88ee0
+  platform_id: 0c8d1e1c-fe65-45d3-a1c3-be69e7941e17
+  name: PixVerse C1
+  url: fal-ai/pixverse/c1/text-to-video
+  body:
+    prompt: '{}'
+    duration: '{:int}'
+    resolution: 1080p
+    aspect_ratio: '{:d}:{:d}'
+    generate_audio: true
+  type: text-to-video
+  price: 0.950 $/10сек
+- id: f8419279-f7f4-43cf-816a-36ef57f3222c
+  platform_id: 1b696238-1fdd-4b95-bff0-86a37be13c78
+  name: Qwen3 Coder 480B A35B
+  url: qwen/qwen3-coder
+  body:
+    messages:
+    - role: system
+      content: '{}'
+    - role: user
+      content: '{}'
+    max_tokens: 300
+    temperature: 0.9
+  type: text
+  price: null
+- id: 87bce48f-a82d-4bd2-b1b0-927c99d6efd9
+  platform_id: 1b696238-1fdd-4b95-bff0-86a37be13c78
+  name: Nemotron 3 Nano 30B A3B
+  url: nvidia/nemotron-3-nano-30b-a3b
+  body:
+    messages:
+    - role: system
+      content: '{}'
+    - role: user
+      content: '{}'
+    max_tokens: 300
+    temperature: 0.9
+  type: text
+  price: null
+- id: daef6745-eb65-4991-9cf5-c2b205970ab1
+  platform_id: 1b696238-1fdd-4b95-bff0-86a37be13c78
+  name: Trinity Large Preview
+  url: arcee-ai/trinity-large-preview
+  body:
+    messages:
+    - role: system
+      content: '{}'
+    - role: user
+      content: '{}'
+    max_tokens: 300
+    temperature: 0.9
+  type: text
+  price: null
+- id: 7cc24019-5519-4436-9edc-8545887f7373
+  platform_id: 1b696238-1fdd-4b95-bff0-86a37be13c78
+  name: DeepSeek R1 Distill Llama 70B
+  url: deepseek/deepseek-r1-distill-llama-70b
+  body:
+    messages:
+    - role: system
+      content: '{}'
+    - role: user
+      content: '{}'
+    max_tokens: 300
+    temperature: 0.9
+  type: text
+  price: null
+- id: 8ed3d2a3-4dc3-4720-a585-09fd1438fea6
+  platform_id: 1b696238-1fdd-4b95-bff0-86a37be13c78
+  name: Llama 3.2 3B Instruct
+  url: meta-llama/llama-3.2-3b-instruct
+  body:
+    messages:
+    - role: system
+      content: '{}'
+    - role: user
+      content: '{}'
+    max_tokens: 300
+    temperature: 0.9
+  type: text
+  price: null
+- id: f692a8c7-e6c0-4ddf-a52d-8977f10b7e9c
+  platform_id: 1b696238-1fdd-4b95-bff0-86a37be13c78
+  name: Llama 3.1 8B Instruct
+  url: meta-llama/llama-3.1-8b-instruct
+  body:
+    messages:
+    - role: system
+      content: '{}'
+    - role: user
+      content: '{}'
+    max_tokens: 300
+    temperature: 0.9
+  type: text
+  price: null
+- id: b9fcf3fb-56cc-4f28-be56-0953768c68b7
+  platform_id: 1b696238-1fdd-4b95-bff0-86a37be13c78
+  name: Qwen3 Next 80B A3B Instruct
+  url: qwen/qwen3-next-80b-a3b-instruct
+  body:
+    messages:
+    - role: system
+      content: '{}'
+    - role: user
+      content: '{}'
+    max_tokens: 300
+    temperature: 0.9
+  type: text
+  price: null
+- id: 5862ec1e-1dd4-41fa-9482-cb4e93b61b19
+  platform_id: 1b696238-1fdd-4b95-bff0-86a37be13c78
+  name: LFM2.5-1.2B-Thinking
+  url: liquid/lfm-2.5-1.2b-thinking
+  body:
+    messages:
+    - role: system
+      content: '{}'
+    - role: user
+      content: '{}'
+    max_tokens: 300
+    temperature: 0.9
+  type: text
+  price: null
+- id: 8c23daf4-1a70-4e13-ada3-4f7d0f1822ef
+  platform_id: 0c8d1e1c-fe65-45d3-a1c3-be69e7941e17
+  name: Sora 2
+  url: fal-ai/sora-2/text-to-video
+  body:
+    prompt: '{}'
+    duration: '{:int}'
+    aspect_ratio: '{:d}:{:d}'
+  type: text-to-video
+  price: 1.000 $/10сек
+- id: f0293755-8bf2-4654-8d7c-eb08dbd919c6
+  platform_id: 0c8d1e1c-fe65-45d3-a1c3-be69e7941e17
+  name: Veo 2
+  url: fal-ai/veo2
+  body:
+    prompt: '{}'
+    duration: '{:d}s'
+    aspect_ratio: '{:d}:{:d}'
+  type: text-to-video
+  price: 5.000 $/10сек
+- id: 31d3c708-acd9-4a90-9efb-909219814b30
+  platform_id: 0c8d1e1c-fe65-45d3-a1c3-be69e7941e17
+  name: Kling Video v1.6 Standard
+  url: fal-ai/kling-video/v1.6/standard/text-to-video
+  body:
+    prompt: '{}'
+    duration: '{:d}'
+    aspect_ratio: '{:d}:{:d}'
+  type: text-to-video
+  price: 0.450 $/10сек
+- id: 2b0ef68a-52e8-4d37-8b29-716c4fb7d0dc
+  platform_id: 0c8d1e1c-fe65-45d3-a1c3-be69e7941e17
+  name: MiniMax Video-01
+  url: fal-ai/minimax/video-01
+  body:
+    prompt: '{}'
+    duration: '{:d}s'
+    aspect_ratio: '{:d}:{:d}'
+  type: text-to-video
+  price: 0.830 $/10сек
+- id: f3c864fe-959f-4997-9685-9e4b6d868a60
+  platform_id: 1b696238-1fdd-4b95-bff0-86a37be13c78
+  name: Gemma 3 12B IT
+  url: google/gemma-3-12b-it
+  body:
+    messages:
+    - role: user
+      content: '{}'
+    max_tokens: 300
+    temperature: 0.9
+  type: text
+  price: null
+- id: ce3dbfd4-efed-479d-9c0a-d02b9923b32a
+  platform_id: 1b696238-1fdd-4b95-bff0-86a37be13c78
+  name: Llama 3.3 70B Instruct
+  url: meta-llama/llama-3.3-70b-instruct
+  body:
+    messages:
+    - role: system
+      content: '{}'
+    - role: user
+      content: '{}'
+    max_tokens: 300
+    temperature: 0.9
+  type: text
+  price: null
+- id: 414a0e24-7c07-4857-924f-3f5fb1aac549
+  platform_id: 1b696238-1fdd-4b95-bff0-86a37be13c78
+  name: Gemma 3n E4B IT
+  url: google/gemma-3n-e4b-it
+  body:
+    messages:
+    - role: user
+      content: '{}'
+    max_tokens: 300
+    temperature: 0.9
+  type: text
+  price: null
+- id: 9829c9d4-ed6c-4f8d-b562-b430a3c9de80
+  platform_id: 1b696238-1fdd-4b95-bff0-86a37be13c78
+  name: Gemma 3 4B IT
+  url: google/gemma-3-4b-it
+  body:
+    messages:
+    - role: user
+      content: '{}'
+    max_tokens: 300
+    temperature: 0.9
+  type: text
+  price: null
+- id: 4cd1d9cd-4a18-4dd8-9672-9130dc42fc56
+  platform_id: 1b696238-1fdd-4b95-bff0-86a37be13c78
+  name: 'Venice: Uncensored'
+  url: cognitivecomputations/dolphin-mistral-24b-venice-edition:free
+  body:
+    messages:
+    - role: system
+      content: '{}'
+    - role: user
+      content: '{}'
+    max_tokens: 300
+    temperature: 0.9
+  type: text
+  price: null
+- id: 4571d5cb-487e-4f73-8a13-87dae6d684c6
+  platform_id: 1b696238-1fdd-4b95-bff0-86a37be13c78
+  name: gpt-oss-20b
+  url: openai/gpt-oss-20b
+  body:
+    messages:
+    - role: system
+      content: '{}'
+    - role: user
+      content: '{}'
+    max_tokens: 300
+    temperature: 0.9
+  type: text
+  price: null
+model_durations:
+- id: da3539f2-51bb-49f9-bafb-f6f7d51432be
+  model_id: b5e3f891-2c4a-4d67-9e8f-1a2b3c4d5e6f
+  duration: 4
+- id: 65ae86ad-fe93-4373-a69a-a28ddc242506
+  model_id: b5e3f891-2c4a-4d67-9e8f-1a2b3c4d5e6f
+  duration: 5
+- id: 7654e467-29f2-4dcc-94f9-6bb4aa709aee
+  model_id: b5e3f891-2c4a-4d67-9e8f-1a2b3c4d5e6f
+  duration: 6
+- id: 07d614ca-0970-4f27-b150-7aa3fd526c1b
+  model_id: b5e3f891-2c4a-4d67-9e8f-1a2b3c4d5e6f
+  duration: 7
+- id: 7f1b6e98-3305-4e9d-b945-cdde16663844
+  model_id: b5e3f891-2c4a-4d67-9e8f-1a2b3c4d5e6f
+  duration: 8
+- id: 1993bc29-3866-4610-86ca-f15ecb181a62
+  model_id: b5e3f891-2c4a-4d67-9e8f-1a2b3c4d5e6f
+  duration: 9
+- id: 49895661-a06b-437e-a5d9-8b248740d67b
+  model_id: b5e3f891-2c4a-4d67-9e8f-1a2b3c4d5e6f
+  duration: 10
+- id: 0374fbe7-8ba2-42cc-875f-bb0c403d175f
+  model_id: b5e3f891-2c4a-4d67-9e8f-1a2b3c4d5e6f
+  duration: 11
+- id: 67bceff7-d252-41ab-8142-87519243881c
+  model_id: b5e3f891-2c4a-4d67-9e8f-1a2b3c4d5e6f
+  duration: 12
+- id: 93c64dcf-0fe9-487f-a46e-bde2b40a6a9b
+  model_id: d3e4f5a6-b7c8-4d91-ae2f-1b2c3d4e5f6a
+  duration: 6
+- id: 3f108059-79f1-41ed-93fe-5b0d74c20c7e
+  model_id: d3e4f5a6-b7c8-4d91-ae2f-1b2c3d4e5f6a
+  duration: 8
+- id: 651ae5d6-0ffb-4f8f-9ae7-28adcc5f92b0
+  model_id: d3e4f5a6-b7c8-4d91-ae2f-1b2c3d4e5f6a
+  duration: 10
+- id: 05a3f0c1-9a31-4f9a-88cf-1682a139a28b
+  model_id: 8c23daf4-1a70-4e13-ada3-4f7d0f1822ef
+  duration: 4
+- id: 0ddc7ba2-e198-4bf8-b95a-f30f3c1745cf
+  model_id: 8c23daf4-1a70-4e13-ada3-4f7d0f1822ef
+  duration: 8
+- id: 1b46ae66-9724-44d9-aa1a-b6bd18fe6976
+  model_id: 8c23daf4-1a70-4e13-ada3-4f7d0f1822ef
+  duration: 12
+- id: 26693d2c-274e-45f0-a197-31f1bd91e377
+  model_id: 8c23daf4-1a70-4e13-ada3-4f7d0f1822ef
+  duration: 16
+- id: 33d7fb50-e3b3-4960-a132-63dfe33da76c
+  model_id: 8c23daf4-1a70-4e13-ada3-4f7d0f1822ef
+  duration: 20
+- id: cf79294f-0280-45d5-94db-33a1a6bba2dd
+  model_id: 31d3c708-acd9-4a90-9efb-909219814b30
+  duration: 5
+- id: 6234ec25-7523-4074-81c4-eabe1b2bf7ec
+  model_id: 31d3c708-acd9-4a90-9efb-909219814b30
+  duration: 10
+- id: 65b45a91-f3d6-4cf2-a8ba-470a8210e120
+  model_id: f0293755-8bf2-4654-8d7c-eb08dbd919c6
+  duration: 5
+- id: af08d499-49bd-4520-a143-3eb074c17a23
+  model_id: f0293755-8bf2-4654-8d7c-eb08dbd919c6
+  duration: 6
+- id: 697fbcad-842f-4089-be04-2153cbdccefe
+  model_id: f0293755-8bf2-4654-8d7c-eb08dbd919c6
+  duration: 7
+- id: 4dc477cd-9433-487d-89f5-7944db2197fd
+  model_id: f0293755-8bf2-4654-8d7c-eb08dbd919c6
+  duration: 8
+- id: 81d5bbb7-837b-4354-83e3-512f1beda731
+  model_id: 2b0ef68a-52e8-4d37-8b29-716c4fb7d0dc
+  duration: 0
+- id: 519f71f3-6426-4496-8b2e-93a3cca908e7
+  model_id: e268ac99-2a94-47c1-9e37-b019e6d024be
+  duration: 0
+- id: 82801def-8d7c-497f-a9bf-fcf472470113
+  model_id: 224e7552-a2aa-49fe-9d5c-5cb274491cef
+  duration: 5
+- id: b8c568a4-bf4e-470b-b875-05a77634b090
+  model_id: 224e7552-a2aa-49fe-9d5c-5cb274491cef
+  duration: 10
+- id: 343c1f93-6fa0-4caf-abc6-3ee6c4e7e324
+  model_id: 224e7552-a2aa-49fe-9d5c-5cb274491cef
+  duration: 15
+- id: 5205af06-138f-4aa9-b019-a6effb69862b
+  model_id: 6f908a00-5251-4471-8793-751cbc3fe11e
+  duration: 1
+- id: 65646b26-6a85-4f04-9357-7a9755ed941c
+  model_id: 6f908a00-5251-4471-8793-751cbc3fe11e
+  duration: 2
+- id: 7c299392-a839-4834-81c9-a786ab2b76c2
+  model_id: 6f908a00-5251-4471-8793-751cbc3fe11e
+  duration: 3
+- id: 0223800d-143f-4eb3-8c07-e1f734da4ff4
+  model_id: 6f908a00-5251-4471-8793-751cbc3fe11e
+  duration: 4
+- id: 6ca25741-006c-452e-8148-efa92278ff47
+  model_id: 6f908a00-5251-4471-8793-751cbc3fe11e
+  duration: 5
+- id: 9fec6c8a-b2cc-4b60-9612-057a93c51c1c
+  model_id: 6f908a00-5251-4471-8793-751cbc3fe11e
+  duration: 6
+- id: 3991b98f-779e-475c-b36a-6b94db165495
+  model_id: 6f908a00-5251-4471-8793-751cbc3fe11e
+  duration: 7
+- id: f3a1ef7d-1529-4d87-b72b-667e226c5e59
+  model_id: 6f908a00-5251-4471-8793-751cbc3fe11e
+  duration: 8
+- id: fefc64a0-0a41-4413-b0d4-0a2e3a77be5b
+  model_id: 6f908a00-5251-4471-8793-751cbc3fe11e
+  duration: 9
+- id: 49b63acd-a9ce-496a-8c8c-802c3e53a595
+  model_id: 6f908a00-5251-4471-8793-751cbc3fe11e
+  duration: 10
+- id: 251a54ec-ff19-4a8c-b64a-34cb4d6198f4
+  model_id: 6f908a00-5251-4471-8793-751cbc3fe11e
+  duration: 11
+- id: dfe45c65-8a8b-4a40-8e0c-c2e280bc6e55
+  model_id: 6f908a00-5251-4471-8793-751cbc3fe11e
+  duration: 12
+- id: 32f398ca-71a2-43b4-8f54-8705baf759d0
+  model_id: 6f908a00-5251-4471-8793-751cbc3fe11e
+  duration: 13
+- id: c91158c3-2ef1-4a99-b82b-798e46dc77d1
+  model_id: 6f908a00-5251-4471-8793-751cbc3fe11e
+  duration: 14
+- id: f5a199a4-173e-4659-9057-f6762b02a082
+  model_id: 6f908a00-5251-4471-8793-751cbc3fe11e
+  duration: 15
+- id: 956e16b6-fb16-45ce-a909-fd86191b9133
+  model_id: 4bc53f61-6e14-4951-a8d8-3bfac31d7dbd
+  duration: 4
+- id: 28283b31-c692-4ba2-96eb-a3e02f241763
+  model_id: 4f59c728-a7f1-45f7-b9d0-8b8657c7db15
+  duration: 4
+- id: 448890a0-8616-4414-80fb-52a799b8dda9
+  model_id: 4bc53f61-6e14-4951-a8d8-3bfac31d7dbd
+  duration: 5
+- id: 42af6849-95f7-4bed-a97a-3a3b14b04465
+  model_id: 4f59c728-a7f1-45f7-b9d0-8b8657c7db15
+  duration: 5
+- id: 921de8e1-a121-47d3-af1c-5aca2f419c63
+  model_id: 4bc53f61-6e14-4951-a8d8-3bfac31d7dbd
+  duration: 6
+- id: 48c05f6a-099a-401c-b5ed-1f02bbb0307d
+  model_id: 4f59c728-a7f1-45f7-b9d0-8b8657c7db15
+  duration: 6
+- id: fe350b62-b6bc-41ab-ac10-b2c184026a2e
+  model_id: 4bc53f61-6e14-4951-a8d8-3bfac31d7dbd
+  duration: 7
+- id: 579d182b-cad4-48ed-b95e-11854161bab1
+  model_id: 4f59c728-a7f1-45f7-b9d0-8b8657c7db15
+  duration: 7
+- id: 2a78ee30-1fac-46c2-b413-c6b2243b725e
+  model_id: 4bc53f61-6e14-4951-a8d8-3bfac31d7dbd
+  duration: 8
+- id: b71ada76-1c6d-4f79-9ad2-d95ad79669f2
+  model_id: 4f59c728-a7f1-45f7-b9d0-8b8657c7db15
+  duration: 8
+- id: 7f31b86f-0d3c-4ef2-a784-96290c35d9f6
+  model_id: 4bc53f61-6e14-4951-a8d8-3bfac31d7dbd
+  duration: 9
+- id: 65a4eac5-0655-45fc-b95e-713a339cfbe3
+  model_id: 4f59c728-a7f1-45f7-b9d0-8b8657c7db15
+  duration: 9
+- id: 1582785f-b935-46e2-80f2-d2e0984fcae6
+  model_id: 4bc53f61-6e14-4951-a8d8-3bfac31d7dbd
+  duration: 10
+- id: 1819ea4e-c5d4-42ac-b2e5-439608b23a6d
+  model_id: 4f59c728-a7f1-45f7-b9d0-8b8657c7db15
+  duration: 10
+- id: 46121f28-d9c5-4ea1-91da-6303271a38b2
+  model_id: 4bc53f61-6e14-4951-a8d8-3bfac31d7dbd
+  duration: 11
+- id: b8ba0e68-a085-48d7-a174-48bdfe97c602
+  model_id: 4f59c728-a7f1-45f7-b9d0-8b8657c7db15
+  duration: 11
+- id: a231c9e6-6331-4740-843f-74806dca2f34
+  model_id: 4bc53f61-6e14-4951-a8d8-3bfac31d7dbd
+  duration: 12
+- id: 3b65f116-1810-4e96-b556-fe48f28a572e
+  model_id: 4f59c728-a7f1-45f7-b9d0-8b8657c7db15
+  duration: 12
+- id: f66cd129-9c8d-4291-90b2-fbf46783fc00
+  model_id: 4bc53f61-6e14-4951-a8d8-3bfac31d7dbd
+  duration: 13
+- id: 4f3c13a8-41bf-4532-abe4-a5056ef3f425
+  model_id: 4f59c728-a7f1-45f7-b9d0-8b8657c7db15
+  duration: 13
+- id: 03d67733-a0ac-4e8e-a123-2fa59373ae32
+  model_id: 4bc53f61-6e14-4951-a8d8-3bfac31d7dbd
+  duration: 14
+- id: 7c706c69-65e6-4bb0-8008-69d49257c0d7
+  model_id: 4f59c728-a7f1-45f7-b9d0-8b8657c7db15
+  duration: 14
+- id: dde81ce0-4148-4b94-a25f-655a40410450
+  model_id: 4bc53f61-6e14-4951-a8d8-3bfac31d7dbd
+  duration: 15
+- id: f588f5c6-96bb-4ca7-a6ca-856c407c8c86
+  model_id: 4f59c728-a7f1-45f7-b9d0-8b8657c7db15
+  duration: 15
+- id: c0fc0f0f-1f1f-492a-9b52-5696e119f018
+  model_id: aacc47c3-a8c6-41ce-9237-79373d9712d8
+  duration: 3
+- id: f47491ac-c8f5-4049-b9f5-66a017948a83
+  model_id: 28d29f45-151a-4836-aff8-53ed29c950f0
+  duration: 3
+- id: 38e37fef-5606-4e6c-a162-2f80d2b39531
+  model_id: aacc47c3-a8c6-41ce-9237-79373d9712d8
+  duration: 4
+- id: 31cdf7b2-b7dd-4df4-9d6f-916a4e2d6291
+  model_id: 28d29f45-151a-4836-aff8-53ed29c950f0
+  duration: 4
+- id: 955d8694-ca08-4e34-96cb-a051f9a37c61
+  model_id: aacc47c3-a8c6-41ce-9237-79373d9712d8
+  duration: 5
+- id: 3972e9ad-c267-4ab0-ae1f-5dca832a5170
+  model_id: 28d29f45-151a-4836-aff8-53ed29c950f0
+  duration: 5
+- id: 12c27c2b-1897-42d9-94d9-3f6eebe1c9c9
+  model_id: aacc47c3-a8c6-41ce-9237-79373d9712d8
+  duration: 6
+- id: efb1d70e-615f-44d3-96e1-93e0827d4fac
+  model_id: 28d29f45-151a-4836-aff8-53ed29c950f0
+  duration: 6
+- id: 9a0abe93-d25d-4834-9246-2a53ceb03bf9
+  model_id: aacc47c3-a8c6-41ce-9237-79373d9712d8
+  duration: 7
+- id: 43fbe3b8-128c-425c-bcd1-8c9889d81567
+  model_id: 28d29f45-151a-4836-aff8-53ed29c950f0
+  duration: 7
+- id: 68279d91-bd95-4127-9592-990e6e237f88
+  model_id: aacc47c3-a8c6-41ce-9237-79373d9712d8
+  duration: 8
+- id: 31b146dc-a518-4be6-8988-959ddf4976c8
+  model_id: 28d29f45-151a-4836-aff8-53ed29c950f0
+  duration: 8
+- id: 494004b9-5040-4b82-a952-f7cbcf1dbc1c
+  model_id: aacc47c3-a8c6-41ce-9237-79373d9712d8
+  duration: 9
+- id: 036f1a01-fb13-4b83-83d2-333e01da0b39
+  model_id: 28d29f45-151a-4836-aff8-53ed29c950f0
+  duration: 9
+- id: d5246cfa-381a-4f2d-a42d-e16f4287f83e
+  model_id: aacc47c3-a8c6-41ce-9237-79373d9712d8
+  duration: 10
+- id: 028a83ee-7073-424e-9db2-83a3b64617c6
+  model_id: 28d29f45-151a-4836-aff8-53ed29c950f0
+  duration: 10
+- id: 7c66386c-7fbb-4ddf-bb82-6876f0962f45
+  model_id: aacc47c3-a8c6-41ce-9237-79373d9712d8
+  duration: 11
+- id: 621c3c50-0564-4ecf-a00e-f11326b089aa
+  model_id: 28d29f45-151a-4836-aff8-53ed29c950f0
+  duration: 11
+- id: 640532a0-8ca6-4b40-9c33-b147809259f5
+  model_id: aacc47c3-a8c6-41ce-9237-79373d9712d8
+  duration: 12
+- id: 29a6de75-ca5d-4d5d-86a6-105009e03e6a
+  model_id: 28d29f45-151a-4836-aff8-53ed29c950f0
+  duration: 12
+- id: e7f8ec6b-1b67-4810-b01e-de3e94e02eae
+  model_id: aacc47c3-a8c6-41ce-9237-79373d9712d8
+  duration: 13
+- id: 7abf0efd-afe9-4113-8b8c-9bce826840a1
+  model_id: 28d29f45-151a-4836-aff8-53ed29c950f0
+  duration: 13
+- id: 338853f8-4844-4fa2-beb0-5d403b1a2fbb
+  model_id: aacc47c3-a8c6-41ce-9237-79373d9712d8
+  duration: 14
+- id: 5d28bf85-d5d7-4bde-b3b5-ac61762bec2f
+  model_id: 28d29f45-151a-4836-aff8-53ed29c950f0
+  duration: 14
+- id: 136ffde4-cafc-4b06-a568-804953d54b65
+  model_id: aacc47c3-a8c6-41ce-9237-79373d9712d8
+  duration: 15
+- id: 536d9def-697a-4bfe-b4d3-d091f4031571
+  model_id: 28d29f45-151a-4836-aff8-53ed29c950f0
+  duration: 15
+- id: ad64dcc3-a722-4792-816d-210975786930
+  model_id: 0378c0c8-da94-4f8d-8a72-a417223b0fb0
+  duration: 5
+- id: 1d9ec9cf-a0a2-49a0-a811-51086f2aff18
+  model_id: 0378c0c8-da94-4f8d-8a72-a417223b0fb0
+  duration: 8
+- id: e0123a0e-866d-4eeb-aad1-72ef1e0aa504
+  model_id: 0b497f50-6509-456f-82bc-f8b77d41026a
+  duration: 5
+- id: 27e10eb1-7f0d-4ef0-9cd4-7698409d8396
+  model_id: 0b497f50-6509-456f-82bc-f8b77d41026a
+  duration: 8
+- id: b4c5abbf-b66d-4ec4-8c5c-50cc01493cd5
+  model_id: 08bc220d-a490-4f18-ba93-2ce55ce88ee0
+  duration: 4
+- id: 72bb32dd-1990-4df4-8e9e-924b105fadd1
+  model_id: 08bc220d-a490-4f18-ba93-2ce55ce88ee0
+  duration: 5
+- id: 53eed87e-1bb7-4f28-ae8b-13b2dc49b0ea
+  model_id: 08bc220d-a490-4f18-ba93-2ce55ce88ee0
+  duration: 6
+- id: 3e3c5a26-8325-48ef-a118-3ce254abe8c0
+  model_id: 08bc220d-a490-4f18-ba93-2ce55ce88ee0
+  duration: 7
+- id: 6868745e-243f-4e9c-935d-28b52105557d
+  model_id: 08bc220d-a490-4f18-ba93-2ce55ce88ee0
+  duration: 8
+- id: e419bb7f-57c2-4bed-a8fc-f4cd66639e9e
+  model_id: 08bc220d-a490-4f18-ba93-2ce55ce88ee0
+  duration: 9
+- id: e8173b5d-4322-47b9-bc44-ed2d61ed3553
+  model_id: 08bc220d-a490-4f18-ba93-2ce55ce88ee0
+  duration: 10
+- id: d7dacb46-daa8-4e0a-9b4c-d031cced5a86
+  model_id: 08bc220d-a490-4f18-ba93-2ce55ce88ee0
+  duration: 11
+- id: 3b173f1a-8bd3-4cad-8cf2-e489d139de62
+  model_id: 08bc220d-a490-4f18-ba93-2ce55ce88ee0
+  duration: 12
+- id: 8ba15c86-d8e5-4bd6-924c-1546c858ea83
+  model_id: 08bc220d-a490-4f18-ba93-2ce55ce88ee0
+  duration: 13
+- id: b95d03d1-5801-42ba-b40c-4574dd532fa1
+  model_id: 08bc220d-a490-4f18-ba93-2ce55ce88ee0
+  duration: 14
+- id: 892c74b5-377b-45fb-9f93-7947e687fbe8
+  model_id: 08bc220d-a490-4f18-ba93-2ce55ce88ee0
+  duration: 15
+- id: 85bb6ea5-e20d-447c-8038-a2d192aea4de
+  model_id: 4ab3ffe0-2eee-43e5-9d4d-77a576a6e17c
+  duration: 2
+- id: da42c386-c5bf-4d92-bfd4-e5d6ad2d43ba
+  model_id: 4ab3ffe0-2eee-43e5-9d4d-77a576a6e17c
+  duration: 3
+- id: 1083faa2-3311-4cef-a8a9-a04f6a1cd3ec
+  model_id: 4ab3ffe0-2eee-43e5-9d4d-77a576a6e17c
+  duration: 4
+- id: da29ec0f-26ea-4a25-b0c5-857aeaf9de23
+  model_id: 4ab3ffe0-2eee-43e5-9d4d-77a576a6e17c
+  duration: 5
+- id: 0fccda90-f82c-4cc6-9cea-d93d5ed6ef97
+  model_id: 4ab3ffe0-2eee-43e5-9d4d-77a576a6e17c
+  duration: 6
+- id: 04125100-0ec5-4b22-9039-0b787a175617
+  model_id: 4ab3ffe0-2eee-43e5-9d4d-77a576a6e17c
+  duration: 7
+- id: d5c06487-fabc-4ee9-b08e-ce3f0abfdaf9
+  model_id: 4ab3ffe0-2eee-43e5-9d4d-77a576a6e17c
+  duration: 8
+- id: 105c2b60-f997-4194-9611-88b37a064641
+  model_id: 4ab3ffe0-2eee-43e5-9d4d-77a576a6e17c
+  duration: 9
+- id: b7db6b49-2525-459c-92c2-99d1293415f8
+  model_id: 4ab3ffe0-2eee-43e5-9d4d-77a576a6e17c
+  duration: 10
+- id: 2ab5c70a-3d67-471c-a5ae-6866d87bb5f3
+  model_id: 4ab3ffe0-2eee-43e5-9d4d-77a576a6e17c
+  duration: 11
+- id: 80b6f974-9aa7-47a1-b06a-a3f549f8e1a9
+  model_id: 4ab3ffe0-2eee-43e5-9d4d-77a576a6e17c
+  duration: 12
+- id: f0b294b6-f8fa-4298-9621-72ecbf9f232e
+  model_id: 4ab3ffe0-2eee-43e5-9d4d-77a576a6e17c
+  duration: 13
+- id: 694de0be-fd48-480f-8d25-1787e43f2ae4
+  model_id: 4ab3ffe0-2eee-43e5-9d4d-77a576a6e17c
+  duration: 14
+- id: 12b45a6b-8fb6-4838-a1bc-2a343e082544
+  model_id: 4ab3ffe0-2eee-43e5-9d4d-77a576a6e17c
+  duration: 15
+- id: 925cdfa4-212c-445c-b1fa-a97a22692afa
+  model_id: 8893a98c-f27f-4bfd-ba3e-596679b36956
+  duration: 5
+- id: 315c9bb2-61c7-4487-a0cb-f2d6b4729c07
+  model_id: b61cebee-8493-4af2-935c-8a9ecc398825
+  duration: 5
+- id: b60cd950-25e6-4c94-a2d4-115645e98336
+  model_id: 8893a98c-f27f-4bfd-ba3e-596679b36956
+  duration: 6
+- id: 4bc34e3c-54be-4f0b-bfaa-9f5bd05dedea
+  model_id: b61cebee-8493-4af2-935c-8a9ecc398825
+  duration: 6
+- id: 5f799986-209e-4bd4-a283-4769563e6eb1
+  model_id: 8893a98c-f27f-4bfd-ba3e-596679b36956
+  duration: 7
+- id: 36b54534-5f7b-483f-9d1a-7d7e8a9cdf0f
+  model_id: b61cebee-8493-4af2-935c-8a9ecc398825
+  duration: 7
+- id: eb33c375-72b3-4c87-8553-355aa3904852
+  model_id: 8893a98c-f27f-4bfd-ba3e-596679b36956
+  duration: 8
+- id: 102490e7-a60e-4e49-8719-4424c710fcfa
+  model_id: b61cebee-8493-4af2-935c-8a9ecc398825
+  duration: 8
+- id: 45a2f50f-5ebe-4ba1-8226-64ab61856c96
+  model_id: 8893a98c-f27f-4bfd-ba3e-596679b36956
+  duration: 9
+- id: f4f3795d-73f9-42e0-85d6-0205aebb0015
+  model_id: b61cebee-8493-4af2-935c-8a9ecc398825
+  duration: 9
+- id: 815a7028-a7a0-414d-8378-b235b696b546
+  model_id: 8893a98c-f27f-4bfd-ba3e-596679b36956
+  duration: 10
+- id: e9493ae8-79c1-4ada-887b-5d0c421ea3ba
+  model_id: b61cebee-8493-4af2-935c-8a9ecc398825
+  duration: 10
+- id: 52f59f9c-45f0-487d-a108-f297f5ad95f3
+  model_id: 8893a98c-f27f-4bfd-ba3e-596679b36956
+  duration: 11
+- id: c86e6ae7-57c8-4ba4-8685-4d639cd82261
+  model_id: b61cebee-8493-4af2-935c-8a9ecc398825
+  duration: 11
+- id: 57144704-3acb-4711-9fa5-c39367038dd8
+  model_id: 8893a98c-f27f-4bfd-ba3e-596679b36956
+  duration: 12
+- id: a721e815-59ee-42c9-91ac-3d0ddbc7f619
+  model_id: b61cebee-8493-4af2-935c-8a9ecc398825
+  duration: 12
+- id: 9ea48de0-b55e-4588-9b20-09b24989b61b
+  model_id: 8893a98c-f27f-4bfd-ba3e-596679b36956
+  duration: 13
+- id: b9e0d25c-181c-4dc5-b917-89594012484b
+  model_id: b61cebee-8493-4af2-935c-8a9ecc398825
+  duration: 13
+- id: 17b7435d-543e-48e9-9e17-058efa7ee7f7
+  model_id: 8893a98c-f27f-4bfd-ba3e-596679b36956
+  duration: 14
+- id: dc516356-0714-49e9-bb25-fc5b46b9ea59
+  model_id: b61cebee-8493-4af2-935c-8a9ecc398825
+  duration: 14
+- id: 65027de5-f517-4ac7-9ba9-2552845d36e9
+  model_id: 8893a98c-f27f-4bfd-ba3e-596679b36956
+  duration: 15
+- id: 96925fa7-06d8-473f-8e54-a7f978a473b5
+  model_id: b61cebee-8493-4af2-935c-8a9ecc398825
+  duration: 15
+targets:
+- id: b62dde43-69fa-4a82-89e7-52ed67654703
+  name: VKontakte
+  aspect_ratio_x: 9
+  aspect_ratio_y: 16
+  active: true
+  order: 1
+  transcode: true
+  config:
+    group_id: 236929597
+    publish_method:
+      wall: 1
+      story: 1
+  slug: vk
+- id: 691d67b7-ff29-48cf-af77-0bff68986fa2
+  name: Дзен
+  aspect_ratio_x: 9
+  aspect_ratio_y: 16
+  active: true
+  order: 2
+  transcode: true
+  config:
+    publisher_id: 69d3ec6ae9ff6e1b8d5c6326
+    publish_method:
+      video: 1
+  slug: dzen
+users:
+- id: fd47c848-e707-4a7a-9c60-807c4280173c
+  name: root
+  login: root
+  password: '0000'
+- id: b64d6594-35f7-4c9f-8e78-dfcc2248cd56
+  name: producer
+  login: producer
+  password: '0000'
+- id: 57a02d85-22d7-412d-997d-e0ae86f7cb7b
+  name: operator
+  login: operator
+  password: '0000'
+user_roles:
+- id: ad3497ec-6549-4194-b431-0b92a7bdcabc
+  name: root
+  slug: root
+  module: ROOT
+- id: 806efac3-5b73-4c78-97a6-9f562d27e0fb
+  name: operator
+  slug: operator
+  module: OPERATOR
+- id: 6557a7c8-d2e5-48c0-a7f1-031ffa1f737a
+  name: producer
+  slug: producer
+  module: PRODUCTION
+user_role_links:
+- id: abe1df63-98e7-4356-aee0-c20b2f1d5fe9
+  user_id: fd47c848-e707-4a7a-9c60-807c4280173c
+  role_id: ad3497ec-6549-4194-b431-0b92a7bdcabc
+- id: d8a74189-8250-49ad-8b79-611ce3653864
+  user_id: b64d6594-35f7-4c9f-8e78-dfcc2248cd56
+  role_id: 6557a7c8-d2e5-48c0-a7f1-031ffa1f737a
+- id: 7ba6c2d7-8255-4f36-8bac-33613e8afa90
+  user_id: fd47c848-e707-4a7a-9c60-807c4280173c
+  role_id: 6557a7c8-d2e5-48c0-a7f1-031ffa1f737a
+- id: 6dc1f122-db1c-4d55-9ae8-6572a70d4bb7
+  user_id: fd47c848-e707-4a7a-9c60-807c4280173c
+  role_id: 806efac3-5b73-4c78-97a6-9f562d27e0fb
+- id: 3bbaeea9-6655-4a36-a5d7-e6bf0e692776
+  user_id: b64d6594-35f7-4c9f-8e78-dfcc2248cd56
+  role_id: 806efac3-5b73-4c78-97a6-9f562d27e0fb
+- id: 7feb435c-f67e-4b4b-86dd-b5a6c57b0684
+  user_id: 57a02d85-22d7-412d-997d-e0ae86f7cb7b
+  role_id: 806efac3-5b73-4c78-97a6-9f562d27e0fb
