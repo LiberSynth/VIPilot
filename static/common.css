@@ -424,9 +424,9 @@
   .btn-primary:disabled { opacity: .35; cursor: default; background: #2a2a38; }
   .btn-secondary {
     width: 100%; background: transparent; color: #4a7cf7;
-    border: 1px solid rgba(74,124,247,.4); border-radius: 12px;
-    padding: 15px; font-size: 15px; font-weight: 600;
-    cursor: pointer; margin-top: 8px;
+    border: 1px solid rgba(74,124,247,.4); border-radius: 9px;
+    padding: 9px 15px; font-size: 14px; font-weight: 600;
+    cursor: pointer;
   }
   .btn-secondary:active { background: rgba(74,124,247,.1); }
   .btn-secondary:disabled { opacity: .4; cursor: default; }
