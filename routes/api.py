@@ -12,6 +12,7 @@ from db import (
     db_reorder_models,
     init_db,
     db_clear_all_history,
+    db_clear_all_data,
     env_get,
     env_set,
     db_create_adhoc_batch,
@@ -314,6 +315,18 @@ def api_clear_history():
     try:
         result = db_clear_all_history()
         return jsonify({"ok": True, "deleted": result})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@bp.route("/clear_all_data", methods=["POST"])
+def api_clear_all_data():
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    try:
+        tables = db_clear_all_data()
+        write_log_entry(None, f"[api] Очистка всех данных: таблиц={len(tables)}, список={', '.join(tables)}")
+        return jsonify({"ok": True, "tables": tables})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
