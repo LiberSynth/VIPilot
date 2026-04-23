@@ -181,9 +181,9 @@
   .hint { font-size: 12px; color: #888; margin-bottom: 10px; line-height: 1.55; }
 
   input[type="time"] {
-    width: 100%; padding: 14px 16px;
+    width: 100%; padding: 12px 16px;
     background: #0f0f13; border: 1px solid #2a2a38; border-radius: 11px;
-    color: #fff; font-size: 22px; font-family: inherit;
+    color: #fff; font-size: 14px; font-family: inherit;
     font-variant-numeric: tabular-nums; appearance: none; -webkit-appearance: none;
     outline: none; transition: border-color .2s; letter-spacing: 2px;
   }
@@ -244,9 +244,9 @@
 
   .lead-row { display: flex; align-items: center; gap: 12px; }
   input[type="number"] {
-    flex: 1; padding: 14px 16px;
+    flex: 1; padding: 12px 16px;
     background: #0f0f13; border: 1px solid #2a2a38; border-radius: 11px;
-    color: #fff; font-size: 22px; font-family: inherit;
+    color: #fff; font-size: 14px; font-family: inherit;
     font-variant-numeric: tabular-nums; outline: none;
     transition: border-color .2s; -moz-appearance: textfield;
   }
@@ -396,15 +396,15 @@
     transition: width .2s, height .2s;
   }
   .ar-inputs { display: flex; align-items: center; gap: 8px; flex: 1; }
-  .ar-num {
+  input[type="number"].ar-num {
     width: 64px; padding: 12px 0; text-align: center;
     background: #0f0f13; border: 1px solid #2a2a38; border-radius: 10px;
-    color: #fff; font-size: 20px; font-weight: 700; font-family: inherit;
+    color: #fff; font-size: 14px; font-weight: 700; font-family: inherit;
     font-variant-numeric: tabular-nums; outline: none;
     transition: border-color .2s; -moz-appearance: textfield;
   }
-  .ar-num::-webkit-inner-spin-button { -webkit-appearance: none; }
-  .ar-num:focus { border-color: #4a7cf7; }
+  input[type="number"].ar-num::-webkit-inner-spin-button { -webkit-appearance: none; }
+  input[type="number"].ar-num:focus { border-color: #4a7cf7; }
   .ar-sep { font-size: 22px; font-weight: 300; color: #555; flex-shrink: 0; }
   .ar-presets { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
   .ar-preset {
@@ -843,7 +843,7 @@
   .pt-btn-remove:active { background: rgba(255,80,80,.18); }
   .pt-btn-remove:disabled { opacity: .4; cursor: default; }
   .pt-add-row { display: flex; gap: 8px; align-items: center; }
-  .pt-time-input {
+  input[type="time"].pt-time-input {
     flex: 1; padding: 0 14px;
     background: #0f0f13; border: 1px solid #2a2a38; border-radius: 10px;
     color: #fff; font-size: 22px; font-family: inherit;
@@ -851,7 +851,7 @@
     outline: none; transition: border-color .2s; letter-spacing: 2px;
     box-sizing: border-box; height: 48px;
   }
-  .pt-time-input:focus { border-color: #4a7cf7; }
+  input[type="time"].pt-time-input:focus { border-color: #4a7cf7; }
   .pt-btn-add {
     background: rgba(74,124,247,.15); border: 1px solid rgba(74,124,247,.4);
     border-radius: 9px; color: #4a7cf7; font-size: 13px; font-weight: 600;
