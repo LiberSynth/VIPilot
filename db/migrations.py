@@ -337,6 +337,11 @@ def _m074_rename_key_env(cur):
 def _m073_add_wan27(cur):
     """Добавляет модель Wan 2.7 в ai_models и её допустимые длительности."""
     cur.execute("""
+        INSERT INTO ai_platforms (name, url)
+        SELECT 'fal.ai', 'https://queue.fal.run/fal-ai'
+        WHERE NOT EXISTS (SELECT 1 FROM ai_platforms WHERE name = 'fal.ai')
+    """)
+    cur.execute("""
         INSERT INTO ai_models (name, url, body, "order", active, grade, type, price, platform_id)
         SELECT
             'Wan 2.7',

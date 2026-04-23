@@ -216,8 +216,8 @@ def check_upgrade() -> bool:
 
     write_log_entry(None, f'[upgrade] Обновление: {stored or "первый запуск"} → {BUILD}', level='silent')
     _run_env_checks()
+    env_set(_BUILD_KEY, BUILD)
     run_migrations()
     seed_db()
     _run_post_migration_checks()
-    env_set(_BUILD_KEY, BUILD)
     return True
