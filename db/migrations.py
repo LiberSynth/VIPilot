@@ -30,7 +30,19 @@ from log.log import write_log_entry
 # ---------------------------------------------------------------------------
 
 # Миграции 1–70 удалены: задеплоены на prod 2026-04-20, db_version = 70.
-# Следующая миграция: _m081_...
+# Следующая миграция: _m082_...
+
+
+def _m081_add_max_model_passes_setting(cur):
+    """Добавляет запись max_model_passes в таблицу settings.
+    Ключ объявлен в seed.py, но в БД мог отсутствовать — форма ROOT не могла его сохранить.
+    Deployed: —
+    """
+    cur.execute("""
+        INSERT INTO settings (key, value)
+        VALUES ('max_model_passes', '5')
+        ON CONFLICT (key) DO NOTHING
+    """)
 
 
 def _m080_drop_stories_top_quality(cur):
@@ -243,6 +255,7 @@ MIGRATIONS = [
     (78, _m078_skyreels_durations),
     (79, _m079_created_at_clock_timestamp),
     (80, _m080_drop_stories_top_quality),
+    (81, _m081_add_max_model_passes_setting),
 ]
 
 
