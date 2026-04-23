@@ -453,7 +453,7 @@
               created++;
               if (!pollingStarted && window._directorApi) {
                 pollingStarted = true;
-                window._directorApi.startBatchPoll(d.batch_id, movieId);
+                window._directorApi.startBatchPoll(d.batch_id, null);
               }
             }
             remaining--;

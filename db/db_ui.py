@@ -16,6 +16,7 @@ def db_get_batch_logs(batch_id):
                     b.story_id::text                                        AS story_id,
                     (m.transcoded_data IS NOT NULL
                      OR m.raw_data IS NOT NULL)                             AS has_video_data,
+                    b.movie_id::text                                        AS movie_id,
                     tm.name                                                 AS text_model_name,
                     vm.name                                                 AS video_model_name
                 FROM batches b
@@ -58,6 +59,7 @@ def db_get_batch_logs(batch_id):
         'scheduled_at':     row['scheduled_at'].isoformat() if row['scheduled_at'] else None,
         'story_id':         row['story_id'],
         'has_video_data':   bool(row['has_video_data']),
+        'movie_id':         row['movie_id'],
         'text_model_name':  row['text_model_name'],
         'video_model_name': row['video_model_name'],
         'logs': [

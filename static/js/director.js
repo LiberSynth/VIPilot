@@ -53,10 +53,16 @@
           var status = data.batch_status || '';
           if (_FINAL_STATUSES.indexOf(status) !== -1) {
             _stopActiveBatchPoll();
-            if (typeof window.loadMovieList === 'function') window.loadMovieList();
-            if (data.has_video_data) {
-              loadMovieInPlayer(movieId);
+            if (data.has_video_data && data.movie_id) {
+              if (typeof window.loadMovieList === 'function') {
+                window.loadMovieList(function() {
+                  var panel = document.getElementById('panel-director');
+                  var panelHidden = !panel || !panel.classList.contains('active');
+                  selectMovie(data.movie_id, panelHidden);
+                });
+              }
             } else {
+              if (typeof window.loadMovieList === 'function') window.loadMovieList();
               _setHint('Генерация завершилась без видео');
               var resetVersion = _pollVersion;
               setTimeout(function() {
@@ -209,7 +215,7 @@
   }
 
   /* ── плеер ── */
-  function loadMovieInPlayer(movieId) {
+  function loadMovieInPlayer(movieId, forceNoAutoplay) {
     var wrap    = document.getElementById('director-video-wrap');
     var titleEl = document.getElementById('director-movie-title');
     if (!wrap) return;
@@ -230,18 +236,18 @@
     }
     var src = '/production/movie/' + encodeURIComponent(movieId) + '/video';
     var autoplayChk = document.getElementById('director-autoplay-check');
-    var autoplayAttr = (autoplayChk && autoplayChk.checked) ? ' autoplay' : '';
+    var autoplayAttr = (!forceNoAutoplay && autoplayChk && autoplayChk.checked) ? ' autoplay' : '';
     wrap.innerHTML = '<video class="probe-video" controls' + autoplayAttr + ' src="' + src + '"></video>';
     setCardMovieGradeBadge(rec ? rec.grade : null, false);
     updateVideoWrapHeight();
   }
 
-  function selectMovie(movieId) {
+  function selectMovie(movieId, forceNoAutoplay) {
     _stopActiveBatchPoll();
     _setHint(_HINT_DEFAULT);
     _selectedMovieId = movieId || null;
     _updateMovieSelection();
-    loadMovieInPlayer(_selectedMovieId);
+    loadMovieInPlayer(_selectedMovieId, forceNoAutoplay);
     if (_selectedMovieId) {
       var rec = _moviesData.filter(function(m) { return String(m.id) === String(_selectedMovieId); })[0];
       if (rec && rec.active_batch_id) {
@@ -432,14 +438,17 @@
   }
 
   /* ── загрузка списка ── */
-  window.loadMovieList = function() {
+  window.loadMovieList = function(callback) {
     var container = document.getElementById('movies-list');
     if (!container) return;
     var hasContent = container.querySelector('.story-row');
     if (!hasContent) container.innerHTML = '<div class="stories-loading">Загрузка...</div>';
     fetch('/production/movies?' + getFilterParams())
       .then(function(r) { return r.json(); })
-      .then(function(data) { renderMovies(data); })
+      .then(function(data) {
+        renderMovies(data);
+        if (typeof callback === 'function') callback();
+      })
       .catch(function() {
         container.innerHTML = '<div class="stories-empty">Ошибка загрузки</div>';
       });
