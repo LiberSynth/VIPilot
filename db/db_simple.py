@@ -445,3 +445,29 @@ def db_get_graded_stories():
             )
             rows = cur.fetchall()
     return [{"title": row[0], "content": row[1], "grade": row[2]} for row in rows]
+
+
+def db_get_used_stories(approve_movies: bool) -> list:
+    if approve_movies:
+        used_cond = (
+            "EXISTS ("
+            "SELECT 1 FROM batches b"
+            " JOIN movies m ON m.id = b.movie_id"
+            " WHERE b.story_id = s.id AND b.movie_id IS NOT NULL"
+            " AND m.grade = 'good')"
+        )
+    else:
+        used_cond = (
+            "EXISTS ("
+            "SELECT 1 FROM batches b"
+            " WHERE b.story_id = s.id AND b.movie_id IS NOT NULL)"
+        )
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                f"SELECT title, content FROM stories s"
+                f" WHERE {used_cond}"
+                f" ORDER BY created_at DESC, id DESC"
+            )
+            rows = cur.fetchall()
+    return [{"title": row[0], "content": row[1]} for row in rows]
