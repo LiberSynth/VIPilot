@@ -185,7 +185,7 @@ var getDraftStoryId;
         inlineStyle +
         'title="Оценка: ' + label + '. Нажмите для смены">' +
         label + '</button>';
-      var exportBtn = '<button class="story-icon story-export-btn" data-id="' + s.id + '" title="Выгрузить">' +
+      var exportBtn = '<button class="story-icon story-export-btn" data-id="' + s.id + '" title="Трассировка: накапливаются в буфере, сброс через 10 с">' +
         (window.EXPORT_STORY_SVG || '') + '</button>';
       var pinTitle = s.pinned ? 'Закреплён' : 'Закрепить';
       var pinBtn = '<button class="story-icon story-pin-btn' + (s.pinned ? ' story-pin-btn--active' : '') + '" data-id="' + s.id + '" data-pinned="' + (s.pinned ? '1' : '0') + '" title="' + pinTitle + '">' +
