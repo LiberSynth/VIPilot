@@ -23,9 +23,9 @@
     <div class="card" style="margin-top:12px">
       <div class="card-title">Параметры</div>
       <div style="margin-top:14px">
-        <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block" for="words-per-second-input">Слов в секунду</label>
+        <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block" for="words-per-second-input">Слов на секунду</label>
         <input type="number" id="words-per-second-input" min="1" max="100" step="1" value="{{ words_per_second | int }}" style="width:80px">
-        <div class="hint" style="margin-top:5px">Используется для оценки длительности сценария.</div>
+        <div class="hint" style="margin-top:5px">Используется для управления объёмом T2V промпта. Параметр {количество_слов} в промптах вычисляется как произведение длительности ролика (сек) на это значение.</div>
       </div>
       <div style="margin-top:14px">
         <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block" for="story_fails_to_next">Попыток на модель</label>
