@@ -23,21 +23,27 @@
       .then(function(r) { return r.json(); })
       .then(function(d) {
         if (!d.text) return;
-        var parts = [];
         var modelLabel = (d.platform_name || '') + ': ' + (d.model_name || '');
-        parts.push('/* Текстовая модель: ' + modelLabel + ' */');
         var body = d.model_body || {};
         var SKIP_KEYS = { messages: true };
         var configLines = Object.keys(body).filter(function(k) { return !SKIP_KEYS[k]; }).map(function(k) { return k + ': ' + body[k]; });
-        if (configLines.length) {
-          parts.push('/* Конфиг модели НАЧАЛО */\n' + configLines.join('\n') + '\n/* Конфиг модели КОНЕЦ */');
-        }
-        parts.push('/* Системный промпт НАЧАЛО */\n' + (d.format_prompt || '') + '\n/* Системный промпт КОНЕЦ */');
-        parts.push('/* Промпт НАЧАЛО */\n\n' + (d.user_prompt || '') + '\n\n/* Промпт КОНЕЦ */');
         var answer = d.title ? d.title + '\n\n' + d.text : d.text;
-        parts.push('/* Ответ текстовой модели НАЧАЛО */\n' + answer + '\n/* Ответ текстовой модели КОНЕЦ */');
-        var current = parts.join('\n\n');
-        var toWrite = _clipBuffer ? _clipBuffer + '\n\n' + current : current;
+
+        var modelBlock = '/* Текстовая модель: ' + modelLabel + ' */';
+        if (configLines.length) {
+          modelBlock += '\n/* Конфиг модели НАЧАЛО */\n' + configLines.join('\n') + '\n/* Конфиг модели КОНЕЦ */';
+        }
+        var answerBlock = '/* Ответ текстовой модели НАЧАЛО */\n' + answer + '\n/* Ответ текстовой модели КОНЕЦ */';
+
+        var toWrite;
+        if (_clipBuffer === null) {
+          var promptBlock = '/* Системный промпт НАЧАЛО */\n' + (d.format_prompt || '') + '\n/* Системный промпт КОНЕЦ */';
+          promptBlock += '\n\n/* Промпт НАЧАЛО */\n\n' + (d.user_prompt || '') + '\n\n/* Промпт КОНЕЦ */';
+          toWrite = promptBlock + '\n\n' + modelBlock + '\n' + answerBlock;
+        } else {
+          toWrite = _clipBuffer + '\n\n' + modelBlock + '\n' + answerBlock;
+        }
+
         _clipBuffer = toWrite;
         clearTimeout(_clipTimer);
         _clipTimer = setTimeout(_resetBuffer, ACCUMULATE_MS);
