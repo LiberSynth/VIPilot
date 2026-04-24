@@ -1,3 +1,5 @@
+import random
+
 from db import cycle_config_get, db_get_graded_stories, db_get_used_stories
 
 
@@ -16,6 +18,8 @@ def _get_word_count() -> str:
 def _get_good_samples() -> str:
     stories = db_get_graded_stories()
     good = [s for s in stories if s['grade'] == 'good']
+    if good:
+        good = random.sample(good, max(1, len(good) // 2))
     parts = [
         f'/* Образец хорошего качества {i} НАЧАЛО */\n\n'
         f'{story["title"]}\n\n'
