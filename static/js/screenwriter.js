@@ -177,7 +177,12 @@ var getDraftStoryId;
           '<svg viewBox="0 0 16 16" fill="currentColor" stroke="none">' +
           '<path d="M8 1 L9.3 6.7 L15 8 L9.3 9.3 L8 15 L6.7 9.3 L1 8 L6.7 6.7 Z"/></svg></span>';
       }
-      var modelLabel = s.model_name ? ' <span class="story-model-name">(' + escapeHtml(s.model_name) + ')</span>' : '';
+      var wordCount = s.content ? s.content.trim().split(/\s+/).filter(Boolean).length : 0;
+      var wordCountStr = wordCount > 0 ? wordCount + '\u00a0слов' : '';
+      var innerLabel = s.model_name && wordCountStr
+        ? escapeHtml(s.model_name) + ', ' + wordCountStr
+        : (s.model_name ? escapeHtml(s.model_name) : wordCountStr);
+      var modelLabel = innerLabel ? ' <span class="story-model-name">(' + innerLabel + ')</span>' : '';
       var inlineStyle = gk !== 'null'
         ? 'style="background:' + bg + ';color:' + tc + '" '
         : '';
