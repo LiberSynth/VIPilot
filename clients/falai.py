@@ -147,13 +147,20 @@ def submit(log_id, model_name: str, submit_url: str, platform_url: str,
     }
 
 
+_POLL_MAX_ERRORS = 10
+
+
 def poll(log_id, status_url: str, response_url: str):
     """
     Поллит fal.ai до завершения генерации.
     Возвращает (video_url, None) при успехе или (None, error_msg) при сбое.
 
+    Выходит досрочно, если подряд получено _POLL_MAX_ERRORS ошибок (None-ответов):
+    это означает недоступность провайдера, а не ожидание выполнения задания.
+
     :param log_id: идентификатор записи лога
     """
+    consecutive_errors = 0
     for attempt in range(_POLL_MAX):
         time.sleep(_POLL_INTERVAL)
         try:
@@ -164,6 +171,7 @@ def poll(log_id, status_url: str, response_url: str):
             ).json()
             status = s.get('status')
             write_log_entry(log_id, f"Статус [{attempt + 1}]: {status}")
+            consecutive_errors = 0
 
             if status == 'COMPLETED':
                 result = requests.get(
@@ -191,7 +199,12 @@ def poll(log_id, status_url: str, response_url: str):
                 return None, msg
 
         except Exception as e:
+            consecutive_errors += 1
             write_log_entry(log_id, f"Ошибка опроса статуса: {e}", level='warn')
+            if consecutive_errors >= _POLL_MAX_ERRORS:
+                msg = f'fal.ai недоступен: {_POLL_MAX_ERRORS} ошибок подряд — прерываем поллинг'
+                write_log_entry(log_id, msg, level='error')
+                return None, msg
 
     msg = 'Таймаут генерации видео (2 часа)'
     write_log_entry(log_id, msg, level='error')
