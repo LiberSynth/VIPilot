@@ -72,8 +72,6 @@
   const PIPELINE_ERROR_STATUSES = ['error', 'video_error', 'transcode_error', 'publish_error'];
   const FINAL_BATCH_STATUSES    = ['published', 'published_partially', 'movie_probe', 'story_probe', 'cancelled', 'error', 'fatal_error', 'video_error', 'transcode_error', 'publish_error', 'donated'];
 
-  const MON_SVG_EXPAND   = `<svg viewBox="0 0 16 16"><polyline points="2,6 2,2 6,2"/><polyline points="10,2 14,2 14,6"/><polyline points="14,10 14,14 10,14"/><polyline points="6,14 2,14 2,10"/></svg>`;
-  const MON_SVG_COLLAPSE = `<svg viewBox="0 0 16 16"><polyline points="6,2 6,6 2,6"/><polyline points="10,2 10,6 14,6"/><polyline points="14,10 10,10 10,14"/><polyline points="2,10 6,10 6,14"/></svg>`;
   const MON_SVG_COPY     = `<svg viewBox="0 0 16 16"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11V3a1 1 0 0 1 1-1h8"/></svg>`;
   const MON_SVG_RESTART  = `<svg viewBox="0 0 16 16" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="15.3,2.7 15.3,6.7 11.3,6.7"/><path d="M13.66 10a6 6 0 1 1-.08-5"/></svg>`;
   const MON_SVG_EYE      = `<svg viewBox="0 0 16 16"><rect x="3" y="2" width="10" height="12" rx="1.5"/><line x1="5.5" y1="5.5" x2="10.5" y2="5.5"/><line x1="5.5" y1="8" x2="10.5" y2="8"/><line x1="5.5" y1="10.5" x2="8.5" y2="10.5"/></svg>`;
@@ -221,10 +219,6 @@
       : '';
 
     const hdrActions =
-      '<div class="monitor-hdr-actions" onclick="event.stopPropagation()">' +
-        '<button class="cycle-float-btn" title="Развернуть все"   onclick="monitorExpandAll(this)">'   + MON_SVG_EXPAND   + '</button>' +
-        '<button class="cycle-float-btn" title="Свернуть все"     onclick="monitorCollapseAll(this)">' + MON_SVG_COLLAPSE + '</button>' +
-      '</div>' +
       '<div class="monitor-hdr-actions-always" onclick="event.stopPropagation()">' +
         batchStoryBtn +
         batchVideoBtn +
@@ -329,7 +323,7 @@
     return groups;
   }
 
-  var _collapsedBids    = {};
+  var _openBid          = null;
   var _collapsedSgKeys  = {};
   var _collapsedLids    = {};
   var _activeBatchIds   = [];
@@ -341,10 +335,7 @@
   var _lastRenderedHtml = {};  // key → last rendered HTML string
 
   function getOpenState() {
-    var bids = {}, sgkeys = {}, lids = {};
-    document.querySelectorAll('.monitor-batch.open').forEach(function(el) {
-      if (el.dataset.bid) bids[el.dataset.bid] = true;
-    });
+    var sgkeys = {}, lids = {};
     document.querySelectorAll('.monitor-sysgroup.open').forEach(function(el) {
       if (el.dataset.sgKey) sgkeys[el.dataset.sgKey] = true;
     });
@@ -357,13 +348,19 @@
     document.querySelectorAll('.monitor-batch').forEach(function(el) {
       if (el.dataset.bid) _seenBids[el.dataset.bid] = true;
     });
-    return { bids: bids, sgkeys: sgkeys, lids: lids };
+    return { sgkeys: sgkeys, lids: lids };
   }
 
   function restoreOpenState(state) {
-    document.querySelectorAll('.monitor-batch').forEach(function(el) {
-      if (state.bids[el.dataset.bid] && !_collapsedBids[el.dataset.bid]) el.classList.add('open');
-    });
+    if (_openBid) {
+      var batchEl = document.querySelector('.monitor-batch[data-bid="' + _openBid + '"]');
+      if (batchEl) {
+        batchEl.classList.add('open');
+        _fetchAndInjectEntries(_openBid);
+      } else {
+        _openBid = null;
+      }
+    }
     document.querySelectorAll('.monitor-sysgroup').forEach(function(el) {
       if (state.sgkeys[el.dataset.sgKey] && !_collapsedSgKeys[el.dataset.sgKey]) el.classList.add('open');
     });
@@ -373,19 +370,7 @@
   }
 
   function autoExpandNewActivity() {
-    document.querySelectorAll('.monitor-batch').forEach(function(batch) {
-      var bid = batch.dataset.bid;
-      if (!bid || _collapsedBids[bid]) return;
-      var hasNew = false;
-      batch.querySelectorAll('.monitor-log-item').forEach(function(li) {
-        var lid = li.dataset.lid;
-        if (!lid || _seenLids[lid]) return;
-        if (!li.querySelector('.monitor-entries')) return;
-        if (!_collapsedLids[lid]) li.classList.add('open');
-        hasNew = true;
-      });
-      if (hasNew) batch.classList.add('open');
-    });
+    if (_openBid !== null) return;
   }
 
   function _evictPubFrameCache() {
@@ -568,13 +553,54 @@
     return lines;
   }
 
+  function _injectEntriesIntoDOM(batchEl, logsData) {
+    logsData.forEach(function(logInfo) {
+      var li = batchEl.querySelector('.monitor-log-item[data-lid="' + logInfo.id + '"]');
+      if (!li) return;
+      if (!logInfo.entries || !logInfo.entries.length) return;
+      if (li.querySelector('.monitor-entries')) return;
+      var html = '';
+      logInfo.entries.forEach(function(en) {
+        var lvl = en.level || 'info';
+        html += '<div class="monitor-entry-row">' +
+                  '<span class="monitor-entry-ts">'                        + fmtMsk(en.created_at)   + '</span>' +
+                  '<span class="monitor-entry-msg ' + esc(lvl) + '">' + esc(en.message || '') + '</span>' +
+                '</div>';
+      });
+      var chevron = '<span class="monitor-log-chevron">▼</span>';
+      var entriesDiv = '<div class="monitor-entries">' + html + '</div>';
+      var headerTop = li.querySelector('.monitor-log-header-top');
+      if (headerTop) headerTop.insertAdjacentHTML('beforeend', chevron);
+      li.insertAdjacentHTML('beforeend', entriesDiv);
+      if (!_collapsedLids[logInfo.id]) li.classList.add('open');
+    });
+  }
+
+  function _fetchAndInjectEntries(bid) {
+    var batchEl = document.querySelector('.monitor-batch[data-bid="' + bid + '"]');
+    if (!batchEl) return;
+    fetch('/api/monitor/batch/' + encodeURIComponent(bid) + '/entries')
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (_openBid !== bid) return;
+        var batchEl2 = document.querySelector('.monitor-batch[data-bid="' + bid + '"]');
+        if (batchEl2) _injectEntriesIntoDOM(batchEl2, data.logs || []);
+      });
+  }
+
   window.monitorToggleBatch = function(e, el) {
     if (e.target.closest('.monitor-batch-body')) return;
-    el.classList.toggle('open');
     var bid = el.dataset.bid;
-    if (bid) {
-      if (el.classList.contains('open')) delete _collapsedBids[bid];
-      else _collapsedBids[bid] = true;
+    var isOpen = el.classList.contains('open');
+    document.querySelectorAll('.monitor-batch.open').forEach(function(b) {
+      b.classList.remove('open');
+    });
+    if (isOpen) {
+      _openBid = null;
+    } else {
+      el.classList.add('open');
+      _openBid = bid || null;
+      if (_openBid) _fetchAndInjectEntries(_openBid);
     }
   };
 
@@ -586,52 +612,6 @@
       if (el.classList.contains('open')) delete _collapsedSgKeys[key];
       else _collapsedSgKeys[key] = true;
     }
-  };
-
-  window.monitorExpandAll = function(btn) {
-    const batch = btn.closest('.monitor-batch');
-    if (!batch) return;
-    batch.querySelectorAll('.monitor-log-item').forEach(function(item) {
-      if (item.querySelector('.monitor-entries')) {
-        item.classList.add('open');
-        if (item.dataset.lid) delete _collapsedLids[item.dataset.lid];
-      }
-    });
-  };
-
-  window.monitorCollapseAll = function(btn) {
-    const batch = btn.closest('.monitor-batch');
-    if (!batch) return;
-    batch.querySelectorAll('.monitor-log-item').forEach(function(item) {
-      item.classList.remove('open');
-      if (item.dataset.lid) _collapsedLids[item.dataset.lid] = true;
-    });
-  };
-
-  window.monitorExpandAllBatches = function() {
-    document.querySelectorAll('.monitor-batch').forEach(function(batch) {
-      var bid = batch.dataset.bid;
-      batch.classList.add('open');
-      if (bid) delete _collapsedBids[bid];
-    });
-    document.querySelectorAll('.monitor-sysgroup').forEach(function(sg) {
-      var key = sg.dataset.sgKey;
-      sg.classList.add('open');
-      if (key) delete _collapsedSgKeys[key];
-    });
-  };
-
-  window.monitorCollapseAllBatches = function() {
-    document.querySelectorAll('.monitor-batch').forEach(function(batch) {
-      var bid = batch.dataset.bid;
-      batch.classList.remove('open');
-      if (bid) _collapsedBids[bid] = true;
-    });
-    document.querySelectorAll('.monitor-sysgroup').forEach(function(sg) {
-      var key = sg.dataset.sgKey;
-      sg.classList.remove('open');
-      if (key) _collapsedSgKeys[key] = true;
-    });
   };
 
   window.monitorSysCopy = function(btn) {

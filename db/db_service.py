@@ -57,20 +57,7 @@ def db_get_monitor(batch_limit=50):
                                 'pipeline',   l.pipeline,
                                 'message',    l.message,
                                 'status',     l.status,
-                                'created_at', l.created_at,
-                                'entries', (
-                                    SELECT COALESCE(
-                                        json_agg(
-                                            json_build_object(
-                                                'message',    le.message,
-                                                'level',      le.level,
-                                                'created_at', le.created_at
-                                            ) ORDER BY le.created_at, le.id
-                                        ),
-                                        '[]'::json
-                                    )
-                                    FROM log_entries le WHERE le.log_id = l.id AND le.level != 'silent'
-                                )
+                                'created_at', l.created_at
                             ) ORDER BY l.created_at, l.id
                         ) FILTER (WHERE l.id IS NOT NULL),
                         '[]'::json
@@ -168,6 +155,35 @@ def db_get_monitor(batch_limit=50):
         for r in orphan_rows
     ]
     return {"batches": batches, "system": system, "orphan_entries": orphan_entries}
+
+
+def db_get_batch_log_entries(batch_id: str) -> list:
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                    l.id::text,
+                    COALESCE(
+                        json_agg(
+                            json_build_object(
+                                'message',    le.message,
+                                'level',      le.level,
+                                'created_at', le.created_at
+                            ) ORDER BY le.created_at, le.id
+                        ) FILTER (WHERE le.id IS NOT NULL AND le.level != 'silent'),
+                        '[]'::json
+                    ) AS entries
+                FROM log l
+                LEFT JOIN log_entries le ON le.log_id = l.id
+                WHERE l.batch_id = %s
+                GROUP BY l.id
+                ORDER BY l.created_at, l.id
+                """,
+                (batch_id,),
+            )
+            rows = cur.fetchall()
+    return [{"id": r[0], "entries": r[1]} for r in rows]
 
 
 def db_cleanup_log_entries(log_lifetime_days: int) -> int:

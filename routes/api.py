@@ -51,7 +51,7 @@ from db import (
     db_delete_movie,
     db_get_movies_with_video_meta,
 )
-from log import db_get_monitor, log_batch_planned, write_log_entry
+from log import db_get_monitor, db_get_batch_log_entries, log_batch_planned, write_log_entry
 from utils.auth import is_authenticated
 from utils.prompt_params import apply_prompt_params
 from utils.utils import parse_hhmm, to_msk, to_utc_from_msk
@@ -433,6 +433,14 @@ def api_workflow_emulation():
     label = "включена" if val == "1" else "выключена"
     write_log_entry(None, f"[api] Эмуляция {label}")
     return jsonify({"ok": True, "emulation_mode": val})
+
+
+@bp.route("/monitor/batch/<batch_id>/entries")
+def api_monitor_batch_entries(batch_id):
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    logs = db_get_batch_log_entries(batch_id)
+    return jsonify({"logs": logs})
 
 
 @bp.route("/monitor/batch/<batch_id>/delete", methods=["POST"])
