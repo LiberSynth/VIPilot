@@ -178,7 +178,7 @@ var getDraftStoryId;
           '<path d="M8 1 L9.3 6.7 L15 8 L9.3 9.3 L8 15 L6.7 9.3 L1 8 L6.7 6.7 Z"/></svg></span>';
       }
       var wordCount = s.content ? s.content.trim().split(/\s+/).filter(Boolean).length : 0;
-      var wordCountStr = wordCount > 0 ? wordCount + '\u00a0слов' : '';
+      var wordCountStr = wordCount > 0 ? 'слов:\u00a0' + wordCount : '';
       var innerLabel = s.model_name && wordCountStr
         ? escapeHtml(s.model_name) + ', ' + wordCountStr
         : (s.model_name ? escapeHtml(s.model_name) : wordCountStr);
@@ -995,6 +995,7 @@ var getDraftStoryId;
 (function() {
   var _videoDuration = 6;
   var _wordsPerSecond = 8;
+  var _currentDraftModel = '';
 
   function _readConfig() {
     var titleEl = document.querySelector('[data-video-duration]');
@@ -1017,7 +1018,9 @@ var getDraftStoryId;
     if (!textarea || !wrap || !counter) return;
     var n = countWords(textarea.value);
     if (n > 0) {
-      counter.textContent = n;
+      var wcStr = 'слов:\u00a0' + n;
+      var label = _currentDraftModel ? _currentDraftModel + ', ' + wcStr : wcStr;
+      counter.textContent = label;
       var threshold = _videoDuration * _wordsPerSecond;
       if (n <= threshold) {
         counter.style.color = '#4caf50';
@@ -1068,12 +1071,14 @@ var getDraftStoryId;
 
   var _origSetDraft = window.setDraftStoryFromRecord;
   window.setDraftStoryFromRecord = function(story) {
+    _currentDraftModel = (story && story.model_name) ? story.model_name : '';
     if (_origSetDraft) _origSetDraft(story);
     updateWordCount();
   };
 
   var _origResetDraft = window.resetDraftStoryId;
   window.resetDraftStoryId = function() {
+    _currentDraftModel = '';
     if (_origResetDraft) _origResetDraft();
     var wrap = document.getElementById('draft-story-wc-wrap');
     if (wrap) wrap.style.display = 'none';
