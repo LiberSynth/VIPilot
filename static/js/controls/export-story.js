@@ -7,8 +7,9 @@
   var _clipTimer = null;
   var ACCUMULATE_MS = 10000;
 
-  window.wrapBlock = function(title, body) {
-    return '/* ' + title + ' НАЧАЛО */\n' + body + '\n/* ' + title + ' КОНЕЦ */';
+  window.wrapBlock = function(title, body, number) {
+    var label = (number !== undefined && number !== null) ? title + ' ' + number : title;
+    return '/* ' + label + ' НАЧАЛО */\n' + body + '\n/* ' + label + ' КОНЕЦ */';
   };
 
   function _resetBuffer() {
