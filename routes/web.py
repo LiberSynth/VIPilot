@@ -69,11 +69,37 @@ def _nav_modules(current_slug):
     return [r for r in roles if r["slug"] != effective_slug]
 
 
+def _save_last_page():
+    qs = request.query_string.decode()
+    session["last_page"] = request.path + ("?" + qs if qs else "")
+
+
+def _get_last_page():
+    last = session.get("last_page")
+    if not last:
+        return None
+    path = last.split("?")[0].rstrip("/")
+    if path == "/web":
+        if _has_slug("root"):
+            return last
+    elif path == "/production":
+        if _has_slug("producer"):
+            return last
+    else:
+        slug = path.lstrip("/")
+        if slug and _has_slug(slug):
+            return last
+    return None
+
+
 def _redirect_after_login():
     roles = _get_session_roles()
     if len(roles) == 1:
         return redirect(_role_url(roles[0]))
     if len(roles) > 1:
+        last = _get_last_page()
+        if last:
+            return redirect(last)
         return redirect(url_for("web.select_module"))
     session.clear()
     return redirect(url_for("web.login", reason="no_roles"))
@@ -173,6 +199,7 @@ def root_page():
     aspect_ratio_y  = target["aspect_ratio_y"] if target else 16
     publish_order   = [t["slug"] for t in active_targets if t.get("slug") in ("vk", "dzen")]
 
+    _save_last_page()
     resp = make_response(render_template(
         "root.html",
         text_prompt=text_prompt,
@@ -246,6 +273,7 @@ def production_page():
     screenwriter_only_pinned = env_get("screenwriter_only_pinned", "0") == "1"
     screenwriter_only_bad = env_get("screenwriter_only_bad", "0") == "1"
     autoplay_movie = env_get("producer_autoplay_movie", "0") == "1"
+    _save_last_page()
     resp = make_response(render_template(
         "production.html",
         format_prompt=format_prompt,
@@ -430,6 +458,7 @@ def module_page(slug):
         resp = make_response(render_template(f"{slug}.html", app_version=APP_VERSION, nav_modules=_nav_modules(slug)))
     except TemplateNotFound:
         return redirect(url_for("web.select_module"))
+    _save_last_page()
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     resp.headers["Pragma"] = "no-cache"
     resp.headers["Expires"] = "0"
