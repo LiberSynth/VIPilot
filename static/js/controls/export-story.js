@@ -7,6 +7,10 @@
   var _clipTimer = null;
   var ACCUMULATE_MS = 10000;
 
+  function wrapBlock(title, body) {
+    return '/* ' + title + ' НАЧАЛО */\n' + body + '\n/* ' + title + ' КОНЕЦ */';
+  }
+
   function _resetBuffer() {
     _clipBuffer = null;
     _clipTimer = null;
@@ -31,14 +35,14 @@
 
         var modelBlock = '/* Текстовая модель: ' + modelLabel + ' */';
         if (configLines.length) {
-          modelBlock += '\n/* Конфиг модели НАЧАЛО */\n' + configLines.join('\n') + '\n/* Конфиг модели КОНЕЦ */';
+          modelBlock += '\n' + wrapBlock('Конфиг модели', configLines.join('\n'));
         }
-        var answerBlock = '/* Ответ текстовой модели НАЧАЛО */\n' + answer + '\n/* Ответ текстовой модели КОНЕЦ */';
+        var answerBlock = wrapBlock('Ответ текстовой модели', answer);
 
         var toWrite;
         if (_clipBuffer === null) {
-          var promptBlock = '/* Системный промпт НАЧАЛО */\n' + (d.format_prompt || '') + '\n/* Системный промпт КОНЕЦ */';
-          promptBlock += '\n\n/* Промпт НАЧАЛО */\n\n' + (d.user_prompt || '') + '\n\n/* Промпт КОНЕЦ */';
+          var promptBlock = wrapBlock('Системный промпт', d.format_prompt || '');
+          promptBlock += '\n\n' + wrapBlock('Промпт', d.user_prompt || '');
           toWrite = promptBlock + '\n\n' + modelBlock + '\n' + answerBlock;
         } else {
           toWrite = _clipBuffer + '\n\n' + modelBlock + '\n' + answerBlock;

@@ -1,3 +1,9 @@
+def wrap_block(title: str, body: str, number: int | None = None) -> str:
+    """Оборачивает тело в блок с маркерами НАЧАЛО/КОНЕЦ."""
+    label = f'{title} {number}' if number is not None else title
+    return f'/* {label} НАЧАЛО */\n{body}\n/* {label} КОНЕЦ */'
+
+
 def fmt_id_msg(template: str, *ids) -> str:
     """Подставляет каждый идентификатор целиком (без обрезки) в соответствующий {} плейсхолдер шаблона."""
     return template.format(*[str(i) for i in ids])

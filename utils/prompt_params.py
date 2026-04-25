@@ -1,6 +1,7 @@
 import random
 
 from db import cycle_config_get, db_get_graded_stories, db_get_used_stories
+from utils.utils import wrap_block
 
 
 def _get_video_duration() -> int:
@@ -21,10 +22,7 @@ def _get_good_samples() -> str:
     if good:
         good = random.sample(good, max(1, len(good) // 2))
     parts = [
-        f'/* Образец хорошего качества {i} НАЧАЛО */\n\n'
-        f'{story["title"]}\n\n'
-        f'{story["content"]}\n\n'
-        f'/* Образец хорошего качества {i} КОНЕЦ */'
+        wrap_block('Образец хорошего качества', f'{story["title"]}\n\n{story["content"]}', i)
         for i, story in enumerate(good, start=1)
     ]
     return '\n\n'.join(parts)
@@ -34,10 +32,7 @@ def _get_bad_samples() -> str:
     stories = db_get_graded_stories()
     bad = [s for s in stories if s['grade'] == 'bad']
     parts = [
-        f'/* Образец плохого качества {i} НАЧАЛО */\n\n'
-        f'{story["title"]}\n\n'
-        f'{story["content"]}\n\n'
-        f'/* Образец плохого качества {i} КОНЕЦ */'
+        wrap_block('Образец плохого качества', f'{story["title"]}\n\n{story["content"]}', i)
         for i, story in enumerate(bad, start=1)
     ]
     return '\n\n'.join(parts)
@@ -47,10 +42,7 @@ def _get_used_plots() -> str:
     approve_movies = cycle_config_get('approve_movies')
     stories = db_get_used_stories(approve_movies)
     parts = [
-        f'/* Использованный сюжет {i} НАЧАЛО */\n\n'
-        f'{story["title"]}\n\n'
-        f'{story["content"]}\n\n'
-        f'/* Использованный сюжет {i} КОНЕЦ */'
+        wrap_block('Использованный сюжет', f'{story["title"]}\n\n{story["content"]}', i)
         for i, story in enumerate(stories, start=1)
     ]
     return '\n\n'.join(parts)
