@@ -1014,20 +1014,20 @@ var getDraftStoryId;
   function updateWordCount() {
     var textarea = document.getElementById('draft-story-content');
     var wrap = document.getElementById('draft-story-wc-wrap');
-    var counter = document.getElementById('draft-story-wc');
-    if (!textarea || !wrap || !counter) return;
+    var prefix = document.getElementById('draft-story-wc-prefix');
+    var numEl = document.getElementById('draft-story-wc-num');
+    if (!textarea || !wrap || !prefix || !numEl) return;
     var n = countWords(textarea.value);
     if (n > 0) {
-      var wcStr = 'слов:\u00a0' + n;
-      var label = _currentDraftModel ? _currentDraftModel + ', ' + wcStr : wcStr;
-      counter.textContent = label;
+      prefix.textContent = _currentDraftModel ? _currentDraftModel + ', слов:\u00a0' : 'слов:\u00a0';
+      numEl.textContent = n;
       var threshold = _videoDuration * _wordsPerSecond;
       if (n <= threshold) {
-        counter.style.color = '#4caf50';
+        numEl.style.color = '#4caf50';
       } else if (n <= threshold * 1.2) {
-        counter.style.color = '#f5a623';
+        numEl.style.color = '#f5a623';
       } else {
-        counter.style.color = '#e53935';
+        numEl.style.color = '#e53935';
       }
       wrap.style.display = '';
     } else {
