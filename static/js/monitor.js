@@ -356,7 +356,7 @@
       var batchEl = document.querySelector('.monitor-batch[data-bid="' + _openBid + '"]');
       if (batchEl) {
         batchEl.classList.add('open');
-        _fetchAndInjectEntries(_openBid);
+        _fetchAndInjectEntries(_openBid, state.lids);
       } else {
         _openBid = null;
       }
@@ -553,7 +553,8 @@
     return lines;
   }
 
-  function _injectEntriesIntoDOM(batchEl, logsData) {
+  function _injectEntriesIntoDOM(batchEl, logsData, openLids) {
+    var lidsToOpen = openLids || {};
     logsData.forEach(function(logInfo) {
       var li = batchEl.querySelector('.monitor-log-item[data-lid="' + logInfo.id + '"]');
       if (!li) return;
@@ -572,11 +573,11 @@
       var headerTop = li.querySelector('.monitor-log-header-top');
       if (headerTop) headerTop.insertAdjacentHTML('beforeend', chevron);
       li.insertAdjacentHTML('beforeend', entriesDiv);
-      if (!_collapsedLids[logInfo.id]) li.classList.add('open');
+      if (lidsToOpen[logInfo.id]) li.classList.add('open');
     });
   }
 
-  function _fetchAndInjectEntries(bid) {
+  function _fetchAndInjectEntries(bid, openLids) {
     var batchEl = document.querySelector('.monitor-batch[data-bid="' + bid + '"]');
     if (!batchEl) return;
     fetch('/api/monitor/batch/' + encodeURIComponent(bid) + '/entries')
@@ -584,7 +585,7 @@
       .then(function(data) {
         if (_openBid !== bid) return;
         var batchEl2 = document.querySelector('.monitor-batch[data-bid="' + bid + '"]');
-        if (batchEl2) _injectEntriesIntoDOM(batchEl2, data.logs || []);
+        if (batchEl2) _injectEntriesIntoDOM(batchEl2, data.logs || [], openLids);
       });
   }
 
