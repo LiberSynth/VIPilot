@@ -7,9 +7,9 @@
   var _clipTimer = null;
   var ACCUMULATE_MS = 10000;
 
-  function wrapBlock(title, body) {
+  window.wrapBlock = function(title, body) {
     return '/* ' + title + ' НАЧАЛО */\n' + body + '\n/* ' + title + ' КОНЕЦ */';
-  }
+  };
 
   function _resetBuffer() {
     _clipBuffer = null;
@@ -35,14 +35,14 @@
 
         var modelBlock = '/* Текстовая модель: ' + modelLabel + ' */';
         if (configLines.length) {
-          modelBlock += '\n' + wrapBlock('Конфиг модели', configLines.join('\n'));
+          modelBlock += '\n' + window.wrapBlock('Конфиг модели', configLines.join('\n'));
         }
-        var answerBlock = wrapBlock('Ответ текстовой модели', answer);
+        var answerBlock = window.wrapBlock('Ответ текстовой модели', answer);
 
         var toWrite;
         if (_clipBuffer === null) {
-          var promptBlock = wrapBlock('Системный промпт', d.format_prompt || '');
-          promptBlock += '\n\n' + wrapBlock('Промпт', d.user_prompt || '');
+          var promptBlock = window.wrapBlock('Системный промпт', d.format_prompt || '');
+          promptBlock += '\n\n' + window.wrapBlock('Промпт', d.user_prompt || '');
           toWrite = promptBlock + '\n\n' + modelBlock + '\n' + answerBlock;
         } else {
           toWrite = _clipBuffer + '\n\n' + modelBlock + '\n' + answerBlock;

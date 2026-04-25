@@ -103,6 +103,7 @@ var getDraftStoryId;
 
 /* ── Список сюжетов в панели Сценариста ── */
 (function() {
+  var _currentStories = [];
   var GRADE_CYCLE = ['good', 'bad', null];
   var GRADE_LABELS = { good: 'хорошо', bad: 'плохо', 'null': 'не указано' };
   var GRADE_COLORS = {
@@ -138,14 +139,30 @@ var getDraftStoryId;
     return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
+  function _setExportStoriesBtnEnabled(enabled) {
+    var btn = document.getElementById('btn-export-stories');
+    if (!btn) return;
+    if (enabled) {
+      btn.removeAttribute('disabled');
+    } else {
+      btn.setAttribute('disabled', 'disabled');
+    }
+  }
+
   function renderStories(stories) {
     var container = document.getElementById('stories-list');
     if (!container) return;
     if (!stories || stories.length === 0) {
+      _currentStories = [];
+      window._currentStoriesList = [];
+      _setExportStoriesBtnEnabled(false);
       updateStoriesCount(0);
       container.innerHTML = '<div class="stories-empty">Нет сюжетов</div>';
       return;
     }
+    _currentStories = stories;
+    window._currentStoriesList = stories;
+    _setExportStoriesBtnEnabled(true);
     updateStoriesCount(stories.length);
     var html = '';
     for (var i = 0; i < stories.length; i++) {
@@ -919,6 +936,35 @@ var getDraftStoryId;
     document.addEventListener('DOMContentLoaded', initDeleteBadStoriesButton);
   } else {
     initDeleteBadStoriesButton();
+  }
+})();
+
+/* ── Кнопка выгрузки текущего списка сюжетов ── */
+(function() {
+  function initExportStoriesBtn() {
+    var btn = document.getElementById('btn-export-stories');
+    if (!btn) return;
+    btn.addEventListener('click', function() {
+      var stories = window._currentStoriesList;
+      if (!stories || stories.length === 0) return;
+      var parts = [];
+      for (var i = 0; i < stories.length; i++) {
+        var s = stories[i];
+        var body = (s.title || '') + '\n\n' + (s.content || '');
+        parts.push(window.wrapBlock('Сюжет', body, i + 1));
+      }
+      var text = parts.join('\n\n');
+      navigator.clipboard.writeText(text).then(function() {
+        btn.classList.add('copied');
+        setTimeout(function() { btn.classList.remove('copied'); }, 2000);
+      }).catch(function() {});
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initExportStoriesBtn);
+  } else {
+    initExportStoriesBtn();
   }
 })();
 
