@@ -318,6 +318,18 @@ def db_set_story_model(story_id, model_id):
     return True
 
 
+def db_update_story_content(story_id, content):
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE stories SET content = %s, manual_changed = TRUE WHERE id = %s::uuid RETURNING id",
+                (content, story_id),
+            )
+            row = cur.fetchone()
+        conn.commit()
+    return str(row[0]) if row else None
+
+
 def db_upsert_story_draft(story_id, title, content):
     with get_db() as conn:
         with conn.cursor() as cur:

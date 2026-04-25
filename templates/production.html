@@ -146,7 +146,7 @@
         </div>
       </div>
       <input type="hidden" id="director-story-id" value="">
-      <textarea id="director-story-content" readonly style="width:100%; box-sizing:border-box; resize:vertical"></textarea>
+      <textarea id="director-story-content" style="width:100%; box-sizing:border-box; resize:vertical"></textarea>
       <div style="margin-top:8px">
         <div class="hint" style="margin-bottom:4px">Модель</div>
         <div class="cust-select" id="director-video-model-wrap">
@@ -353,6 +353,24 @@
   }
 
   document.addEventListener('click', function() { closeList(); });
+
+  /* ── Сохранение содержания сюжета ── */
+  var _contentSaveTimer = null;
+  var _contentSaveEl = document.getElementById('director-story-content');
+  if (_contentSaveEl) {
+    _contentSaveEl.addEventListener('input', function() {
+      var storyId = document.getElementById('director-story-id').value;
+      if (!storyId) return;
+      clearTimeout(_contentSaveTimer);
+      _contentSaveTimer = setTimeout(function() {
+        fetch('/production/story/' + storyId + '/content', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: _contentSaveEl.value }),
+        });
+      }, 800);
+    });
+  }
 
   /* ── Комбобокс видеомодели ── */
   function loadDirectorVideoModels() {
