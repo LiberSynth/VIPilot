@@ -582,9 +582,10 @@ def api_production_stories():
     show_bad = request.args.get("show_bad", "1") != "0"
     for_approval = request.args.get("for_approval", "0") == "1"
     only_pinned = request.args.get("only_pinned", "0") == "1"
+    only_bad = request.args.get("only_bad", "0") == "1"
     pin_id = request.args.get("pin_id") or None
     approve_movies = cycle_config_get("approve_movies")
-    stories = db_get_stories_list(show_used=show_used, show_bad=show_bad, for_approval=for_approval, pin_id=pin_id, approve_movies=approve_movies, only_pinned=only_pinned)
+    stories = db_get_stories_list(show_used=show_used, show_bad=show_bad, for_approval=for_approval, pin_id=pin_id, approve_movies=approve_movies, only_pinned=only_pinned, only_bad=only_bad)
     return jsonify(stories)
 
 
@@ -631,7 +632,7 @@ def api_production_env_set():
     data = request.get_json(silent=True) or {}
     key = data.get("key", "")
     value = data.get("value", "")
-    allowed_keys = {"screenwriter_show_used", "screenwriter_only_good", "screenwriter_for_approval", "screenwriter_only_pinned"}
+    allowed_keys = {"screenwriter_show_used", "screenwriter_only_good", "screenwriter_only_bad", "screenwriter_for_approval", "screenwriter_only_pinned"}
     if key not in allowed_keys:
         return jsonify({"error": "invalid key"}), 400
     env_set(key, str(value))

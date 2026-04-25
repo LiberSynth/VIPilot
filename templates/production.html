@@ -101,6 +101,10 @@
         <span class="sw-filter-label">Только хорошие</span>
         <input class="sw-filter-check" type="checkbox" id="filter-only-good" {% if screenwriter_only_good %}checked{% endif %}>
       </label>
+      <label class="sw-filter-row" style="margin-bottom:6px" for="filter-only-bad">
+        <span class="sw-filter-label">Только плохие</span>
+        <input class="sw-filter-check" type="checkbox" id="filter-only-bad" {% if screenwriter_only_bad %}checked{% endif %}>
+      </label>
       <label class="sw-filter-row" style="margin-bottom:6px" for="filter-only-pinned">
         <span class="sw-filter-label">Только закреплённые</span>
         <input class="sw-filter-check" type="checkbox" id="filter-only-pinned" {% if screenwriter_only_pinned %}checked{% endif %}>

@@ -396,6 +396,7 @@ var getDraftStoryId;
   function getFilterParams() {
     var showUsed = document.getElementById('filter-show-used');
     var onlyGood = document.getElementById('filter-only-good');
+    var onlyBad = document.getElementById('filter-only-bad');
     var onlyPinned = document.getElementById('filter-only-pinned');
     var forApproval = document.getElementById('filter-for-approval');
     var params = new URLSearchParams();
@@ -404,6 +405,7 @@ var getDraftStoryId;
     } else {
       params.set('show_used', (showUsed && showUsed.checked) ? '1' : '0');
       params.set('show_bad', (onlyGood && onlyGood.checked) ? '0' : '1');
+      if (onlyBad && onlyBad.checked) params.set('only_bad', '1');
       if (onlyPinned && onlyPinned.checked) params.set('only_pinned', '1');
     }
     var pinId = typeof getDraftStoryId === 'function' ? getDraftStoryId() : null;
@@ -431,6 +433,7 @@ var getDraftStoryId;
   function initFilterCheckboxes() {
     var showUsed = document.getElementById('filter-show-used');
     var onlyGood = document.getElementById('filter-only-good');
+    var onlyBad = document.getElementById('filter-only-bad');
     var onlyPinned = document.getElementById('filter-only-pinned');
     var forApproval = document.getElementById('filter-for-approval');
     function envPost(key, value) {
@@ -450,9 +453,11 @@ var getDraftStoryId;
       forApproval.addEventListener('change', function() {
         if (forApproval.checked) {
           if (onlyGood) onlyGood.checked = false;
+          if (onlyBad) onlyBad.checked = false;
           if (showUsed) showUsed.checked = false;
           if (onlyPinned) onlyPinned.checked = false;
           envPost('screenwriter_only_good', '0');
+          envPost('screenwriter_only_bad', '0');
           envPost('screenwriter_show_used', '0');
           envPost('screenwriter_only_pinned', '0');
         }
@@ -475,6 +480,15 @@ var getDraftStoryId;
           envPost('screenwriter_for_approval', '0');
         }
         onFilterChange('screenwriter_only_good', onlyGood);
+      });
+    }
+    if (onlyBad) {
+      onlyBad.addEventListener('change', function() {
+        if (onlyBad.checked && forApproval && forApproval.checked) {
+          forApproval.checked = false;
+          envPost('screenwriter_for_approval', '0');
+        }
+        onFilterChange('screenwriter_only_bad', onlyBad);
       });
     }
     if (onlyPinned) {
