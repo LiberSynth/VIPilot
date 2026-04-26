@@ -1,4 +1,4 @@
-{% macro panel_story(format_prompt, text_prompt, video_post_prompt, story_fails_to_next, words_per_second) %}
+{% macro panel_story(format_prompt, text_prompt, video_post_prompt, story_fails_to_next, words_per_second, good_samples_count) %}
   <div id="panel-story" class="tab-panel">
     <form id="story-form" style="margin-top:0">
       <div class="card" style="margin-top:12px">
@@ -31,6 +31,11 @@
         <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block" for="story_fails_to_next">Попыток на модель</label>
         <input type="number" name="story_fails_to_next" id="story_fails_to_next" value="{{ story_fails_to_next }}" min="1" max="99" step="1" style="max-width:120px" autocomplete="off">
         <div class="hint" style="margin-top:5px">Число неудачных попыток перед переходом к следующей модели.</div>
+      </div>
+      <div style="margin-top:14px">
+        <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block" for="good-samples-count-input">Хороших образцов в промпте</label>
+        <input type="number" id="good-samples-count-input" min="1" max="999" step="1" value="{{ good_samples_count }}" style="width:80px" autocomplete="off">
+        <div class="hint" style="margin-top:5px">Сколько закреплённых историй с оценкой «Хорошо» подаётся в промпт как положительные примеры. Список формируется случайным образом из всех доступных закреплённых историй с этой оценкой.</div>
       </div>
     </div>
 

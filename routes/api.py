@@ -424,6 +424,21 @@ def api_cycle_config_words_per_second():
     return jsonify({"ok": True, "words_per_second": value})
 
 
+@bp.route("/cycle-config/good-samples-count", methods=["POST"])
+def api_cycle_config_good_samples_count():
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    body = request.get_json(silent=True) or {}
+    try:
+        value = int(body.get("value", 0))
+    except (TypeError, ValueError):
+        return jsonify({"error": "invalid value"}), 400
+    if value < 1:
+        return jsonify({"error": "value must be >= 1"}), 400
+    cycle_config_set("good_samples_count", value)
+    return jsonify({"ok": True, "good_samples_count": value})
+
+
 @bp.route("/workflow/emulation", methods=["POST"])
 def api_workflow_emulation():
     if not is_authenticated():

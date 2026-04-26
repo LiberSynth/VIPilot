@@ -1109,6 +1109,18 @@ var getDraftStoryId;
     }, 500);
   }
 
+  var _gscTimer = null;
+  function _saveGoodSamplesCount(value) {
+    clearTimeout(_gscTimer);
+    _gscTimer = setTimeout(function() {
+      fetch('/api/cycle-config/good-samples-count', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({value: value})
+      });
+    }, 500);
+  }
+
   function initWordCount() {
     _readConfig();
     var textarea = document.getElementById('draft-story-content');
@@ -1124,6 +1136,15 @@ var getDraftStoryId;
           _wordsPerSecond = v;
           updateWordCount();
           _saveWordsPerSecond(v);
+        }
+      });
+    }
+    var gscInput = document.getElementById('good-samples-count-input');
+    if (gscInput) {
+      gscInput.addEventListener('input', function() {
+        var v = parseInt(gscInput.value, 10);
+        if (v >= 1) {
+          _saveGoodSamplesCount(v);
         }
       });
     }

@@ -178,6 +178,7 @@ def root_page():
     max_model_passes    = environment.max_model_passes
     story_fails_to_next = max(1, int(settings_get("story_fails_to_next", "3")))
     words_per_second    = float(cycle_config_get("words_per_second") or 8.0)
+    good_samples_count  = max(1, int(cycle_config_get("good_samples_count") or 25))
     video_fails_to_next = max(1, int(settings_get("video_fails_to_next", "3")))
     approve_stories     = cycle_config_get("approve_stories")
     approve_movies      = cycle_config_get("approve_movies")
@@ -222,6 +223,7 @@ def root_page():
         max_model_passes=max_model_passes,
         story_fails_to_next=story_fails_to_next,
         words_per_second=words_per_second,
+        good_samples_count=good_samples_count,
         video_fails_to_next=video_fails_to_next,
         approve_stories=approve_stories,
         approve_movies=approve_movies,
@@ -263,6 +265,7 @@ def production_page():
     story_fails_to_next = max(1, int(settings_get("story_fails_to_next", "3")))
     video_duration      = max(1, min(60, cycle_config_get("video_duration")))
     words_per_second    = cycle_config_get("words_per_second")
+    good_samples_count  = max(1, int(cycle_config_get("good_samples_count") or 25))
     video_fails_to_next = max(1, int(settings_get("video_fails_to_next", "3")))
     approve_stories_prod = cycle_config_get("approve_stories")
     approve_movies_prod  = cycle_config_get("approve_movies")
@@ -282,6 +285,7 @@ def production_page():
         story_fails_to_next=story_fails_to_next,
         video_duration=video_duration,
         words_per_second=words_per_second,
+        good_samples_count=good_samples_count,
         video_fails_to_next=video_fails_to_next,
         approve_stories=approve_stories_prod,
         approve_movies=approve_movies_prod,

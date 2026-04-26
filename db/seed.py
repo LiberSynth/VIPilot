@@ -40,7 +40,8 @@ def seed_db():
                         ('video_duration',    '6'),
                         ('approve_stories',   '0'),
                         ('approve_movies',    '0'),
-                        ('words_per_second',  '8.0')
+                        ('words_per_second',     '8.0'),
+                        ('good_samples_count', '25')
                     ON CONFLICT (key) DO NOTHING
                 """)
 
