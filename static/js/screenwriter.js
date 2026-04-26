@@ -379,6 +379,7 @@ var getDraftStoryId;
           var storyObj = _findStory(storyId);
           if (storyObj && typeof setDraftStoryFromRecord === 'function') setDraftStoryFromRecord(storyObj);
           row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          if (typeof window.loadStoryList === 'function') window.loadStoryList();
         }
       });
     });
