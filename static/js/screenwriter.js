@@ -112,6 +112,27 @@ var getDraftStoryId;
   function _getCard() { return document.getElementById('card-story-draft'); }
   function _getHolder() { return document.getElementById('story-card-holder'); }
 
+  function _saveFocus() {
+    var ae = document.activeElement;
+    var card = _getCard();
+    if (!ae || !card || !card.contains(ae)) return null;
+    return {
+      id: ae.id,
+      start: ae.selectionStart != null ? ae.selectionStart : null,
+      end:   ae.selectionEnd   != null ? ae.selectionEnd   : null,
+    };
+  }
+
+  function _restoreFocus(saved) {
+    if (!saved || !saved.id) return;
+    var el = document.getElementById(saved.id);
+    if (!el) return;
+    el.focus();
+    if (saved.start !== null) {
+      try { el.setSelectionRange(saved.start, saved.end); } catch (e) {}
+    }
+  }
+
   function _detachCard() {
     var card = _getCard();
     var holder = _getHolder();
@@ -123,7 +144,7 @@ var getDraftStoryId;
     if (card && expandEl) expandEl.appendChild(card);
   }
 
-  function _insertFakeRow(container) {
+  function _insertFakeRow(container, focusTitle) {
     var existing = container.querySelector('.story-row[data-id="__new__"]');
     if (existing) existing.remove();
     var chevronSvg = '<svg viewBox="0 0 12 7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 1l5 5 5-5"/></svg>';
@@ -143,8 +164,10 @@ var getDraftStoryId;
     if (expandEl) _attachCardToExpand(expandEl);
     _expandedStoryId = '__new__';
     fakeRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    var titleEl = document.getElementById('draft-story-title');
-    if (titleEl) titleEl.focus();
+    if (focusTitle) {
+      var titleEl = document.getElementById('draft-story-title');
+      if (titleEl) titleEl.focus();
+    }
   }
 
   /* Экспозиция для других модулей */
@@ -192,6 +215,7 @@ var getDraftStoryId;
     var container = document.getElementById('stories-list');
     if (!container) return;
 
+    var savedFocus = _saveFocus();
     var prevExpandedId = _expandedStoryId;
     _detachCard();
 
@@ -392,6 +416,8 @@ var getDraftStoryId;
         _expandedStoryId = null;
       }
     }
+
+    _restoreFocus(savedFocus);
   }
 
   function _openDeleteStoryDialog(storyId, storyTitle, triggerBtn) {
@@ -600,7 +626,7 @@ var getDraftStoryId;
       if (titleEl) titleEl.value = '';
       if (contentEl) contentEl.value = '';
       if (typeof window.updateDraftWordCount === 'function') window.updateDraftWordCount();
-      _insertFakeRow(container);
+      _insertFakeRow(container, true);
     });
   }
 
