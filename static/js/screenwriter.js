@@ -8,14 +8,6 @@ var getDraftStoryId;
   var _draftSaving = false;
   var _draftPendingRetry = false;
 
-  function setDraftCardState(state) {
-    var card = document.getElementById('card-story-draft');
-    if (!card) return;
-    card.classList.remove('card--editing-new', 'card--editing-existing');
-    if (state === 'new') card.classList.add('card--editing-new');
-    else if (state === 'existing') card.classList.add('card--editing-existing');
-  }
-
   getDraftStoryId = function() { return _draftStoryId; };
 
   resetDraftStoryId = function() {
@@ -23,7 +15,6 @@ var getDraftStoryId;
     _draftSaving = false;
     _draftPendingRetry = false;
     clearTimeout(_draftTimer);
-    setDraftCardState(null);
   };
 
   setDraftStoryFromRecord = function(story) {
@@ -35,7 +26,6 @@ var getDraftStoryId;
     _draftSaving = false;
     _draftPendingRetry = false;
     clearTimeout(_draftTimer);
-    setDraftCardState('existing');
   };
 
   function saveDraft() {
@@ -61,7 +51,6 @@ var getDraftStoryId;
         var isNew = !_draftStoryId;
         _draftStoryId = d.story_id;
         if (isNew) {
-          setDraftCardState('new');
           if (typeof window.onDraftStoryFirstSaved === 'function') window.onDraftStoryFirstSaved();
         }
         if (typeof loadStoryList === 'function') loadStoryList();
@@ -104,6 +93,7 @@ var getDraftStoryId;
 /* ── Список сюжетов в панели Сценариста ── */
 (function() {
   var _currentStories = [];
+  var _expandedStoryId = null;
   var GRADE_CYCLE = ['good', 'bad', null];
   var GRADE_LABELS = { good: 'хорошо', bad: 'плохо', 'null': 'не указано' };
   var GRADE_COLORS = {
@@ -117,6 +107,48 @@ var getDraftStoryId;
     'null': '#888',
   };
   function gradeKey(g) { return g === null || g === undefined ? 'null' : g; }
+
+  /* ── Управление карточкой-синглтоном ── */
+  function _getCard() { return document.getElementById('card-story-draft'); }
+  function _getHolder() { return document.getElementById('story-card-holder'); }
+
+  function _detachCard() {
+    var card = _getCard();
+    var holder = _getHolder();
+    if (card && holder && card.parentNode !== holder) holder.appendChild(card);
+  }
+
+  function _attachCardToExpand(expandEl) {
+    var card = _getCard();
+    if (card && expandEl) expandEl.appendChild(card);
+  }
+
+  function _insertFakeRow(container) {
+    var existing = container.querySelector('.story-row[data-id="__new__"]');
+    if (existing) existing.remove();
+    var chevronSvg = '<svg viewBox="0 0 12 7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 1l5 5 5-5"/></svg>';
+    var fakeRow = document.createElement('div');
+    fakeRow.className = 'story-row story-row--expanded';
+    fakeRow.setAttribute('data-id', '__new__');
+    fakeRow.innerHTML =
+      '<div class="story-row-header">' +
+        '<div class="story-title" style="color:#888;font-style:italic">Новый сюжет</div>' +
+        '<div class="story-row-right">' +
+          '<span class="story-chevron">' + chevronSvg + '</span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="story-expand"></div>';
+    container.insertBefore(fakeRow, container.firstChild);
+    var expandEl = fakeRow.querySelector('.story-expand');
+    if (expandEl) _attachCardToExpand(expandEl);
+    _expandedStoryId = '__new__';
+    fakeRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    var titleEl = document.getElementById('draft-story-title');
+    if (titleEl) titleEl.focus();
+  }
+
+  /* Экспозиция для других модулей */
+  window.setExpandedStoryId = function(id) { _expandedStoryId = id; };
 
   function updateStoriesCount(n) {
     var el = document.getElementById('stories-count');
@@ -149,21 +181,36 @@ var getDraftStoryId;
     }
   }
 
+  function _findStory(id) {
+    for (var j = 0; j < _currentStories.length; j++) {
+      if (String(_currentStories[j].id) === String(id)) return _currentStories[j];
+    }
+    return null;
+  }
+
   function renderStories(stories) {
     var container = document.getElementById('stories-list');
     if (!container) return;
+
+    var prevExpandedId = _expandedStoryId;
+    _detachCard();
+
     if (!stories || stories.length === 0) {
       _currentStories = [];
       window._currentStoriesList = [];
       _setExportStoriesBtnEnabled(false);
       updateStoriesCount(0);
+      _expandedStoryId = null;
       container.innerHTML = '<div class="stories-empty">Нет сюжетов</div>';
       return;
     }
+
     _currentStories = stories;
     window._currentStoriesList = stories;
     _setExportStoriesBtnEnabled(true);
     updateStoriesCount(stories.length);
+
+    var chevronSvg = '<svg viewBox="0 0 12 7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 1l5 5 5-5"/></svg>';
     var html = '';
     for (var i = 0; i < stories.length; i++) {
       var s = stories[i];
@@ -229,23 +276,20 @@ var getDraftStoryId;
         '<polyline points="2,4 14,4"/><path d="M6 4V2h4v2"/><rect x="3" y="4" width="10" height="10" rx="1.5"/><line x1="6" y1="7" x2="6" y2="11"/><line x1="10" y1="7" x2="10" y2="11"/>' +
         '</svg></button>';
       html += '<div class="story-row" data-id="' + s.id + '" data-used="' + (s.used ? '1' : '0') + '">' +
-        '<div class="story-title">' + escapeHtml(s.title || '(без названия)') + modelLabel + ' ' + gradeBadge + '</div>' +
-        '<div class="story-row-right">' + icons + pinBtn + deleteBtn + exportBtn + '</div>' +
+        '<div class="story-row-header">' +
+          '<div class="story-title">' + escapeHtml(s.title || '(без названия)') + modelLabel + ' ' + gradeBadge + '</div>' +
+          '<div class="story-row-right">' + icons + pinBtn + deleteBtn + exportBtn +
+            '<button class="story-chevron" title="Развернуть">' + chevronSvg + '</button>' +
+          '</div>' +
+        '</div>' +
+        '<div class="story-expand"></div>' +
       '</div>';
     }
     container.innerHTML = html;
+
     container.querySelectorAll('.story-grade-badge').forEach(function(btn) {
       btn.addEventListener('click', function(e) {
         e.stopPropagation();
-        var storyId = btn.getAttribute('data-id');
-        var storyObj = null;
-        for (var j = 0; j < stories.length; j++) {
-          if (String(stories[j].id) === String(storyId)) { storyObj = stories[j]; break; }
-        }
-        if (storyObj && typeof setDraftStoryFromRecord === 'function') {
-          setDraftStoryFromRecord(storyObj);
-        }
-        _updateSelectedRow();
         cycleGrade(btn);
       });
     });
@@ -287,32 +331,66 @@ var getDraftStoryId;
         _openDeleteStoryDialog(storyId, storyTitle, btn);
       });
     });
+
+    /* ── Аккордеон: клик по заголовку строки ── */
     container.querySelectorAll('.story-row').forEach(function(row) {
       var storyId = row.getAttribute('data-id');
-      var storyObj = null;
-      for (var j = 0; j < stories.length; j++) {
-        if (String(stories[j].id) === String(storyId)) { storyObj = stories[j]; break; }
-      }
-      if (!storyObj) return;
-      row.addEventListener('click', function() {
-        if (typeof setDraftStoryFromRecord === 'function') setDraftStoryFromRecord(storyObj);
-        _updateSelectedRow();
-        if (typeof window.loadStoryList === 'function') window.loadStoryList();
+      var header = row.querySelector('.story-row-header');
+      if (!header) return;
+      header.addEventListener('click', function() {
+        if (_expandedStoryId === storyId) {
+          row.classList.remove('story-row--expanded');
+          _detachCard();
+          _expandedStoryId = null;
+        } else {
+          if (_expandedStoryId) {
+            var cur = container.querySelector('.story-row--expanded');
+            if (cur) cur.classList.remove('story-row--expanded');
+            _detachCard();
+          }
+          _expandedStoryId = storyId;
+          row.classList.add('story-row--expanded');
+          var expandEl = row.querySelector('.story-expand');
+          if (expandEl) _attachCardToExpand(expandEl);
+          var storyObj = _findStory(storyId);
+          if (storyObj && typeof setDraftStoryFromRecord === 'function') setDraftStoryFromRecord(storyObj);
+          row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
       });
     });
-    _updateSelectedRow();
-  }
 
-  function _updateSelectedRow() {
-    var currentId = typeof getDraftStoryId === 'function' ? getDraftStoryId() : null;
-    var container = document.getElementById('stories-list');
-    if (!container) return;
-    container.querySelectorAll('.story-row--selected').forEach(function(r) {
-      r.classList.remove('story-row--selected');
-    });
-    if (currentId) {
-      var sel = container.querySelector('.story-row[data-id="' + currentId + '"]');
-      if (sel) sel.classList.add('story-row--selected');
+    /* ── Восстановление раскрытой строки после перерисовки ── */
+    var pendingId = window._requestExpandStoryAfterRender;
+    if (pendingId) {
+      window._requestExpandStoryAfterRender = null;
+      prevExpandedId = pendingId;
+    }
+
+    if (prevExpandedId === '__new__') {
+      var draftId = typeof getDraftStoryId === 'function' ? getDraftStoryId() : null;
+      if (draftId) {
+        var realRow = container.querySelector('.story-row[data-id="' + draftId + '"]');
+        if (realRow) {
+          _expandedStoryId = draftId;
+          realRow.classList.add('story-row--expanded');
+          var expandEl2 = realRow.querySelector('.story-expand');
+          if (expandEl2) _attachCardToExpand(expandEl2);
+        } else {
+          _expandedStoryId = null;
+        }
+      } else {
+        _insertFakeRow(container);
+      }
+    } else if (prevExpandedId) {
+      var expandRow = container.querySelector('.story-row[data-id="' + prevExpandedId + '"]');
+      if (expandRow) {
+        _expandedStoryId = prevExpandedId;
+        expandRow.classList.add('story-row--expanded');
+        var expandEl3 = expandRow.querySelector('.story-expand');
+        if (expandEl3) _attachCardToExpand(expandEl3);
+      } else {
+        _expandedStoryId = null;
+      }
     }
   }
 
@@ -329,8 +407,10 @@ var getDraftStoryId;
           .then(function(r) { return r.ok ? r.json() : r.json().then(function(d) { throw d; }); })
           .then(function() {
             dlg.close();
-            var row = document.querySelector('.story-row[data-id="' + storyId + '"]');
-            if (row) row.remove();
+            if (_expandedStoryId === storyId) {
+              _detachCard();
+              _expandedStoryId = null;
+            }
             if (typeof window.loadStoryList === 'function') window.loadStoryList();
           })
           .catch(function(d) {
@@ -358,10 +438,6 @@ var getDraftStoryId;
     btn.style.color = nextGk !== 'null' ? (GRADE_TEXT_COLORS[nextGk] || '') : '';
     btn.textContent = GRADE_LABELS[nextGk] || nextGk;
     btn.title = 'Оценка: ' + (GRADE_LABELS[nextGk] || nextGk) + '. Нажмите для смены';
-    var _cardId = typeof getDraftStoryId === 'function' ? getDraftStoryId() : null;
-    if (_cardId && String(_cardId) === String(storyId) && typeof window.setCardGradeBadge === 'function') {
-      window.setCardGradeBadge(nextGrade, false);
-    }
     fetch('/production/story/' + storyId + '/grade', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -378,10 +454,6 @@ var getDraftStoryId;
         btn.style.color = gk !== 'null' ? (GRADE_TEXT_COLORS[gk] || '') : '';
         btn.textContent = GRADE_LABELS[gk] || gk;
         btn.title = 'Оценка: ' + (GRADE_LABELS[gk] || gk) + '. Нажмите для смены';
-        var _cId = typeof getDraftStoryId === 'function' ? getDraftStoryId() : null;
-        if (_cId && String(_cId) === String(storyId) && typeof window.setCardGradeBadge === 'function') {
-          window.setCardGradeBadge(grade, false);
-        }
       } else {
         var prevGk = gradeKey(prevAttr === 'null' ? null : prevAttr);
         btn.setAttribute('data-grade', prevGk);
@@ -389,10 +461,6 @@ var getDraftStoryId;
         btn.style.color = prevGk !== 'null' ? (GRADE_TEXT_COLORS[prevGk] || '') : '';
         btn.textContent = GRADE_LABELS[prevGk] || prevGk;
         btn.title = 'Оценка: ' + (GRADE_LABELS[prevGk] || prevGk) + '. Нажмите для смены';
-        var _cId2 = typeof getDraftStoryId === 'function' ? getDraftStoryId() : null;
-        if (_cId2 && String(_cId2) === String(storyId) && typeof window.setCardGradeBadge === 'function') {
-          window.setCardGradeBadge(prevAttr === 'null' ? null : prevAttr, false);
-        }
       }
     })
     .catch(function() {
@@ -403,10 +471,6 @@ var getDraftStoryId;
       btn.style.color = prevGk !== 'null' ? (GRADE_TEXT_COLORS[prevGk] || '') : '';
       btn.textContent = GRADE_LABELS[prevGk] || prevGk;
       btn.title = 'Оценка: ' + (GRADE_LABELS[prevGk] || prevGk) + '. Нажмите для смены';
-      var _cId3 = typeof getDraftStoryId === 'function' ? getDraftStoryId() : null;
-      if (_cId3 && String(_cId3) === String(storyId) && typeof window.setCardGradeBadge === 'function') {
-        window.setCardGradeBadge(prevAttr === 'null' ? null : prevAttr, false);
-      }
     });
   }
 
@@ -457,11 +521,10 @@ var getDraftStoryId;
       fetch('/production/env', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: key, value: value }) });
     }
     function onFilterChange(key, checkbox) {
-      var value = checkbox.checked ? '1' : '0';
       fetch('/production/env', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: key, value: value }),
+        body: JSON.stringify({ key: key, value: checkbox.checked ? '1' : '0' }),
       }).then(function() {
         window.loadStoryList();
       });
@@ -523,12 +586,21 @@ var getDraftStoryId;
     var btn = document.getElementById('btn-story-new');
     if (!btn) return;
     btn.addEventListener('click', function() {
+      var container = document.getElementById('stories-list');
+      if (!container) return;
+      if (_expandedStoryId) {
+        var cur = container.querySelector('.story-row--expanded');
+        if (cur) cur.classList.remove('story-row--expanded');
+        _detachCard();
+        _expandedStoryId = null;
+      }
+      if (typeof resetDraftStoryId === 'function') resetDraftStoryId();
       var titleEl = document.getElementById('draft-story-title');
       var contentEl = document.getElementById('draft-story-content');
       if (titleEl) titleEl.value = '';
       if (contentEl) contentEl.value = '';
-      if (typeof resetDraftStoryId === 'function') resetDraftStoryId();
-      if (titleEl) titleEl.focus();
+      if (typeof window.updateDraftWordCount === 'function') window.updateDraftWordCount();
+      _insertFakeRow(container);
     });
   }
 
@@ -605,16 +677,8 @@ var getDraftStoryId;
                   if (typeof setDraftStoryFromRecord === 'function') {
                     setDraftStoryFromRecord({ id: storyId, title: s.title || '', content: s.text || '' });
                   }
-                  if (typeof loadStoryList === 'function') {
-                    loadStoryList();
-                    setTimeout(function() {
-                      var container = document.getElementById('stories-list');
-                      if (container) {
-                        var row = container.querySelector('.story-row[data-id="' + storyId + '"]');
-                        if (row) row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                      }
-                    }, 400);
-                  }
+                  if (typeof window.setExpandedStoryId === 'function') window.setExpandedStoryId(storyId);
+                  if (typeof loadStoryList === 'function') loadStoryList();
                   if (typeof window.loadMovieList === 'function') window.loadMovieList();
                   pollNext();
                 })
@@ -700,192 +764,6 @@ var getDraftStoryId;
     document.addEventListener('DOMContentLoaded', initGenerateButton);
   } else {
     initGenerateButton();
-  }
-})();
-
-/* ── Плашка grade в карточке сюжета ── */
-(function() {
-  var GRADE_LABELS = { good: 'хорошо', bad: 'плохо', 'null': 'не указано' };
-  var GRADE_COLORS = { good: '#3ecf8e', bad: '#ff6060', 'null': 'rgba(255,255,255,.07)' };
-  var GRADE_TEXT_COLORS = { good: '#fff', bad: '#fff', 'null': '#aaa' };
-  var GRADE_CYCLE = ['good', 'bad', null];
-
-  function gradeKey(g) { return g === null || g === undefined ? 'null' : g; }
-
-  function setCardGradeBadge(grade, hidden) {
-    var btn = document.getElementById('card-story-grade');
-    if (!btn) return;
-    if (hidden) {
-      btn.hidden = true;
-      btn.disabled = true;
-      return;
-    }
-    var gk = gradeKey(grade);
-    btn.hidden = false;
-    btn.disabled = false;
-    btn.setAttribute('data-grade', gk);
-    btn.style.background = gk !== 'null' ? (GRADE_COLORS[gk] || '') : '';
-    btn.style.color = gk !== 'null' ? (GRADE_TEXT_COLORS[gk] || '') : '';
-    btn.textContent = GRADE_LABELS[gk] || gk;
-    btn.title = 'Оценка: ' + (GRADE_LABELS[gk] || gk) + '. Нажмите для смены';
-  }
-
-  window.setCardGradeBadge = setCardGradeBadge;
-
-  function _syncStoryListGrade(storyId, grade) {
-    var container = document.getElementById('stories-list');
-    if (!container) return;
-    var listBtn = container.querySelector('.story-grade-badge[data-id="' + storyId + '"]');
-    if (!listBtn) return;
-    var gk = gradeKey(grade);
-    listBtn.setAttribute('data-grade', gk);
-    listBtn.style.background = gk !== 'null' ? (GRADE_COLORS[gk] || '') : '';
-    listBtn.style.color = gk !== 'null' ? (GRADE_TEXT_COLORS[gk] || '') : '';
-    listBtn.textContent = GRADE_LABELS[gk] || gk;
-    listBtn.title = 'Оценка: ' + (GRADE_LABELS[gk] || gk) + '. Нажмите для смены';
-  }
-
-  function initCardGradeBadge() {
-    var btn = document.getElementById('card-story-grade');
-    if (!btn) return;
-    var _cardReqId = 0;
-    btn.addEventListener('click', function() {
-      if (btn.disabled) return;
-      var storyId = typeof getDraftStoryId === 'function' ? getDraftStoryId() : null;
-      if (!storyId) return;
-      var currentGradeAttr = btn.getAttribute('data-grade');
-      var currentGrade = currentGradeAttr === 'null' ? null : currentGradeAttr;
-      var idx = GRADE_CYCLE.indexOf(currentGrade);
-      var nextGrade = GRADE_CYCLE[(idx + 1) % GRADE_CYCLE.length];
-      var prevAttr = currentGradeAttr;
-      var myReqId = ++_cardReqId;
-      setCardGradeBadge(nextGrade, false);
-      _syncStoryListGrade(storyId, nextGrade);
-      fetch('/production/story/' + storyId + '/grade', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ grade: nextGrade }),
-      })
-      .then(function(r) { return r.ok ? r.json() : null; })
-      .then(function(d) {
-        if (myReqId !== _cardReqId) return;
-        if (d && d.ok) {
-          var grade = d.grade !== undefined ? d.grade : null;
-          setCardGradeBadge(grade, false);
-          _syncStoryListGrade(storyId, grade);
-          if (typeof window.loadStoryList === 'function') window.loadStoryList();
-        } else {
-          var prev = prevAttr === 'null' ? null : prevAttr;
-          setCardGradeBadge(prev, false);
-          _syncStoryListGrade(storyId, prev);
-        }
-      })
-      .catch(function() {
-        if (myReqId !== _cardReqId) return;
-        var prev = prevAttr === 'null' ? null : prevAttr;
-        setCardGradeBadge(prev, false);
-        _syncStoryListGrade(storyId, prev);
-      });
-    });
-  }
-
-  var _origSetDraft = window.setDraftStoryFromRecord;
-  window.setDraftStoryFromRecord = function(story) {
-    if (_origSetDraft) _origSetDraft(story);
-    setCardGradeBadge(story.grade !== undefined ? story.grade : null, false);
-  };
-
-  var _origResetDraft = window.resetDraftStoryId;
-  window.resetDraftStoryId = function() {
-    if (_origResetDraft) _origResetDraft();
-    setCardGradeBadge(null, true);
-  };
-
-  var _origFirstSaved = window.onDraftStoryFirstSaved;
-  window.onDraftStoryFirstSaved = function() {
-    if (_origFirstSaved) _origFirstSaved();
-    setCardGradeBadge(null, false);
-  };
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initCardGradeBadge);
-  } else {
-    initCardGradeBadge();
-  }
-})();
-
-/* ── Кнопка pin в карточке сюжета ── */
-(function() {
-  var PIN_SVG_FILLED  = '<svg viewBox="0 0 16 16" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="10" x2="8" y2="15"/><path d="M5 2 L5 7 L2 10 L14 10 L11 7 L11 2 Z"/><line x1="5" y1="2" x2="11" y2="2"/></svg>';
-  var PIN_SVG_OUTLINE = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="10" x2="8" y2="15"/><path d="M5 2 L5 7 L2 10 L14 10 L11 7 L11 2 Z"/><line x1="5" y1="2" x2="11" y2="2"/></svg>';
-
-  function setCardPinBtn(pinned, hidden) {
-    var btn = document.getElementById('card-story-pin');
-    if (!btn) return;
-    if (hidden) {
-      btn.hidden = true;
-      btn.disabled = true;
-      return;
-    }
-    var p = !!pinned;
-    btn.hidden = false;
-    btn.disabled = false;
-    btn.setAttribute('data-pinned', p ? '1' : '0');
-    btn.title = p ? 'Закреплён' : 'Закрепить';
-    btn.innerHTML = p ? PIN_SVG_FILLED : PIN_SVG_OUTLINE;
-    btn.classList.toggle('story-pin-btn--active', p);
-  }
-
-  window.setCardPinBtn = setCardPinBtn;
-
-  function initCardPinBtn() {
-    var btn = document.getElementById('card-story-pin');
-    if (!btn) return;
-    btn.addEventListener('click', function() {
-      if (btn.disabled) return;
-      var storyId = typeof getDraftStoryId === 'function' ? getDraftStoryId() : null;
-      if (!storyId) return;
-      var newPinned = btn.getAttribute('data-pinned') !== '1';
-      btn.disabled = true;
-      fetch('/production/story/' + storyId + '/pin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pinned: newPinned }),
-      })
-      .then(function(r) { return r.ok ? r.json() : null; })
-      .then(function(d) {
-        btn.disabled = false;
-        if (d && d.ok) {
-          setCardPinBtn(newPinned, false);
-          if (typeof window.loadStoryList === 'function') window.loadStoryList();
-        }
-      })
-      .catch(function() { btn.disabled = false; });
-    });
-  }
-
-  var _origSetDraft = window.setDraftStoryFromRecord;
-  window.setDraftStoryFromRecord = function(story) {
-    if (_origSetDraft) _origSetDraft(story);
-    setCardPinBtn(story.pinned || false, false);
-  };
-
-  var _origResetDraft = window.resetDraftStoryId;
-  window.resetDraftStoryId = function() {
-    if (_origResetDraft) _origResetDraft();
-    setCardPinBtn(false, true);
-  };
-
-  var _origFirstSaved = window.onDraftStoryFirstSaved;
-  window.onDraftStoryFirstSaved = function() {
-    if (_origFirstSaved) _origFirstSaved();
-    setCardPinBtn(false, false);
-  };
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initCardPinBtn);
-  } else {
-    initCardPinBtn();
   }
 })();
 
@@ -997,7 +875,10 @@ var getDraftStoryId;
     defaultOpt.className = 'cust-select-option selected';
     defaultOpt.dataset.value = '';
     defaultOpt.textContent = 'Подобрать';
-    defaultOpt.addEventListener('click', function() { selectModel('', 'Подобрать'); closeList(); });
+    defaultOpt.addEventListener('click', function() {
+      selectModel('', 'Подобрать');
+      closeList();
+    });
     list.appendChild(defaultOpt);
     _models.forEach(function(m) {
       var opt = document.createElement('div');
@@ -1055,13 +936,12 @@ var getDraftStoryId;
 (function() {
   var _videoDuration = 6;
   var _wordsPerSecond = 8;
-  var _currentDraftModel = '';
 
   function _readConfig() {
-    var titleEl = document.querySelector('[data-video-duration]');
-    if (titleEl) {
-      var d = parseInt(titleEl.getAttribute('data-video-duration'), 10);
-      var w = parseInt(titleEl.getAttribute('data-words-per-second'), 10);
+    var el = document.querySelector('[data-video-duration]');
+    if (el) {
+      var d = parseInt(el.getAttribute('data-video-duration'), 10);
+      var w = parseInt(el.getAttribute('data-words-per-second'), 10);
       if (d > 0) _videoDuration = d;
       if (w > 0) _wordsPerSecond = w;
     }
@@ -1074,12 +954,10 @@ var getDraftStoryId;
   function updateWordCount() {
     var textarea = document.getElementById('draft-story-content');
     var wrap = document.getElementById('draft-story-wc-wrap');
-    var prefix = document.getElementById('draft-story-wc-prefix');
     var numEl = document.getElementById('draft-story-wc-num');
-    if (!textarea || !wrap || !prefix || !numEl) return;
+    if (!textarea || !wrap || !numEl) return;
     var n = countWords(textarea.value);
     if (n > 0) {
-      prefix.textContent = _currentDraftModel ? _currentDraftModel + ', слов:\u00a0' : 'слов:\u00a0';
       numEl.textContent = n;
       var threshold = _videoDuration * _wordsPerSecond;
       if (n <= threshold) {
@@ -1152,14 +1030,12 @@ var getDraftStoryId;
 
   var _origSetDraft = window.setDraftStoryFromRecord;
   window.setDraftStoryFromRecord = function(story) {
-    _currentDraftModel = (story && story.model_name) ? story.model_name : '';
     if (_origSetDraft) _origSetDraft(story);
     updateWordCount();
   };
 
   var _origResetDraft = window.resetDraftStoryId;
   window.resetDraftStoryId = function() {
-    _currentDraftModel = '';
     if (_origResetDraft) _origResetDraft();
     var wrap = document.getElementById('draft-story-wc-wrap');
     if (wrap) wrap.style.display = 'none';

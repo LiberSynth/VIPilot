@@ -67,20 +67,13 @@
       </div>
       <div id="story-generate-hint" class="story-generate-hint">Вы можете сгенерировать сюжет при помощи AI-модели</div>
     </div>
-    <div class="card" id="card-story-draft">
-      <div class="card-draft-header">
-        <div class="card-title" style="margin-bottom:0" data-video-duration="{{ video_duration }}" data-words-per-second="{{ words_per_second | int }}">Сюжет<span id="draft-story-wc-wrap" style="display:none; text-transform:none; font-weight:400; letter-spacing:0"> (<span id="draft-story-wc-prefix"></span><span id="draft-story-wc-num"></span>)</span></div>
-        <div class="card-top-actions">
-          <button id="card-story-grade" class="story-grade-badge" hidden data-grade="null" title="Оценка. Нажмите для смены"></button>
-          <button id="card-story-pin" class="story-icon story-pin-btn" hidden data-pinned="0" title="Закрепить">
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="10" x2="8" y2="15"/><path d="M5 2 L5 7 L2 10 L14 10 L11 7 L11 2 Z"/><line x1="5" y1="2" x2="11" y2="2"/></svg>
-          </button>
-        </div>
+    <div id="story-card-holder" hidden>
+      <div id="card-story-draft" data-video-duration="{{ video_duration }}" data-words-per-second="{{ words_per_second | int }}">
+        <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block">Название</label>
+        <input type="text" id="draft-story-title" placeholder="Введите название сюжета" autocomplete="off">
+        <label class="setting-label" style="font-size:12px;margin-top:12px;margin-bottom:4px;display:block">Промпт<span id="draft-story-wc-wrap" style="display:none; font-weight:400; text-transform:none; letter-spacing:0"> (слов:&nbsp;<span id="draft-story-wc-num"></span>)</span></label>
+        <textarea id="draft-story-content" spellcheck="true" placeholder="Введите сюжет" autocomplete="off"></textarea>
       </div>
-      <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block">Название</label>
-      <input type="text" id="draft-story-title" placeholder="Введите название сюжета" autocomplete="off">
-      <label class="setting-label" style="font-size:12px;margin-top:12px;margin-bottom:4px;display:block">Промпт</label>
-      <textarea id="draft-story-content" spellcheck="true" placeholder="Введите сюжет" autocomplete="off"></textarea>
     </div>
 
     <div class="card" style="margin-top:0">
