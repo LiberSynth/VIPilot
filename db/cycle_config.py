@@ -7,7 +7,8 @@ _DEFAULTS = {
     "video_duration":    6,
     "approve_stories":   False,
     "approve_movies":    False,
-    "words_per_second":  8.0,
+    "words_per_second":    8.0,
+    "good_samples_count": 25,
 }
 
 _ALLOWED_KEYS = frozenset(_DEFAULTS.keys())
@@ -26,6 +27,11 @@ def _coerce(key, raw):
     if key == "words_per_second":
         try:
             return float(raw)
+        except (ValueError, TypeError):
+            return _DEFAULTS[key]
+    if key == "good_samples_count":
+        try:
+            return int(raw)
         except (ValueError, TypeError):
             return _DEFAULTS[key]
     return raw
