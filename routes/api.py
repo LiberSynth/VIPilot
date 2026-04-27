@@ -1,4 +1,4 @@
-Опубликовать". import os
+import os
 import random
 import threading
 import time
@@ -222,6 +222,9 @@ def client_is_configured(slug: str, cfg: dict = None, target_id: str = None) -> 
     if slug == "rutube":
         from services.browser_registry import get_browser as _get_browser
         return bool(cfg.get("person_id")) and _get_browser("rutube").profile_exists(target_id)
+    if slug == "vkvideo":
+        from services.browser_registry import get_browser as _get_browser
+        return bool(cfg.get("club_id")) and _get_browser("vkvideo").profile_exists(target_id)
     if slug == "grok":
         return bool(os.environ.get("XAI_API_KEY", ""))
     if slug == "text":

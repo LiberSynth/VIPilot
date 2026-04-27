@@ -32,6 +32,8 @@ from clients import dzen as dzen_client
 from clients.dzen import DzenCsrfExpired, DzenSessionMissing
 from clients import rutube as rutube_client
 from clients.rutube import RutubeCsrfExpired, RutubeSessionMissing
+from clients import vkvideo as vkvideo_client
+from clients.vkvideo import VkVideoCsrfExpired, VkVideoSessionMissing
 
 
 def is_scheduled(batch) -> bool:
@@ -107,10 +109,26 @@ def _call_rutube(slug, method, batch_id, log_id, target):
     return rutube_client.publish(video_data, cfg, log_id, batch_id=batch_id, target_id=target_id)
 
 
+def _call_vkvideo(slug, method, batch_id, log_id, target):
+    cfg = target.get('config') or {}
+    target_id = target.get('id')
+    if not client_is_configured('vkvideo', cfg, target_id):
+        if not cfg.get('club_id'):
+            write_log_entry(log_id, 'VK Видео не настроен: club_id отсутствует', level='error')
+        else:
+            write_log_entry(log_id, 'VK Видео: браузерная сессия не сохранена — авторизуйтесь на вкладке «Публикация»', level='error')
+        return False
+
+    video_data = _get_video(batch_id, log_id)
+
+    return vkvideo_client.publish(video_data, cfg, log_id, batch_id=batch_id, target_id=target_id)
+
+
 _CLIENTS = {
-    'vk':     _call_vk,
-    'dzen':   _call_dzen,
-    'rutube': _call_rutube,
+    'vk':      _call_vk,
+    'dzen':    _call_dzen,
+    'rutube':  _call_rutube,
+    'vkvideo': _call_vkvideo,
 }
 
 
@@ -275,7 +293,7 @@ def run(batch_id, log_id):
         step_error = None
         try:
             ok = _call_client(slug, method, batch_id, log_id, target)
-        except (DzenSessionMissing, DzenCsrfExpired, RutubeSessionMissing, RutubeCsrfExpired) as e:
+        except (DzenSessionMissing, DzenCsrfExpired, RutubeSessionMissing, RutubeCsrfExpired, VkVideoSessionMissing, VkVideoCsrfExpired) as e:
             ok = False
             step_error = str(e)
             write_log_entry(log_id, f'{slug}.{method}: {e}', level='error')

@@ -34,7 +34,7 @@ _CONFIGS = {
         platform_name="vkvideo",
         profile_dir=os.path.join(_PROJECT_ROOT, "data", "vkvideo_profile"),
         start_url="https://vkvideo.ru/",
-        cookie_domains=["https://vkvideo.ru", "https://vk.com"],
+        cookie_domains=["https://vkvideo.ru", "https://vk.com", "https://cabinet.vkvideo.ru"],
         thread_name="vkvideo-browser",
     ),
 }
