@@ -1,3 +1,6 @@
-2026/04/27-19:12:55.852 11736 Reusing MANIFEST /home/runner/workspace/data/vkvideo_profile/Default/Local Storage/leveldb/MANIFEST-000001
-2026/04/27-19:12:55.882 11736 Recovering log #7
-2026/04/27-19:12:55.882 11736 Reusing old log /home/runner/workspace/data/vkvideo_profile/Default/Local Storage/leveldb/000007.log 
+2026/04/27-19:14:19.873 1190c Reusing MANIFEST /home/runner/workspace/data/vkvideo_profile/Default/Local Storage/leveldb/MANIFEST-000001
+2026/04/27-19:14:19.884 1190c Recovering log #7
+2026/04/27-19:14:19.884 1190c Reusing old log /home/runner/workspace/data/vkvideo_profile/Default/Local Storage/leveldb/000007.log 
+2026/04/27-19:14:30.630 1190f Level-0 table #11: started
+2026/04/27-19:14:30.641 1190f Level-0 table #11: 16497 bytes OK
+2026/04/27-19:14:30.644 1190f Delete type=0 #7
