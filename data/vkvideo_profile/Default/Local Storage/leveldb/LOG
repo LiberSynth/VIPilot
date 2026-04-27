@@ -1,3 +1,15 @@
 2026/04/27-22:41:11.421 1b57e Reusing MANIFEST /home/runner/workspace/data/vkvideo_profile/Default/Local Storage/leveldb/MANIFEST-000001
 2026/04/27-22:41:11.439 1b57e Recovering log #41
 2026/04/27-22:41:11.445 1b57e Reusing old log /home/runner/workspace/data/vkvideo_profile/Default/Local Storage/leveldb/000041.log 
+2026/04/27-22:42:11.706 1b581 Level-0 table #44: started
+2026/04/27-22:42:11.745 1b581 Level-0 table #44: 22322 bytes OK
+2026/04/27-22:42:11.748 1b581 Delete type=0 #41
+2026/04/27-22:42:11.748 1b581 Compacting 4@0 + 1@1 files
+2026/04/27-22:42:11.760 1b581 Generated table #45@0: 257 keys, 48420 bytes
+2026/04/27-22:42:11.760 1b581 Compacted 4@0 + 1@1 files => 48420 bytes
+2026/04/27-22:42:11.764 1b581 compacted to: files[ 0 1 1 0 0 0 0 ]
+2026/04/27-22:42:11.764 1b581 Delete type=2 #33
+2026/04/27-22:42:11.764 1b581 Delete type=2 #36
+2026/04/27-22:42:11.764 1b581 Delete type=2 #38
+2026/04/27-22:42:11.764 1b581 Delete type=2 #41
+2026/04/27-22:42:11.764 1b581 Delete type=2 #44
