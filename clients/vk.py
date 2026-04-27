@@ -86,13 +86,15 @@ def publish_story(video_data: bytes, group_id: int, log_id) -> int | None:
 def _clip_url_to_attachment(clip_url: str) -> str:
     """Преобразует ссылку VK Видео в attachment-строку для wall.post.
 
-    https://vkvideo.ru/clip-236929597_456239776  →  clip-236929597_456239776
+    https://vkvideo.ru/clip-236929597_456239776  →  video-236929597_456239776
+
+    VK API wall.post принимает тип «video», а не «clip».
     """
     if not clip_url:
         return ""
     for prefix in ("https://vkvideo.ru/clip", "http://vkvideo.ru/clip", "vkvideo.ru/clip"):
         if clip_url.startswith(prefix):
-            return "clip" + clip_url[len(prefix):]
+            return "video" + clip_url[len(prefix):]
     return ""
 
 
