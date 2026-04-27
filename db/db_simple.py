@@ -169,6 +169,19 @@ def db_update_target_aspect_ratio(target_id, x, y):
     return True
 
 
+def db_get_all_targets():
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                'SELECT id::text, name, active, slug FROM targets ORDER BY "order", name'
+            )
+            rows = cur.fetchall()
+    return [
+        {"id": row[0], "name": row[1], "active": bool(row[2]), "slug": row[3] or ""}
+        for row in rows
+    ]
+
+
 def db_get_target_by_name(name: str) -> dict | None:
     with get_db() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:

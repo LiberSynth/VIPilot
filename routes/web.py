@@ -20,6 +20,7 @@ from db import (
     cycle_config_get,
     cycle_config_set,
     db_get_active_targets,
+    db_get_all_targets,
     db_update_target_aspect_ratio,
     db_get_target_by_name,
     db_update_target_publish_method_by_slug,
@@ -211,12 +212,10 @@ def root_page():
     target_id       = target["id"] if target else None
     aspect_ratio_x  = target["aspect_ratio_x"] if target else 9
     aspect_ratio_y  = target["aspect_ratio_y"] if target else 16
+    _known_slugs    = {"vk", "dzen", "rutube", "vkvideo"}
     publish_order   = [
-        slug for slug, tgt in [
-            ("vk", vk_target), ("dzen", dzen_target),
-            ("rutube", rutube_target), ("vkvideo", vkvideo_target),
-        ]
-        if tgt is not None
+        t["slug"] for t in db_get_all_targets()
+        if t["slug"] in _known_slugs
     ]
 
     _save_last_page()
