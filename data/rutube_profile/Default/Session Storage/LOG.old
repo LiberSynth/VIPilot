@@ -1,5 +1,16 @@
-2026/04/27-15:37:20.478 b257 Reusing MANIFEST /home/runner/workspace/data/rutube_profile/Default/Session Storage/MANIFEST-000001
-2026/04/27-15:37:20.478 b257 Recovering log #13
-2026/04/27-15:37:20.479 b257 Reusing old log /home/runner/workspace/data/rutube_profile/Default/Session Storage/000013.log 
-2026/04/27-15:38:17.629 b25a Level-0 table #17: started
-2026/04/27-15:38:17.666 b25a Level-0 table #17: 14971 bytes OK
+2026/04/27-16:19:02.955 b860 Reusing MANIFEST /home/runner/workspace/data/rutube_profile/Default/Session Storage/MANIFEST-000001
+2026/04/27-16:19:02.955 b860 Recovering log #13
+2026/04/27-16:19:02.956 b860 Level-0 table #16: started
+2026/04/27-16:19:02.999 b860 Level-0 table #16: 14971 bytes OK
+2026/04/27-16:19:03.000 b860 Recovering log #16
+2026/04/27-16:19:03.000 b860 Reusing old log /home/runner/workspace/data/rutube_profile/Default/Session Storage/000016.log 
+2026/04/27-16:19:03.293 b860 Delete type=0 #13
+2026/04/27-16:19:03.293 b860 Delete type=2 #17
+2026/04/27-16:19:03.293 b862 Compacting 4@0 + 0@1 files
+2026/04/27-16:19:03.661 b862 Generated table #17@0: 147 keys, 46383 bytes
+2026/04/27-16:19:03.661 b862 Compacted 4@0 + 0@1 files => 46383 bytes
+2026/04/27-16:19:03.824 b862 compacted to: files[ 0 1 1 0 0 0 0 ]
+2026/04/27-16:19:03.824 b862 Delete type=2 #7
+2026/04/27-16:19:03.824 b862 Delete type=2 #11
+2026/04/27-16:19:03.824 b862 Delete type=2 #14
+2026/04/27-16:19:03.824 b862 Delete type=2 #16

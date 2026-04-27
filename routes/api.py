@@ -201,14 +201,14 @@ def publication_file_name(title: str) -> str:
 _TAGS = ("юмор", "приколы", "ремонт", "стройка", "неудача")
 
 
-def tags() -> str:
-    """Возвращает теги публикации в виде строки тегов через пробел."""
-    return " ".join(f"{t}" for t in _TAGS)
+def теги() -> list[str]:
+    """Возвращает список тегов публикации."""
+    return list(_TAGS)
 
 
-def hashtags() -> str:
+def хэштеги() -> str:
     """Возвращает теги публикации в виде строки хэштегов через пробел."""
-    return " ".join(f"#{t}" for t in _TAGS)
+    return ' '.join(f'#{t}' for t in _TAGS)
 
 
 def client_is_configured(slug: str, cfg: dict = None, target_id: str = None) -> bool:

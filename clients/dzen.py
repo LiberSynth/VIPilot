@@ -13,7 +13,7 @@ import time as _time
 
 from log import write_log_entry
 from utils.utils import fmt_id_msg
-from routes.api import build_publication_title, publication_file_name
+from routes.api import build_publication_title, publication_file_name, теги
 
 
 _NAV_TIMEOUT = 30_000   # ms — таймаут навигации
@@ -358,7 +358,31 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
             page.wait_for_timeout(5000)
     _snap(page, batch_id)
 
-    # ── Шаг 5: Публикуем ─────────────────────────────────────────────────
+    # ── Шаг 5: Заполняем теги ────────────────────────────────────────────
+    write_log_entry(None, "[dzen] Заполняю теги…", level='silent')
+    if log_id:
+        write_log_entry(log_id, "Дзен: Заполняю теги…")
+    try:
+        tags_input = page.locator(
+            "input[placeholder*='теги'], "
+            "input[placeholder*='Теги']"
+        ).first
+        tags_input.wait_for(state="visible", timeout=5_000)
+        tags_input.click()
+        for tag in теги():
+            tags_input.type(tag)
+            page.keyboard.press("Enter")
+            page.wait_for_timeout(300)
+        write_log_entry(None, "[dzen] Теги заполнены", level='silent')
+        if log_id:
+            write_log_entry(log_id, "Дзен: Теги заполнены")
+        _snap(page, batch_id)
+    except Exception as _e:
+        write_log_entry(None, f"[dzen] Не удалось заполнить теги: {_e}", level='silent')
+        if log_id:
+            write_log_entry(log_id, "Дзен: Не удалось заполнить теги — продолжаю…")
+
+    # ── Шаг 6: Публикуем ─────────────────────────────────────────────────
     write_log_entry(None, "[dzen] Нажимаю «Опубликовать»…", level='silent')
     if log_id:
         write_log_entry(log_id, "Дзен: Нажимаю «Опубликовать»…")
@@ -368,7 +392,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
     page.wait_for_timeout(2000)
     _snap(page, batch_id)
 
-    # ── Шаг 6: Обрабатываем три разных элемента (25 секунд) ─────────────
+    # ── Шаг 7: Обрабатываем три разных элемента (25 секунд) ─────────────
     #
     # A. Кнопка «Опубликовать после обработки» — нажать немедленно при появлении.
     # B. Капча VK «Я не робот» (iframe id.vk.com/not_robot_captcha) — кликнуть
@@ -533,15 +557,15 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
         page.wait_for_timeout(_DIALOG_POLL)
 
     if captcha_clicked:
-        write_log_entry(None, "[dzen] Действия в шаге 6 выполнены, жду подтверждения публикации…", level='silent')
+        write_log_entry(None, "[dzen] Действия в шаге 7 выполнены, жду подтверждения публикации…", level='silent')
         if log_id:
-            write_log_entry(log_id, "Дзен: Действия в шаге 6 выполнены, жду подтверждения публикации…")
+            write_log_entry(log_id, "Дзен: Действия в шаге 7 выполнены, жду подтверждения публикации…")
     else:
-        write_log_entry(None, "[dzen] Шаг 6 завершён (капча/попап не обнаружены), жду подтверждения…", level='silent')
+        write_log_entry(None, "[dzen] Шаг 7 завершён (капча/попап не обнаружены), жду подтверждения…", level='silent')
         if log_id:
-            write_log_entry(log_id, "Дзен: Шаг 6 завершён (капча/попап не обнаружены), жду подтверждения…")
+            write_log_entry(log_id, "Дзен: Шаг 7 завершён (капча/попап не обнаружены), жду подтверждения…")
 
-    # ── Шаг 7: Ожидаем подтверждения публикации ──────────────────────────
+    # ── Шаг 8: Ожидаем подтверждения публикации ──────────────────────────
     _PUBLISH_CONFIRM_TIMEOUT = 60_000  # ms — полный таймаут ожидания
     _CONFIRM_POLL = 2_000              # ms — интервал опроса
 
