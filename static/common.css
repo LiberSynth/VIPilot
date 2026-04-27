@@ -704,6 +704,7 @@
     padding: 4px 14px 4px 52px;
   }
   .monitor-log-item.open .monitor-entries { display: block; }
+  .monitor-log-item:not(.open) .monitor-pub-frame { display: none !important; }
   .monitor-entry-row {
     display: flex; gap: 8px; padding: 2px 0;
     border-bottom: 1px solid #0e0e18; font-size: 11px;
