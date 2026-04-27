@@ -172,8 +172,6 @@ def root_page():
     vk_publish_wall      = bool(_vk_pm.get("wall",      0))
     vk_publish_clip_story = bool(_vk_pm.get("clip_story", 0))
     vk_publish_clip_wall  = bool(_vk_pm.get("clip_wall",  0))
-    if not vk_publish_story and not vk_publish_wall and not vk_publish_clip_story and not vk_publish_clip_wall:
-        vk_publish_story = True
     video_duration     = max(1, min(60, cycle_config_get("video_duration")))
     video_post_prompt  = cycle_config_get("video_post_prompt")
     buffer_hours       = max(1, min(720, int(settings_get("buffer_hours", "24"))))
@@ -375,8 +373,6 @@ def save():
         vk_wall_raw       = request.form.get("vk_publish_wall",       "0")
         vk_clip_story_raw = request.form.get("vk_publish_clip_story", "0")
         vk_clip_wall_raw  = request.form.get("vk_publish_clip_wall",  "0")
-        if vk_story_raw != "1" and vk_wall_raw != "1" and vk_clip_story_raw != "1" and vk_clip_wall_raw != "1":
-            vk_story_raw = "1"
         db_update_target_publish_method_by_slug("vk", {
             "story":      1 if vk_story_raw      == "1" else 0,
             "wall":       1 if vk_wall_raw       == "1" else 0,

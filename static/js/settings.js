@@ -104,34 +104,9 @@ function onApproveStoriesToggle(chk) {
 }
 
 function onVkMethodToggle(changedChk) {
-  const ids = [
-    { chk: 'vk_story_pub_check',      hid: 'vk_story_pub_hidden' },
-    { chk: 'vk_wall_pub_check',       hid: 'vk_wall_pub_hidden' },
-    { chk: 'vk_clip_story_pub_check', hid: 'vk_clip_story_pub_hidden' },
-    { chk: 'vk_clip_wall_pub_check',  hid: 'vk_clip_wall_pub_hidden' },
-  ];
-  if (changedChk.checked) {
-    ids.forEach(o => {
-      const el  = document.getElementById(o.chk);
-      const hid = document.getElementById(o.hid);
-      if (!el || !hid) return;
-      if (el !== changedChk) { el.checked = false; hid.value = '0'; }
-      else { hid.value = '1'; }
-    });
-  } else {
-    const anyChecked = ids.some(o => {
-      const el = document.getElementById(o.chk);
-      return el && el.checked;
-    });
-    if (!anyChecked) {
-      changedChk.checked = true;
-    }
-    ids.forEach(o => {
-      const el  = document.getElementById(o.chk);
-      const hid = document.getElementById(o.hid);
-      if (el && hid) hid.value = el.checked ? '1' : '0';
-    });
-  }
+  const hidId = changedChk.id.replace('_check', '_hidden');
+  const hid = document.getElementById(hidId);
+  if (hid) hid.value = changedChk.checked ? '1' : '0';
   savePublishSettings();
 }
 
