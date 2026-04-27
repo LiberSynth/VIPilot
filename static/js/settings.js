@@ -49,8 +49,9 @@ function collectAllSettings(activeTab) {
     const approveVal = chkApproveStories ? (chkApproveStories.checked ? '1' : '0') : (hidApproveStories ? hidApproveStories.value : '0');
     data.set('approve_stories', approveVal);
   }
-  setIfExists('vk_publish_story', 'vk_story_pub_hidden');
-  setIfExists('vk_publish_wall',  'vk_wall_pub_hidden');
+  setIfExists('vk_publish_story',    'vk_story_pub_hidden');
+  setIfExists('vk_publish_wall',     'vk_wall_pub_hidden');
+  setIfExists('vk_publish_clip_wall','vk_clip_wall_pub_hidden');
   setIfExists('aspect_ratio_x',   'ar-x');
   setIfExists('aspect_ratio_y',   'ar-y');
   setIfExists('target_id',        'target_id');
