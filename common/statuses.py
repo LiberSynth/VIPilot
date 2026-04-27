@@ -4,7 +4,7 @@ KNOWN_BATCH_STATUSES = frozenset({
     'video_ready', 'transcoding',
     'transcode_ready',
     'story_probe',
-    'cancelled', 'error', 'movie_probe', 'donated',
+    'cancelled', 'error', 'movie_probe', 'donated', 'reserved',
     'video_error', 'transcode_error', 'publish_error', 'published',
     'published_partially', 'fatal_error',
 })
@@ -13,7 +13,7 @@ FINAL_BATCH_STATUSES = (
     'published', 'published_partially', 'movie_probe', 'story_probe',
     'cancelled', 'error', 'fatal_error',
     'video_error', 'transcode_error', 'publish_error',
-    'donated',
+    'donated', 'reserved',
 )
 
 PIPELINE_RESET_STATUS = {
