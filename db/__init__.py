@@ -3,6 +3,7 @@ from .init import init_db
 from .db_simple import (
     env_get,
     env_set,
+    db_next_publication_number,
     settings_get,
     settings_set,
     db_get_schedule,

@@ -62,6 +62,13 @@ from common.statuses import batch_is_active
 bp = Blueprint("api", __name__, url_prefix="/api")
 
 
+def build_publication_title() -> str:
+    """Атомарно получает следующий номер публикации и возвращает его строкой."""
+    from db import db_next_publication_number
+    num = db_next_publication_number()
+    return str(num)
+
+
 def resolve_batch_title(batch_id: str) -> str:
     """Возвращает заголовок сюжета батча или 'Видео'."""
     from db import db_get_batch_by_id

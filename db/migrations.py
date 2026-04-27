@@ -33,6 +33,17 @@ from log.log import write_log_entry
 # Следующая миграция: _m084_...
 
 
+def _m087_publication_counter(cur):
+    """Добавляет начальное значение счётчика публикаций в таблицу environment.
+    Deployed: —
+    """
+    cur.execute("""
+        INSERT INTO environment (key, value)
+        VALUES ('publication_counter', '0')
+        ON CONFLICT (key) DO NOTHING
+    """)
+
+
 def _m086_user_role_links_pk(cur):
     """Заменяет составной PK (user_id, role_id) на суррогатный id UUID.
     Добавляет UNIQUE-ограничение на (user_id, role_id) и отдельные индексы.
@@ -444,6 +455,7 @@ MIGRATIONS = [
     (84, _m084_add_words_per_second),
     (85, _m085_cycle_config_to_kv),
     (86, _m086_user_role_links_pk),
+    (87, _m087_publication_counter),
 ]
 
 
