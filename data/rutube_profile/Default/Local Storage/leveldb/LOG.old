@@ -1,3 +1,5 @@
-2026/04/27-16:27:37.969 bf6e Reusing MANIFEST /home/runner/workspace/data/rutube_profile/Default/Local Storage/leveldb/MANIFEST-000001
-2026/04/27-16:27:37.998 bf6e Recovering log #13
-2026/04/27-16:27:37.998 bf6e Reusing old log /home/runner/workspace/data/rutube_profile/Default/Local Storage/leveldb/000013.log 
+2026/04/27-16:29:20.093 c0e2 Reusing MANIFEST /home/runner/workspace/data/rutube_profile/Default/Local Storage/leveldb/MANIFEST-000001
+2026/04/27-16:29:20.101 c0e2 Recovering log #13
+2026/04/27-16:29:20.103 c0e2 Level-0 table #16: started
+2026/04/27-16:29:20.123 c0e2 Level-0 table #16: 26997 bytes OK
+2026/04/27-16:29:20.129 c0e2 Delete type=0 #13
