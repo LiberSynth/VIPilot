@@ -11,14 +11,15 @@ import time
 import requests
 
 from log import write_log_entry
-from utils.utils import fmt_id_msg, safe_filename
+from utils.utils import fmt_id_msg
+from routes.api import build_publication_title, publication_file_name
 
 _VK_TOKEN = os.environ.get('VK_USER_TOKEN', '')
 _VK_API   = 'https://api.vk.com/method'
 _VK_VER   = '5.131'
 
 
-def publish_story(video_data: bytes, group_id: int, log_id, title: str = '') -> int | None:
+def publish_story(video_data: bytes, group_id: int, log_id) -> int | None:
     """Публикует видео как историю ВКонтакте. Возвращает story_id или None."""
     r = requests.post(f'{_VK_API}/stories.getVideoUploadServer', data={
         'group_id':    group_id,
@@ -33,7 +34,8 @@ def publish_story(video_data: bytes, group_id: int, log_id, title: str = '') -> 
         return None
 
     upload_url = r['response']['upload_url']
-    filename = f"{safe_filename(title)}.mp4" if title else 'video.mp4'
+    pub_title = build_publication_title()
+    filename = publication_file_name(pub_title)
 
     for attempt in range(3):
         try:
@@ -81,11 +83,12 @@ def publish_story(video_data: bytes, group_id: int, log_id, title: str = '') -> 
     return None
 
 
-def publish_wall(video_data: bytes, group_id: int, log_id, title: str = '') -> int | None:
+def publish_wall(video_data: bytes, group_id: int, log_id) -> int | None:
     """Публикует видео на стену сообщества ВКонтакте. Возвращает post_id или None."""
+    pub_title = build_publication_title()
     save_resp = requests.post(f'{_VK_API}/video.save', data={
         'group_id':     group_id,
-        'name':         title or '',
+        'name':         pub_title,
         'description':  '',
         'wallpost':     0,
         'access_token': _VK_TOKEN,
@@ -100,7 +103,7 @@ def publish_wall(video_data: bytes, group_id: int, log_id, title: str = '') -> i
     upload_url = save_resp['response']['upload_url']
     video_id   = save_resp['response']['video_id']
     owner_id   = save_resp['response']['owner_id']
-    filename = f"{safe_filename(title)}.mp4" if title else 'video.mp4'
+    filename = publication_file_name(pub_title)
 
     up = requests.post(
         upload_url,

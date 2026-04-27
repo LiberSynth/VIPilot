@@ -26,7 +26,7 @@ from log import db_log_update, db_get_log_entries, write_log_entry
 from pipelines.base import check_cancelled
 from common.exceptions import AppException
 from utils.utils import fmt_id_msg
-from routes.api import resolve_batch_title, client_is_configured
+from routes.api import client_is_configured
 from clients import vk
 from clients import dzen as dzen_client
 from clients.dzen import DzenCsrfExpired, DzenSessionMissing
@@ -66,13 +66,12 @@ def _call_vk(slug, method, batch_id, log_id, target):
         return False
     video_data = _get_video(batch_id, log_id)
     group_id = int(cfg.get('group_id', 236929597))
-    title = resolve_batch_title(batch_id)
     if method == 'story':
         write_log_entry(log_id, 'Публикую историю…')
-        return vk.publish_story(video_data, group_id, log_id, title=title) is not None
+        return vk.publish_story(video_data, group_id, log_id) is not None
     elif method == 'wall':
         write_log_entry(log_id, 'Публикую на стену…')
-        return vk.publish_wall(video_data, group_id, log_id, title=title) is not None
+        return vk.publish_wall(video_data, group_id, log_id) is not None
     else:
         write_log_entry(log_id, f'VK: неизвестный метод «{method}» — пропуск', level='warn')
         return False
@@ -90,8 +89,7 @@ def _call_dzen(slug, method, batch_id, log_id, target):
 
     video_data = _get_video(batch_id, log_id)
 
-    title = resolve_batch_title(batch_id)
-    return dzen_client.publish(video_data, cfg, title, log_id, batch_id=batch_id, target_id=target_id)
+    return dzen_client.publish(video_data, cfg, log_id, batch_id=batch_id, target_id=target_id)
 
 
 def _call_rutube(slug, method, batch_id, log_id, target):
@@ -106,8 +104,7 @@ def _call_rutube(slug, method, batch_id, log_id, target):
 
     video_data = _get_video(batch_id, log_id)
 
-    title = resolve_batch_title(batch_id)
-    return rutube_client.publish(video_data, cfg, title, log_id, batch_id=batch_id, target_id=target_id)
+    return rutube_client.publish(video_data, cfg, log_id, batch_id=batch_id, target_id=target_id)
 
 
 _CLIENTS = {

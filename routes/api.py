@@ -69,6 +69,11 @@ def build_publication_title() -> str:
     return str(num)
 
 
+def publication_file_name(title: str) -> str:
+    """Возвращает имя mp4-файла для публикации."""
+    return title + '.mp4'
+
+
 def resolve_batch_title(batch_id: str) -> str:
     """Возвращает заголовок сюжета батча или 'Видео'."""
     from db import db_get_batch_by_id

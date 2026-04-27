@@ -12,7 +12,8 @@ import tempfile
 import time as _time
 
 from log import write_log_entry
-from utils.utils import fmt_id_msg, safe_filename
+from utils.utils import fmt_id_msg
+from routes.api import build_publication_title, publication_file_name
 
 
 _NAV_TIMEOUT = 30_000   # ms — таймаут навигации
@@ -38,7 +39,6 @@ class DzenApiError(RuntimeError):
 def publish(
     video_data: bytes,
     target_config: dict,
-    title: str,
     log_id,
     batch_id=None,
     target_id: str | None = None,
@@ -73,15 +73,16 @@ def publish(
         write_log_entry(log_id, fmt_id_msg("Дзен: {} КБ, publisher={}", len(video_data) // 1024, publisher_id))
 
     # Пишем видео во временный файл с именем = заголовок (Дзен автоподставляет имя файла)
-    safe_name = safe_filename(title)
+    pub_title = build_publication_title()
+    file_name = publication_file_name(pub_title)
     tmp_dir = tempfile.mkdtemp()
-    video_path = os.path.join(tmp_dir, f"{safe_name}.mp4")
+    video_path = os.path.join(tmp_dir, file_name)
     try:
         with open(video_path, "wb") as _f:
             _f.write(video_data)
 
         def _do_publish(page, _ctx):
-            _publish_ui(page, publisher_id, video_path, title, log_id, batch_id=batch_id)
+            _publish_ui(page, publisher_id, video_path, log_id, batch_id=batch_id)
 
         result = run_pipeline_browser(_do_publish, saved_cookies)
 
@@ -186,22 +187,10 @@ def _dismiss_popups(page, log_id=None) -> None:
             pass
 
 
-def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, batch_id=None):
+def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None):
     """Управляет браузером для публикации видео через UI Дзена."""
 
     studio_url = f"https://dzen.ru/profile/editor/id/{publisher_id}/"
-    safe_name = safe_filename(title)
-
-    def _check_title_in_list():
-        """Проверяет наличие элемента с названием видео в списке публикаций."""
-        try:
-            el = page.get_by_text(safe_name, exact=False).first
-            if el.is_visible(timeout=5_000):
-                write_log_entry(None, f"[dzen] Элемент «{safe_name}» найден в списке публикаций.", level='silent')
-                if log_id:
-                    write_log_entry(log_id, f"Дзен: Видео «{safe_name}» появилось в списке публикаций.")
-        except Exception:
-            pass
 
     # ── Шаг 1: Переходим в студию ────────────────────────────────────────
     write_log_entry(None, f"[dzen] Переход в студию: {studio_url}", level='silent')
@@ -568,7 +557,6 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
         write_log_entry(None, f"[dzen] URL уже содержит {state_label} до старта цикла — публикация подтверждена.", level='silent')
         if log_id:
             write_log_entry(log_id, f"Дзен: URL → {state_label} — публикация подтверждена.")
-        _check_title_in_list()
 
     # CSS-селекторы (только чистый CSS, без text= — они несовместимы с wait_for_selector)
     css_success_selector = (
@@ -633,18 +621,6 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
         # 2b. Проверка тост-ошибок Дзена — завершаем сразу, не ждём таймаута
         _check_error_toast()
 
-        # 2c. Элемент с названием видео в списке публикаций
-        try:
-            el = page.get_by_text(safe_name, exact=False).first
-            if el.is_visible(timeout=500):
-                confirmed = True
-                write_log_entry(None, f"[dzen] Элемент «{safe_name}» виден на странице — публикация подтверждена.", level='silent')
-                if log_id:
-                    write_log_entry(log_id, f"Дзен: Видео «{safe_name}» появилось в списке публикаций.")
-                break
-        except Exception:
-            pass
-
         # 3. Проверка URL
         url_now = page.url
         if url_now != url_before:
@@ -655,7 +631,6 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
                 write_log_entry(None, f"[dzen] URL → {state_label} — публикация подтверждена.", level='silent')
                 if log_id:
                     write_log_entry(log_id, f"Дзен: URL → {state_label} — публикация подтверждена.")
-                _check_title_in_list()
                 break
             video_match = re.search(r"/video/|/shorts/|/watch\?", url_now)
             if video_match or "editor" not in url_now:
@@ -680,7 +655,6 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
             write_log_entry(None, f"[dzen] URL → {state_label} — публикация подтверждена (финал).", level='silent')
             if log_id:
                 write_log_entry(log_id, f"Дзен: URL → {state_label} — публикация подтверждена (финал).")
-            _check_title_in_list()
         else:
             video_url_pattern = re.search(r"/video/|/shorts/|/watch\?", url_after)
             if video_url_pattern and url_after != url_before:

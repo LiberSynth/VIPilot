@@ -11,7 +11,8 @@ import tempfile
 import time as _time
 
 from log import write_log_entry
-from utils.utils import fmt_id_msg, safe_filename
+from utils.utils import fmt_id_msg
+from routes.api import build_publication_title, publication_file_name
 
 
 _NAV_TIMEOUT  = 30_000   # ms — таймаут навигации
@@ -40,7 +41,6 @@ class RutubeApiError(RuntimeError):
 def publish(
     video_data: bytes,
     target_config: dict,
-    title: str,
     log_id,
     batch_id=None,
     target_id: str | None = None,
@@ -74,9 +74,10 @@ def publish(
     if log_id:
         write_log_entry(log_id, f"Рутьюб: {len(video_data) // 1024} КБ, person_id={person_id}")
 
-    safe_name = safe_filename(title)
+    pub_title = build_publication_title()
+    file_name = publication_file_name(pub_title)
     tmp_dir = tempfile.mkdtemp()
-    video_path = os.path.join(tmp_dir, f"{safe_name}.mp4")
+    video_path = os.path.join(tmp_dir, file_name)
     try:
         with open(video_path, "wb") as _f:
             _f.write(video_data)

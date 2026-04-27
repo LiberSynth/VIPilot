@@ -1,3 +1,3 @@
-2026/04/27-14:27:14.834 8a51 Reusing MANIFEST /home/runner/workspace/data/rutube_profile/Default/shared_proto_db/metadata/MANIFEST-000001
-2026/04/27-14:27:14.834 8a51 Recovering log #3
-2026/04/27-14:27:14.834 8a51 Reusing old log /home/runner/workspace/data/rutube_profile/Default/shared_proto_db/metadata/000003.log 
+2026/04/27-14:36:13.136 8e45 Reusing MANIFEST /home/runner/workspace/data/rutube_profile/Default/shared_proto_db/metadata/MANIFEST-000001
+2026/04/27-14:36:13.138 8e45 Recovering log #3
+2026/04/27-14:36:13.139 8e45 Reusing old log /home/runner/workspace/data/rutube_profile/Default/shared_proto_db/metadata/000003.log 
