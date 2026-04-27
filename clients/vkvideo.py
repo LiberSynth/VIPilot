@@ -88,7 +88,7 @@ def publish(
             _f.write(video_data)
 
         def _do_publish(page, _ctx):
-            _publish_ui(page, club_id, video_path, log_id, batch_id=batch_id)
+            _publish_ui(page, club_id, video_path, pub_title, log_id, batch_id=batch_id)
 
         result = _get_browser("vkvideo").run_pipeline_browser(_do_publish, saved_cookies)
 
@@ -142,7 +142,7 @@ def _read_clip_url(page) -> str:
     return ""
 
 
-def _publish_ui(page, club_id: str, video_path: str, log_id, batch_id=None):
+def _publish_ui(page, club_id: str, video_path: str, pub_title: str, log_id, batch_id=None):
     """Управляет браузером для публикации клипа через UI VK Видео."""
 
     cabinet_url = f"https://cabinet.vkvideo.ru/dashboard/@club{club_id}?showUploader=1&isClipUploading=1"
@@ -234,10 +234,11 @@ def _publish_ui(page, club_id: str, video_path: str, log_id, batch_id=None):
         ).first
         desc_field.wait_for(state="visible", timeout=5_000)
         desc_field.click()
-        desc_field.fill(hashtags())
-        write_log_entry(None, "[vkvideo] Описание заполнено", level='silent')
+        description = f"{pub_title}. {hashtags()}"
+        desc_field.fill(description)
+        write_log_entry(None, f"[vkvideo] Описание заполнено: {description}", level='silent')
         if log_id:
-            write_log_entry(log_id, "VK Видео: Описание заполнено")
+            write_log_entry(log_id, f"VK Видео: Описание заполнено: {description}")
         _snap(page, batch_id)
     except Exception as _e:
         write_log_entry(None, f"[vkvideo] Не удалось заполнить описание: {_e}", level='silent')
