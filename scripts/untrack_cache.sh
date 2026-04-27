@@ -4,5 +4,5 @@
 # Запускать один раз вручную из корня репозитория.
 set -e
 
-git rm -r --cached data/rutube_profile/ data/dzen_profile/ 2>/dev/null || true
+git rm -r --cached data/rutube_profile/ data/dzen_profile/
 echo "Готово. Теперь выполните git commit -m 'Remove browser cache from tracking'."
