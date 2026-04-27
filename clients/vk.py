@@ -83,6 +83,54 @@ def publish_story(video_data: bytes, group_id: int, log_id) -> int | None:
     return None
 
 
+def _clip_url_to_attachment(clip_url: str) -> str:
+    """Преобразует ссылку VK Видео в attachment-строку для wall.post.
+
+    https://vkvideo.ru/clip-236929597_456239776  →  clip-236929597_456239776
+    """
+    if not clip_url:
+        return ""
+    for prefix in ("https://vkvideo.ru/clip", "http://vkvideo.ru/clip", "vkvideo.ru/clip"):
+        if clip_url.startswith(prefix):
+            return "clip" + clip_url[len(prefix):]
+    return ""
+
+
+def publish_clip_wall(clip_url: str, title: str, group_id: int, log_id) -> int | None:
+    """Публикует пост на стену сообщества со ссылкой на существующий клип VK Видео.
+
+    Не загружает видео — только создаёт wall.post с attachment клипа.
+    Возвращает post_id или None.
+    """
+    attachment = _clip_url_to_attachment(clip_url)
+    if not attachment:
+        if log_id:
+            write_log_entry(log_id, f"VK: Не удалось получить attachment из ссылки «{clip_url}»", level='error')
+        return None
+
+    if log_id:
+        write_log_entry(log_id, fmt_id_msg("VK: Публикую пост с клипом: attachment={}, title={}", attachment, title))
+
+    post_resp = requests.post(f'{_VK_API}/wall.post', data={
+        'owner_id':     -group_id,
+        'from_group':   1,
+        'message':      title,
+        'attachments':  attachment,
+        'access_token': _VK_TOKEN,
+        'v': _VK_VER,
+    }, timeout=15).json()
+
+    if 'response' in post_resp:
+        post_id = post_resp['response']['post_id']
+        if log_id:
+            write_log_entry(log_id, fmt_id_msg('VK: Пост с клипом опубликован: post_id={}', post_id))
+        return post_id
+
+    if log_id:
+        write_log_entry(log_id, f"VK: wall.post: {post_resp.get('error', post_resp)}", level='error')
+    return None
+
+
 def publish_wall(video_data: bytes, group_id: int, log_id) -> int | None:
     """Публикует видео на стену сообщества ВКонтакте. Возвращает post_id или None."""
     pub_title = build_publication_title()

@@ -87,8 +87,10 @@ def publish(
         with open(video_path, "wb") as _f:
             _f.write(video_data)
 
+        _state = {"clip_url": ""}
+
         def _do_publish(page, _ctx):
-            _publish_ui(page, club_id, video_path, pub_title, log_id, batch_id=batch_id)
+            _state["clip_url"] = _publish_ui(page, club_id, video_path, pub_title, log_id, batch_id=batch_id)
 
         result = _get_browser("vkvideo").run_pipeline_browser(_do_publish, saved_cookies)
 
@@ -103,7 +105,7 @@ def publish(
 
     if log_id:
         write_log_entry(log_id, "VK Видео: клип опубликован успешно")
-    return True
+    return {"ok": True, "clip_url": _state["clip_url"], "pub_title": pub_title}
 
 
 # ---------------------------------------------------------------------------
@@ -374,3 +376,5 @@ def _publish_ui(page, club_id: str, video_path: str, pub_title: str, log_id, bat
             "VK Видео: форма публикации не открылась и тост успеха не найден — "
             "вероятно, сессия устарела или изменился интерфейс"
         )
+
+    return clip_url

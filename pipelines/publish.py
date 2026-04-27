@@ -61,25 +61,35 @@ def _get_video(batch_id, log_id):
 
 
 
-def _call_vk(slug, method, batch_id, log_id, target):
+def _call_vk(slug, method, batch_id, log_id, target, step_results):
     cfg = target.get('config') or {}
     if not client_is_configured('vk'):
         write_log_entry(log_id, 'VK_USER_TOKEN не задан', level='error')
         return False
-    video_data = _get_video(batch_id, log_id)
     group_id = int(cfg.get('group_id', 236929597))
     if method == 'story':
         write_log_entry(log_id, 'Публикую историю…')
+        video_data = _get_video(batch_id, log_id)
         return vk.publish_story(video_data, group_id, log_id) is not None
     elif method == 'wall':
         write_log_entry(log_id, 'Публикую на стену…')
+        video_data = _get_video(batch_id, log_id)
         return vk.publish_wall(video_data, group_id, log_id) is not None
+    elif method == 'clip_wall':
+        vkvideo_result = step_results.get('vkvideo') or {}
+        clip_url  = vkvideo_result.get('clip_url', '')
+        pub_title = vkvideo_result.get('pub_title', '')
+        if not clip_url:
+            write_log_entry(log_id, 'VK clip_wall: clip_url не получен от шага vkvideo — пропуск', level='error')
+            return False
+        write_log_entry(log_id, f'VK: Публикую пост с клипом VK Видео…')
+        return vk.publish_clip_wall(clip_url, pub_title, group_id, log_id) is not None
     else:
         write_log_entry(log_id, f'VK: неизвестный метод «{method}» — пропуск', level='warn')
         return False
 
 
-def _call_dzen(slug, method, batch_id, log_id, target):
+def _call_dzen(slug, method, batch_id, log_id, target, step_results):
     cfg = target.get('config') or {}
     target_id = target.get('id')
     if not client_is_configured('dzen', cfg, target_id):
@@ -94,7 +104,7 @@ def _call_dzen(slug, method, batch_id, log_id, target):
     return dzen_client.publish(video_data, cfg, log_id, batch_id=batch_id, target_id=target_id)
 
 
-def _call_rutube(slug, method, batch_id, log_id, target):
+def _call_rutube(slug, method, batch_id, log_id, target, step_results):
     cfg = target.get('config') or {}
     target_id = target.get('id')
     if not client_is_configured('rutube', cfg, target_id):
@@ -109,7 +119,7 @@ def _call_rutube(slug, method, batch_id, log_id, target):
     return rutube_client.publish(video_data, cfg, log_id, batch_id=batch_id, target_id=target_id)
 
 
-def _call_vkvideo(slug, method, batch_id, log_id, target):
+def _call_vkvideo(slug, method, batch_id, log_id, target, step_results):
     cfg = target.get('config') or {}
     target_id = target.get('id')
     if not client_is_configured('vkvideo', cfg, target_id):
@@ -121,7 +131,12 @@ def _call_vkvideo(slug, method, batch_id, log_id, target):
 
     video_data = _get_video(batch_id, log_id)
 
-    return vkvideo_client.publish(video_data, cfg, log_id, batch_id=batch_id, target_id=target_id)
+    result = vkvideo_client.publish(video_data, cfg, log_id, batch_id=batch_id, target_id=target_id)
+    step_results['vkvideo'] = {
+        'clip_url':  result.get('clip_url', ''),
+        'pub_title': result.get('pub_title', ''),
+    }
+    return result.get('ok', False)
 
 
 _CLIENTS = {
@@ -132,13 +147,13 @@ _CLIENTS = {
 }
 
 
-def _call_client(slug, method, batch_id, log_id, target):
+def _call_client(slug, method, batch_id, log_id, target, step_results):
     """Диспетчеризует вызов клиента по реестру _CLIENTS. Возвращает True при успехе."""
     handler = _CLIENTS.get(slug)
     if handler is None:
         write_log_entry(log_id, f'Платформа «{slug}» не поддерживается', level='warn')
         return False
-    return handler(slug, method, batch_id, log_id, target)
+    return handler(slug, method, batch_id, log_id, target, step_results)
 
 
 def _parse_composite_status(status: str):
@@ -273,6 +288,7 @@ def run(batch_id, log_id):
     any_ok = False
     failed_steps = []
     expected_from = status
+    step_results = {}  # передаётся между шагами: vkvideo → vk (clip_url, pub_title)
     for step_idx, (slug, method, target) in enumerate(steps):
         if resume_from is not None:
             if (slug, method) != resume_from:
@@ -292,7 +308,7 @@ def run(batch_id, log_id):
 
         step_error = None
         try:
-            ok = _call_client(slug, method, batch_id, log_id, target)
+            ok = _call_client(slug, method, batch_id, log_id, target, step_results)
         except (DzenSessionMissing, DzenCsrfExpired, RutubeSessionMissing, RutubeCsrfExpired, VkVideoSessionMissing, VkVideoCsrfExpired) as e:
             ok = False
             step_error = str(e)
