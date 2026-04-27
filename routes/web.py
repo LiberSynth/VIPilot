@@ -167,8 +167,11 @@ def root_page():
     vk_target  = db_get_target_by_name("VKontakte")
     vk_active  = bool(vk_target.get("active")) if vk_target else False
     _vk_pm     = (vk_target.get("config") or {}).get("publish_method", {}) if vk_target else {}
-    vk_publish_story   = bool(_vk_pm.get("story", 1))
-    vk_publish_wall    = bool(_vk_pm.get("wall",  1))
+    vk_publish_story     = bool(_vk_pm.get("story",     0))
+    vk_publish_wall      = bool(_vk_pm.get("wall",      0))
+    vk_publish_clip_wall = bool(_vk_pm.get("clip_wall", 0))
+    if not vk_publish_story and not vk_publish_wall and not vk_publish_clip_wall:
+        vk_publish_story = True
     video_duration     = max(1, min(60, cycle_config_get("video_duration")))
     video_post_prompt  = cycle_config_get("video_post_prompt")
     buffer_hours       = max(1, min(720, int(settings_get("buffer_hours", "24"))))
@@ -231,6 +234,7 @@ def root_page():
         notify_phone=notify_phone,
         vk_publish_story=vk_publish_story,
         vk_publish_wall=vk_publish_wall,
+        vk_publish_clip_wall=vk_publish_clip_wall,
         video_duration=video_duration,
         video_post_prompt=video_post_prompt,
         buffer_hours=buffer_hours,
@@ -368,14 +372,16 @@ def save():
     if "notify_phone" in request.form:
         settings_set("notify_phone", request.form.get("notify_phone", "").strip())
 
-    if "vk_publish_story" in request.form or "vk_publish_wall" in request.form:
-        vk_story_raw = request.form.get("vk_publish_story", "0")
-        vk_wall_raw  = request.form.get("vk_publish_wall",  "0")
-        if vk_story_raw != "1" and vk_wall_raw != "1":
+    if any(k in request.form for k in ("vk_publish_story", "vk_publish_wall", "vk_publish_clip_wall")):
+        vk_story_raw     = request.form.get("vk_publish_story",     "0")
+        vk_wall_raw      = request.form.get("vk_publish_wall",      "0")
+        vk_clip_wall_raw = request.form.get("vk_publish_clip_wall", "0")
+        if vk_story_raw != "1" and vk_wall_raw != "1" and vk_clip_wall_raw != "1":
             vk_story_raw = "1"
         db_update_target_publish_method_by_slug("vk", {
-            "story": 1 if vk_story_raw == "1" else 0,
-            "wall":  1 if vk_wall_raw  == "1" else 0,
+            "story":     1 if vk_story_raw     == "1" else 0,
+            "wall":      1 if vk_wall_raw      == "1" else 0,
+            "clip_wall": 1 if vk_clip_wall_raw == "1" else 0,
         })
 
     ar_target_id = request.form.get("target_id", "").strip()

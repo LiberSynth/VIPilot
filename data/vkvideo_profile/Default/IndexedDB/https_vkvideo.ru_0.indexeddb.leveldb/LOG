@@ -1,3 +1,3 @@
-2026/04/27-20:35:21.288 1675f Reusing MANIFEST /home/runner/workspace/data/vkvideo_profile/Default/IndexedDB/https_vkvideo.ru_0.indexeddb.leveldb/MANIFEST-000001
-2026/04/27-20:35:21.288 1675f Recovering log #4
-2026/04/27-20:35:21.288 1675f Reusing old log /home/runner/workspace/data/vkvideo_profile/Default/IndexedDB/https_vkvideo.ru_0.indexeddb.leveldb/000004.log 
+2026/04/27-20:56:18.780 172b0 Reusing MANIFEST /home/runner/workspace/data/vkvideo_profile/Default/IndexedDB/https_vkvideo.ru_0.indexeddb.leveldb/MANIFEST-000001
+2026/04/27-20:56:18.780 172b0 Recovering log #4
+2026/04/27-20:56:18.783 172b0 Reusing old log /home/runner/workspace/data/vkvideo_profile/Default/IndexedDB/https_vkvideo.ru_0.indexeddb.leveldb/000004.log 
