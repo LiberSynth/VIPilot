@@ -843,7 +843,16 @@ def api_production_good_movies_meta():
     err = _production_auth_check()
     if err:
         return err
-    return jsonify(db_get_movies_with_video_meta())
+    from db import db_get_movies_list
+    show_published = request.args.get("show_published", "1") != "0"
+    show_bad       = request.args.get("show_bad", "1") != "0"
+    for_approval   = request.args.get("for_approval", "0") == "1"
+    rows = db_get_movies_list(
+        show_published=show_published,
+        show_bad=show_bad,
+        for_approval=for_approval,
+    )
+    return jsonify(rows)
 
 
 @production_bp.route("/production/movies/<movie_id>/download", methods=["GET"])

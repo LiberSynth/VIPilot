@@ -487,15 +487,26 @@
     return String(name || '').replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, ' ').trim();
   }
 
+  function _fmtCreatedAt(isoStr) {
+    if (!isoStr) return 'unknown';
+    var d = new Date(isoStr);
+    var yyyy = d.getUTCFullYear();
+    var mo   = String(d.getUTCMonth() + 1).padStart(2, '0');
+    var dd   = String(d.getUTCDate()).padStart(2, '0');
+    var hh   = String(d.getUTCHours()).padStart(2, '0');
+    var nn   = String(d.getUTCMinutes()).padStart(2, '0');
+    var ss   = String(d.getUTCSeconds()).padStart(2, '0');
+    var zzz  = String(d.getUTCMilliseconds()).padStart(3, '0');
+    return yyyy + '-' + mo + '-' + dd + ' ' + hh + '-' + nn + '-' + ss + '.' + zzz;
+  }
+
   function _buildExportFilename(meta) {
-    var model = (meta.model_name || '').trim();
-    var story = (meta.story_title || '').trim();
-    var b = story || String(meta.id);
+    var dateStr  = _fmtCreatedAt(meta.created_at);
+    var story    = (meta.story_title || '').trim();
+    var b        = story || String(meta.id);
     var gradeRaw = (meta.grade !== null && meta.grade !== undefined) ? String(meta.grade) : null;
-    var grade = gradeRaw ? (GRADE_LABELS[gradeRaw] || '') : '';
-    var parts = [];
-    if (model) parts.push(model);
-    parts.push(b);
+    var grade    = gradeRaw ? (GRADE_LABELS[gradeRaw] || '') : '';
+    var parts    = [dateStr, b];
     if (grade) parts.push(grade);
     return _sanitizeFilename(parts.join(' - ')) + '.mp4';
   }
@@ -503,7 +514,7 @@
   async function _exportMovies(triggerBtn) {
     var metaList;
     try {
-      var r = await fetch('/production/movies/good_meta');
+      var r = await fetch('/production/movies/good_meta?' + getFilterParams());
       if (!r.ok) throw new Error('http ' + r.status);
       metaList = await r.json();
     } catch (e) {
