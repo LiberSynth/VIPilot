@@ -137,12 +137,12 @@ def publish_wall(video_data: bytes, group_id: int, log_id) -> int | None:
         if log_id:
             write_log_entry(log_id, f"shortVideo.edit: {edit_resp['error']}", level='warn')
 
-    # ── 5. Публикуем в клипы и на стену ──────────────────────────────────
+    # ── 5. Публикуем только в клипы ВКВидео (без публикации на стену сообщества) ──
     pub_resp = requests.post(f'{_VK_API}/shortVideo.publish', data={
         'video_id':      video_id,
         'owner_id':      owner_id,
         'license_agree': 1,
-        'wallpost':      1,
+        'wallpost':      0,
         'access_token':  _VK_TOKEN,
         'v': _VK_VER,
     }, timeout=15).json()
@@ -153,5 +153,5 @@ def publish_wall(video_data: bytes, group_id: int, log_id) -> int | None:
         return None
 
     if log_id:
-        write_log_entry(log_id, fmt_id_msg('Клип опубликован в ВКВидео и на стене: video_id={}', video_id))
+        write_log_entry(log_id, fmt_id_msg('Клип опубликован в ВКВидео: video_id={}', video_id))
     return video_id
