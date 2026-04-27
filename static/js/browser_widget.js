@@ -11,8 +11,8 @@
  */
 
 function createBrowserWidget(slug) {
-  var VIEWPORT_W = 900;
-  var VIEWPORT_H = 680;
+  var VIEWPORT_W = 1280;
+  var VIEWPORT_H = 720;
 
   var canvas  = document.getElementById(slug + '-browser-canvas');
   var overlay = document.getElementById(slug + '-browser-overlay');

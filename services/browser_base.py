@@ -20,8 +20,8 @@ from utils.utils import fmt_id_msg
 class PlatformBrowser:
     """Playwright-браузер для авторизации и публикации на одной платформе."""
 
-    _VIEWPORT_W = 900
-    _VIEWPORT_H = 680
+    _VIEWPORT_W = 1280
+    _VIEWPORT_H = 720
     _USER_AGENT = (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
