@@ -96,10 +96,10 @@ def _clip_url_to_attachment(clip_url: str) -> str:
     return ""
 
 
-def publish_clip_wall(clip_url: str, title: str, group_id: int, log_id) -> int | None:
-    """Публикует пост на стену сообщества со ссылкой на существующий клип VK Видео.
+def publish_clip_story(clip_url: str, title: str, group_id: int, log_id) -> int | None:
+    """Публикует историю сообщества со ссылкой на существующий клип VK Видео.
 
-    Не загружает видео — только создаёт wall.post с attachment клипа.
+    Не загружает видео — создаёт wall.post с attachment клипа (публикуется как история).
     Возвращает post_id или None.
     """
     attachment = _clip_url_to_attachment(clip_url)
@@ -109,7 +109,7 @@ def publish_clip_wall(clip_url: str, title: str, group_id: int, log_id) -> int |
         return None
 
     if log_id:
-        write_log_entry(log_id, fmt_id_msg("VK: Публикую пост с клипом: attachment={}, title={}", attachment, title))
+        write_log_entry(log_id, fmt_id_msg("VK: Публикую историю с клипом: attachment={}, title={}", attachment, title))
 
     post_resp = requests.post(f'{_VK_API}/wall.post', data={
         'owner_id':     -group_id,
@@ -123,11 +123,11 @@ def publish_clip_wall(clip_url: str, title: str, group_id: int, log_id) -> int |
     if 'response' in post_resp:
         post_id = post_resp['response']['post_id']
         if log_id:
-            write_log_entry(log_id, fmt_id_msg('VK: Пост с клипом опубликован: post_id={}', post_id))
+            write_log_entry(log_id, fmt_id_msg('VK: История с клипом опубликована: post_id={}', post_id))
         return post_id
 
     if log_id:
-        write_log_entry(log_id, f"VK: wall.post: {post_resp.get('error', post_resp)}", level='error')
+        write_log_entry(log_id, f"VK: wall.post (clip_story): {post_resp.get('error', post_resp)}", level='error')
     return None
 
 

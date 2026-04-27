@@ -138,12 +138,12 @@
         </div>
         <div class="toggle-row" style="margin-top:10px">
           <div>
-            <div class="toggle-label">Пост с клипом VK Видео</div>
+            <div class="toggle-label">История с клипом VK Видео</div>
             <div class="hint" style="margin-top:2px">Клип берётся из шага VK Видео</div>
           </div>
           <label class="toggle-wrap">
-            <input type="hidden" name="vk_publish_clip_wall" id="vk_clip_wall_pub_hidden" value="{{ '1' if vk_publish_clip_wall else '0' }}">
-            <input type="checkbox" id="vk_clip_wall_pub_check" {% if vk_publish_clip_wall %}checked{% endif %}
+            <input type="hidden" name="vk_publish_clip_story" id="vk_clip_story_pub_hidden" value="{{ '1' if vk_publish_clip_story else '0' }}">
+            <input type="checkbox" id="vk_clip_story_pub_check" {% if vk_publish_clip_story %}checked{% endif %}
                    onchange="onVkMethodToggle(this)">
             <span class="toggle-track"></span>
           </label>
