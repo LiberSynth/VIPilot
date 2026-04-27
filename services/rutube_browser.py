@@ -29,6 +29,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from log import write_log_entry
+from utils.utils import fmt_id_msg
 
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RUTUBE_PROFILE_DIR = os.path.join(_PROJECT_ROOT, "data", "rutube_profile")
@@ -166,7 +167,7 @@ def _browser_loop(target_id: str):
                         ok = db_set_target_session_context(_current_target_id, state)
                         if ok:
                             _save_result = {"ok": True, "error": None}
-                            write_log_entry(None, f"[rutube_browser] Сессия сохранена в БД: {len(cookies)} куков, target={_current_target_id}", level='silent')
+                            write_log_entry(None, fmt_id_msg(f"[rutube_browser] Сессия сохранена в БД: {len(cookies)} куков, target={{}}", _current_target_id), level='silent')
                         else:
                             _save_result = {"ok": False, "error": "Ошибка записи в БД"}
                     except Exception as e:
