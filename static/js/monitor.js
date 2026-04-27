@@ -559,7 +559,8 @@
       var li = batchEl.querySelector('.monitor-log-item[data-lid="' + logInfo.id + '"]');
       if (!li) return;
       if (!logInfo.entries || !logInfo.entries.length) return;
-      if (li.querySelector('.monitor-entries')) return;
+      var existingDiv = li.querySelector('.monitor-entries');
+      if (existingDiv) existingDiv.remove();
       var html = '';
       logInfo.entries.forEach(function(en) {
         var lvl = en.level || 'info';
@@ -568,10 +569,11 @@
                   '<span class="monitor-entry-msg ' + esc(lvl) + '">' + esc(en.message || '') + '</span>' +
                 '</div>';
       });
-      var chevron = '<span class="monitor-log-chevron">▼</span>';
       var entriesDiv = '<div class="monitor-entries">' + html + '</div>';
       var headerTop = li.querySelector('.monitor-log-header-top');
-      if (headerTop) headerTop.insertAdjacentHTML('beforeend', chevron);
+      if (headerTop && !headerTop.querySelector('.monitor-log-chevron')) {
+        headerTop.insertAdjacentHTML('beforeend', '<span class="monitor-log-chevron">▼</span>');
+      }
       li.insertAdjacentHTML('beforeend', entriesDiv);
       if (lidsToOpen[logInfo.id]) li.classList.add('open');
     });
