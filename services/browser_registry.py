@@ -33,7 +33,7 @@ _CONFIGS = {
     "vkvideo": dict(
         platform_name="vkvideo",
         profile_dir=os.path.join(_PROJECT_ROOT, "data", "vkvideo_profile"),
-        start_url="https://vkvideo.ru/",
+        start_url="about:blank",
         cookie_domains=["https://vkvideo.ru", "https://vk.com"],
         thread_name="vkvideo-browser",
     ),
