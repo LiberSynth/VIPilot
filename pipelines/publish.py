@@ -165,12 +165,8 @@ def _parse_composite_status(status: str):
 
 
 def _build_steps(active_targets):
-    """Строит список шагов публикации: [(slug, method, target), ...] по алфавиту метода внутри таргета.
-
-    vk.clip_wall всегда ставится после всех vkvideo-шагов, так как требует clip_url из step_results.
-    """
+    """Строит список шагов публикации: [(slug, method, target), ...] по алфавиту метода внутри таргета."""
     steps = []
-    deferred = []
     for t in active_targets:
         slug = t.get('slug') or ''
         if not slug:
@@ -179,11 +175,8 @@ def _build_steps(active_targets):
         methods = cfg.get('publish_method') or {}
         enabled_methods = sorted(k for k, v in methods.items() if str(v).strip() not in ('0', '', 'false', 'False'))
         for method in enabled_methods:
-            if slug == 'vk' and method == 'clip_wall':
-                deferred.append((slug, method, t))
-            else:
-                steps.append((slug, method, t))
-    return steps + deferred
+            steps.append((slug, method, t))
+    return steps
 
 
 def run(batch_id, log_id):
