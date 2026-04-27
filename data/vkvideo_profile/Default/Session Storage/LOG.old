@@ -1,3 +1,6 @@
-2026/04/27-21:11:21.140 17dba Reusing MANIFEST /home/runner/workspace/data/vkvideo_profile/Default/Session Storage/MANIFEST-000001
-2026/04/27-21:11:21.140 17dba Recovering log #3
-2026/04/27-21:11:21.140 17dba Reusing old log /home/runner/workspace/data/vkvideo_profile/Default/Session Storage/000003.log 
+2026/04/27-21:23:00.274 18427 Reusing MANIFEST /home/runner/workspace/data/vkvideo_profile/Default/Session Storage/MANIFEST-000001
+2026/04/27-21:23:00.274 18427 Recovering log #3
+2026/04/27-21:23:00.275 18427 Reusing old log /home/runner/workspace/data/vkvideo_profile/Default/Session Storage/000003.log 
+2026/04/27-21:23:04.040 18427 Level-0 table #5: started
+2026/04/27-21:23:04.047 18427 Level-0 table #5: 18398 bytes OK
+2026/04/27-21:23:04.053 18427 Delete type=0 #3
