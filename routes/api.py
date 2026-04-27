@@ -74,18 +74,6 @@ def publication_file_name(title: str) -> str:
     return title + '.mp4'
 
 
-def resolve_batch_title(batch_id: str) -> str:
-    """Возвращает заголовок сюжета батча или 'Видео'."""
-    from db import db_get_batch_by_id
-    batch = db_get_batch_by_id(batch_id)
-    story_id = batch.get('story_id') if batch else None
-    if story_id:
-        title = db_get_story_title(str(story_id)) or ''
-        if title:
-            return title
-    return 'Видео'
-
-
 def client_is_configured(slug: str, cfg: dict = None, target_id: str = None) -> bool:
     """Возвращает True если клиент с данным slug настроен."""
     cfg = cfg or {}
