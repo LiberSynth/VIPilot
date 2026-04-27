@@ -49,10 +49,8 @@ function collectAllSettings(activeTab) {
     const approveVal = chkApproveStories ? (chkApproveStories.checked ? '1' : '0') : (hidApproveStories ? hidApproveStories.value : '0');
     data.set('approve_stories', approveVal);
   }
-  setIfExists('vk_publish_story',      'vk_story_pub_hidden');
-  setIfExists('vk_publish_wall',       'vk_wall_pub_hidden');
-  setIfExists('vk_publish_clip_story', 'vk_clip_story_pub_hidden');
-  setIfExists('vk_publish_clip_wall',  'vk_clip_wall_pub_hidden');
+  setIfExists('vk_publish_story', 'vk_story_pub_hidden');
+  setIfExists('vk_publish_wall',  'vk_wall_pub_hidden');
   setIfExists('aspect_ratio_x',   'ar-x');
   setIfExists('aspect_ratio_y',   'ar-y');
   setIfExists('target_id',        'target_id');
@@ -106,9 +104,20 @@ function onApproveStoriesToggle(chk) {
 }
 
 function onVkMethodToggle(changedChk) {
-  const hidId = changedChk.id.replace('_check', '_hidden');
-  const hid = document.getElementById(hidId);
-  if (hid) hid.value = changedChk.checked ? '1' : '0';
+  const ids = [
+    { chk: 'vk_story_pub_check',     hid: 'vk_story_pub_hidden' },
+    { chk: 'vk_wall_pub_check',      hid: 'vk_wall_pub_hidden' },
+    { chk: 'vk_clip_wall_pub_check', hid: 'vk_clip_wall_pub_hidden' },
+  ];
+  const anyChecked = ids.some(o => document.getElementById(o.chk) && document.getElementById(o.chk).checked);
+  if (!anyChecked) {
+    changedChk.checked = true;
+  }
+  ids.forEach(o => {
+    const el  = document.getElementById(o.chk);
+    const hid = document.getElementById(o.hid);
+    if (el && hid) hid.value = el.checked ? '1' : '0';
+  });
   savePublishSettings();
 }
 

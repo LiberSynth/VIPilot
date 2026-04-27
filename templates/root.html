@@ -113,10 +113,10 @@
           </div>
         </div>
         <div style="border-top:1px solid var(--border,rgba(255,255,255,.07));margin:14px 0 0"></div>
+        <div class="hint" style="margin-top:10px">Хотя бы одна опция должна быть включена.</div>
         <div class="toggle-row" style="margin-top:10px">
           <div>
             <div class="toggle-label">Публиковать историю</div>
-            <div class="hint" style="margin-top:2px">Видео берётся из шага генерации</div>
           </div>
           <label class="toggle-wrap">
             <input type="hidden" name="vk_publish_story" id="vk_story_pub_hidden" value="{{ '1' if vk_publish_story else '0' }}">
@@ -128,7 +128,6 @@
         <div class="toggle-row" style="margin-top:10px">
           <div>
             <div class="toggle-label">Публиковать на стену</div>
-            <div class="hint" style="margin-top:2px">Видео берётся из шага генерации</div>
           </div>
           <label class="toggle-wrap">
             <input type="hidden" name="vk_publish_wall" id="vk_wall_pub_hidden" value="{{ '1' if vk_publish_wall else '0' }}">
@@ -139,19 +138,7 @@
         </div>
         <div class="toggle-row" style="margin-top:10px">
           <div>
-            <div class="toggle-label">История с клипом VK Видео</div>
-            <div class="hint" style="margin-top:2px">Клип берётся из шага VK Видео</div>
-          </div>
-          <label class="toggle-wrap">
-            <input type="hidden" name="vk_publish_clip_story" id="vk_clip_story_pub_hidden" value="{{ '1' if vk_publish_clip_story else '0' }}">
-            <input type="checkbox" id="vk_clip_story_pub_check" {% if vk_publish_clip_story %}checked{% endif %}
-                   onchange="onVkMethodToggle(this)">
-            <span class="toggle-track"></span>
-          </label>
-        </div>
-        <div class="toggle-row" style="margin-top:10px">
-          <div>
-            <div class="toggle-label">Пост на стену с клипом VK Видео</div>
+            <div class="toggle-label">Пост с клипом VK Видео</div>
             <div class="hint" style="margin-top:2px">Клип берётся из шага VK Видео</div>
           </div>
           <label class="toggle-wrap">

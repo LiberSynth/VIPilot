@@ -10,7 +10,6 @@ from .db_simple import (
     db_add_schedule_slot,
     db_delete_schedule_slot,
     db_get_active_targets,
-    db_get_all_targets,
     db_update_target_transcode,
     db_update_target_aspect_ratio,
     db_get_target_by_name,

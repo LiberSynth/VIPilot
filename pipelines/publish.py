@@ -75,15 +75,6 @@ def _call_vk(slug, method, batch_id, log_id, target, step_results):
         write_log_entry(log_id, 'Публикую на стену…')
         video_data = _get_video(batch_id, log_id)
         return vk.publish_wall(video_data, group_id, log_id) is not None
-    elif method == 'clip_story':
-        vkvideo_result = step_results.get('vkvideo') or {}
-        clip_url  = vkvideo_result.get('clip_url', '')
-        pub_title = vkvideo_result.get('pub_title', '')
-        if not clip_url:
-            write_log_entry(log_id, 'VK clip_story: clip_url не получен от шага vkvideo — пропуск', level='error')
-            return False
-        write_log_entry(log_id, 'VK: Публикую историю с клипом VK Видео…')
-        return vk.publish_clip_story(clip_url, pub_title, group_id, log_id) is not None
     elif method == 'clip_wall':
         vkvideo_result = step_results.get('vkvideo') or {}
         clip_url  = vkvideo_result.get('clip_url', '')
@@ -91,7 +82,7 @@ def _call_vk(slug, method, batch_id, log_id, target, step_results):
         if not clip_url:
             write_log_entry(log_id, 'VK clip_wall: clip_url не получен от шага vkvideo — пропуск', level='error')
             return False
-        write_log_entry(log_id, 'VK: Публикую пост на стену с клипом VK Видео…')
+        write_log_entry(log_id, f'VK: Публикую пост с клипом VK Видео…')
         return vk.publish_clip_wall(clip_url, pub_title, group_id, log_id) is not None
     else:
         write_log_entry(log_id, f'VK: неизвестный метод «{method}» — пропуск', level='warn')
