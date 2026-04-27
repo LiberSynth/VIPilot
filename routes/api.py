@@ -543,8 +543,9 @@ def api_batch_publish_frame(batch_id):
     """Возвращает последний JPEG-скриншот браузера публикации для батча."""
     if not is_authenticated():
         return Response("Unauthorized", status=401)
-    from services.dzen_browser import get_frame_for_batch
-    img = get_frame_for_batch(batch_id)
+    from services.dzen_browser import get_frame_for_batch as dzen_get_frame
+    from services.rutube_browser import get_frame_for_batch as rutube_get_frame
+    img = dzen_get_frame(batch_id) or rutube_get_frame(batch_id)
     if img is None:
         return Response("", status=204)
     return Response(
