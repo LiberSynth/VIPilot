@@ -30,6 +30,8 @@ from utils.utils import fmt_id_msg
 from clients import vk
 from clients import dzen as dzen_client
 from clients.dzen import DzenCsrfExpired, DzenSessionMissing
+from clients import rutube as rutube_client
+from clients.rutube import RutubeCsrfExpired, RutubeSessionMissing
 
 
 def is_scheduled(batch) -> bool:
@@ -105,9 +107,26 @@ def _call_dzen(slug, method, batch_id, log_id, target):
     return dzen_client.publish(video_data, cfg, title, log_id, batch_id=batch_id, target_id=target_id)
 
 
+def _call_rutube(slug, method, batch_id, log_id, target):
+    cfg = target.get('config') or {}
+    target_id = target.get('id')
+    if not rutube_client.is_configured(cfg, target_id):
+        if not cfg.get('person_id'):
+            write_log_entry(log_id, 'Рутьюб не настроен: person_id отсутствует', level='error')
+        else:
+            write_log_entry(log_id, 'Рутьюб: браузерная сессия не сохранена — авторизуйтесь на вкладке «Публикация»', level='error')
+        return False
+
+    video_data = _get_video(batch_id, log_id)
+
+    title = _resolve_title(batch_id, log_id)
+    return rutube_client.publish(video_data, cfg, title, log_id, batch_id=batch_id, target_id=target_id)
+
+
 _CLIENTS = {
-    'vk':   _call_vk,
-    'dzen': _call_dzen,
+    'vk':     _call_vk,
+    'dzen':   _call_dzen,
+    'rutube': _call_rutube,
 }
 
 
@@ -272,7 +291,7 @@ def run(batch_id, log_id):
         step_error = None
         try:
             ok = _call_client(slug, method, batch_id, log_id, target)
-        except (DzenSessionMissing, DzenCsrfExpired) as e:
+        except (DzenSessionMissing, DzenCsrfExpired, RutubeSessionMissing, RutubeCsrfExpired) as e:
             ok = False
             step_error = str(e)
             write_log_entry(log_id, f'{slug}.{method}: {e}', level='error')
