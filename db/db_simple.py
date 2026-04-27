@@ -147,6 +147,29 @@ def db_get_active_targets():
     ]
 
 
+def db_get_all_targets():
+    """Возвращает все таргеты (активные и неактивные), отсортированные по order."""
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                'SELECT id, name, aspect_ratio_x, aspect_ratio_y, transcode, config, slug, active FROM targets ORDER BY "order", name'
+            )
+            rows = cur.fetchall()
+    return [
+        {
+            "id": str(row[0]),
+            "name": row[1],
+            "aspect_ratio_x": row[2],
+            "aspect_ratio_y": row[3],
+            "transcode": bool(row[4]),
+            "config": row[5] or {},
+            "slug": row[6] or "",
+            "active": bool(row[7]),
+        }
+        for row in rows
+    ]
+
+
 def db_update_target_transcode(target_id, value: bool):
     with get_db() as conn:
         with conn.cursor() as cur:
