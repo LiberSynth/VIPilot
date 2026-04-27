@@ -1,4 +1,4 @@
-import os
+Опубликовать". import os
 import random
 import threading
 import time
