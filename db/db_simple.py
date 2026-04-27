@@ -58,21 +58,6 @@ def env_set(key, value):
         conn.commit()
 
 
-def db_next_publication_number() -> int:
-    """Атомарно инкрементирует счётчик публикаций и возвращает новое значение."""
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute("""
-                UPDATE environment
-                SET value = (CAST(value AS INTEGER) + 1)::TEXT
-                WHERE key = 'publication_counter'
-                RETURNING CAST(value AS INTEGER)
-            """)
-            row = cur.fetchone()
-        conn.commit()
-    return row[0] if row else 1
-
-
 def settings_get(key, default=""):
     with get_db() as conn:
         with conn.cursor() as cur:

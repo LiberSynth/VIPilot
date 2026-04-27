@@ -116,10 +116,7 @@ _RUBRICATOR_ADJECTIVES = {
 
 
 def build_publication_title() -> str:
-    """Возвращает уникальный заголовок публикации с согласованным рубрикатором и порядковым номером."""
-    from db import db_next_publication_number
-    num = db_next_publication_number()
-
+    """Возвращает заголовок публикации с согласованным рубрикатором."""
     msk     = datetime.now(timezone(timedelta(hours=3)))
     month   = msk.month
     hour    = msk.hour
@@ -146,7 +143,7 @@ def build_publication_title() -> str:
     gender_idx = {'m': 0, 'f': 1, 'n': 2}[_RUBRICATOR[rubricator]]
     adjective  = _RUBRICATOR_ADJECTIVES[category][idx][gender_idx]
 
-    return f"{adjective} {rubricator} №{num}"
+    return f"{adjective} {rubricator}"
 
 
 def publication_file_name(title: str) -> str:
