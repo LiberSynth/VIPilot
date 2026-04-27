@@ -5,7 +5,7 @@
   var GRADE_CYCLE       = ['good', 'bad', null];
 
 
-  var _selectedMovieId = null;
+  var _expandedMovieId = null;
   var _moviesData      = [];
   var _pollTimer       = null;
   var _pollVersion     = 0;
@@ -118,89 +118,19 @@
     return params.toString();
   }
 
-  /* ── плашка grade в карточке ВИДЕО ── */
-  function setCardMovieGradeBadge(grade, hidden) {
-    var btn = document.getElementById('card-movie-grade');
-    if (!btn) return;
-    if (hidden) { btn.hidden = true; btn.disabled = true; return; }
-    var gk = gradeKey(grade);
-    btn.hidden   = false;
-    btn.disabled = false;
-    btn.setAttribute('data-grade', gk);
-    btn.style.background = gk !== 'null' ? (GRADE_COLORS[gk] || '') : '';
-    btn.style.color      = gk !== 'null' ? (GRADE_TEXT_COLORS[gk] || '') : '';
-    btn.textContent = GRADE_LABELS[gk] || gk;
-    btn.title = 'Оценка: ' + (GRADE_LABELS[gk] || gk) + '. Нажмите для смены';
+  /* ── синглтон плеера: перемещение между строками ── */
+  function _getPlayerCard()   { return document.getElementById('director-player-card'); }
+  function _getPlayerHolder() { return document.getElementById('director-player-holder'); }
+
+  function _detachPlayer() {
+    var card   = _getPlayerCard();
+    var holder = _getPlayerHolder();
+    if (card && holder && card.parentNode !== holder) holder.appendChild(card);
   }
 
-  function initCardMovieGradeBadge() {
-    var btn = document.getElementById('card-movie-grade');
-    if (!btn) return;
-    var _cardReqId = 0;
-    btn.addEventListener('click', function() {
-      if (btn.disabled || !_selectedMovieId) return;
-      var movieId = _selectedMovieId;
-      var currentAttr = btn.getAttribute('data-grade');
-      var current = currentAttr === 'null' ? null : currentAttr;
-      var idx = GRADE_CYCLE.indexOf(current);
-      var next = GRADE_CYCLE[(idx + 1) % GRADE_CYCLE.length];
-      var prevAttr = currentAttr;
-      var myReqId = ++_cardReqId;
-      setCardMovieGradeBadge(next, false);
-      _syncListRowGrade(movieId, next);
-      fetch('/production/movie/' + movieId + '/grade', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ grade: next }),
-      })
-      .then(function(r) { return r.ok ? r.json() : null; })
-      .then(function(d) {
-        if (myReqId !== _cardReqId) return;
-        if (d && d.ok) {
-          var g = d.grade !== undefined ? d.grade : null;
-          _syncListRowGrade(movieId, g);
-          if (String(movieId) === String(_selectedMovieId)) setCardMovieGradeBadge(g, false);
-          window.loadMovieList();
-        } else {
-          var prev = prevAttr === 'null' ? null : prevAttr;
-          _syncListRowGrade(movieId, prev);
-          if (String(movieId) === String(_selectedMovieId)) setCardMovieGradeBadge(prev, false);
-        }
-      })
-      .catch(function() {
-        if (myReqId !== _cardReqId) return;
-        var prev = prevAttr === 'null' ? null : prevAttr;
-        _syncListRowGrade(movieId, prev);
-        if (String(movieId) === String(_selectedMovieId)) setCardMovieGradeBadge(prev, false);
-      });
-    });
-  }
-
-  /* синхронизирует плашку в строке списка без перезагрузки */
-  function _syncListRowGrade(movieId, grade) {
-    var container = document.getElementById('movies-list');
-    if (!container) return;
-    var btn = container.querySelector('.story-grade-badge[data-id="' + movieId + '"]');
-    if (!btn) return;
-    var gk = gradeKey(grade);
-    btn.setAttribute('data-grade', gk);
-    btn.style.background = gk !== 'null' ? (GRADE_COLORS[gk] || '') : '';
-    btn.style.color      = gk !== 'null' ? (GRADE_TEXT_COLORS[gk] || '') : '';
-    btn.textContent = GRADE_LABELS[gk] || gk;
-    btn.title = 'Оценка: ' + (GRADE_LABELS[gk] || gk) + '. Нажмите для смены';
-  }
-
-  /* ── выделение строки в списке ── */
-  function _updateMovieSelection() {
-    var container = document.getElementById('movies-list');
-    if (!container) return;
-    container.querySelectorAll('.story-row--selected').forEach(function(r) {
-      r.classList.remove('story-row--selected');
-    });
-    if (_selectedMovieId) {
-      var sel = container.querySelector('.story-row[data-id="' + _selectedMovieId + '"]');
-      if (sel) sel.classList.add('story-row--selected');
-    }
+  function _attachPlayerToExpand(expandEl) {
+    var card = _getPlayerCard();
+    if (card && expandEl) expandEl.appendChild(card);
   }
 
   /* ── плеер: высота рамки ── */
@@ -216,61 +146,73 @@
 
   /* ── плеер ── */
   function loadMovieInPlayer(movieId, forceNoAutoplay) {
-    var wrap    = document.getElementById('director-video-wrap');
-    var titleEl = document.getElementById('director-movie-title');
+    var wrap = document.getElementById('director-video-wrap');
     if (!wrap) return;
     if (!movieId) {
       wrap.innerHTML = '<video class="probe-video" controls></video>';
-      if (titleEl) { titleEl.textContent = ''; titleEl.style.display = 'none'; }
-      setCardMovieGradeBadge(null, true);
       updateVideoWrapHeight();
       return;
-    }
-    var rec = _moviesData.filter(function(m) { return String(m.id) === String(movieId); })[0];
-    if (titleEl) {
-      var title = (rec && rec.story_title) ? rec.story_title : '';
-      var model = (rec && rec.model_name)  ? rec.model_name  : '';
-      var modelLabel = model ? ' <span class="story-model-name">(' + escHtml(model) + ')</span>' : '';
-      titleEl.innerHTML = escHtml(title) + modelLabel;
-      titleEl.style.display = (title || model) ? '' : 'none';
     }
     var src = '/production/movie/' + encodeURIComponent(movieId) + '/video';
     var autoplayChk = document.getElementById('director-autoplay-check');
     var autoplayAttr = (!forceNoAutoplay && autoplayChk && autoplayChk.checked) ? ' autoplay' : '';
     wrap.innerHTML = '<video class="probe-video" controls' + autoplayAttr + ' src="' + src + '"></video>';
-    setCardMovieGradeBadge(rec ? rec.grade : null, false);
     updateVideoWrapHeight();
   }
 
   function selectMovie(movieId, forceNoAutoplay) {
     _stopActiveBatchPoll();
     _setHint(_HINT_DEFAULT);
-    _selectedMovieId = movieId || null;
-    _updateMovieSelection();
-    loadMovieInPlayer(_selectedMovieId, forceNoAutoplay);
-    if (_selectedMovieId) {
-      var rec = _moviesData.filter(function(m) { return String(m.id) === String(_selectedMovieId); })[0];
-      if (rec && rec.active_batch_id) {
-        _startActiveBatchPoll(rec.active_batch_id, _selectedMovieId);
+
+    if (_expandedMovieId) {
+      var oldRow = document.querySelector('#movies-list .story-row[data-id="' + _expandedMovieId + '"]');
+      if (oldRow) oldRow.classList.remove('story-row--expanded');
+      _detachPlayer();
+    }
+
+    _expandedMovieId = movieId || null;
+
+    if (_expandedMovieId) {
+      var newRow = document.querySelector('#movies-list .story-row[data-id="' + _expandedMovieId + '"]');
+      if (newRow) {
+        newRow.classList.add('story-row--expanded');
+        var expandEl = newRow.querySelector('.story-expand');
+        if (expandEl) _attachPlayerToExpand(expandEl);
+        newRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }
+      loadMovieInPlayer(_expandedMovieId, forceNoAutoplay);
+      var rec = _moviesData.filter(function(m) { return String(m.id) === String(_expandedMovieId); })[0];
+      if (rec && rec.active_batch_id) {
+        _startActiveBatchPoll(rec.active_batch_id, _expandedMovieId);
+      }
+    }
+  }
+
+  function toggleMovie(movieId) {
+    if (_expandedMovieId && String(_expandedMovieId) === String(movieId)) {
+      selectMovie(null);
+    } else {
+      selectMovie(movieId);
     }
   }
 
   /* ── рендер списка ── */
   function renderMovies(movies) {
     _moviesData = movies || [];
-    if (_selectedMovieId) {
-      var stillExists = _moviesData.some(function(m) { return String(m.id) === String(_selectedMovieId); });
-      if (!stillExists) selectMovie(null);
-    }
     var container = document.getElementById('movies-list');
     if (!container) return;
+
+    var prevExpandedId = _expandedMovieId;
+    _detachPlayer();
+
     if (!_moviesData.length) {
+      _expandedMovieId = null;
       updateCount(0);
       container.innerHTML = '<div class="stories-empty">Нет видео</div>';
       return;
     }
     updateCount(_moviesData.length);
+    var chevronSvg = '<svg viewBox="0 0 12 7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 1l5 5 5-5"/></svg>';
     var html = '';
     for (var i = 0; i < _moviesData.length; i++) {
       var m = _moviesData[i];
@@ -302,14 +244,21 @@
         + '<polyline points="2,4 14,4"/><path d="M6 4V2h4v2"/><rect x="3" y="4" width="10" height="10" rx="1.5"/><line x1="6" y1="7" x2="6" y2="11"/><line x1="10" y1="7" x2="10" y2="11"/>'
         + '</svg></button>';
       html += '<div class="story-row" data-id="' + m.id + '">'
-        + '<div class="story-title">' + escHtml(m.story_title || '(без названия)') + modelLabel + ' ' + gradeBadge + '</div>'
-        + '<div class="story-row-right">' + publishedIcon + infoBtn + deleteBtn + '</div>'
+        + '<div class="story-row-header">'
+          + '<div class="story-title">' + escHtml(m.story_title || '(без названия)') + modelLabel + ' ' + gradeBadge + '</div>'
+          + '<div class="story-row-right">' + publishedIcon + infoBtn + deleteBtn
+            + '<button class="story-chevron" title="Развернуть">' + chevronSvg + '</button>'
+          + '</div>'
+        + '</div>'
+        + '<div class="story-expand"></div>'
         + '</div>';
     }
     container.innerHTML = html;
-    container.querySelectorAll('.story-row').forEach(function(row) {
-      row.addEventListener('click', function() {
-        selectMovie(row.getAttribute('data-id'));
+
+    container.querySelectorAll('.story-row-header').forEach(function(header) {
+      var row = header.closest('.story-row');
+      header.addEventListener('click', function() {
+        toggleMovie(row.getAttribute('data-id'));
       });
     });
     container.querySelectorAll('.story-grade-badge').forEach(function(btn) {
@@ -336,11 +285,18 @@
         _openDeleteMovieDialog(movieId, movieTitle, btn);
       });
     });
-    _updateMovieSelection();
-    /* обновляем плашку карточки если выбранный фильм есть в новом списке */
-    if (_selectedMovieId) {
-      var rec = _moviesData.filter(function(m) { return String(m.id) === String(_selectedMovieId); })[0];
-      if (rec) setCardMovieGradeBadge(rec.grade !== undefined ? rec.grade : null, false);
+
+    /* ── Восстановление раскрытой строки после перерисовки ── */
+    if (prevExpandedId) {
+      var expandRow = container.querySelector('.story-row[data-id="' + prevExpandedId + '"]');
+      if (expandRow) {
+        _expandedMovieId = prevExpandedId;
+        expandRow.classList.add('story-row--expanded');
+        var expandEl = expandRow.querySelector('.story-expand');
+        if (expandEl) _attachPlayerToExpand(expandEl);
+      } else {
+        _expandedMovieId = null;
+      }
     }
   }
 
@@ -361,9 +317,6 @@
     btn.style.color      = nextGk !== 'null' ? (GRADE_TEXT_COLORS[nextGk] || '') : '';
     btn.textContent = GRADE_LABELS[nextGk] || nextGk;
     btn.title = 'Оценка: ' + (GRADE_LABELS[nextGk] || nextGk) + '. Нажмите для смены';
-    if (String(movieId) === String(_selectedMovieId)) {
-      setCardMovieGradeBadge(next, false);
-    }
     fetch('/production/movie/' + movieId + '/grade', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -380,9 +333,6 @@
         btn.style.color      = gk !== 'null' ? (GRADE_TEXT_COLORS[gk] || '') : '';
         btn.textContent = GRADE_LABELS[gk] || gk;
         btn.title = 'Оценка: ' + (GRADE_LABELS[gk] || gk) + '. Нажмите для смены';
-        if (String(movieId) === String(_selectedMovieId)) {
-          setCardMovieGradeBadge(g, false);
-        }
       } else {
         var prevGk = gradeKey(prevAttr === 'null' ? null : prevAttr);
         btn.setAttribute('data-grade', prevGk);
@@ -390,9 +340,6 @@
         btn.style.color      = prevGk !== 'null' ? (GRADE_TEXT_COLORS[prevGk] || '') : '';
         btn.textContent = GRADE_LABELS[prevGk] || prevGk;
         btn.title = 'Оценка: ' + (GRADE_LABELS[prevGk] || prevGk) + '. Нажмите для смены';
-        if (String(movieId) === String(_selectedMovieId)) {
-          setCardMovieGradeBadge(prevAttr === 'null' ? null : prevAttr, false);
-        }
       }
     })
     .catch(function() {
@@ -403,9 +350,6 @@
       btn.style.color      = prevGk !== 'null' ? (GRADE_TEXT_COLORS[prevGk] || '') : '';
       btn.textContent = GRADE_LABELS[prevGk] || prevGk;
       btn.title = 'Оценка: ' + (GRADE_LABELS[prevGk] || prevGk) + '. Нажмите для смены';
-      if (String(movieId) === String(_selectedMovieId)) {
-        setCardMovieGradeBadge(prevAttr === 'null' ? null : prevAttr, false);
-      }
     });
   }
 
@@ -423,7 +367,7 @@
           .then(function() {
             dlg.close();
             if (typeof window.showToast === 'function') window.showToast('Видео удалено');
-            if (String(movieId) === String(_selectedMovieId)) {
+            if (String(movieId) === String(_expandedMovieId)) {
               selectMovie(null);
             }
             window.loadMovieList();
@@ -644,18 +588,16 @@
 
   function initDirector() {
     initFilters();
-    initCardMovieGradeBadge();
     initDeleteBadMoviesButton();
     initImportMovieButton();
     initExportGoodMoviesButton();
     initAutoplayToggle();
-    loadMovieInPlayer(null);
     window.addEventListener('resize', updateVideoWrapHeight);
   }
 
   window._directorApi = {
     startBatchPoll: _startActiveBatchPoll,
-    getSelectedMovieId: function() { return _selectedMovieId; },
+    getSelectedMovieId: function() { return _expandedMovieId; },
   };
 
   if (document.readyState === 'loading') {

@@ -161,17 +161,15 @@
         <span class="story-generate-count-label">штук</span>
       </div>
       <div id="director-generate-hint" class="story-generate-hint">Вы можете сгенерировать ролик при помощи AI-модели.</div>
-      <div class="card-draft-header" style="margin-top:8px">
-        <div class="card-top-actions" style="margin-left:auto">
-          <button id="card-movie-grade" class="story-grade-badge" hidden data-grade="null" title="Оценка. Нажмите для смены"></button>
-        </div>
+    </div>
+    <div id="director-player-holder" hidden>
+      <div id="director-player-card">
+        <div id="director-video-wrap"></div>
+        <label class="sw-filter-row" style="margin-top:8px" for="director-autoplay-check">
+          <span class="sw-filter-label">Автозапуск</span>
+          <input class="sw-filter-check" type="checkbox" id="director-autoplay-check" {% if autoplay_movie %}checked{% endif %}>
+        </label>
       </div>
-      <div id="director-movie-title" style="display:none; font-size:13px; color:#ccc; margin-bottom:8px; font-weight:500"></div>
-      <div id="director-video-wrap"></div>
-      <label class="sw-filter-row" style="margin-top:8px" for="director-autoplay-check">
-        <span class="sw-filter-label">Автозапуск</span>
-        <input class="sw-filter-check" type="checkbox" id="director-autoplay-check" {% if autoplay_movie %}checked{% endif %}>
-      </label>
     </div>
 
     <div class="card" style="margin-top:0">
