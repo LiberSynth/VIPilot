@@ -82,7 +82,7 @@ def publish(
             _f.write(video_data)
 
         def _do_publish(page, _ctx):
-            _publish_ui(page, video_path, title, log_id, batch_id=batch_id)
+            _publish_ui(page, video_path, log_id, batch_id=batch_id)
 
         result = run_pipeline_browser(_do_publish, saved_cookies)
 
@@ -116,10 +116,8 @@ def _snap(page, batch_id=None) -> None:
         write_log_entry(None, f"[rutube] _snap: {_e}", level='silent')
 
 
-def _publish_ui(page, video_path: str, title: str, log_id, batch_id=None):
+def _publish_ui(page, video_path: str, log_id, batch_id=None):
     """Управляет браузером для публикации видео через UI Рутьюба."""
-
-    safe_name = safe_filename(title)
 
     # ── Шаг 1: Переходим в студию ────────────────────────────────────────
     write_log_entry(None, f"[rutube] Переход в студию: {STUDIO_URL}", level='silent')
@@ -203,20 +201,7 @@ def _publish_ui(page, video_path: str, title: str, log_id, batch_id=None):
         page.wait_for_timeout(5000)
     _snap(page, batch_id)
 
-    # ── Шаг 6: Заполняем/исправляем Название ─────────────────────────────
-    write_log_entry(None, f"[rutube] Устанавливаю заголовок: «{safe_name}»…", level='silent')
-    if log_id:
-        write_log_entry(log_id, "Рутьюб: Устанавливаю заголовок…")
-    try:
-        title_input = page.locator("input").first
-        title_input.wait_for(state="visible", timeout=5_000)
-        title_input.triple_click()
-        title_input.type(safe_name[:100])
-        page.wait_for_timeout(500)
-    except Exception as _e:
-        write_log_entry(None, f"[rutube] Не удалось заполнить заголовок: {_e}", level='silent')
-
-    # ── Шаг 7: Выбираем категорию ─────────────────────────────────────────
+    # ── Шаг 6: Выбираем категорию ─────────────────────────────────────────
     write_log_entry(None, f"[rutube] Выбираю категорию «{_CATEGORY}»…", level='silent')
     if log_id:
         write_log_entry(log_id, f"Рутьюб: Выбираю категорию «{_CATEGORY}»…")
@@ -248,7 +233,7 @@ def _publish_ui(page, video_path: str, title: str, log_id, batch_id=None):
             "вероятно, сессия устарела или изменился интерфейс"
         )
 
-    # ── Шаг 8: Нажимаем «Опубликовать» ───────────────────────────────────
+    # ── Шаг 7: Нажимаем «Опубликовать» ───────────────────────────────────
     write_log_entry(None, "[rutube] Нажимаю «Опубликовать»…", level='silent')
     if log_id:
         write_log_entry(log_id, "Рутьюб: Нажимаю «Опубликовать»…")
@@ -258,7 +243,7 @@ def _publish_ui(page, video_path: str, title: str, log_id, batch_id=None):
     page.wait_for_timeout(2000)
     _snap(page, batch_id)
 
-    # ── Шаг 9: Проверяем успех (toast «Видео опубликовано») ──────────────
+    # ── Шаг 8: Проверяем успех (toast «Видео опубликовано») ──────────────
     write_log_entry(None, "[rutube] Проверяю результат публикации…", level='silent')
     if log_id:
         write_log_entry(log_id, "Рутьюб: Проверяю результат публикации…")
