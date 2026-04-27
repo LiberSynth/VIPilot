@@ -289,38 +289,18 @@ def _publish_ui(page, club_id: str, video_path: str, pub_title: str, log_id, bat
                 write_log_entry(log_id, f"VK Видео: Не удалось выключить «{label_text}» — продолжаю…")
     _snap(page, batch_id)
 
-    # ── Шаг 8: Ждём обложки и активную кнопку «Опубликовать» ─────────────
-    write_log_entry(None, "[vkvideo] Жду обложки клипа…", level='silent')
+    # ── Шаг 8: Ждём доступную кнопку «Опубликовать» ──────────────────────
+    write_log_entry(None, "[vkvideo] Жду кнопку «Опубликовать»…", level='silent')
     if log_id:
-        write_log_entry(log_id, "VK Видео: Жду обложки клипа…")
-    _cover_deadline = _time.monotonic() + 60
-    _covers_loaded = False
-    while _time.monotonic() < _cover_deadline:
-        try:
-            covers = page.locator("img[src*='vkvideo'], img[src*='userapi']")
-            if covers.count() > 0:
-                _covers_loaded = True
-                break
-        except Exception:
-            pass
-        page.wait_for_timeout(2000)
-
-    if _covers_loaded:
-        write_log_entry(None, "[vkvideo] Обложки загружены", level='silent')
-        if log_id:
-            write_log_entry(log_id, "VK Видео: Обложки загружены")
-    else:
-        write_log_entry(None, "[vkvideo] Обложки не появились — продолжаю без них…", level='silent')
-        if log_id:
-            write_log_entry(log_id, "VK Видео: Обложки не появились — продолжаю…")
+        write_log_entry(log_id, "VK Видео: Жду кнопку «Опубликовать»…")
+    pub_btn = page.locator("button:has-text('Опубликовать')").last
+    pub_btn.wait_for(state="visible", timeout=90_000)
     _snap(page, batch_id)
 
     # ── Шаг 9: Нажимаем «Опубликовать» ───────────────────────────────────
     write_log_entry(None, "[vkvideo] Нажимаю «Опубликовать»…", level='silent')
     if log_id:
         write_log_entry(log_id, "VK Видео: Нажимаю «Опубликовать»…")
-    pub_btn = page.locator("button:has-text('Опубликовать')").last
-    pub_btn.wait_for(state="visible", timeout=15_000)
     pub_btn.click()
     page.wait_for_timeout(3000)
     _snap(page, batch_id)
