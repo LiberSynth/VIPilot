@@ -577,7 +577,6 @@
     initImportMovieButton();
     initExportGoodMoviesButton();
     initAutoplayToggle();
-    window.addEventListener('resize', updateVideoWrapHeight);
   }
 
   window._directorApi = {
