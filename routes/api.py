@@ -201,12 +201,12 @@ def publication_file_name(title: str) -> str:
 _TAGS = ("юмор", "приколы", "ремонт", "стройка", "неудача")
 
 
-def теги() -> list[str]:
+def tags() -> list[str]:
     """Возвращает список тегов публикации."""
     return list(_TAGS)
 
 
-def хэштеги() -> str:
+def hashtags() -> str:
     """Возвращает теги публикации в виде строки хэштегов через пробел."""
     return ' '.join(f'#{t}' for t in _TAGS)
 

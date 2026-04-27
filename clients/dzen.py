@@ -13,7 +13,7 @@ import time as _time
 
 from log import write_log_entry
 from utils.utils import fmt_id_msg
-from routes.api import build_publication_title, publication_file_name, теги
+from routes.api import build_publication_title, publication_file_name, tags
 
 
 _NAV_TIMEOUT = 30_000   # ms — таймаут навигации
@@ -369,7 +369,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
         ).first
         tags_input.wait_for(state="visible", timeout=5_000)
         tags_input.click()
-        for tag in теги():
+        for tag in tags():
             tags_input.type(tag)
             page.keyboard.press("Enter")
             page.wait_for_timeout(300)
