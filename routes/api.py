@@ -217,13 +217,11 @@ def client_is_configured(slug: str, cfg: dict = None, target_id: str = None) -> 
     if slug == "vk":
         return bool(os.environ.get("VK_USER_TOKEN", ""))
     if slug == "dzen":
-        from services.dzen_browser import profile_exists
-
-        return bool(cfg.get("publisher_id")) and profile_exists(target_id)
+        from services.browser_registry import get_browser as _get_browser
+        return bool(cfg.get("publisher_id")) and _get_browser("dzen").profile_exists(target_id)
     if slug == "rutube":
-        from services.rutube_browser import profile_exists
-
-        return bool(cfg.get("person_id")) and profile_exists(target_id)
+        from services.browser_registry import get_browser as _get_browser
+        return bool(cfg.get("person_id")) and _get_browser("rutube").profile_exists(target_id)
     if slug == "grok":
         return bool(os.environ.get("XAI_API_KEY", ""))
     if slug == "text":
@@ -747,17 +745,14 @@ def api_batch_publish_frame(batch_id):
     """Возвращает последний JPEG-скриншот браузера публикации для батча."""
     if not is_authenticated():
         return Response("Unauthorized", status=401)
-    from services.dzen_browser import get_frame_for_batch as dzen_get_frame
-    from services.rutube_browser import get_frame_for_batch as rutube_get_frame
-
-    dzen_entry = dzen_get_frame(batch_id)  # (bytes, ts) or None
-    rutube_entry = rutube_get_frame(batch_id)  # (bytes, ts) or None
-    if dzen_entry and rutube_entry:
-        img = dzen_entry[0] if dzen_entry[1] >= rutube_entry[1] else rutube_entry[0]
-    elif dzen_entry:
-        img = dzen_entry[0]
-    elif rutube_entry:
-        img = rutube_entry[0]
+    from services.browser_registry import get_browser as _get_browser, SLUGS
+    entries = [
+        _get_browser(s).get_frame_for_batch(batch_id)
+        for s in SLUGS
+    ]
+    entries = [e for e in entries if e]
+    if entries:
+        img = max(entries, key=lambda e: e[1])[0]
     else:
         img = None
     if img is None:

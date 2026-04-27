@@ -25,16 +25,12 @@ def create_app() -> Flask:
 def init_app(app: Flask):
     from routes.web import bp as web_bp
     from routes.api import bp as api_bp, production_bp
-    from routes.dzen_browser import bp as dzen_browser_bp
-    from routes.rutube_browser import bp as rutube_browser_bp
-    from routes.vkvideo_browser import bp as vkvideo_browser_bp
+    from routes.browser_widget import bp as browser_widget_bp
 
     app.register_blueprint(web_bp)
     app.register_blueprint(api_bp)
     app.register_blueprint(production_bp)
-    app.register_blueprint(dzen_browser_bp)
-    app.register_blueprint(rutube_browser_bp)
-    app.register_blueprint(vkvideo_browser_bp)
+    app.register_blueprint(browser_widget_bp)
 
     _reset_stalled_batches()
     _interrupt_running_pipelines()

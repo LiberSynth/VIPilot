@@ -48,7 +48,7 @@ def publish(
     Браузер виден в панели «Публикация» — можно наблюдать весь процесс.
     Возвращает True при успехе.
     """
-    from services.dzen_browser import run_pipeline_browser
+    from services.browser_registry import get_browser as _get_browser
     from db import db_get_target_session_context
 
     cfg = target_config or {}
@@ -84,7 +84,7 @@ def publish(
         def _do_publish(page, _ctx):
             _publish_ui(page, publisher_id, video_path, log_id, batch_id=batch_id)
 
-        result = run_pipeline_browser(_do_publish, saved_cookies)
+        result = _get_browser("dzen").run_pipeline_browser(_do_publish, saved_cookies)
 
         if not result["ok"]:
             err = result.get("error", "Неизвестная ошибка")
@@ -107,11 +107,12 @@ def publish(
 def _snap(page, batch_id=None) -> None:
     """Снимает скриншот и передаёт кадр в SSE-трансляцию и монитор (thread-safe)."""
     try:
-        from services.dzen_browser import push_frame, push_frame_for_batch
+        from services.browser_registry import get_browser as _get_browser
+        _b = _get_browser("dzen")
         img = page.screenshot(type="jpeg", quality=65)
-        push_frame(img)
+        _b.push_frame(img)
         if batch_id:
-            push_frame_for_batch(batch_id, img)
+            _b.push_frame_for_batch(batch_id, img)
     except Exception as _e:
         write_log_entry(None, f"[dzen] _snap: {_e}", level='silent')
 
