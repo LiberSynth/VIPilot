@@ -908,7 +908,7 @@
   .probe-modal-error { color: #c05050; }
   .probe-video { width: 100%; border-radius: 6px; display: block; background: #000; max-height: 320px; }
   .probe-modal-video-section { padding: 12px 12px 0; }
-  #director-video-wrap { overflow: hidden; border-radius: 8px; margin-bottom: 8px; }
+  #director-video-wrap { overflow: hidden; border-radius: 8px; }
   #director-video-wrap .probe-video { aspect-ratio: 16/9; max-height: none; width: 100%; display: block; background: #000; border-radius: 8px; object-fit: contain; }
   .probe-story-sep { border: none; border-top: 1px solid rgba(255,255,255,.08); margin: 10px 0 0; }
   .probe-story-result { padding: 10px 14px 14px; }
@@ -996,7 +996,7 @@
     display: flex; align-items: center; gap: 8px;
     padding: 9px 12px;
   }
-  .story-expand { display: none; padding: 0 12px 14px; }
+  .story-expand { display: none; padding: 12px; }
   .story-row--expanded .story-expand { display: block; }
   .story-chevron {
     background: none; border: none; padding: 0; cursor: pointer;
