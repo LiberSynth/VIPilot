@@ -155,6 +155,16 @@ def publication_file_name(title: str) -> str:
     return title + '.mp4'
 
 
+def теги() -> list[str]:
+    """Возвращает список тегов публикации."""
+    return list(_TAGS)
+
+
+def хэштеги() -> str:
+    """Возвращает теги публикации в виде строки хэштегов через пробел."""
+    return ' '.join(f'#{t}' for t in _TAGS)
+
+
 def client_is_configured(slug: str, cfg: dict = None, target_id: str = None) -> bool:
     """Возвращает True если клиент с данным slug настроен."""
     cfg = cfg or {}
