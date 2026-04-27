@@ -48,11 +48,7 @@ var getDraftStoryId;
     .then(function(r) { return r.ok ? r.json() : null; })
     .then(function(d) {
       if (d && d.story_id) {
-        var isNew = !_draftStoryId;
         _draftStoryId = d.story_id;
-        if (isNew) {
-          if (typeof window.onDraftStoryFirstSaved === 'function') window.onDraftStoryFirstSaved();
-        }
         if (typeof loadStoryList === 'function') loadStoryList();
       }
       _draftSaving = false;
@@ -380,12 +376,6 @@ var getDraftStoryId;
     });
 
     /* ── Восстановление раскрытой строки после перерисовки ── */
-    var pendingId = window._requestExpandStoryAfterRender;
-    if (pendingId) {
-      window._requestExpandStoryAfterRender = null;
-      prevExpandedId = pendingId;
-    }
-
     if (prevExpandedId === '__new__') {
       var draftId = typeof getDraftStoryId === 'function' ? getDraftStoryId() : null;
       if (draftId) {
