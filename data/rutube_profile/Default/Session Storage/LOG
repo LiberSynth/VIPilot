@@ -1,3 +1,6 @@
 2026/04/27-14:55:38.185 9497 Reusing MANIFEST /home/runner/workspace/data/rutube_profile/Default/Session Storage/MANIFEST-000001
 2026/04/27-14:55:38.186 9497 Recovering log #8
 2026/04/27-14:55:38.186 9497 Reusing old log /home/runner/workspace/data/rutube_profile/Default/Session Storage/000008.log 
+2026/04/27-14:56:38.188 949a Level-0 table #11: started
+2026/04/27-14:56:38.218 949a Level-0 table #11: 15747 bytes OK
+2026/04/27-14:56:38.222 949a Delete type=0 #8
