@@ -64,17 +64,6 @@ from common.statuses import batch_is_active
 bp = Blueprint("api", __name__, url_prefix="/api")
 
 
-_RUBRICATORS_FULL = [
-    "выпуск", "сюжет", "эпизод", "короткий", "история",
-    "момент", "ролик", "отрывок", "сцена", "зарисовка",
-    "фрагмент", "серия", "часть", "набросок", "скетч",
-    "мотивация", "урок", "чек-ап", "воспоминание", "факт",
-    "настрой", "разбор", "срез", "итог", "совет",
-    "лайфхак", "напоминание", "взгляд", "шпаргалка", "дневник",
-    "заметка", "мысль", "кейс", "эфир", "доза",
-    "вставка", "миниатюра", "этюд", "пассаж", "штрих",
-]
-
 _RUBRICATOR_GENDER = {
     "выпуск": 'm', "сюжет": 'm', "эпизод": 'm', "короткий": 'm', "история": 'f',
     "момент": 'm', "ролик": 'm', "отрывок": 'm', "сцена": 'f', "зарисовка": 'f',
@@ -153,7 +142,7 @@ def build_publication_title() -> str:
         elif 17 <= hour <= 22: idx = 2
         else:                  idx = 3
 
-    rubricator = random.choice(_RUBRICATORS_FULL)
+    rubricator = random.choice(list(_RUBRICATOR_GENDER))
     gender_idx = {'m': 0, 'f': 1, 'n': 2}[_RUBRICATOR_GENDER[rubricator]]
     adjective  = _ADJECTIVES[category][idx][gender_idx]
 
