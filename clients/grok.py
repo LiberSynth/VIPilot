@@ -18,11 +18,6 @@ _POLL_INTERVAL = 10
 _POLL_MAX      = 240  # 40 минут максимум
 
 
-def is_configured() -> bool:
-    """Возвращает True если API-ключ задан."""
-    return bool(_XAI_KEY)
-
-
 def _headers():
     return {
         'Authorization': f'Bearer {_XAI_KEY}',

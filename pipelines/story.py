@@ -28,6 +28,7 @@ from log import db_log_update, write_log_entry
 from pipelines.base import check_cancelled, iterate_models
 from common.exceptions import AppException
 from clients import text_client
+from routes.api import client_is_configured
 from utils.utils import fmt_id_msg
 
 
@@ -232,7 +233,7 @@ def run(batch_id, log_id):
 
     db_log_update(log_id, "Генерация сюжета…", "running")
 
-    if not text_client.is_configured():
+    if not client_is_configured('text'):
         msg = "API-ключ текстовой платформы не задан — генерация невозможна"
         db_log_update(log_id, msg, "error")
         write_log_entry(log_id, msg, level="error")

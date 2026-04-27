@@ -62,6 +62,40 @@ from common.statuses import batch_is_active
 bp = Blueprint("api", __name__, url_prefix="/api")
 
 
+def resolve_batch_title(batch_id: str) -> str:
+    """Возвращает заголовок сюжета батча или 'Видео'."""
+    from db import db_get_batch_by_id
+    batch = db_get_batch_by_id(batch_id)
+    story_id = batch.get('story_id') if batch else None
+    if story_id:
+        title = db_get_story_title(str(story_id)) or ''
+        if title:
+            return title
+    return 'Видео'
+
+
+def client_is_configured(slug: str, cfg: dict = None, target_id: str = None) -> bool:
+    """Возвращает True если клиент с данным slug настроен."""
+    cfg = cfg or {}
+    if slug == 'vk':
+        return bool(os.environ.get('VK_USER_TOKEN', ''))
+    if slug == 'dzen':
+        from services.dzen_browser import profile_exists
+        return bool(cfg.get('publisher_id')) and profile_exists(target_id)
+    if slug == 'rutube':
+        from services.rutube_browser import profile_exists
+        return bool(cfg.get('person_id')) and profile_exists(target_id)
+    if slug == 'grok':
+        return bool(os.environ.get('XAI_API_KEY', ''))
+    if slug == 'text':
+        return bool(os.environ.get('OPENROUTER_API_KEY') or os.environ.get('DEEPSEEK_API_KEY'))
+    if slug == 'skyreels':
+        return bool(os.environ.get('SKYREELS_API_KEY', ''))
+    if slug == 'falai':
+        return bool(os.environ.get('FAL_API_KEY', ''))
+    return False
+
+
 def _build_video_response(data: bytes) -> Response:
     """Формирует ответ для видео с поддержкой HTTP Range-запросов."""
     total = len(data)

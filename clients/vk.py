@@ -6,23 +6,16 @@ VK API-клиент.
 
 import io
 import os
-import re
 import time
 
 import requests
 
 from log import write_log_entry
-from utils.utils import fmt_id_msg
+from utils.utils import fmt_id_msg, safe_filename
 
 _VK_TOKEN = os.environ.get('VK_USER_TOKEN', '')
 _VK_API   = 'https://api.vk.com/method'
 _VK_VER   = '5.131'
-
-
-def _safe_filename(title: str) -> str:
-    """Возвращает безопасное имя файла из title (без спецсимволов, макс 80 символов)."""
-    safe = re.sub(r'[^\w\s\-]', '', title, flags=re.UNICODE).strip()[:80]
-    return safe or 'video'
 
 
 def publish_story(video_data: bytes, group_id: int, log_id, title: str = '') -> int | None:
@@ -40,7 +33,7 @@ def publish_story(video_data: bytes, group_id: int, log_id, title: str = '') -> 
         return None
 
     upload_url = r['response']['upload_url']
-    filename = f"{_safe_filename(title)}.mp4" if title else 'video.mp4'
+    filename = f"{safe_filename(title)}.mp4" if title else 'video.mp4'
 
     for attempt in range(3):
         try:
@@ -107,7 +100,7 @@ def publish_wall(video_data: bytes, group_id: int, log_id, title: str = '') -> i
     upload_url = save_resp['response']['upload_url']
     video_id   = save_resp['response']['video_id']
     owner_id   = save_resp['response']['owner_id']
-    filename = f"{_safe_filename(title)}.mp4" if title else 'video.mp4'
+    filename = f"{safe_filename(title)}.mp4" if title else 'video.mp4'
 
     up = requests.post(
         upload_url,
@@ -133,8 +126,3 @@ def publish_wall(video_data: bytes, group_id: int, log_id, title: str = '') -> i
     if log_id:
         write_log_entry(log_id, f"wall.post: {post_resp.get('error', post_resp)}", level='error')
     return None
-
-
-def is_configured() -> bool:
-    """Возвращает True если токен задан."""
-    return bool(_VK_TOKEN)

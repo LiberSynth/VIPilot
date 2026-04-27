@@ -19,7 +19,6 @@ from db import (
     db_get_batch_by_id,
     db_get_batch_video_data,
     db_get_batch_original_video,
-    db_get_story_title,
     db_set_batch_status,
     db_claim_batch_status,
 )
@@ -27,6 +26,7 @@ from log import db_log_update, db_get_log_entries, write_log_entry
 from pipelines.base import check_cancelled
 from common.exceptions import AppException
 from utils.utils import fmt_id_msg
+from routes.api import resolve_batch_title, client_is_configured
 from clients import vk
 from clients import dzen as dzen_client
 from clients.dzen import DzenCsrfExpired, DzenSessionMissing
@@ -58,28 +58,15 @@ def _get_video(batch_id, log_id):
     return video_data
 
 
-def _resolve_title(batch_id, log_id):
-    """Возвращает заголовок сюжета батча или 'Видео'."""
-    batch = db_get_batch_by_id(batch_id)
-    story_id = batch.get('story_id') if batch else None
-    if story_id:
-        try:
-            title = db_get_story_title(story_id) or ''
-            if title:
-                return title
-        except Exception as e:
-            write_log_entry(log_id, f"Не удалось получить заголовок сюжета: {e}", level='warn')
-    return 'Видео'
-
 
 def _call_vk(slug, method, batch_id, log_id, target):
     cfg = target.get('config') or {}
-    if not vk.is_configured():
+    if not client_is_configured('vk'):
         write_log_entry(log_id, 'VK_USER_TOKEN не задан', level='error')
         return False
     video_data = _get_video(batch_id, log_id)
     group_id = int(cfg.get('group_id', 236929597))
-    title = _resolve_title(batch_id, log_id)
+    title = resolve_batch_title(batch_id)
     if method == 'story':
         write_log_entry(log_id, 'Публикую историю…')
         return vk.publish_story(video_data, group_id, log_id, title=title) is not None
@@ -94,7 +81,7 @@ def _call_vk(slug, method, batch_id, log_id, target):
 def _call_dzen(slug, method, batch_id, log_id, target):
     cfg = target.get('config') or {}
     target_id = target.get('id')
-    if not dzen_client.is_configured(cfg, target_id):
+    if not client_is_configured('dzen', cfg, target_id):
         if not cfg.get('publisher_id'):
             write_log_entry(log_id, 'Дзен не настроен: publisher_id отсутствует', level='error')
         else:
@@ -103,14 +90,14 @@ def _call_dzen(slug, method, batch_id, log_id, target):
 
     video_data = _get_video(batch_id, log_id)
 
-    title = _resolve_title(batch_id, log_id)
+    title = resolve_batch_title(batch_id)
     return dzen_client.publish(video_data, cfg, title, log_id, batch_id=batch_id, target_id=target_id)
 
 
 def _call_rutube(slug, method, batch_id, log_id, target):
     cfg = target.get('config') or {}
     target_id = target.get('id')
-    if not rutube_client.is_configured(cfg, target_id):
+    if not client_is_configured('rutube', cfg, target_id):
         if not cfg.get('person_id'):
             write_log_entry(log_id, 'Рутьюб не настроен: person_id отсутствует', level='error')
         else:
@@ -119,7 +106,7 @@ def _call_rutube(slug, method, batch_id, log_id, target):
 
     video_data = _get_video(batch_id, log_id)
 
-    title = _resolve_title(batch_id, log_id)
+    title = resolve_batch_title(batch_id)
     return rutube_client.publish(video_data, cfg, title, log_id, batch_id=batch_id, target_id=target_id)
 
 

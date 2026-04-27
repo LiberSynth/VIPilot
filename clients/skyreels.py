@@ -18,10 +18,6 @@ _POLL_INTERVAL = 15
 _POLL_MAX      = 480  # 480 × 15 с = 2 часа
 
 
-def is_configured() -> bool:
-    return bool(_SKYREELS_KEY)
-
-
 def _headers():
     return {'Content-Type': 'application/json'}
 

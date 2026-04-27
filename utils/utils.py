@@ -1,3 +1,12 @@
+import re
+
+
+def safe_filename(title: str) -> str:
+    """Очищает строку для использования как имя файла (без спецсимволов, макс 80 символов)."""
+    safe = re.sub(r'[^\w\s\-]', '', title, flags=re.UNICODE).strip()[:80]
+    return safe or 'video'
+
+
 def wrap_block(title: str, body: str, number: int | None = None) -> str:
     """Оборачивает тело в блок с маркерами НАЧАЛО/КОНЕЦ."""
     label = f'{title} {number}' if number is not None else title

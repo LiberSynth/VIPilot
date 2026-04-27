@@ -36,6 +36,7 @@ from log import write_log, db_log_update, write_log_entry
 from pipelines.base import check_cancelled, iterate_models
 from common.exceptions import AppException
 from clients import falai, grok, skyreels
+from routes.api import client_is_configured
 from clients.falai import ProviderFatalError
 from utils.utils import fmt_id_msg, nearest_allowed_duration
 
@@ -184,7 +185,7 @@ def run(batch_id, log_id):
         write_log_entry(log_id, fmt_id_msg("[video] Батч {} ({}) — {} генерации видео",
                                       batch_id, target, 'возобновление' if resumed else 'начало'))
 
-        if not falai.is_configured():
+        if not client_is_configured('falai'):
             msg = 'FAL_API_KEY не задан — генерация невозможна'
             db_log_update(log_id, msg, 'error')
             write_log_entry(log_id, f"[video] {msg}")

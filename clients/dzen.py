@@ -12,7 +12,7 @@ import tempfile
 import time as _time
 
 from log import write_log_entry
-from utils.utils import fmt_id_msg
+from utils.utils import fmt_id_msg, safe_filename
 
 
 _NAV_TIMEOUT = 30_000   # ms — таймаут навигации
@@ -29,16 +29,6 @@ class DzenCsrfExpired(RuntimeError):
 
 class DzenApiError(RuntimeError):
     """Ошибка публикации на Дзен."""
-
-
-# ---------------------------------------------------------------------------
-# Проверка конфигурации
-# ---------------------------------------------------------------------------
-
-def is_configured(cfg: dict, target_id: str | None = None) -> bool:
-    """True если publisher_id задан и сессия сохранена в БД."""
-    from services.dzen_browser import profile_exists
-    return bool(cfg.get("publisher_id")) and profile_exists(target_id)
 
 
 # ---------------------------------------------------------------------------
@@ -83,7 +73,7 @@ def publish(
         write_log_entry(log_id, fmt_id_msg("Дзен: {} КБ, publisher={}", len(video_data) // 1024, publisher_id))
 
     # Пишем видео во временный файл с именем = заголовок (Дзен автоподставляет имя файла)
-    safe_name = re.sub(r'[^\w\s\-]', '', title, flags=re.UNICODE).strip()[:80] or "video"
+    safe_name = safe_filename(title)
     tmp_dir = tempfile.mkdtemp()
     video_path = os.path.join(tmp_dir, f"{safe_name}.mp4")
     try:
@@ -200,7 +190,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, title: str, log_id, ba
     """Управляет браузером для публикации видео через UI Дзена."""
 
     studio_url = f"https://dzen.ru/profile/editor/id/{publisher_id}/"
-    safe_name = re.sub(r'[^\w\s\-]', '', title, flags=re.UNICODE).strip()[:80] or "video"
+    safe_name = safe_filename(title)
 
     def _check_title_in_list():
         """Проверяет наличие элемента с названием видео в списке публикаций."""

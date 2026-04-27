@@ -10,13 +10,6 @@ import requests
 from log import write_log_entry
 
 
-def is_configured() -> bool:
-    """Возвращает True если хотя бы один известный API-ключ задан."""
-    return bool(
-        os.environ.get('OPENROUTER_API_KEY') or os.environ.get('DEEPSEEK_API_KEY')
-    )
-
-
 def _headers(env_key_name: str | None):
     api_key = os.environ.get(env_key_name or '', '') if env_key_name else ''
     return {

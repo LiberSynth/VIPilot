@@ -21,11 +21,6 @@ class ProviderFatalError(Exception):
     """Raised when a provider returns a permanent, non-retryable billing/account error."""
 
 
-def is_configured() -> bool:
-    """Возвращает True если API-ключ задан."""
-    return bool(_FAL_KEY)
-
-
 def _headers():
     return {
         'Authorization': f'Key {_FAL_KEY}',
