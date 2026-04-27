@@ -1,3 +1,3 @@
-2026/04/27-17:00:24.239 d086 Reusing MANIFEST /home/runner/workspace/data/rutube_profile/Default/Local Storage/leveldb/MANIFEST-000001
-2026/04/27-17:00:24.249 d086 Recovering log #17
-2026/04/27-17:00:24.249 d086 Reusing old log /home/runner/workspace/data/rutube_profile/Default/Local Storage/leveldb/000017.log 
+2026/04/27-17:08:57.403 d44e Reusing MANIFEST /home/runner/workspace/data/rutube_profile/Default/Local Storage/leveldb/MANIFEST-000001
+2026/04/27-17:08:57.410 d44e Recovering log #19
+2026/04/27-17:08:57.410 d44e Reusing old log /home/runner/workspace/data/rutube_profile/Default/Local Storage/leveldb/000019.log 

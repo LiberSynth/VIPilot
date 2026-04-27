@@ -66,9 +66,12 @@ def _call_vk(slug, method, batch_id, log_id, target):
         return False
     video_data = _get_video(batch_id, log_id)
     group_id = int(cfg.get('group_id', 236929597))
+    # if method == 'story':
+    #     write_log_entry(log_id, 'Публикую историю…')
+    #     return vk.publish_story(video_data, group_id, log_id) is not None
     if method == 'story':
-        write_log_entry(log_id, 'Публикую историю…')
-        return vk.publish_story(video_data, group_id, log_id) is not None
+        write_log_entry(log_id, 'Публикация истории временно отключена — пропуск', level='warn')
+        return True
     elif method == 'wall':
         write_log_entry(log_id, 'Публикую на стену…')
         return vk.publish_wall(video_data, group_id, log_id) is not None

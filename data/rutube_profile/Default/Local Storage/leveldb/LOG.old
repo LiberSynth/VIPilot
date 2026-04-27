@@ -1,3 +1,15 @@
-2026/04/27-16:55:24.580 cc6c Reusing MANIFEST /home/runner/workspace/data/rutube_profile/Default/Local Storage/leveldb/MANIFEST-000001
-2026/04/27-16:55:24.596 cc6c Recovering log #17
-2026/04/27-16:55:24.596 cc6c Reusing old log /home/runner/workspace/data/rutube_profile/Default/Local Storage/leveldb/000017.log 
+2026/04/27-17:00:24.239 d086 Reusing MANIFEST /home/runner/workspace/data/rutube_profile/Default/Local Storage/leveldb/MANIFEST-000001
+2026/04/27-17:00:24.249 d086 Recovering log #17
+2026/04/27-17:00:24.249 d086 Reusing old log /home/runner/workspace/data/rutube_profile/Default/Local Storage/leveldb/000017.log 
+2026/04/27-17:03:24.397 d08a Level-0 table #20: started
+2026/04/27-17:03:24.426 d08a Level-0 table #20: 25296 bytes OK
+2026/04/27-17:03:24.429 d08a Delete type=0 #17
+2026/04/27-17:03:24.661 d08a Compacting 4@0 + 1@1 files
+2026/04/27-17:03:24.677 d08a Generated table #21@0: 12 keys, 2812 bytes
+2026/04/27-17:03:24.677 d08a Compacted 4@0 + 1@1 files => 2812 bytes
+2026/04/27-17:03:24.833 d08a compacted to: files[ 0 1 1 0 0 0 0 ]
+2026/04/27-17:03:24.833 d08a Delete type=2 #8
+2026/04/27-17:03:24.833 d08a Delete type=2 #11
+2026/04/27-17:03:24.833 d08a Delete type=2 #14
+2026/04/27-17:03:24.833 d08a Delete type=2 #16
+2026/04/27-17:03:24.833 d08a Delete type=2 #20
