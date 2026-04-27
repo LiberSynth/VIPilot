@@ -246,7 +246,7 @@ def _publish_ui(page, club_id: str, video_path: str, pub_title: str, log_id, bat
             write_log_entry(log_id, "VK Видео: Не удалось заполнить описание — продолжаю…")
 
     # ── Шаг 7: Выключаем ненужные переключатели ──────────────────────────
-    _TOGGLES_OFF = ["Показать на главной сообщества", "Разрешить дуэты"]
+    _TOGGLES_OFF = ["Показать на главной сообщества"]
     write_log_entry(None, f"[vkvideo] Выключаю переключатели: {_TOGGLES_OFF}", level='silent')
     if log_id:
         write_log_entry(log_id, "VK Видео: Выключаю переключатели…")
