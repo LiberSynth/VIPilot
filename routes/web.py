@@ -204,7 +204,10 @@ def root_page():
     target_id       = target["id"] if target else None
     aspect_ratio_x  = target["aspect_ratio_x"] if target else 9
     aspect_ratio_y  = target["aspect_ratio_y"] if target else 16
-    publish_order   = [t["slug"] for t in active_targets if t.get("slug") in ("vk", "dzen", "rutube")]
+    publish_order   = [
+        slug for slug, tgt in [("vk", vk_target), ("dzen", dzen_target), ("rutube", rutube_target)]
+        if tgt is not None
+    ]
 
     _save_last_page()
     resp = make_response(render_template(
