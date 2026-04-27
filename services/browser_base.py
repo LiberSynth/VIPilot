@@ -156,6 +156,16 @@ class PlatformBrowser:
                 )
                 page = context.new_page()
 
+                # active_page[0] всегда указывает на последнюю открытую вкладку.
+                # Если сайт открывает новую вкладку — переключаемся на неё автоматически.
+                active_page = [page]
+
+                def _on_new_page(new_page):
+                    active_page[0] = new_page
+                    write_log_entry(None, f"{tag} Новая вкладка: {new_page.url}", level='silent')
+
+                context.on("page", _on_new_page)
+
                 try:
                     page.goto(self._start_url, wait_until="domcontentloaded", timeout=30_000)
                 except Exception as e:
@@ -188,17 +198,19 @@ class PlatformBrowser:
                             self._save_result = {"ok": False, "error": str(e)}
                         self._save_done_event.set()
 
+                    cur_page = active_page[0]
+
                     processed = 0
                     while processed < 20:
                         try:
                             ev = self._event_queue.get_nowait()
-                            self._process_event(page, ev)
+                            self._process_event(cur_page, ev)
                             processed += 1
                         except queue.Empty:
                             break
 
                     try:
-                        img = page.screenshot(type="jpeg", quality=65)
+                        img = cur_page.screenshot(type="jpeg", quality=65)
                         with self._frame_lock:
                             self._latest_frame   = img
                             self._frame_counter += 1
