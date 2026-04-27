@@ -1,8 +1,6 @@
 """
 VK API-клиент.
 Отвечает за публикацию видео в историю и на стену сообщества ВКонтакте.
-- История: stories.getVideoUploadServer → stories.save
-- Стена + ВКВидео (клип): shortVideo.create → upload → shortVideo.edit → shortVideo.publish
 Принимает видео в виде байт (bytes) — никаких файлов на диске.
 """
 
@@ -14,11 +12,11 @@ import requests
 
 from log import write_log_entry
 from utils.utils import fmt_id_msg
-from routes.api import build_publication_title, publication_file_name, hashtags
+from routes.api import build_publication_title, publication_file_name
 
 _VK_TOKEN = os.environ.get('VK_USER_TOKEN', '')
 _VK_API   = 'https://api.vk.com/method'
-_VK_VER   = '5.199'
+_VK_VER   = '5.131'
 
 
 def publish_story(video_data: bytes, group_id: int, log_id) -> int | None:
@@ -86,72 +84,48 @@ def publish_story(video_data: bytes, group_id: int, log_id) -> int | None:
 
 
 def publish_wall(video_data: bytes, group_id: int, log_id) -> int | None:
-    """Публикует видео как клип ВКВидео и на стену сообщества. Возвращает video_id или None."""
+    """Публикует видео на стену сообщества ВКонтакте. Возвращает post_id или None."""
     pub_title = build_publication_title()
-    file_size = len(video_data)
-    filename  = publication_file_name(pub_title)
-
-    # ── 1. Получаем URL для загрузки клипа ───────────────────────────────
-    create_resp = requests.post(f'{_VK_API}/shortVideo.create', data={
+    save_resp = requests.post(f'{_VK_API}/video.save', data={
         'group_id':     group_id,
-        'file_size':    file_size,
         'name':         pub_title,
+        'description':  '',
+        'wallpost':     0,
         'access_token': _VK_TOKEN,
         'v': _VK_VER,
     }, timeout=15).json()
 
-    if 'error' in create_resp:
+    if 'error' in save_resp:
         if log_id:
-            write_log_entry(log_id, f"shortVideo.create: {create_resp['error']}", level='error')
+            write_log_entry(log_id, f"video.save: {save_resp['error']}", level='error')
         return None
 
-    upload_url = create_resp['response']['upload_url']
+    upload_url = save_resp['response']['upload_url']
+    video_id   = save_resp['response']['video_id']
+    owner_id   = save_resp['response']['owner_id']
+    filename = publication_file_name(pub_title)
 
-    # ── 2. Загружаем видео ────────────────────────────────────────────────
     up = requests.post(
         upload_url,
-        files={'file': (filename, io.BytesIO(video_data), 'video/mp4')},
+        files={'video_file': (filename, io.BytesIO(video_data), 'video/mp4')},
         timeout=300,
     )
     up.raise_for_status()
-    video_info = up.json()
-    video_id   = video_info['video_id']
-    owner_id   = video_info['owner_id']
 
-    if log_id:
-        write_log_entry(log_id, fmt_id_msg('ВК: видео загружено, video_id={}', video_id))
-
-    # ── 3. Ждём обработки ────────────────────────────────────────────────
-    time.sleep(10)
-
-    # ── 4. Добавляем хэштеги ─────────────────────────────────────────────
-    edit_resp = requests.post(f'{_VK_API}/shortVideo.edit', data={
-        'video_id':     video_id,
-        'owner_id':     owner_id,
-        'description':  hashtags(),
+    post_resp = requests.post(f'{_VK_API}/wall.post', data={
+        'owner_id':     -group_id,
+        'from_group':   1,
+        'attachments':  f'video{owner_id}_{video_id}',
         'access_token': _VK_TOKEN,
         'v': _VK_VER,
     }, timeout=15).json()
 
-    if 'error' in edit_resp:
+    if 'response' in post_resp:
+        post_id = post_resp['response']['post_id']
         if log_id:
-            write_log_entry(log_id, f"shortVideo.edit: {edit_resp['error']}", level='warn')
-
-    # ── 5. Публикуем только в клипы ВКВидео (без публикации на стену сообщества) ──
-    pub_resp = requests.post(f'{_VK_API}/shortVideo.publish', data={
-        'video_id':      video_id,
-        'owner_id':      owner_id,
-        'license_agree': 1,
-        'wallpost':      0,
-        'access_token':  _VK_TOKEN,
-        'v': _VK_VER,
-    }, timeout=15).json()
-
-    if 'error' in pub_resp:
-        if log_id:
-            write_log_entry(log_id, f"shortVideo.publish: {pub_resp['error']}", level='error')
-        return None
+            write_log_entry(log_id, f'Пост на стене: post_id={post_id}')
+        return post_id
 
     if log_id:
-        write_log_entry(log_id, fmt_id_msg('Клип опубликован в ВКВидео: video_id={}', video_id))
-    return video_id
+        write_log_entry(log_id, f"wall.post: {post_resp.get('error', post_resp)}", level='error')
+    return None
