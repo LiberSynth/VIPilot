@@ -32,7 +32,6 @@ from db import (
     db_get_batch_logs,
     cycle_config_get,
     cycle_config_set,
-
     db_get_stories_list,
     db_get_stories_pool,
     db_count_good_pool,
@@ -54,7 +53,12 @@ from db import (
     db_delete_movie,
     db_get_movies_with_video_meta,
 )
-from log import db_get_monitor, db_get_batch_log_entries, log_batch_planned, write_log_entry
+from log import (
+    db_get_monitor,
+    db_get_batch_log_entries,
+    log_batch_planned,
+    write_log_entry,
+)
 from utils.auth import is_authenticated
 from utils.prompt_params import apply_prompt_params
 from utils.utils import parse_hhmm, to_msk, to_utc_from_msk
@@ -65,54 +69,84 @@ bp = Blueprint("api", __name__, url_prefix="/api")
 
 
 _RUBRICATOR = {
-    "выпуск": 'm', "сюжет": 'm', "эпизод": 'm', "короткий": 'm', "история": 'f',
-    "момент": 'm', "ролик": 'm', "отрывок": 'm', "сцена": 'f', "зарисовка": 'f',
-    "фрагмент": 'm', "серия": 'f', "часть": 'f', "набросок": 'm', "скетч": 'm',
-    "мотивация": 'f', "урок": 'm', "чек-ап": 'm', "воспоминание": 'n', "факт": 'm',
-    "настрой": 'm', "разбор": 'm', "срез": 'm', "итог": 'm', "совет": 'm',
-    "лайфхак": 'm', "напоминание": 'n', "взгляд": 'm', "шпаргалка": 'f', "дневник": 'm',
-    "заметка": 'f', "мысль": 'f', "кейс": 'm', "эфир": 'm', "доза": 'f',
-    "вставка": 'f', "миниатюра": 'f', "этюд": 'm', "пассаж": 'm', "штрих": 'm',
+    "выпуск": "m",
+    "сюжет": "m",
+    "эпизод": "m",
+    "короткий": "m",
+    "история": "f",
+    "момент": "m",
+    "ролик": "m",
+    "отрывок": "m",
+    "сцена": "f",
+    "зарисовка": "f",
+    "фрагмент": "m",
+    "серия": "f",
+    "часть": "f",
+    "набросок": "m",
+    "скетч": "m",
+    "мотивация": "f",
+    "урок": "m",
+    "чек-ап": "m",
+    "воспоминание": "n",
+    "факт": "m",
+    "настрой": "m",
+    "разбор": "m",
+    "срез": "m",
+    "итог": "m",
+    "совет": "m",
+    "лайфхак": "m",
+    "напоминание": "n",
+    "взгляд": "m",
+    "шпаргалка": "f",
+    "дневник": "m",
+    "заметка": "f",
+    "мысль": "f",
+    "кейс": "m",
+    "эфир": "m",
+    "доза": "f",
+    "вставка": "f",
+    "миниатюра": "f",
+    "этюд": "m",
+    "пассаж": "m",
+    "штрих": "m",
 }
-
-_TAGS = ('юмор', 'приколы', 'ремонт', 'стройка', 'неудача')
 
 # Тройки прилагательных: (мужской, женский, средний)
 _RUBRICATOR_ADJECTIVES = {
-    'season': [
-        ('Весенний',    'Весенняя',    'Весеннее'),    # весна  (3, 4, 5)
-        ('Летний',      'Летняя',      'Летнее'),      # лето   (6, 7, 8)
-        ('Осенний',     'Осенняя',     'Осеннее'),     # осень  (9, 10, 11)
-        ('Зимний',      'Зимняя',      'Зимнее'),      # зима   (12, 1, 2)
+    "season": [
+        ("Весенний", "Весенняя", "Весеннее"),  # весна  (3, 4, 5)
+        ("Летний", "Летняя", "Летнее"),  # лето   (6, 7, 8)
+        ("Осенний", "Осенняя", "Осеннее"),  # осень  (9, 10, 11)
+        ("Зимний", "Зимняя", "Зимнее"),  # зима   (12, 1, 2)
     ],
-    'month': [
-        ('Январский',    'Январская',    'Январское'),
-        ('Февральский',  'Февральская',  'Февральское'),
-        ('Мартовский',   'Мартовская',   'Мартовское'),
-        ('Апрельский',   'Апрельская',   'Апрельское'),
-        ('Майский',      'Майская',      'Майское'),
-        ('Июньский',     'Июньская',     'Июньское'),
-        ('Июльский',     'Июльская',     'Июльское'),
-        ('Августовский', 'Августовская', 'Августовское'),
-        ('Сентябрьский', 'Сентябрьская', 'Сентябрьское'),
-        ('Октябрьский',  'Октябрьская',  'Октябрьское'),
-        ('Ноябрьский',   'Ноябрьская',   'Ноябрьское'),
-        ('Декабрьский',  'Декабрьская',  'Декабрьское'),
+    "month": [
+        ("Январский", "Январская", "Январское"),
+        ("Февральский", "Февральская", "Февральское"),
+        ("Мартовский", "Мартовская", "Мартовское"),
+        ("Апрельский", "Апрельская", "Апрельское"),
+        ("Майский", "Майская", "Майское"),
+        ("Июньский", "Июньская", "Июньское"),
+        ("Июльский", "Июльская", "Июльское"),
+        ("Августовский", "Августовская", "Августовское"),
+        ("Сентябрьский", "Сентябрьская", "Сентябрьское"),
+        ("Октябрьский", "Октябрьская", "Октябрьское"),
+        ("Ноябрьский", "Ноябрьская", "Ноябрьское"),
+        ("Декабрьский", "Декабрьская", "Декабрьское"),
     ],
-    'weekday': [
-        ('Понедельничный', 'Понедельничная', 'Понедельничное'),  # пн
-        ('Вторничный',     'Вторничная',     'Вторничное'),      # вт
-        ('Средовой',       'Средовая',       'Средовое'),        # ср
-        ('Четверговый',    'Четверговая',    'Четверговое'),     # чт
-        ('Пятничный',      'Пятничная',      'Пятничное'),       # пт
-        ('Субботний',      'Субботняя',      'Субботнее'),       # сб
-        ('Воскресный',     'Воскресная',     'Воскресное'),      # вс
+    "weekday": [
+        ("Понедельничный", "Понедельничная", "Понедельничное"),  # пн
+        ("Вторничный", "Вторничная", "Вторничное"),  # вт
+        ("Средовой", "Средовая", "Средовое"),  # ср
+        ("Четверговый", "Четверговая", "Четверговое"),  # чт
+        ("Пятничный", "Пятничная", "Пятничное"),  # пт
+        ("Субботний", "Субботняя", "Субботнее"),  # сб
+        ("Воскресный", "Воскресная", "Воскресное"),  # вс
     ],
-    'daytime': [
-        ('Утренний', 'Утренняя', 'Утреннее'),   # 5–11
-        ('Дневной',  'Дневная',  'Дневное'),    # 12–16
-        ('Вечерний', 'Вечерняя', 'Вечернее'),   # 17–22
-        ('Ночной',   'Ночная',   'Ночное'),     # 23–4
+    "daytime": [
+        ("Утренний", "Утренняя", "Утреннее"),  # 5–11
+        ("Дневной", "Дневная", "Дневное"),  # 12–16
+        ("Вечерний", "Вечерняя", "Вечернее"),  # 17–22
+        ("Ночной", "Ночная", "Ночное"),  # 23–4
     ],
 }
 
@@ -120,70 +154,86 @@ _RUBRICATOR_ADJECTIVES = {
 def build_publication_title() -> str:
     """Возвращает заголовок публикации с порядковым номером и согласованным рубрикатором."""
     from db import db_next_publication_number
+
     num = db_next_publication_number()
-    msk     = datetime.now(timezone(timedelta(hours=3)))
-    month   = msk.month
-    hour    = msk.hour
+    msk = datetime.now(timezone(timedelta(hours=3)))
+    month = msk.month
+    hour = msk.hour
     weekday = msk.weekday()  # 0=пн, 6=вс
 
-    category = random.choice(('season', 'month', 'weekday', 'daytime'))
+    category = random.choice(("season", "month", "weekday", "daytime"))
 
-    if category == 'season':
-        if month in (3, 4, 5):    idx = 0
-        elif month in (6, 7, 8):  idx = 1
-        elif month in (9, 10, 11): idx = 2
-        else:                      idx = 3
-    elif category == 'month':
+    if category == "season":
+        if month in (3, 4, 5):
+            idx = 0
+        elif month in (6, 7, 8):
+            idx = 1
+        elif month in (9, 10, 11):
+            idx = 2
+        else:
+            idx = 3
+    elif category == "month":
         idx = month - 1
-    elif category == 'weekday':
+    elif category == "weekday":
         idx = weekday
     else:
-        if 5 <= hour <= 11:    idx = 0
-        elif 12 <= hour <= 16: idx = 1
-        elif 17 <= hour <= 22: idx = 2
-        else:                  idx = 3
+        if 5 <= hour <= 11:
+            idx = 0
+        elif 12 <= hour <= 16:
+            idx = 1
+        elif 17 <= hour <= 22:
+            idx = 2
+        else:
+            idx = 3
 
     rubricator = random.choice(list(_RUBRICATOR))
-    gender_idx = {'m': 0, 'f': 1, 'n': 2}[_RUBRICATOR[rubricator]]
-    adjective  = _RUBRICATOR_ADJECTIVES[category][idx][gender_idx]
+    gender_idx = {"m": 0, "f": 1, "n": 2}[_RUBRICATOR[rubricator]]
+    adjective = _RUBRICATOR_ADJECTIVES[category][idx][gender_idx]
 
     return f"{adjective} {rubricator} {num}"
 
 
 def publication_file_name(title: str) -> str:
     """Возвращает имя mp4-файла для публикации."""
-    return title + '.mp4'
+    return title + ".mp4"
 
 
-def теги() -> list[str]:
-    """Возвращает список тегов публикации."""
-    return list(_TAGS)
+_TAGS = ("юмор", "приколы", "ремонт", "стройка", "неудача")
 
 
-def хэштеги() -> str:
+def tags() -> str:
+    """Возвращает теги публикации в виде строки тегов через пробел."""
+    return " ".join(f"{t}" for t in _TAGS)
+
+
+def hashtags() -> str:
     """Возвращает теги публикации в виде строки хэштегов через пробел."""
-    return ' '.join(f'#{t}' for t in _TAGS)
+    return " ".join(f"#{t}" for t in _TAGS)
 
 
 def client_is_configured(slug: str, cfg: dict = None, target_id: str = None) -> bool:
     """Возвращает True если клиент с данным slug настроен."""
     cfg = cfg or {}
-    if slug == 'vk':
-        return bool(os.environ.get('VK_USER_TOKEN', ''))
-    if slug == 'dzen':
+    if slug == "vk":
+        return bool(os.environ.get("VK_USER_TOKEN", ""))
+    if slug == "dzen":
         from services.dzen_browser import profile_exists
-        return bool(cfg.get('publisher_id')) and profile_exists(target_id)
-    if slug == 'rutube':
+
+        return bool(cfg.get("publisher_id")) and profile_exists(target_id)
+    if slug == "rutube":
         from services.rutube_browser import profile_exists
-        return bool(cfg.get('person_id')) and profile_exists(target_id)
-    if slug == 'grok':
-        return bool(os.environ.get('XAI_API_KEY', ''))
-    if slug == 'text':
-        return bool(os.environ.get('OPENROUTER_API_KEY') or os.environ.get('DEEPSEEK_API_KEY'))
-    if slug == 'skyreels':
-        return bool(os.environ.get('SKYREELS_API_KEY', ''))
-    if slug == 'falai':
-        return bool(os.environ.get('FAL_API_KEY', ''))
+
+        return bool(cfg.get("person_id")) and profile_exists(target_id)
+    if slug == "grok":
+        return bool(os.environ.get("XAI_API_KEY", ""))
+    if slug == "text":
+        return bool(
+            os.environ.get("OPENROUTER_API_KEY") or os.environ.get("DEEPSEEK_API_KEY")
+        )
+    if slug == "skyreels":
+        return bool(os.environ.get("SKYREELS_API_KEY", ""))
+    if slug == "falai":
+        return bool(os.environ.get("FAL_API_KEY", ""))
     return False
 
 
@@ -195,18 +245,20 @@ def _build_video_response(data: bytes) -> Response:
         try:
             ranges = range_header.strip().replace("bytes=", "").split("-")
             start = int(ranges[0])
-            end   = int(ranges[1]) if ranges[1] else total - 1
+            end = int(ranges[1]) if ranges[1] else total - 1
         except (IndexError, ValueError):
             start, end = 0, total - 1
         end = min(end, total - 1)
-        chunk = data[start:end + 1]
-        resp = Response(chunk, status=206, mimetype="video/mp4", direct_passthrough=True)
-        resp.headers["Content-Range"]  = f"bytes {start}-{end}/{total}"
-        resp.headers["Accept-Ranges"]  = "bytes"
+        chunk = data[start : end + 1]
+        resp = Response(
+            chunk, status=206, mimetype="video/mp4", direct_passthrough=True
+        )
+        resp.headers["Content-Range"] = f"bytes {start}-{end}/{total}"
+        resp.headers["Accept-Ranges"] = "bytes"
         resp.headers["Content-Length"] = str(len(chunk))
     else:
         resp = Response(data, status=200, mimetype="video/mp4")
-        resp.headers["Accept-Ranges"]  = "bytes"
+        resp.headers["Accept-Ranges"] = "bytes"
         resp.headers["Content-Length"] = str(total)
     resp.headers["Cache-Control"] = "no-store"
     return resp
@@ -224,7 +276,9 @@ def api_run_now():
     batch_id = db_create_adhoc_batch()
     if not batch_id:
         return jsonify({"error": "Не удалось создать батч"}), 500
-    log_batch_planned(batch_id, 'Оперативный запуск', "Запуск по запросу пользователя (внеплановый)")
+    log_batch_planned(
+        batch_id, "Оперативный запуск", "Запуск по запросу пользователя (внеплановый)"
+    )
     environment.wakeup_loop()
     return jsonify({"ok": True, "batch_id": batch_id})
 
@@ -234,7 +288,7 @@ def api_monitor():
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
     data = db_get_monitor()
-    data['active_batch_ids'] = list(environment.get_active_batch_ids())
+    data["active_batch_ids"] = list(environment.get_active_batch_ids())
     return jsonify(data)
 
 
@@ -356,7 +410,9 @@ def api_text_model_probe(model_id):
     batch_id = db_create_story_probe_batch(model_id)
     if not batch_id:
         return jsonify({"error": "Не удалось создать батч"}), 500
-    log_batch_planned(batch_id, 'Пробный запуск текстовой модели', f"Модель: {m['name']}")
+    log_batch_planned(
+        batch_id, "Пробный запуск текстовой модели", f"Модель: {m['name']}"
+    )
     environment.wakeup_loop()
     return jsonify({"batch_id": batch_id})
 
@@ -407,10 +463,12 @@ def api_video_model_probe(model_id):
     body = request.get_json(silent=True) or {}
     story_id = body.get("story_id") or None
 
-    batch_id = db_create_video_batch('movie_probe', movie_model_id=model_id, story_id=story_id)
+    batch_id = db_create_video_batch(
+        "movie_probe", movie_model_id=model_id, story_id=story_id
+    )
     if not batch_id:
         return jsonify({"error": "Не удалось создать батч"}), 500
-    log_batch_planned(batch_id, 'Пробный запуск видеомодели', f"Модель: {m['name']}")
+    log_batch_planned(batch_id, "Пробный запуск видеомодели", f"Модель: {m['name']}")
     environment.wakeup_loop()
     return jsonify({"batch_id": batch_id})
 
@@ -453,7 +511,10 @@ def api_clear_all_data():
         return jsonify({"error": "unauthorized"}), 401
     try:
         tables = db_clear_all_data()
-        write_log_entry(None, f"[api] Очистка всех данных: таблиц={len(tables)}, список={', '.join(tables)}")
+        write_log_entry(
+            None,
+            f"[api] Очистка всех данных: таблиц={len(tables)}, список={', '.join(tables)}",
+        )
         return jsonify({"ok": True, "tables": tables})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
@@ -516,6 +577,7 @@ def api_donors_count():
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
     from db import db_get_donor_count
+
     good_only = request.args.get("good_only") == "1"
     return jsonify({"count": db_get_donor_count(good_only=good_only)})
 
@@ -589,17 +651,21 @@ def api_delete_batch(batch_id):
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
     if batch_id in environment.get_active_batch_ids():
-        return jsonify({"ok": False, "error": "Батч сейчас активно обрабатывается пайплайном"}), 409
+        return jsonify(
+            {"ok": False, "error": "Батч сейчас активно обрабатывается пайплайном"}
+        ), 409
     batch_status = db_get_batch_status(batch_id)
     if batch_is_active(batch_status):
-        return jsonify({"ok": False, "error": "Нельзя удалить батч в активном статусе"}), 409
+        return jsonify(
+            {"ok": False, "error": "Нельзя удалить батч в активном статусе"}
+        ), 409
     try:
         ok = db_delete_batch(batch_id)
         if not ok:
             return jsonify({"error": "not found"}), 404
         return jsonify({"ok": True})
     except Exception as e:
-        write_log_entry(None, f"[api] Ошибка удаления батча: {e}", level='silent')
+        write_log_entry(None, f"[api] Ошибка удаления батча: {e}", level="silent")
         return jsonify({"ok": False, "error": "internal error"}), 500
 
 
@@ -619,9 +685,11 @@ def api_workflow_restart():
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
     write_log_entry(None, "[api] Перезапуск приложения вручную")
+
     def _do_restart():
         import time as _time
         import sys as _sys
+
         _time.sleep(0.8)
         # Закрываем все унаследованные файловые дескрипторы (в т.ч. сокет Flask),
         # чтобы новый процесс мог занять порт 5000 без конфликтов.
@@ -630,6 +698,7 @@ def api_workflow_restart():
         except Exception:
             pass
         os.execv(_sys.executable, [_sys.executable] + _sys.argv)
+
     threading.Thread(target=_do_restart, daemon=True).start()
     return jsonify({"ok": True})
 
@@ -651,7 +720,7 @@ def api_get_story(story_id):
     text = db_get_story_text(story_id)
     if text is None:
         return jsonify({"error": "not found"}), 404
-    title = db_get_story_title(story_id) or ''
+    title = db_get_story_title(story_id) or ""
     format_prompt = cycle_config_get("format_prompt") or ""
     user_prompt = cycle_config_get("text_prompt") or ""
     user_prompt = apply_prompt_params(user_prompt)
@@ -660,7 +729,17 @@ def api_get_story(story_id):
     platform_name = model_info["platform_name"] if model_info else ""
     model_name = model_info["model_name"] if model_info else ""
     model_body = model_info["body"] if model_info else None
-    return jsonify({"text": text, "title": title, "format_prompt": format_prompt, "user_prompt": user_prompt, "platform_name": platform_name, "model_name": model_name, "model_body": model_body})
+    return jsonify(
+        {
+            "text": text,
+            "title": title,
+            "format_prompt": format_prompt,
+            "user_prompt": user_prompt,
+            "platform_name": platform_name,
+            "model_name": model_name,
+            "model_body": model_body,
+        }
+    )
 
 
 @bp.route("/batch/<batch_id>/publish-frame")
@@ -670,7 +749,8 @@ def api_batch_publish_frame(batch_id):
         return Response("Unauthorized", status=401)
     from services.dzen_browser import get_frame_for_batch as dzen_get_frame
     from services.rutube_browser import get_frame_for_batch as rutube_get_frame
-    dzen_entry   = dzen_get_frame(batch_id)    # (bytes, ts) or None
+
+    dzen_entry = dzen_get_frame(batch_id)  # (bytes, ts) or None
     rutube_entry = rutube_get_frame(batch_id)  # (bytes, ts) or None
     if dzen_entry and rutube_entry:
         img = dzen_entry[0] if dzen_entry[1] >= rutube_entry[1] else rutube_entry[0]
@@ -697,6 +777,7 @@ def api_import_update_package():
     if not file:
         return jsonify({"error": "no file"}), 400
     from utils.import_update_package import import_package
+
     stream = io.StringIO(file.read().decode("utf-8"))
     summary = import_package(stream)
     return jsonify({"ok": True, "summary": summary})
@@ -707,6 +788,7 @@ def api_export_update_package():
     if not is_authenticated():
         return Response("Unauthorized", status=401)
     from utils.export_update_package import export
+
     buf = io.StringIO()
     export(output_path=None, stream=buf)
     data = buf.getvalue().encode("utf-8")
@@ -723,6 +805,7 @@ production_bp = Blueprint("production_api", __name__)
 
 def _production_auth_check():
     from flask import session
+
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
     roles = session.get("roles", [])
@@ -744,7 +827,15 @@ def api_production_stories():
     only_bad = request.args.get("only_bad", "0") == "1"
     pin_id = request.args.get("pin_id") or None
     approve_movies = cycle_config_get("approve_movies")
-    stories = db_get_stories_list(show_used=show_used, show_bad=show_bad, for_approval=for_approval, pin_id=pin_id, approve_movies=approve_movies, only_pinned=only_pinned, only_bad=only_bad)
+    stories = db_get_stories_list(
+        show_used=show_used,
+        show_bad=show_bad,
+        for_approval=for_approval,
+        pin_id=pin_id,
+        approve_movies=approve_movies,
+        only_pinned=only_pinned,
+        only_bad=only_bad,
+    )
     return jsonify(stories)
 
 
@@ -770,7 +861,9 @@ def api_production_stories_pool():
         return err
     approve_stories = cycle_config_get("approve_stories")
     approve_movies = cycle_config_get("approve_movies")
-    stories = db_get_stories_pool(grade_required=approve_stories, approve_movies=approve_movies)
+    stories = db_get_stories_pool(
+        grade_required=approve_stories, approve_movies=approve_movies
+    )
     return jsonify(stories)
 
 
@@ -791,7 +884,13 @@ def api_production_env_set():
     data = request.get_json(silent=True) or {}
     key = data.get("key", "")
     value = data.get("value", "")
-    allowed_keys = {"screenwriter_show_used", "screenwriter_only_good", "screenwriter_only_bad", "screenwriter_for_approval", "screenwriter_only_pinned"}
+    allowed_keys = {
+        "screenwriter_show_used",
+        "screenwriter_only_good",
+        "screenwriter_only_bad",
+        "screenwriter_for_approval",
+        "screenwriter_only_pinned",
+    }
     if key not in allowed_keys:
         return jsonify({"error": "invalid key"}), 400
     env_set(key, str(value))
@@ -865,7 +964,8 @@ def api_production_story_delete(story_id):
         return err
     from db.connection import get_db
     from common.statuses import FINAL_BATCH_STATUSES
-    final_statuses_sql = ', '.join(f"'{s}'" for s in FINAL_BATCH_STATUSES)
+
+    final_statuses_sql = ", ".join(f"'{s}'" for s in FINAL_BATCH_STATUSES)
     conflict_error = None
     not_found = False
     with get_db() as conn:
@@ -969,9 +1069,10 @@ def api_production_good_movies_meta():
     if err:
         return err
     from db import db_get_movies_list
+
     show_published = request.args.get("show_published", "1") != "0"
-    show_bad       = request.args.get("show_bad", "1") != "0"
-    for_approval   = request.args.get("for_approval", "0") == "1"
+    show_bad = request.args.get("show_bad", "1") != "0"
+    for_approval = request.args.get("for_approval", "0") == "1"
     rows = db_get_movies_list(
         show_published=show_published,
         show_bad=show_bad,
@@ -996,18 +1097,19 @@ def api_production_movies_upload():
     err = _production_auth_check()
     if err:
         return err
-    if 'file' not in request.files:
+    if "file" not in request.files:
         return jsonify({"error": "Файл не передан"}), 400
-    f = request.files['file']
+    f = request.files["file"]
     if not f.filename:
         return jsonify({"error": "Имя файла пустое"}), 400
     filename = f.filename
-    if filename.lower().endswith('.mp4'):
+    if filename.lower().endswith(".mp4"):
         filename = filename[:-4]
     words = filename.split()[:4]
-    title = ' '.join(words) or 'Без названия'
+    title = " ".join(words) or "Без названия"
     video_data = f.read()
     from db import db_create_manual_movie
+
     batch_id = db_create_manual_movie(title, video_data)
     environment.wakeup_loop()
     return jsonify({"ok": True, "batch_id": batch_id})
@@ -1022,13 +1124,17 @@ def api_production_video_generate():
     model_id = data.get("model_id") or None
     story_id = data.get("story_id") or None
     if model_id:
-        batch_id = db_create_video_batch('movie_probe', movie_model_id=model_id, story_id=story_id)
+        batch_id = db_create_video_batch(
+            "movie_probe", movie_model_id=model_id, story_id=story_id
+        )
     else:
-        batch_id = db_create_video_batch('movie_probe', story_id=story_id)
+        batch_id = db_create_video_batch("movie_probe", story_id=story_id)
     if not batch_id:
         return jsonify({"error": "db_error"}), 500
     environment.wakeup_loop()
-    log_batch_planned(batch_id, "Генерация видео вручную", "Запуск по запросу пользователя")
+    log_batch_planned(
+        batch_id, "Генерация видео вручную", "Запуск по запросу пользователя"
+    )
     return jsonify({"batch_id": batch_id})
 
 
@@ -1046,7 +1152,7 @@ def api_production_story_generate():
     if not batch_id:
         return jsonify({"error": "db_error"}), 500
     environment.wakeup_loop()
-    log_batch_planned(batch_id, 'Генерация сюжета вручную', "Запуск по запросу пользователя")
+    log_batch_planned(
+        batch_id, "Генерация сюжета вручную", "Запуск по запросу пользователя"
+    )
     return jsonify({"batch_id": batch_id})
-
-
