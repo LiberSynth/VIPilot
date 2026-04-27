@@ -201,6 +201,37 @@
       </div>
       {% endif %}
 
+      {% if slug == 'vkvideo' %}
+      <div class="card{% if not vkvideo_active %} target-disabled{% endif %}"
+           id="vkvideo-browser-card"
+           {% if not loop.first %}style="margin-top:12px"{% endif %}
+           data-studio-url="{% if vkvideo_club_id %}https://vkvideo.ru/@club{{ vkvideo_club_id }}/{% endif %}">
+        <input type="hidden" id="vkvideo_target_id" value="{{ vkvideo_target_id or '' }}">
+        <div class="card-title">Публикация в VK Видео</div>
+
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
+          <div class="hint" style="flex:1;margin:0">
+            Используется браузерная автоматизация Playwrite.<br>
+            Если браузер не авторизован — войдите в аккаунт VK.
+            После входа нажмите <b>Сохранить сессию</b>.
+          </div>
+          <button class="btn-run-now" id="vkvideo-btn-save"
+                  onclick="vkvideoBrowserSaveSession()"
+                  style="font-size:13px;padding:7px 14px;white-space:nowrap">Сохранить сессию</button>
+        </div>
+
+        <div id="vkvideo-browser-wrap" style="position:relative;border-radius:6px;overflow:hidden;border:1px solid var(--border,rgba(255,255,255,.12))">
+          <canvas id="vkvideo-browser-canvas"
+                  style="display:block;width:100%;cursor:pointer"
+                  tabindex="0"></canvas>
+          <div id="vkvideo-browser-overlay"
+               style="position:absolute;inset:0;background:rgba(10,10,20,.85);display:flex;align-items:center;justify-content:center;color:#aaa;font-size:14px">
+            Загрузка…
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
       {% endfor %}
     </form>
   </div>
@@ -394,6 +425,7 @@
 <script src="/static/js/modals.js"></script>
 <script src="/static/js/dzen_browser.js"></script>
 <script src="/static/js/rutube_browser.js"></script>
+<script src="/static/js/vkvideo_browser.js"></script>
 
 </body>
 </html>

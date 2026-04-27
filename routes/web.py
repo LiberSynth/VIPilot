@@ -30,6 +30,7 @@ import common.environment as environment
 from utils.auth import is_authenticated
 from utils.limiter import limiter
 from services.dzen_browser import get_session_saved_at as _dzen_saved_at
+from services.vkvideo_browser import get_session_saved_at as _vkvideo_saved_at
 from utils.utils import (
     parse_batch_lifetime,
     parse_long_lifetime,
@@ -199,13 +200,22 @@ def root_page():
     rutube_target_id  = rutube_target["id"] if rutube_target else None
     rutube_active     = bool(rutube_target.get("active")) if rutube_target else False
 
+    vkvideo_target    = db_get_target_by_name("VK Видео")
+    vkvideo_config    = vkvideo_target.get("config") or {} if vkvideo_target else {}
+    vkvideo_club_id   = vkvideo_config.get("club_id", "")
+    vkvideo_target_id = vkvideo_target["id"] if vkvideo_target else None
+    vkvideo_active    = bool(vkvideo_target.get("active")) if vkvideo_target else False
+
     active_targets  = db_get_active_targets()
     target          = active_targets[0] if active_targets else None
     target_id       = target["id"] if target else None
     aspect_ratio_x  = target["aspect_ratio_x"] if target else 9
     aspect_ratio_y  = target["aspect_ratio_y"] if target else 16
     publish_order   = [
-        slug for slug, tgt in [("vk", vk_target), ("dzen", dzen_target), ("rutube", rutube_target)]
+        slug for slug, tgt in [
+            ("vk", vk_target), ("dzen", dzen_target),
+            ("rutube", rutube_target), ("vkvideo", vkvideo_target),
+        ]
         if tgt is not None
     ]
 
@@ -249,6 +259,9 @@ def root_page():
         rutube_target_id=rutube_target_id,
         rutube_person_id=rutube_person_id,
         rutube_active=rutube_active,
+        vkvideo_target_id=vkvideo_target_id,
+        vkvideo_club_id=vkvideo_club_id,
+        vkvideo_active=vkvideo_active,
         publish_order=publish_order,
         app_version=APP_VERSION,
         nav_modules=_nav_modules("root"),
