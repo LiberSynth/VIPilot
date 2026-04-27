@@ -476,6 +476,8 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
                     if not is_captcha:
                         continue
                     write_log_entry(None, f"[dzen] Капча-фрейм найден: {frame.url!r}", level='silent')
+                    if log_id:
+                        write_log_entry(log_id, "Дзен: Капча-фрейм найден")
                     # Вариант 1: JS-клик напрямую по input[type=checkbox] внутри фрейма.
                     # Это надёжнее чем Playwright-клик — не зависит от видимости и позиции.
                     _js_clicked = False
