@@ -76,7 +76,7 @@ _RUBRICATOR = {
 }
 
 # Тройки прилагательных: (мужской, женский, средний)
-_ADJECTIVES = {
+_RUBRICATOR_ADJECTIVES = {
     'season': [
         ('весенний',    'весенняя',    'весеннее'),    # весна  (3, 4, 5)
         ('летний',      'летняя',      'летнее'),      # лето   (6, 7, 8)
@@ -144,7 +144,7 @@ def build_publication_title() -> str:
 
     rubricator = random.choice(list(_RUBRICATOR))
     gender_idx = {'m': 0, 'f': 1, 'n': 2}[_RUBRICATOR[rubricator]]
-    adjective  = _ADJECTIVES[category][idx][gender_idx]
+    adjective  = _RUBRICATOR_ADJECTIVES[category][idx][gender_idx]
 
     return f"{adjective} {rubricator} №{num}"
 
