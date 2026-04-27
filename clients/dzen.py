@@ -440,8 +440,6 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
             try:
                 all_frames = page.frames
                 write_log_entry(None, f"[dzen] Фреймы: {[f.url for f in all_frames]}", level='silent')
-                if log_id:
-                    write_log_entry(log_id, f"Дзен: Фреймы: {[f.url for f in all_frames]}")
                 for frame in all_frames:
                     if captcha_clicked:
                         break
