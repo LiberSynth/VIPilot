@@ -148,6 +148,18 @@
             <span class="toggle-track"></span>
           </label>
         </div>
+        <div class="toggle-row" style="margin-top:10px">
+          <div>
+            <div class="toggle-label">Пост на стену с клипом VK Видео</div>
+            <div class="hint" style="margin-top:2px">Клип берётся из шага VK Видео</div>
+          </div>
+          <label class="toggle-wrap">
+            <input type="hidden" name="vk_publish_clip_wall" id="vk_clip_wall_pub_hidden" value="{{ '1' if vk_publish_clip_wall else '0' }}">
+            <input type="checkbox" id="vk_clip_wall_pub_check" {% if vk_publish_clip_wall %}checked{% endif %}
+                   onchange="onVkMethodToggle(this)">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
       </div>
       {% endif %}
 

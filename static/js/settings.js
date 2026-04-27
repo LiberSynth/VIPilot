@@ -108,6 +108,7 @@ function onVkMethodToggle(changedChk) {
     { chk: 'vk_story_pub_check',     hid: 'vk_story_pub_hidden' },
     { chk: 'vk_wall_pub_check',      hid: 'vk_wall_pub_hidden' },
     { chk: 'vk_clip_story_pub_check', hid: 'vk_clip_story_pub_hidden' },
+    { chk: 'vk_clip_wall_pub_check',  hid: 'vk_clip_wall_pub_hidden' },
   ];
   const anyChecked = ids.some(o => document.getElementById(o.chk) && document.getElementById(o.chk).checked);
   if (!anyChecked) {

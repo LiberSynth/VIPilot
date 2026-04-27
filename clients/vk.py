@@ -84,7 +84,7 @@ def publish_story(video_data: bytes, group_id: int, log_id) -> int | None:
 
 
 def _clip_url_to_attachment(clip_url: str) -> str:
-    """Преобразует ссылку VK Видео в attachment-строку для wall.post.
+    """Преобразует ссылку VK Видео в attachment-строку (тип clip) для wall.post.
 
     https://vkvideo.ru/clip-236929597_456239776  →  clip-236929597_456239776
     """
@@ -93,6 +93,22 @@ def _clip_url_to_attachment(clip_url: str) -> str:
     for prefix in ("https://vkvideo.ru/clip", "http://vkvideo.ru/clip", "vkvideo.ru/clip"):
         if clip_url.startswith(prefix):
             return "clip" + clip_url[len(prefix):]
+    return ""
+
+
+def _clip_url_to_video_attachment(clip_url: str) -> str:
+    """Преобразует ссылку VK Видео в attachment-строку типа video для wall.post.
+
+    Клипы хранятся как видео-объекты — тип video работает в wall.post,
+    тип clip официально не документирован.
+
+    https://vkvideo.ru/clip-236929597_456239776  →  video-236929597_456239776
+    """
+    if not clip_url:
+        return ""
+    for prefix in ("https://vkvideo.ru/clip", "http://vkvideo.ru/clip", "vkvideo.ru/clip"):
+        if clip_url.startswith(prefix):
+            return "video" + clip_url[len(prefix):]
     return ""
 
 
@@ -128,6 +144,42 @@ def publish_clip_story(clip_url: str, title: str, group_id: int, log_id) -> int 
 
     if log_id:
         write_log_entry(log_id, f"VK: wall.post (clip_story): {post_resp.get('error', post_resp)}", level='error')
+    return None
+
+
+def publish_clip_wall(clip_url: str, title: str, group_id: int, log_id) -> int | None:
+    """Публикует запись на стену сообщества с клипом VK Видео в качестве видео-вложения.
+
+    Клип передаётся как video-объект (video<owner>_<id>) — загрузка не нужна,
+    видео уже существует на серверах VK.
+    Возвращает post_id или None.
+    """
+    attachment = _clip_url_to_video_attachment(clip_url)
+    if not attachment:
+        if log_id:
+            write_log_entry(log_id, f"VK: Не удалось получить video-attachment из ссылки «{clip_url}»", level='error')
+        return None
+
+    if log_id:
+        write_log_entry(log_id, fmt_id_msg("VK: Публикую пост на стену с клипом: attachment={}, title={}", attachment, title))
+
+    post_resp = requests.post(f'{_VK_API}/wall.post', data={
+        'owner_id':     -group_id,
+        'from_group':   1,
+        'message':      title,
+        'attachments':  attachment,
+        'access_token': _VK_TOKEN,
+        'v': _VK_VER,
+    }, timeout=15).json()
+
+    if 'response' in post_resp:
+        post_id = post_resp['response']['post_id']
+        if log_id:
+            write_log_entry(log_id, fmt_id_msg('VK: Пост на стену с клипом опубликован: post_id={}', post_id))
+        return post_id
+
+    if log_id:
+        write_log_entry(log_id, f"VK: wall.post (clip_wall): {post_resp.get('error', post_resp)}", level='error')
     return None
 
 
