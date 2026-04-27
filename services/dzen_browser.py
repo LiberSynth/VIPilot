@@ -310,7 +310,7 @@ def push_frame(img: bytes):
 # Хранилище кадров по batch_id (для монитора)
 # ---------------------------------------------------------------------------
 
-_batch_frames: dict = {}        # batch_id → JPEG bytes
+_batch_frames: dict = {}        # batch_id → (JPEG bytes, monotonic timestamp)
 _batch_frames_lock = threading.Lock()
 _MAX_BATCH_FRAMES = 30          # держим не более N батчей
 
@@ -318,14 +318,14 @@ _MAX_BATCH_FRAMES = 30          # держим не более N батчей
 def push_frame_for_batch(batch_id: str, img: bytes):
     """Сохраняет последний JPEG-кадр для конкретного батча."""
     with _batch_frames_lock:
-        _batch_frames[batch_id] = img
+        _batch_frames[batch_id] = (img, time.monotonic())
         if len(_batch_frames) > _MAX_BATCH_FRAMES:
             oldest = next(iter(_batch_frames))
             del _batch_frames[oldest]
 
 
-def get_frame_for_batch(batch_id: str) -> Optional[bytes]:
-    """Возвращает последний JPEG-кадр батча или None."""
+def get_frame_for_batch(batch_id: str) -> Optional[tuple]:
+    """Возвращает (JPEG bytes, timestamp) для батча или None."""
     with _batch_frames_lock:
         return _batch_frames.get(batch_id)
 

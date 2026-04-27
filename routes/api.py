@@ -545,7 +545,16 @@ def api_batch_publish_frame(batch_id):
         return Response("Unauthorized", status=401)
     from services.dzen_browser import get_frame_for_batch as dzen_get_frame
     from services.rutube_browser import get_frame_for_batch as rutube_get_frame
-    img = dzen_get_frame(batch_id) or rutube_get_frame(batch_id)
+    dzen_entry   = dzen_get_frame(batch_id)    # (bytes, ts) or None
+    rutube_entry = rutube_get_frame(batch_id)  # (bytes, ts) or None
+    if dzen_entry and rutube_entry:
+        img = dzen_entry[0] if dzen_entry[1] >= rutube_entry[1] else rutube_entry[0]
+    elif dzen_entry:
+        img = dzen_entry[0]
+    elif rutube_entry:
+        img = rutube_entry[0]
+    else:
+        img = None
     if img is None:
         return Response("", status=204)
     return Response(
