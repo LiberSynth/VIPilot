@@ -4,6 +4,7 @@ attached_assets/
 
 # Browser profile cache and runtime artifacts
 data/dzen_profile/
+data/rutube_profile/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
