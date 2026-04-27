@@ -133,31 +133,18 @@
     if (card && expandEl) expandEl.appendChild(card);
   }
 
-  /* ── плеер: высота рамки ── */
-  function updateVideoWrapHeight() {
-    var wrap = document.getElementById('director-video-wrap');
-    if (!wrap) return;
-    var header = document.querySelector('header');
-    var headerBottom = header ? header.getBoundingClientRect().bottom : 0;
-    var cardPad = 15;
-    var avail = window.innerHeight - headerBottom - cardPad * 2;
-    wrap.style.height = Math.round(avail / 1.618) + 'px';
-  }
-
   /* ── плеер ── */
   function loadMovieInPlayer(movieId, forceNoAutoplay) {
     var wrap = document.getElementById('director-video-wrap');
     if (!wrap) return;
     if (!movieId) {
       wrap.innerHTML = '<video class="probe-video" controls></video>';
-      updateVideoWrapHeight();
       return;
     }
     var src = '/production/movie/' + encodeURIComponent(movieId) + '/video';
     var autoplayChk = document.getElementById('director-autoplay-check');
     var autoplayAttr = (!forceNoAutoplay && autoplayChk && autoplayChk.checked) ? ' autoplay' : '';
     wrap.innerHTML = '<video class="probe-video" controls' + autoplayAttr + ' src="' + src + '"></video>';
-    updateVideoWrapHeight();
   }
 
   function selectMovie(movieId, forceNoAutoplay) {
@@ -573,8 +560,6 @@
       _exportMovies(btn);
     });
   }
-
-  window.directorUpdateVideoWrapHeight = updateVideoWrapHeight;
 
   function initAutoplayToggle() {
     var chk = document.getElementById('director-autoplay-check');

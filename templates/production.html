@@ -165,10 +165,6 @@
     <div id="director-player-holder" hidden>
       <div id="director-player-card">
         <div id="director-video-wrap"></div>
-        <label class="sw-filter-row" style="margin-top:8px" for="director-autoplay-check">
-          <span class="sw-filter-label">Автозапуск</span>
-          <input class="sw-filter-check" type="checkbox" id="director-autoplay-check" {% if autoplay_movie %}checked{% endif %}>
-        </label>
       </div>
     </div>
 
@@ -195,7 +191,11 @@
         </button>
         </div>
       </div>
-      <label class="sw-filter-row" style="margin-top:7px; margin-bottom:6px" for="movie-filter-for-approval">
+      <label class="sw-filter-row" style="margin-top:7px; margin-bottom:6px" for="director-autoplay-check">
+        <span class="sw-filter-label">Автозапуск</span>
+        <input class="sw-filter-check" type="checkbox" id="director-autoplay-check" {% if autoplay_movie %}checked{% endif %}>
+      </label>
+      <label class="sw-filter-row" style="margin-bottom:6px" for="movie-filter-for-approval">
         <span class="sw-filter-label">На утверждение</span>
         <input class="sw-filter-check" type="checkbox" id="movie-filter-for-approval">
       </label>
@@ -319,7 +319,7 @@
   var _origSwitchPanel = window.switchPanel;
   window.switchPanel = function(name) {
     if (_origSwitchPanel) _origSwitchPanel(name);
-    if (name === 'director') { loadDirectorStoryPool(); loadDirectorVideoModels(); if (typeof window.loadMovieList === 'function') window.loadMovieList(); if (typeof window.directorUpdateVideoWrapHeight === 'function') window.directorUpdateVideoWrapHeight(); }
+    if (name === 'director') { loadDirectorStoryPool(); loadDirectorVideoModels(); if (typeof window.loadMovieList === 'function') window.loadMovieList(); }
   };
 
   var btn = document.getElementById('director-story-btn');
