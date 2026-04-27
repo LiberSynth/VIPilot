@@ -20,7 +20,7 @@ def db_get_log_entries(log_id):
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT message, level, created_at FROM log_entries WHERE log_id = %s ORDER BY created_at, id",
+                "SELECT message, level, created_at FROM log_entries WHERE log_id = %s ORDER BY created_at DESC, id DESC",
                 (log_id,),
             )
             rows = cur.fetchall()
@@ -94,7 +94,7 @@ def db_get_monitor(batch_limit=50):
                                 'message',    le.message,
                                 'level',      le.level,
                                 'created_at', le.created_at
-                            ) ORDER BY le.created_at, le.id
+                            ) ORDER BY le.created_at DESC, le.id DESC
                         ) FILTER (WHERE le.id IS NOT NULL),
                         '[]'::json
                     ) AS entries
@@ -170,7 +170,7 @@ def db_get_batch_log_entries(batch_id: str) -> list:
                                 'message',    le.message,
                                 'level',      le.level,
                                 'created_at', le.created_at
-                            ) ORDER BY le.created_at, le.id
+                            ) ORDER BY le.created_at DESC, le.id DESC
                         ) FILTER (WHERE le.id IS NOT NULL AND le.level != 'silent'),
                         '[]'::json
                     ) AS entries
