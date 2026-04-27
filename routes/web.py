@@ -193,12 +193,18 @@ def root_page():
     dzen_active    = bool(dzen_target.get("active")) if dzen_target else False
     dzen_session_saved_at = _dzen_saved_at()
 
+    rutube_target     = db_get_target_by_name("Rutube")
+    rutube_config     = rutube_target.get("config") or {} if rutube_target else {}
+    rutube_person_id  = rutube_config.get("person_id", "")
+    rutube_target_id  = rutube_target["id"] if rutube_target else None
+    rutube_active     = bool(rutube_target.get("active")) if rutube_target else False
+
     active_targets  = db_get_active_targets()
     target          = active_targets[0] if active_targets else None
     target_id       = target["id"] if target else None
     aspect_ratio_x  = target["aspect_ratio_x"] if target else 9
     aspect_ratio_y  = target["aspect_ratio_y"] if target else 16
-    publish_order   = [t["slug"] for t in active_targets if t.get("slug") in ("vk", "dzen")]
+    publish_order   = [t["slug"] for t in active_targets if t.get("slug") in ("vk", "dzen", "rutube")]
 
     _save_last_page()
     resp = make_response(render_template(
@@ -237,6 +243,9 @@ def root_page():
         dzen_session_saved_at=dzen_session_saved_at,
         vk_active=vk_active,
         dzen_active=dzen_active,
+        rutube_target_id=rutube_target_id,
+        rutube_person_id=rutube_person_id,
+        rutube_active=rutube_active,
         publish_order=publish_order,
         app_version=APP_VERSION,
         nav_modules=_nav_modules("root"),
