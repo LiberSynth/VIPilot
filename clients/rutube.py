@@ -72,7 +72,7 @@ def publish(
     saved_cookies = session.get("cookies", [])
 
     if log_id:
-        write_log_entry(log_id, f"Рутьюб: {len(video_data) // 1024} КБ, person_id={person_id}")
+        write_log_entry(log_id, fmt_id_msg("Рутьюб: {} КБ, person_id={}", len(video_data) // 1024, person_id))
 
     pub_title = build_publication_title()
     file_name = publication_file_name(pub_title)
