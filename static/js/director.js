@@ -571,12 +571,23 @@
     });
   }
 
+  function updateVideoWrapHeight() {
+    var wrap = document.getElementById('director-video-wrap');
+    if (!wrap) return;
+    var headerEl = document.querySelector('.header-top');
+    var headerH = headerEl ? headerEl.offsetHeight : 0;
+    var availableH = window.innerHeight - headerH;
+    wrap.style.height = Math.round(availableH / 1.618) + 'px';
+  }
+
   function initDirector() {
     initFilters();
     initDeleteBadMoviesButton();
     initImportMovieButton();
     initExportGoodMoviesButton();
     initAutoplayToggle();
+    updateVideoWrapHeight();
+    window.addEventListener('resize', updateVideoWrapHeight);
   }
 
   window._directorApi = {
