@@ -29,8 +29,6 @@ from db import (
 import common.environment as environment
 from utils.auth import is_authenticated
 from utils.limiter import limiter
-from services.dzen_browser import get_session_saved_at as _dzen_saved_at
-from services.vkvideo_browser import get_session_saved_at as _vkvideo_saved_at
 from utils.utils import (
     parse_batch_lifetime,
     parse_long_lifetime,
@@ -192,7 +190,6 @@ def root_page():
     dzen_publisher_id = dzen_config.get("publisher_id", "")
     dzen_target_id = dzen_target["id"] if dzen_target else None
     dzen_active    = bool(dzen_target.get("active")) if dzen_target else False
-    dzen_session_saved_at = _dzen_saved_at()
 
     rutube_target     = db_get_target_by_name("Rutube")
     rutube_config     = rutube_target.get("config") or {} if rutube_target else {}
@@ -253,7 +250,6 @@ def root_page():
         aspect_ratio_y=aspect_ratio_y,
         dzen_target_id=dzen_target_id,
         dzen_publisher_id=dzen_publisher_id,
-        dzen_session_saved_at=dzen_session_saved_at,
         vk_active=vk_active,
         dzen_active=dzen_active,
         rutube_target_id=rutube_target_id,
