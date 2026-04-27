@@ -245,7 +245,49 @@ def _publish_ui(page, club_id: str, video_path: str, pub_title: str, log_id, bat
         if log_id:
             write_log_entry(log_id, "VK Видео: Не удалось заполнить описание — продолжаю…")
 
-    # ── Шаг 7: Ждём обложки и активную кнопку «Опубликовать» ─────────────
+    # ── Шаг 7: Выключаем ненужные переключатели ──────────────────────────
+    _TOGGLES_OFF = ["Показать на главной сообщества", "Разрешить дуэты"]
+    write_log_entry(None, f"[vkvideo] Выключаю переключатели: {_TOGGLES_OFF}", level='silent')
+    if log_id:
+        write_log_entry(log_id, "VK Видео: Выключаю переключатели…")
+    for label_text in _TOGGLES_OFF:
+        try:
+            label = page.locator(f"label:has-text('{label_text}')").first
+            if label.count() == 0 or not label.is_visible(timeout=3_000):
+                write_log_entry(None, f"[vkvideo] Переключатель «{label_text}» не найден — пропуск", level='silent')
+                continue
+            chk = label.locator("input[type='checkbox']")
+            if chk.count() > 0 and chk.first.is_checked():
+                chk.first.click(force=True)
+                page.wait_for_timeout(300)
+                write_log_entry(None, f"[vkvideo] Переключатель «{label_text}» выключен", level='silent')
+                if log_id:
+                    write_log_entry(log_id, f"VK Видео: «{label_text}» — выключено")
+            else:
+                toggle_btn = label.locator("[role='switch'], button").first
+                if toggle_btn.count() > 0:
+                    aria = toggle_btn.get_attribute("aria-checked")
+                    if aria == "true":
+                        toggle_btn.click()
+                        page.wait_for_timeout(300)
+                        write_log_entry(None, f"[vkvideo] Переключатель «{label_text}» выключен (role=switch)", level='silent')
+                        if log_id:
+                            write_log_entry(log_id, f"VK Видео: «{label_text}» — выключено")
+                    else:
+                        write_log_entry(None, f"[vkvideo] Переключатель «{label_text}» уже выключен", level='silent')
+                else:
+                    label.click()
+                    page.wait_for_timeout(300)
+                    write_log_entry(None, f"[vkvideo] Переключатель «{label_text}» кликнут (fallback)", level='silent')
+                    if log_id:
+                        write_log_entry(log_id, f"VK Видео: «{label_text}» — кликнут")
+        except Exception as _e:
+            write_log_entry(None, f"[vkvideo] Ошибка при переключателе «{label_text}»: {_e}", level='silent')
+            if log_id:
+                write_log_entry(log_id, f"VK Видео: Не удалось выключить «{label_text}» — продолжаю…")
+    _snap(page, batch_id)
+
+    # ── Шаг 8: Ждём обложки и активную кнопку «Опубликовать» ─────────────
     write_log_entry(None, "[vkvideo] Жду обложки клипа…", level='silent')
     if log_id:
         write_log_entry(log_id, "VK Видео: Жду обложки клипа…")
@@ -271,7 +313,7 @@ def _publish_ui(page, club_id: str, video_path: str, pub_title: str, log_id, bat
             write_log_entry(log_id, "VK Видео: Обложки не появились — продолжаю…")
     _snap(page, batch_id)
 
-    # ── Шаг 8: Нажимаем «Опубликовать» ───────────────────────────────────
+    # ── Шаг 9: Нажимаем «Опубликовать» ───────────────────────────────────
     write_log_entry(None, "[vkvideo] Нажимаю «Опубликовать»…", level='silent')
     if log_id:
         write_log_entry(log_id, "VK Видео: Нажимаю «Опубликовать»…")
@@ -281,7 +323,7 @@ def _publish_ui(page, club_id: str, video_path: str, pub_title: str, log_id, bat
     page.wait_for_timeout(3000)
     _snap(page, batch_id)
 
-    # ── Шаг 9: Проверяем успех (тост «Клип опубликован») ─────────────────
+    # ── Шаг 10: Проверяем успех (тост «Клип опубликован») ────────────────
     write_log_entry(None, "[vkvideo] Проверяю результат публикации…", level='silent')
     if log_id:
         write_log_entry(log_id, "VK Видео: Проверяю результат публикации…")
