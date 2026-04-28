@@ -399,29 +399,6 @@ def db_delete_bad_movies() -> dict:
     return {"movies": ml_count, "batches": bl_count, "logs": ll_count, "log_entries": le_count}
 
 
-def db_get_movies_with_video_meta() -> list[dict]:
-    """Возвращает список {id, model_name, story_title, grade} для всех movies (включая grade = bad и NULL)."""
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT DISTINCT ON (m.id)
-                    m.id::text,
-                    a.name AS model_name,
-                    s.title AS story_title,
-                    m.grade
-                FROM movies m
-                LEFT JOIN ai_models a ON a.id = m.model_id
-                LEFT JOIN batches b ON b.movie_id = m.id
-                LEFT JOIN stories s ON s.id = b.story_id
-                ORDER BY m.id, b.created_at DESC NULLS LAST
-            """)
-            rows = cur.fetchall()
-    return [
-        {"id": r[0], "model_name": r[1] or "", "story_title": r[2] or "", "grade": r[3]}
-        for r in rows
-    ]
-
-
 def db_get_batch_status(batch_id: str) -> str | None:
     """Возвращает текущий статус батча или None если не найден."""
     with get_db() as conn:
