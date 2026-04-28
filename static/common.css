@@ -488,7 +488,6 @@
   @media (max-width: 520px) {
     .wf-btns { margin-left: 0; width: 100%; }
     .wf-btn  { flex: 1; text-align: center; padding: 9px 8px; font-size: 12px; }
-    .header-center { font-size: 11px; position: static; transform: none; margin-left: auto; }
   }
 
   /* ── Monitor ── */

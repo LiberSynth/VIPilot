@@ -63,7 +63,8 @@ function collectAllSettings(activeTab) {
   setIfExists('file_lifetime',    'file_lifetime');
   setIfExists('buffer_hours',     'buffer_hours');
   setIfExists('loop_interval',    'loop_interval');
-  setIfExists('max_batch_threads','max_batch_threads');
+  setIfExists('max_batch_threads', 'max_batch_threads');
+  setIfExists('max_model_passes',  'max_model_passes');
   return data;
 }
 

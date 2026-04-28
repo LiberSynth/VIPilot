@@ -41,9 +41,10 @@
   };
 
   const PLATFORM_LABELS = {
-    dzen:   'Дзен',
-    vk:     'ВКонтакте',
-    rutube: 'Rutube',
+    dzen:    'Дзен',
+    vk:      'ВКонтакте',
+    rutube:  'Rutube',
+    vkvideo: 'VK Видео',
   };
 
   function translateStatus(s) {
@@ -420,10 +421,6 @@
     });
   }
 
-  function autoExpandNewActivity() {
-    if (_openBid !== null) return;
-  }
-
   function _evictPubFrameCache() {
     var inDom = {};
     document.querySelectorAll('.monitor-pub-frame img[data-bid]').forEach(function(img) {
@@ -572,7 +569,6 @@
     }
 
     restoreOpenState(prev);
-    if (!_firstRender) autoExpandNewActivity();
     _firstRender = false;
     refreshPublishFrames();
     if (_orphanEntriesCache === null && !_orphanFetching &&
