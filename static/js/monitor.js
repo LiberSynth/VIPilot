@@ -33,6 +33,22 @@
     donated:          'из пула',
   };
 
+  const COMPOSITE_PHASE_LABELS = {
+    posting:   'публикуется',
+    published: 'опубликовано',
+    pending:   'ожидание публикации',
+    failed:    'ошибка публикации',
+  };
+
+  function translateStatus(s) {
+    if (STATUS_LABELS[s]) return STATUS_LABELS[s];
+    if (s.indexOf('.') >= 0) {
+      var phase = s.split('.').pop();
+      if (COMPOSITE_PHASE_LABELS[phase]) return COMPOSITE_PHASE_LABELS[phase];
+    }
+    return s;
+  }
+
   function esc(s) {
     return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
@@ -171,7 +187,7 @@
         : batch.type === 'story_probe'
           ? 'Пробный сюжет'
           : 'Публикация: сейчас';
-    const statusLabel = (bs === 'movie_probe' || bs === 'story_probe') ? 'выполнен' : (STATUS_LABELS[bs] || bs);
+    const statusLabel = (bs === 'movie_probe' || bs === 'story_probe') ? 'выполнен' : translateStatus(bs);
     const sub = [schedStr, statusLabel, batch.title || '']
       .filter(Boolean).join(' · ');
 
