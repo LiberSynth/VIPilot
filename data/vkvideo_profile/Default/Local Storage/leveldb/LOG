@@ -1,3 +1,6 @@
 2026/04/28-09:29:08.017 40b4 Reusing MANIFEST /home/runner/workspace/data/vkvideo_profile/Default/Local Storage/leveldb/MANIFEST-000001
 2026/04/28-09:29:08.032 40b4 Recovering log #51
 2026/04/28-09:29:08.032 40b4 Reusing old log /home/runner/workspace/data/vkvideo_profile/Default/Local Storage/leveldb/000051.log 
+2026/04/28-09:30:08.036 40b4 Level-0 table #56: started
+2026/04/28-09:30:08.070 40b4 Level-0 table #56: 22020 bytes OK
+2026/04/28-09:30:08.074 40b4 Delete type=0 #51

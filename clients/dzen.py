@@ -464,6 +464,8 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
 
                     if _js_clicked:
                         page.wait_for_timeout(2000)
+                        write_log_entry(log_id, "Дзен: Капча-фрейм пройден.")
+                        write_log_entry(log_id, "[dzen] Капча пройдена через JS-клик.", level='silent')
                         captcha_clicked = True
                         _snap(page, batch_id)
                         break
@@ -480,6 +482,8 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
                                 write_log_entry(log_id, f"[dzen] Капча: Playwright-клик {sel!r}", level='silent')
                                 el.click(force=True, timeout=2000)
                                 page.wait_for_timeout(2000)
+                                write_log_entry(log_id, "Дзен: Капча-фрейм пройден.")
+                                write_log_entry(log_id, f"[dzen] Капча пройдена через Playwright-клик {sel!r}.", level='silent')
                                 captcha_clicked = True
                                 _snap(page, batch_id)
                                 break
