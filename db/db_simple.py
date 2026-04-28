@@ -147,17 +147,6 @@ def db_get_active_targets():
     ]
 
 
-def db_update_target_transcode(target_id, value: bool):
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "UPDATE targets SET transcode = %s WHERE id = %s",
-                (value, target_id),
-            )
-        conn.commit()
-    return True
-
-
 def db_update_target_aspect_ratio(target_id, x, y):
     with get_db() as conn:
         with conn.cursor() as cur:
@@ -192,17 +181,6 @@ def db_get_target_by_name(name: str) -> dict | None:
             )
             row = cur.fetchone()
     return dict(row) if row else None
-
-
-def db_update_target_config(target_id: str, config: dict) -> bool:
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "UPDATE targets SET config = %s::jsonb WHERE id = %s::uuid",
-                (json.dumps(config), target_id),
-            )
-        conn.commit()
-    return True
 
 
 def db_update_target_publish_method_by_slug(slug: str, methods: dict) -> bool:
