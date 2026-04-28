@@ -51,7 +51,6 @@ from db import (
     db_get_batch_status,
     db_delete_story,
     db_delete_movie,
-    db_get_movies_with_video_meta,
 )
 from log import (
     db_get_monitor,

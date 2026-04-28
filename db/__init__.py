@@ -52,7 +52,6 @@ from .db_pipeline import (
     db_set_batch_status,
     db_claim_batch_status,
     db_cancel_orphaned_slot_batches,
-    db_reset_batch_to_pending,
     db_claim_unused_story_for_batch,
     db_claim_donor_batch,
     db_set_batch_story_ready_from_donor,
@@ -60,7 +59,6 @@ from .db_pipeline import (
     db_get_donor_count,
     db_get_actionable_batches,
     db_get_batch_by_id,
-    db_get_batches_with_unknown_status,
     db_is_batch_scheduled,
     db_reset_stalled_batches,
     db_reset_batch_pipeline,
@@ -109,4 +107,3 @@ from .db_service import (
     db_get_movies_with_video_meta,
 )
 from .cycle_config import cycle_config_get, cycle_config_set
-from common.statuses import KNOWN_BATCH_STATUSES

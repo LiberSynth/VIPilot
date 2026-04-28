@@ -387,19 +387,6 @@ def db_upsert_story_draft(story_id, title, content):
     return str(row[0]) if row else None
 
 
-def db_activate_model(model_id: str, model_type: str):
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "UPDATE ai_models SET active = FALSE WHERE type = %s", (model_type,)
-            )
-            cur.execute(
-                "UPDATE ai_models SET active = TRUE  WHERE id = %s", (model_id,)
-            )
-        conn.commit()
-    return True
-
-
 def db_toggle_model(model_id: str):
     with get_db() as conn:
         with conn.cursor() as cur:

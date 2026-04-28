@@ -36,13 +36,6 @@ def _check_ffmpeg() -> tuple[bool, str]:
         return False, f'ffmpeg: ошибка — {e}'
 
 
-def _check_ffprobe() -> tuple[bool, str]:
-    path = shutil.which('ffprobe')
-    if not path:
-        return False, 'ffprobe не найден'
-    return True, f'ffprobe: {path}'
-
-
 def _check_flask() -> tuple[bool, str]:
     try:
         import flask
@@ -142,7 +135,6 @@ def _check_model_durations() -> tuple[bool, str]:
 
 _CHECKS = [
     ('ffmpeg',     _check_ffmpeg),
-    ('ffprobe',    _check_ffprobe),
     ('flask',      _check_flask),
     ('requests',   _check_requests),
     ('psycopg2',   _check_psycopg2),

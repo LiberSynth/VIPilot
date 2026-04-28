@@ -207,16 +207,6 @@ def db_cancel_orphaned_slot_batches():
     return batch_ids
 
 
-def db_reset_batch_to_pending(batch_id):
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "UPDATE batches SET story_id = NULL, movie_id = NULL WHERE id = %s",
-                (batch_id,),
-            )
-        db_set_batch_status(batch_id, "pending", conn)
-
-
 def db_claim_unused_story_for_batch(batch_id: str, grade_required: bool) -> dict | None:
     with get_db() as conn:
         with conn.cursor() as cur:
@@ -379,14 +369,6 @@ def db_get_batch_by_id(batch_id):
             )
             row = cur.fetchone()
     return dict(row) if row else None
-
-
-def db_get_batches_with_unknown_status(known_statuses):
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT id, status FROM batches")
-            rows = cur.fetchall()
-    return {row[0]: row[1] for row in rows if row[1] not in known_statuses}
 
 
 def db_is_batch_scheduled(scheduled_at, batch_type="slot"):
