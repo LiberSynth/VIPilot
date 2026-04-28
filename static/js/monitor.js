@@ -172,7 +172,7 @@
           ? 'Пробный сюжет'
           : 'Публикация: сейчас';
     const statusLabel = (bs === 'movie_probe' || bs === 'story_probe') ? 'выполнен' : (STATUS_LABELS[bs] || bs);
-    const sub = [schedStr, statusLabel]
+    const sub = [schedStr, statusLabel, batch.title || '']
       .filter(Boolean).join(' · ');
 
     if (logs.length === 0) {

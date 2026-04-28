@@ -63,7 +63,8 @@ def db_get_monitor(batch_limit=50):
                         '[]'::json
                     ) AS logs,
                     tm.name AS text_model_name,
-                    vm.name AS video_model_name
+                    vm.name AS video_model_name,
+                    b.title
                 FROM batches b
                 LEFT JOIN (
                     SELECT id, model_id,
@@ -76,7 +77,7 @@ def db_get_monitor(batch_limit=50):
                 LEFT JOIN ai_models vm ON vm.id = m.model_id
                 GROUP BY b.id, b.scheduled_at, b.type, b.status, b.created_at,
                          b.story_id, m.has_video_data,
-                         tm.name, vm.name
+                         tm.name, vm.name, b.title
                 ORDER BY COALESCE(MAX(l.created_at), b.created_at) DESC, b.id DESC
                 LIMIT %s
                 """,
@@ -132,6 +133,7 @@ def db_get_monitor(batch_limit=50):
             "logs": r[8],
             "text_model_name": r[9],
             "video_model_name": r[10],
+            "title": r[11],
         }
         for r in batch_rows
     ]

@@ -18,7 +18,8 @@ def db_get_batch_logs(batch_id):
                      OR m.raw_data IS NOT NULL)                             AS has_video_data,
                     b.movie_id::text                                        AS movie_id,
                     tm.name                                                 AS text_model_name,
-                    vm.name                                                 AS video_model_name
+                    vm.name                                                 AS video_model_name,
+                    b.title
                 FROM batches b
                 LEFT JOIN movies m ON m.id = b.movie_id
                 LEFT JOIN stories s ON s.id = b.story_id
@@ -62,6 +63,7 @@ def db_get_batch_logs(batch_id):
         'movie_id':         row['movie_id'],
         'text_model_name':  row['text_model_name'],
         'video_model_name': row['video_model_name'],
+        'title':            row['title'],
         'logs': [
             {
                 'id':         r['id'],
