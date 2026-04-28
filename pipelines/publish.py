@@ -6,25 +6,27 @@ Pipeline 6 — Публикация.
 from datetime import datetime, timezone
 
 import common.environment as environment
+from utils.notify import notify_failure
 from db import (
-    cycle_config_get,
-    db_get_batch_by_id,
     db_get_active_targets,
-    db_claim_batch_status,
-    db_set_batch_status,
+    db_get_batch_by_id,
     db_get_batch_video_data,
     db_get_batch_original_video,
+    db_set_batch_status,
+    db_claim_batch_status,
 )
 from log import db_log_update, db_get_log_entries, write_log_entry
 from pipelines.base import check_cancelled
 from common.exceptions import AppException
-from routes.api import client_is_configured
-from clients import vk, dzen_client, rutube_client, vkvideo_client
-from clients.dzen import DzenSessionMissing, DzenCsrfExpired
-from clients.rutube import RutubeSessionMissing, RutubeCsrfExpired
-from clients.vkvideo import VkVideoSessionMissing, VkVideoCsrfExpired
-from utils.notify import notify_failure
 from utils.utils import fmt_id_msg
+from routes.api import client_is_configured
+from clients import vk
+from clients import dzen as dzen_client
+from clients.dzen import DzenCsrfExpired, DzenSessionMissing
+from clients import rutube as rutube_client
+from clients.rutube import RutubeCsrfExpired, RutubeSessionMissing
+from clients import vkvideo as vkvideo_client
+from clients.vkvideo import VkVideoCsrfExpired, VkVideoSessionMissing
 
 
 def _is_too_early(batch):
