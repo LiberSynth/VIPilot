@@ -1,4 +1,0 @@
-2026/04/28-12:26:09.285 130 Creating DB /home/runner/workspace/data/vkvideo_profile/Default/Service Worker/Database since it was missing.
-2026/04/28-12:26:09.295 130 Reusing MANIFEST /home/runner/workspace/data/vkvideo_profile/Default/Service Worker/Database/MANIFEST-000001
-2026/04/28-12:26:09.295 130 Recovering log #3
-2026/04/28-12:26:09.296 130 Reusing old log /home/runner/workspace/data/vkvideo_profile/Default/Service Worker/Database/000003.log 
