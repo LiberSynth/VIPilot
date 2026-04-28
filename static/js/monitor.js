@@ -40,11 +40,22 @@
     failed:    'ошибка публикации',
   };
 
+  const PLATFORM_LABELS = {
+    dzen:   'Дзен',
+    vk:     'ВКонтакте',
+    rutube: 'Rutube',
+  };
+
   function translateStatus(s) {
     if (STATUS_LABELS[s]) return STATUS_LABELS[s];
     if (s.indexOf('.') >= 0) {
-      var phase = s.split('.').pop();
-      if (COMPOSITE_PHASE_LABELS[phase]) return COMPOSITE_PHASE_LABELS[phase];
+      var parts = s.split('.');
+      var phase = parts[parts.length - 1];
+      if (COMPOSITE_PHASE_LABELS[phase]) {
+        var platformSlug = parts[0];
+        var platformName = PLATFORM_LABELS[platformSlug] || platformSlug;
+        return platformName + ' · ' + COMPOSITE_PHASE_LABELS[phase];
+      }
     }
     return s;
   }
