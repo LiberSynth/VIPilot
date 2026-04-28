@@ -491,8 +491,13 @@
           var tmp = document.createElement('div');
           tmp.innerHTML = newHtml;
           var newNode = tmp.firstChild;
+          if (isOpen) {
+            newNode.classList.add('open');
+            newNode.querySelectorAll('.monitor-log-item').forEach(function(li) {
+              if (prev.lids && prev.lids[li.dataset.lid]) li.classList.add('open');
+            });
+          }
           el.replaceChild(newNode, existing);
-          if (isOpen) newNode.classList.add('open');
           _lastRenderedHtml[key] = newHtml;
           return newNode;
         }
@@ -504,9 +509,14 @@
       return tmp2.firstChild;
     });
 
-    var frag = document.createDocumentFragment();
-    resolvedNodes.forEach(function(node) { frag.appendChild(node); });
-    el.appendChild(frag);
+    var needsReorder = resolvedNodes.some(function(node, i) {
+      return el.children[i] !== node;
+    });
+    if (needsReorder) {
+      var frag = document.createDocumentFragment();
+      resolvedNodes.forEach(function(node) { frag.appendChild(node); });
+      el.appendChild(frag);
+    }
 
     restoreOpenState(prev);
     if (!_firstRender) autoExpandNewActivity();
