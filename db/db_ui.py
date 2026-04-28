@@ -164,7 +164,7 @@ def db_get_stories_list(show_used=True, show_bad=True, for_approval=False, pin_i
     ]
 
 
-def db_get_movies_list(show_published=True, show_bad=True, for_approval=False):
+def db_get_movies_list(show_published=True, show_bad=True, for_approval=False, pin_id=None):
     _published_check = """EXISTS (
         SELECT 1 FROM batches b2
         WHERE b2.movie_id = m.id
@@ -180,7 +180,15 @@ def db_get_movies_list(show_published=True, show_bad=True, for_approval=False):
             filter_conditions.append(f"NOT ({_published_check})")
         if not show_bad:
             filter_conditions.append("m.grade = 'good'")
-    where_clause = ("WHERE " + " AND ".join(filter_conditions)) if filter_conditions else ""
+    params = []
+    if pin_id and filter_conditions:
+        base_cond = " AND ".join(filter_conditions)
+        where_clause = f"WHERE (m.id::text = %s) OR ({base_cond})"
+        params = [str(pin_id)]
+    elif filter_conditions:
+        where_clause = "WHERE " + " AND ".join(filter_conditions)
+    else:
+        where_clause = ""
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(f"""
@@ -218,7 +226,7 @@ def db_get_movies_list(show_published=True, show_bad=True, for_approval=False):
                 LEFT JOIN ai_models vm ON vm.id = m.model_id
                 {where_clause}
                 ORDER BY m.created_at DESC, m.id DESC
-            """)
+            """, params or None)
             rows = cur.fetchall()
     return [
         {

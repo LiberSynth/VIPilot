@@ -923,10 +923,12 @@ def api_production_movies():
     for_approval = request.args.get("for_approval") == "1"
     show_published = request.args.get("show_published", "1") != "0"
     show_bad = request.args.get("show_bad", "1") != "0"
+    pin_id = request.args.get("pin_id") or None
     movies = db_get_movies_list(
         show_published=show_published,
         show_bad=show_bad,
         for_approval=for_approval,
+        pin_id=pin_id,
     )
     return jsonify(movies)
 

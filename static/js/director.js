@@ -115,6 +115,7 @@
       params.set('show_published', (showPublished && showPublished.checked) ? '1' : '0');
       params.set('show_bad', (onlyGood && onlyGood.checked) ? '0' : '1');
     }
+    if (_expandedMovieId) params.set('pin_id', _expandedMovieId);
     return params.toString();
   }
 
