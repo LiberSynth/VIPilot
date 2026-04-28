@@ -39,7 +39,7 @@ def check_cancelled(pipeline_name: str, batch_id: str, batch: dict, log_id=None)
         msg = 'Батч отменён — слот удалён из расписания'
         if log_id:
             db_log_update(log_id, msg, 'cancelled')
-        write_log_entry(log_id, fmt_id_msg("[{}] Батч {} отменён, пропускаю", pipeline_name, batch_id))
+        write_log_entry(log_id, fmt_id_msg("[{}] Батч {} отменён, пропускаю", pipeline_name, batch_id), level='silent')
         return True
     return False
 

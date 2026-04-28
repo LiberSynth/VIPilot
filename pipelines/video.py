@@ -119,7 +119,7 @@ def run(batch_id, log_id):
             donor_batch_id = batch_data.get('donor_batch_id') if isinstance(batch_data, dict) else None
             if donor_batch_id:
                 if not check_cancelled('video', batch_id, batch, log_id):
-                    write_log_entry(log_id, fmt_id_msg("Режим пула — переносим видео из батча {}", donor_batch_id))
+                    write_log_entry(log_id, "Режим пула — переносим видео.")
                     write_log_entry(log_id, fmt_id_msg("[video] Батч {} — режим пула, переносим видео из пула {}", batch_id, donor_batch_id), level='silent')
                     db_log_update(log_id, 'Видео получено из пула', 'running')
                     result_donor_id = db_transfer_donor_movie(donor_batch_id, batch_id)
@@ -128,7 +128,7 @@ def run(batch_id, log_id):
                         new_status = updated['status'] if updated else None
                         detail = fmt_id_msg("Видео подобрано из пула {}", donor_batch_id)
                         db_log_update(log_id, detail, 'ok')
-                        write_log_entry(log_id, detail)
+                        write_log_entry(log_id, "Видео подобрано из пула.")
                         if new_status == 'transcode_ready':
                             # Обоснованное исключение: транскод-пайплайн не будет запущен,
                             # т.к. статус уже transcode_ready; запись создаётся здесь,
@@ -175,11 +175,11 @@ def run(batch_id, log_id):
                 write_log_entry(log_id, f"[video] {msg}", level='silent')
                 raise AppException(batch_id, 'video', msg, log_id)
             donor_movie_id, donor_batch_id, donor_story_id = result
-            write_log_entry(log_id, fmt_id_msg("Видео заимствовано из батча: {}", donor_batch_id), level='info')
+            write_log_entry(log_id, fmt_id_msg("Видео заимствовано из батча: {}", donor_batch_id), level='silent')
             db_copy_movie_for_emulation(donor_movie_id, batch_id)
             if donor_story_id:
                 db_link_batch_story_only(batch_id, donor_story_id)
-                write_log_entry(log_id, fmt_id_msg("story_id подменён: {} → {}", story_id, donor_story_id), level='info')
+                write_log_entry(log_id, fmt_id_msg("story_id подменён: {} → {}", story_id, donor_story_id), level='silent')
             db_set_batch_status(batch_id, 'video_ready')
             db_log_update(log_id, 'Видео [эмуляция]', 'ok')
             return
@@ -236,11 +236,11 @@ def run(batch_id, log_id):
             story_text = story_text + '\n\n' + video_post_prompt
 
         db_log_update(log_id, f"Генерация видео. {'(возобновление)' if resumed else ''}".strip(), 'running')
-        write_log_entry(log_id, f"Соотношение сторон: {ar_x}:{ar_y}")
+        write_log_entry(log_id, f"Соотношение сторон: {ar_x}:{ar_y}", level='silent')
         if is_probe:
-            write_log_entry(log_id, f"Пробная модель: {models[0]['name']}, попыток: {max_attempts_per_model}")
+            write_log_entry(log_id, f"Пробная модель: {models[0]['name']}, попыток: {max_attempts_per_model}", level='silent')
         else:
-            write_log_entry(log_id, f"Моделей: {len(models)}, попыток на модель: {max_attempts_per_model}")
+            write_log_entry(log_id, f"Моделей: {len(models)}, попыток на модель: {max_attempts_per_model}", level='silent')
 
         used_model    = None
         used_model_id = None
@@ -273,7 +273,8 @@ def run(batch_id, log_id):
             client = _video_client(m.get('platform_name', ''))
 
             if saved_request_id:
-                write_log_entry(log_id, fmt_id_msg("Возобновление: request_id={}", saved_request_id))
+                write_log_entry(log_id, "Возобновление предыдущего запроса.")
+                write_log_entry(log_id, fmt_id_msg("Возобновление: request_id={}", saved_request_id), level='silent')
                 video_url, poll_err = client.poll(log_id, saved_status_url, saved_response_url)
                 if video_url:
                     used_model_id = str(m['id'])
@@ -288,7 +289,7 @@ def run(batch_id, log_id):
 
             if cnt == 0:
                 db_update_batch_current_movie_model_id(batch_id, m['id'])
-                write_log_entry(log_id, f"Модель: {model_name}")
+                write_log_entry(log_id, "Отправляю запрос к провайдеру.")
                 write_log_entry(log_id, f"[video] Запрос к провайдеру: модель={model_name}, ar={ar_x}:{ar_y}", level='silent')
             else:
                 write_log_entry(log_id, f"[{model_name}] попытка {cnt + 1}/{max_attempts_per_model}", level='warn')
@@ -318,7 +319,7 @@ def run(batch_id, log_id):
                 'status_url':   s_url,
                 'response_url': r_url,
             })
-            write_log_entry(log_id, fmt_id_msg("Запрос принят ({}): {}", model_name, req_id))
+            write_log_entry(log_id, "Запрос принят, ожидаю результат.")
             write_log_entry(log_id, fmt_id_msg("[video] Генерация запущена: request_id={}", req_id), level='silent')
 
             video_url, poll_err = client.poll(log_id, s_url, r_url)
@@ -352,7 +353,7 @@ def run(batch_id, log_id):
         if resume_model_id:
             idx = next((i for i, m in enumerate(models) if str(m['id']) == resume_model_id), None)
             if idx is not None and idx > 0:
-                write_log_entry(log_id, fmt_id_msg("Подхват с модели {} (позиция {} из {})", resume_model_id, idx + 1, len(models)))
+                write_log_entry(log_id, "Подхват при возобновлении.")
                 write_log_entry(log_id, fmt_id_msg("[video] Подхват: первый проход начинается с модели {} (позиция {} из {})", resume_model_id, idx + 1, len(models)), level='silent')
             else:
                 resume_unlocked = True
@@ -393,7 +394,7 @@ def run(batch_id, log_id):
             original_data = falai.download_video(log_id, video_url)
             orig_mb = round(len(original_data) / 1024 / 1024, 1)
             db_create_batch_movie(batch_id, original_data, video_url, used_model_id)
-            write_log_entry(log_id, f"Оригинал сохранён ({orig_mb} МБ)")
+            write_log_entry(log_id, "Оригинал сохранён в базе данных.")
             write_log_entry(log_id, f"[video] Оригинал сохранён в БД ({orig_mb} МБ)", level='silent')
         except Exception as e:
             msg = f"Ошибка скачивания оригинала: {e}"

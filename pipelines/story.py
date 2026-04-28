@@ -71,16 +71,10 @@ def run(batch_id, log_id):
             "ok",
         )
         _story_title = db_get_story_title(preset_story_id) or preset_story_id
-        write_log_entry(
-            log_id, fmt_id_msg('Используется заданный сюжет "{}"', _story_title)
-        )
+        write_log_entry(log_id, 'Используется заданный сюжет.')
         write_log_entry(
             log_id,
-            fmt_id_msg(
-                "[story] Батч {} — story_id назначен пользователем ({}), батч → story_ready",
-                batch_id,
-                preset_story_id,
-            ),
+            f"[story] Батч {batch_id} — story_id назначен пользователем ({preset_story_id}), сюжет: «{_story_title}», батч → story_ready",
             level='silent',
         )
         db_set_batch_story(batch_id, preset_story_id)
@@ -144,14 +138,12 @@ def run(batch_id, log_id):
             db_log_update(
                 log_id, "Подобрано видео из пула, генерация сюжета не требуется", "ok"
             )
-            write_log_entry(log_id, detail)
+            write_log_entry(log_id, "Видео подобрано из пула, генерация сюжета не требуется.")
             write_log_entry(
                 log_id,
-                fmt_id_msg(
-                    "[story] Батч {} — подобрано видео из пула {}, батч → story_ready",
-                    batch_id,
-                    donor_batch_id,
-                ),
+                f"[story] Батч {batch_id} — подобрано видео из пула {donor_batch_id}"
+                + (f", сюжет: «{donor_title}»" if donor_title else "")
+                + ", батч → story_ready",
                 level='silent',
             )
             return
@@ -283,7 +275,7 @@ def run(batch_id, log_id):
     format_prompt = apply_prompt_params(format_prompt)
 
     write_log_entry(
-        log_id, f"Моделей: {len(models)}, попыток на модель: {max_attempts_per_model}"
+        log_id, f"Моделей: {len(models)}, попыток на модель: {max_attempts_per_model}", level='silent'
     )
 
     story_id = None
@@ -348,8 +340,8 @@ def run(batch_id, log_id):
 
     story_id, title, result = iterate_result
 
-    write_log_entry(log_id, f"Название: {title}")
-    write_log_entry(log_id, f"Сюжет:\n{result}")
+    write_log_entry(log_id, f"Название: {title}", level='silent')
+    write_log_entry(log_id, f"Сюжет:\n{result}", level='silent')
     write_log_entry(
         log_id,
         f"[story] Сюжет получен: {result[:100]}{'.' if len(result) > 100 else ''}",

@@ -73,8 +73,8 @@ def run():
                             f"Таргеты: {target_names}",
                             f"Горизонт планирования: {buffer_hours} ч",
                         )
-                        write_log_entry(log_id, f"[planning] Создан батч: {dt.strftime('%d.%m %H:%M')} UTC")
+                        write_log_entry(log_id, f"[planning] Создан батч: {dt.strftime('%d.%m %H:%M')} UTC", level='silent')
 
     except Exception as e:
-        write_log_entry(log_id, f"[planning] Необработанная ошибка: {e}")
+        write_log_entry(log_id, f"[planning] Необработанная ошибка: {e}", level='silent')
         raise

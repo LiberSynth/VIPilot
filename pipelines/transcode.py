@@ -131,7 +131,7 @@ def run(batch_id, log_id):
         raise FatalError(msg)
 
     src_mb = round(len(original_data) / 1024 / 1024, 1)
-    write_log_entry(log_id, f'Оригинал получен из БД ({src_mb} МБ), запускаю ffmpeg.')
+    write_log_entry(log_id, 'Оригинал получен из БД, запускаю ffmpeg.')
     write_log_entry(log_id, f"[transcode] Оригинал {src_mb} МБ, запускаю ffmpeg.", level='silent')
 
     tmp_src_path = None

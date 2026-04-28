@@ -535,7 +535,7 @@ def api_workflow_start():
         return jsonify({"error": "unauthorized"}), 401
     env_set("workflow_state", "running")
     environment.set_running()
-    write_log_entry(None, "[api] Движок запущен вручную")
+    write_log_entry(None, "[api] Движок запущен вручную", level='silent')
     return jsonify({"ok": True, "state": "running"})
 
 
@@ -545,7 +545,7 @@ def api_workflow_pause():
         return jsonify({"error": "unauthorized"}), 401
     env_set("workflow_state", "pause")
     environment.set_paused()
-    write_log_entry(None, "[api] Движок приостановлен вручную")
+    write_log_entry(None, "[api] Движок приостановлен вручную", level='silent')
     return jsonify({"ok": True, "state": "pause"})
 
 
@@ -557,7 +557,7 @@ def api_workflow_deep_debugging():
     val = "1" if body.get("enabled") == "1" else "0"
     env_set("deep_debugging", val)
     label = "включена" if val == "1" else "выключена"
-    write_log_entry(None, f"[api] Глубокая отладка {label}")
+    write_log_entry(None, f"[api] Глубокая отладка {label}", level='silent')
     return jsonify({"ok": True, "deep_debugging": val})
 
 
@@ -569,7 +569,7 @@ def api_workflow_use_donor():
     val = "1" if body.get("enabled") == "1" else "0"
     env_set("use_donor", val)
     label = "включен" if val == "1" else "выключен"
-    write_log_entry(None, f"[api] Подбирать видео из пула: {label}")
+    write_log_entry(None, f"[api] Подбирать видео из пула: {label}", level='silent')
     return jsonify({"ok": True, "use_donor": val})
 
 
@@ -593,7 +593,7 @@ def api_workflow_approve_movies():
     if val == "1":
         env_set("use_donor", "1")
     label = "включено" if val == "1" else "выключено"
-    write_log_entry(None, f"[api] Утверждать видео: {label}")
+    write_log_entry(None, f"[api] Утверждать видео: {label}", level='silent')
     return jsonify({"ok": True, "approve_movies": val})
 
 
@@ -635,7 +635,7 @@ def api_workflow_emulation():
     val = "1" if body.get("enabled") == "1" else "0"
     env_set("emulation_mode", val)
     label = "включена" if val == "1" else "выключена"
-    write_log_entry(None, f"[api] Эмуляция {label}")
+    write_log_entry(None, f"[api] Эмуляция {label}", level='silent')
     return jsonify({"ok": True, "emulation_mode": val})
 
 
@@ -685,7 +685,7 @@ def api_reset_batch_pipeline(batch_id, pipeline):
 def api_workflow_restart():
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
-    write_log_entry(None, "[api] Перезапуск приложения вручную")
+    write_log_entry(None, "[api] Перезапуск приложения вручную", level='silent')
 
     def _do_restart():
         import time as _time
