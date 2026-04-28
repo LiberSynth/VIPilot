@@ -171,7 +171,7 @@ def db_get_batch_log_entries(batch_id: str) -> list:
                                 'level',      le.level,
                                 'created_at', le.created_at
                             ) ORDER BY le.created_at DESC, le.id DESC
-                        ) FILTER (WHERE le.id IS NOT NULL AND le.level != 'silent'),
+                        ) FILTER (WHERE le.id IS NOT NULL),
                         '[]'::json
                     ) AS entries
                 FROM log l
