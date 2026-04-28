@@ -76,7 +76,8 @@ def publish(
 
     saved_cookies = session.get("cookies", [])
 
-    write_log_entry(log_id, fmt_id_msg("VK Видео: {} КБ, club_id={}", len(video_data) // 1024, club_id))
+    write_log_entry(log_id, "VK Видео: Публикация запущена.")
+    write_log_entry(log_id, fmt_id_msg("[vkvideo] {} КБ, club_id={}", len(video_data) // 1024, club_id), level='silent')
 
     pub_title = build_publication_title()
     file_name = publication_file_name(pub_title)
@@ -154,7 +155,7 @@ def _publish_ui(page, club_id: str, video_path: str, pub_title: str, log_id, bat
     _snap(page, batch_id)
 
     cur = page.url
-    write_log_entry(log_id, f"VK Видео: URL после перехода: {cur}")
+    write_log_entry(log_id, f"[vkvideo] URL после перехода: {cur}", level='silent')
     if "vk.com/login" in cur or "/auth" in cur or "passport" in cur:
         raise VkVideoCsrfExpired(
             "Сессия истекла — авторизуйтесь снова в браузере (вкладка «Публикация»)"
@@ -200,7 +201,8 @@ def _publish_ui(page, club_id: str, video_path: str, pub_title: str, log_id, bat
     # ── Шаг 5: Читаем ссылку на клип из DOM ──────────────────────────────
     clip_url = _read_clip_url(page)
     if clip_url:
-        write_log_entry(log_id, f"VK Видео: Ссылка на клип: {clip_url}")
+        write_log_entry(log_id, "VK Видео: Ссылка на клип получена.")
+        write_log_entry(log_id, f"[vkvideo] Ссылка на клип: {clip_url}", level='silent')
     else:
         write_log_entry(log_id, "VK Видео: Ссылка на клип не найдена — продолжаю.")
 
@@ -216,7 +218,8 @@ def _publish_ui(page, club_id: str, video_path: str, pub_title: str, log_id, bat
         desc_field.click()
         description = f"{pub_title}. {hashtags()}"
         desc_field.fill(description)
-        write_log_entry(log_id, f"VK Видео: Описание заполнено: {description}")
+        write_log_entry(log_id, "VK Видео: Описание заполнено.")
+        write_log_entry(log_id, f"[vkvideo] Описание: {description}", level='silent')
         _snap(page, batch_id)
     except Exception as _e:
         write_log_entry(log_id, "VK Видео: Не удалось заполнить описание — продолжаю.")

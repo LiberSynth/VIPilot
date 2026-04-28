@@ -71,7 +71,8 @@ def publish(
 
     saved_cookies = session.get("cookies", [])
 
-    write_log_entry(log_id, fmt_id_msg("Рутьюб: {} КБ, person_id={}", len(video_data) // 1024, person_id))
+    write_log_entry(log_id, "Рутьюб: Публикация запущена.")
+    write_log_entry(log_id, fmt_id_msg("[rutube] {} КБ, person_id={}", len(video_data) // 1024, person_id), level='silent')
 
     pub_title = build_publication_title()
     file_name = publication_file_name(pub_title)
@@ -126,7 +127,7 @@ def _publish_ui(page, video_path: str, log_id, batch_id=None):
     _snap(page, batch_id)
 
     cur = page.url
-    write_log_entry(log_id, f"Рутьюб: URL после перехода: {cur}")
+    write_log_entry(log_id, f"[rutube] URL после перехода: {cur}", level='silent')
     if "rutube.ru/login" in cur or "/auth" in cur or "passport" in cur:
         raise RutubeCsrfExpired(
             "Сессия истекла — авторизуйтесь снова в браузере (вкладка «Публикация»)"
