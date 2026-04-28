@@ -81,6 +81,7 @@ def run(batch_id, log_id):
                 batch_id,
                 preset_story_id,
             ),
+            level='silent',
         )
         db_set_batch_story(batch_id, preset_story_id)
         return
@@ -151,6 +152,7 @@ def run(batch_id, log_id):
                     batch_id,
                     donor_batch_id,
                 ),
+                level='silent',
             )
             return
         else:
@@ -159,7 +161,7 @@ def run(batch_id, log_id):
                 write_log_entry(log_id, msg, level="error")
                 db_log_update(log_id, msg, "error")
                 write_log_entry(
-                    log_id, fmt_id_msg("[story] Батч {} — {}", batch_id, msg)
+                    log_id, fmt_id_msg("[story] Батч {} — {}", batch_id, msg), level='silent'
                 )
                 raise AppException(batch_id, "story", msg, log_id)
 
@@ -199,6 +201,7 @@ def run(batch_id, log_id):
                     batch_id,
                     pool_story_id,
                 ),
+                level='silent',
             )
             return
         else:
@@ -207,7 +210,7 @@ def run(batch_id, log_id):
                 write_log_entry(log_id, msg, level="error")
                 db_log_update(log_id, msg, "error")
                 write_log_entry(
-                    log_id, fmt_id_msg("[story] Батч {} — {}", batch_id, msg)
+                    log_id, fmt_id_msg("[story] Батч {} — {}", batch_id, msg), level='silent'
                 )
                 raise AppException(batch_id, "story", msg, log_id)
             reason = (
@@ -221,14 +224,16 @@ def run(batch_id, log_id):
                 "running",
             )
             write_log_entry(
-                log_id, fmt_id_msg("[story] Батч {} — {}", batch_id, reason)
+                log_id, fmt_id_msg("[story] Батч {} — {}", batch_id, reason), level='silent'
             )
 
+    write_log_entry(log_id, 'Начало генерации сюжета…')
     write_log_entry(
         log_id,
         fmt_id_msg(
             "[story] Батч {} ({}) — начало генерации сюжета", batch_id, target
         ),
+        level='silent',
     )
 
     db_log_update(log_id, "Генерация сюжета…", "running")
@@ -237,7 +242,7 @@ def run(batch_id, log_id):
         msg = "API-ключ текстовой платформы не задан — генерация невозможна"
         db_log_update(log_id, msg, "error")
         write_log_entry(log_id, msg, level="error")
-        write_log_entry(log_id, f"[story] {msg}")
+        write_log_entry(log_id, f"[story] {msg}", level='silent')
         raise AppException(batch_id, "story", msg, log_id)
 
     batch_data = batch.get("data") or {}
@@ -263,7 +268,7 @@ def run(batch_id, log_id):
         msg = "Нет активных text-моделей в ai_models"
         db_log_update(log_id, msg, "error")
         write_log_entry(log_id, msg, level="error")
-        write_log_entry(log_id, f"[story] {msg}")
+        write_log_entry(log_id, f"[story] {msg}", level='silent')
         raise AppException(batch_id, "story", msg, log_id)
 
     try:
@@ -295,7 +300,7 @@ def run(batch_id, log_id):
         if cnt == 0:
             write_log_entry(log_id, f"Модель: {model_name}")
             write_log_entry(
-                log_id, f"[story] Запрос к текстовой платформе: модель={model_name}"
+                log_id, f"[story] Запрос к текстовой платформе: модель={model_name}", level='silent'
             )
         raw = text_client.generate(log_id, model_name, m, format_prompt, user_prompt)
         if raw:
@@ -333,22 +338,23 @@ def run(batch_id, log_id):
             msg = f"Модель не ответила после {max_attempts_per_model} попыток — пробный сюжет не получен"
             db_log_update(log_id, msg, "error")
             write_log_entry(log_id, msg, level='error')
-            write_log_entry(log_id, f"[story] {msg}")
+            write_log_entry(log_id, f"[story] {msg}", level='silent')
             raise AppException(batch_id, "story", msg, log_id)
         msg = f"Все активные модели не дали результата после {max_passes} проходов"
         db_log_update(log_id, msg, "error")
         write_log_entry(log_id, msg, level="error")
-        write_log_entry(log_id, f"[story] {msg}")
+        write_log_entry(log_id, f"[story] {msg}", level='silent')
         raise AppException(batch_id, "story", msg, log_id)
 
     story_id, title, result = iterate_result
 
+    write_log_entry(log_id, f"Название: {title}")
+    write_log_entry(log_id, f"Сюжет:\n{result}")
     write_log_entry(
         log_id,
         f"[story] Сюжет получен: {result[:100]}{'…' if len(result) > 100 else ''}",
+        level='silent',
     )
-    write_log_entry(log_id, f"Название: {title}")
-    write_log_entry(log_id, f"Сюжет:\n{result}")
 
     if is_story_probe:
         db_finalize_story_probe(batch_id, story_id)
@@ -364,6 +370,7 @@ def run(batch_id, log_id):
             fmt_id_msg(
                 "[story] Пробный сюжет: story_id={}, batch → story_probe", story_id
             ),
+            level='silent',
         )
     else:
         if not db_set_batch_story(batch_id, story_id):
@@ -372,7 +379,7 @@ def run(batch_id, log_id):
             )
             db_log_update(log_id, msg, "error")
             write_log_entry(log_id, msg, level="error")
-            write_log_entry(log_id, f"[story] {msg}")
+            write_log_entry(log_id, f"[story] {msg}", level='silent')
             raise AppException(batch_id, "story", msg, log_id)
         db_set_story_model(story_id, used_model_id)
         msg = f"Сюжет сгенерирован ({used_model_name})"
@@ -386,4 +393,5 @@ def run(batch_id, log_id):
             fmt_id_msg(
                 "[story] Готово: story_id={}, batch → story_ready", story_id
             ),
+            level='silent',
         )

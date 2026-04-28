@@ -1,42 +1,33 @@
 """
-Pipeline 5 — Публикация.
-Принимает batch_id, публикует видео на таргеты по универсальному пайплайну.
-
-Статусы: transcode_ready → {slug}.{method}.posting → {slug}.{method}.published → ... → published
-  {slug}.{method}.posting  — активный захват; при рестарте → {slug}.{method}.pending
-  {slug}.{method}.pending  — ожидание resume после краша на данном шаге
-  {slug}.{method}.published — шаг завершён, следующий шаг не начат
-
-Батчи с *.pending и *.published подхватываются главным циклом через db_get_actionable_batches.
+Pipeline 6 — Публикация.
+Принимает batch_id, публикует видео на все активные платформы.
 """
 
 from datetime import datetime, timezone
 
 import common.environment as environment
-from utils.notify import notify_failure
 from db import (
-    db_get_active_targets,
+    cycle_config_get,
     db_get_batch_by_id,
+    db_get_active_targets,
+    db_claim_batch_status,
+    db_set_batch_status,
     db_get_batch_video_data,
     db_get_batch_original_video,
-    db_set_batch_status,
-    db_claim_batch_status,
 )
 from log import db_log_update, db_get_log_entries, write_log_entry
 from pipelines.base import check_cancelled
 from common.exceptions import AppException
-from utils.utils import fmt_id_msg
 from routes.api import client_is_configured
-from clients import vk
-from clients import dzen as dzen_client
-from clients.dzen import DzenCsrfExpired, DzenSessionMissing
-from clients import rutube as rutube_client
-from clients.rutube import RutubeCsrfExpired, RutubeSessionMissing
-from clients import vkvideo as vkvideo_client
-from clients.vkvideo import VkVideoCsrfExpired, VkVideoSessionMissing
+from clients import vk, dzen_client, rutube_client, vkvideo_client
+from clients.dzen import DzenSessionMissing, DzenCsrfExpired
+from clients.rutube import RutubeSessionMissing, RutubeCsrfExpired
+from clients.vkvideo import VkVideoSessionMissing, VkVideoCsrfExpired
+from utils.notify import notify_failure
+from utils.utils import fmt_id_msg
 
 
-def is_scheduled(batch) -> bool:
+def _is_too_early(batch):
     """Возвращает True если батч ещё не наступило время публиковать."""
     sched = batch.get('scheduled_at')
     if sched is None:
@@ -69,10 +60,12 @@ def _call_vk(slug, method, batch_id, log_id, target, step_results):
     group_id = int(cfg.get('group_id', 236929597))
     if method == 'story':
         write_log_entry(log_id, 'Публикую историю…')
+        write_log_entry(log_id, f"[publish] group_id={group_id}", level='silent')
         video_data = _get_video(batch_id, log_id)
         return vk.publish_story(video_data, group_id, log_id) is not None
     elif method == 'wall':
         write_log_entry(log_id, 'Публикую на стену…')
+        write_log_entry(log_id, f"[publish] group_id={group_id}", level='silent')
         video_data = _get_video(batch_id, log_id)
         return vk.publish_wall(video_data, group_id, log_id) is not None
     elif method == 'clip_wall':
@@ -83,6 +76,7 @@ def _call_vk(slug, method, batch_id, log_id, target, step_results):
             write_log_entry(log_id, 'VK clip_wall: clip_url не получен от шага vkvideo — пропуск', level='error')
             return False
         write_log_entry(log_id, f'VK: Публикую пост с клипом VK Видео…')
+        write_log_entry(log_id, f"[publish] clip_url={clip_url}", level='silent')
         return vk.publish_clip_wall(clip_url, pub_title, group_id, log_id) is not None
     else:
         write_log_entry(log_id, f'VK: неизвестный метод «{method}» — пропуск', level='warn')
@@ -197,9 +191,9 @@ def run(batch_id, log_id):
         if batch['type'] == 'movie_probe':
             db_log_update(log_id, 'Публикация (пробный)…', 'running')
             write_log_entry(log_id, 'Пробный батч — публикация на платформу не выполняется')
+            write_log_entry(log_id, fmt_id_msg("[publish] Батч {} пробный — публикация пропущена", batch_id), level='silent')
             db_set_batch_status(batch_id, 'movie_probe')
             db_log_update(log_id, 'Без публикации (пробный батч)', 'ok')
-            write_log_entry(log_id, fmt_id_msg("[publish] Батч {} пробный — публикация пропущена", batch_id))
             return
 
         if check_cancelled('publish', batch_id, batch, log_id):
@@ -208,7 +202,8 @@ def run(batch_id, log_id):
         now = datetime.now(timezone.utc)
         if batch['scheduled_at'] is not None and now < batch['scheduled_at']:
             remaining = int((batch['scheduled_at'] - now).total_seconds() / 60)
-            write_log_entry(log_id, fmt_id_msg("[publish] Батч {} ещё не время ({} мин до публикации)", batch_id, remaining))
+            write_log_entry(log_id, fmt_id_msg("Ещё {} мин до публикации", remaining))
+            write_log_entry(log_id, fmt_id_msg("[publish] Батч {} ещё не время ({} мин до публикации)", batch_id, remaining), level='silent')
             return
 
     if not active_targets:
@@ -216,12 +211,14 @@ def run(batch_id, log_id):
             msg = 'Батч отменён — нет активных таргетов'
             db_set_batch_status(batch_id, 'cancelled')
             db_log_update(log_id, msg, 'cancelled')
-            write_log_entry(log_id, fmt_id_msg("[publish] {} (батч {})", msg, batch_id))
+            write_log_entry(log_id, msg)
+            write_log_entry(log_id, fmt_id_msg("[publish] {} (батч {})", msg, batch_id), level='silent')
             return
         else:
             msg = 'Нет активных таргетов — публикация невозможна'
             db_log_update(log_id, msg, 'error')
-            write_log_entry(log_id, f"[publish] {msg}")
+            write_log_entry(log_id, msg, level='error')
+            write_log_entry(log_id, f"[publish] {msg}", level='silent')
             raise AppException(batch_id, 'publish', msg, log_id)
 
     steps = _build_steps(active_targets)
@@ -230,12 +227,14 @@ def run(batch_id, log_id):
             msg = 'Батч отменён — нет методов публикации в конфиге таргетов'
             db_set_batch_status(batch_id, 'cancelled')
             db_log_update(log_id, msg, 'cancelled')
-            write_log_entry(log_id, fmt_id_msg("[publish] {} (батч {})", msg, batch_id))
+            write_log_entry(log_id, msg)
+            write_log_entry(log_id, fmt_id_msg("[publish] {} (батч {})", msg, batch_id), level='silent')
             return
         else:
             msg = 'Нет методов публикации в конфиге таргетов'
             db_log_update(log_id, msg, 'error')
-            write_log_entry(log_id, f"[publish] {msg}")
+            write_log_entry(log_id, msg, level='error')
+            write_log_entry(log_id, f"[publish] {msg}", level='silent')
             raise AppException(batch_id, 'publish', msg, log_id)
 
     target_names = ', '.join(t['name'] for t in active_targets)
@@ -255,11 +254,12 @@ def run(batch_id, log_id):
             step_found = any(slug == cur_slug and method == cur_method for slug, method, _ in steps)
             if step_found:
                 resume_from = (cur_slug, cur_method)
-                write_log_entry(log_id, fmt_id_msg("[publish] Батч {} resume с шага {}.{}", batch_id, cur_slug, cur_method))
+                write_log_entry(log_id, fmt_id_msg("Возобновление публикации с шага {}.{}", cur_slug, cur_method))
+                write_log_entry(log_id, fmt_id_msg("[publish] Батч {} resume с шага {}.{}", batch_id, cur_slug, cur_method), level='silent')
             else:
                 msg = f'Шаг {cur_slug}.{cur_method} удалён из конфига — батч требует ручной проверки'
                 write_log_entry(log_id, f'Шаг {cur_slug}.{cur_method} более не активен в конфиге — перевожу в ошибку', level='error')
-                write_log_entry(log_id, fmt_id_msg("[publish] Батч {} шаг {}.{} не найден в текущем конфиге", batch_id, cur_slug, cur_method))
+                write_log_entry(log_id, fmt_id_msg("[publish] Батч {} шаг {}.{} не найден в текущем конфиге", batch_id, cur_slug, cur_method), level='silent')
                 db_log_update(log_id, msg, 'error')
                 raise AppException(batch_id, 'publish', msg, log_id)
         elif cur_phase in ('published', 'failed'):
@@ -272,17 +272,19 @@ def run(batch_id, log_id):
             if found_idx is None:
                 msg = f'Шаг {cur_slug}.{cur_method} удалён из конфига — батч требует ручной проверки'
                 write_log_entry(log_id, msg, level='error')
-                write_log_entry(log_id, fmt_id_msg("[publish] Батч {} шаг {}.{} не найден в текущем конфиге", batch_id, cur_slug, cur_method))
+                write_log_entry(log_id, fmt_id_msg("[publish] Батч {} шаг {}.{} не найден в текущем конфиге", batch_id, cur_slug, cur_method), level='silent')
                 db_log_update(log_id, msg, 'error')
                 raise AppException(batch_id, 'publish', msg, log_id)
             elif found_idx + 1 < len(steps):
                 ns, nm, _ = steps[found_idx + 1]
                 resume_from = (ns, nm)
-                write_log_entry(log_id, fmt_id_msg("[publish] Батч {} resume с шага {}.{}", batch_id, ns, nm))
+                write_log_entry(log_id, fmt_id_msg("Продолжаю с шага {}.{}", ns, nm))
+                write_log_entry(log_id, fmt_id_msg("[publish] Батч {} resume с шага {}.{}", batch_id, ns, nm), level='silent')
             else:
                 db_set_batch_status(batch_id, 'published')
                 db_log_update(log_id, 'Опубликовано (возобновление — все шаги завершены)', 'ok')
-                write_log_entry(log_id, fmt_id_msg("[publish] Батч {} опубликован (возобновление)", batch_id))
+                write_log_entry(log_id, 'Опубликовано (возобновление — все шаги завершены)')
+                write_log_entry(log_id, fmt_id_msg("[publish] Батч {} опубликован (возобновление)", batch_id), level='silent')
                 return
 
     any_ok = False
@@ -300,11 +302,13 @@ def run(batch_id, log_id):
         failed_status = f"{slug}.{method}.failed"
 
         if not db_claim_batch_status(batch_id, expected_from, posting_status):
-            write_log_entry(log_id, fmt_id_msg("[publish] Батч {} уже захвачен другим процессом для {} — пропуск", batch_id, posting_status))
+            write_log_entry(log_id, 'Батч уже захвачен другим процессом — пропуск')
+            write_log_entry(log_id, fmt_id_msg("[publish] Батч {} уже захвачен другим процессом для {} — пропуск", batch_id, posting_status), level='silent')
             db_log_update(log_id, f'Захват {posting_status} не удался — пропуск', 'ok')
             return
 
         write_log_entry(log_id, f'Шаг {slug}.{method}: выполняю…')
+        write_log_entry(log_id, fmt_id_msg("[publish] Батч {}: шаг {}.{} — начало", batch_id, slug, method), level='silent')
 
         step_error = None
         try:
@@ -321,7 +325,7 @@ def run(batch_id, log_id):
         if not ok:
             failed_steps.append(f"{slug}.{method}")
             err_msg = step_error or 'ошибка публикации'
-            write_log_entry(log_id, fmt_id_msg("[publish] Батч {} ошибка {}.{}: {}", batch_id, slug, method, err_msg))
+            write_log_entry(log_id, fmt_id_msg("[publish] Батч {} ошибка {}.{}: {}", batch_id, slug, method, err_msg), level='silent')
             db_set_batch_status(batch_id, failed_status)
             expected_from = failed_status
             continue
@@ -330,6 +334,7 @@ def run(batch_id, log_id):
 
         db_set_batch_status(batch_id, published_status)
         write_log_entry(log_id, f'Шаг {slug}.{method}: опубликовано')
+        write_log_entry(log_id, fmt_id_msg("[publish] Батч {}: шаг {}.{} — завершено успешно", batch_id, slug, method), level='silent')
         expected_from = published_status
 
     if any_ok:
@@ -337,7 +342,8 @@ def run(batch_id, log_id):
             fail_list = ', '.join(failed_steps)
             db_set_batch_status(batch_id, 'published_partially')
             db_log_update(log_id, f'Частично опубликовано ({target_names}); ошибки: {fail_list}', 'ok')
-            write_log_entry(log_id, fmt_id_msg("[publish] Батч {} частично опубликован (ошибки: {})", batch_id, fail_list))
+            write_log_entry(log_id, f'Частично опубликовано; ошибки: {fail_list}')
+            write_log_entry(log_id, fmt_id_msg("[publish] Батч {} частично опубликован (ошибки: {})", batch_id, fail_list), level='silent')
             entries = db_get_log_entries(log_id) if log_id else []
             err_entries = [e for e in entries if e['level'] in ('warn', 'error')]
             notify_failure(
@@ -348,7 +354,8 @@ def run(batch_id, log_id):
         else:
             db_set_batch_status(batch_id, 'published')
             db_log_update(log_id, f'Опубликовано ({target_names})', 'ok')
-            write_log_entry(log_id, fmt_id_msg("[publish] Батч {} опубликован", batch_id))
+            write_log_entry(log_id, f'Успешно опубликовано ({target_names})')
+            write_log_entry(log_id, fmt_id_msg("[publish] Батч {} опубликован", batch_id), level='silent')
             entries = db_get_log_entries(log_id)
             warn_entries = [e for e in entries if e['level'] in ('warn', 'error')]
             if warn_entries:
@@ -360,5 +367,6 @@ def run(batch_id, log_id):
     else:
         abt_msg = f'Ошибка публикации батча в {target_names}'
         db_log_update(log_id, 'Ошибка публикации', 'error')
-        write_log_entry(log_id, fmt_id_msg("[publish] Батч {} ошибка публикации", batch_id))
+        write_log_entry(log_id, f'Ошибка публикации батча в {target_names}', level='error')
+        write_log_entry(log_id, fmt_id_msg("[publish] Батч {} ошибка публикации", batch_id), level='silent')
         raise AppException(batch_id, 'publish', abt_msg, log_id)

@@ -119,7 +119,8 @@ def run(batch_id, log_id):
             donor_batch_id = batch_data.get('donor_batch_id') if isinstance(batch_data, dict) else None
             if donor_batch_id:
                 if not check_cancelled('video', batch_id, batch, log_id):
-                    write_log_entry(log_id, fmt_id_msg("[video] Батч {} — режим пула, переносим видео из пула {}", batch_id, donor_batch_id))
+                    write_log_entry(log_id, fmt_id_msg("Режим пула — переносим видео из батча {}", donor_batch_id))
+                    write_log_entry(log_id, fmt_id_msg("[video] Батч {} — режим пула, переносим видео из пула {}", batch_id, donor_batch_id), level='silent')
                     db_log_update(log_id, 'Видео получено из пула', 'running')
                     result_donor_id = db_transfer_donor_movie(donor_batch_id, batch_id)
                     if result_donor_id:
@@ -137,12 +138,12 @@ def run(batch_id, log_id):
                                 status='ok', batch_id=batch_id,
                             )
                             write_log_entry(tr_log_id, detail)
-                        write_log_entry(log_id, fmt_id_msg("[video] Батч {} — видео из пула, новый статус: {}", batch_id, new_status))
+                        write_log_entry(log_id, fmt_id_msg("[video] Батч {} — видео из пула, новый статус: {}", batch_id, new_status), level='silent')
                     else:
                         msg = fmt_id_msg("Не удалось получить видео из пула {}", donor_batch_id)
                         db_log_update(log_id, msg, 'error')
                         write_log_entry(log_id, msg, level='error')
-                        write_log_entry(log_id, f"[video] {msg}")
+                        write_log_entry(log_id, f"[video] {msg}", level='silent')
                         raise AppException(batch_id, 'video', msg, log_id)
                     return
 
@@ -163,14 +164,15 @@ def run(batch_id, log_id):
         # Эмуляция: заимствуем оригинальное видео из случайного реального батча в пуле.
         # Используется при разработке, когда дёргать реального провайдера нежелательно.
         if snap.emulation_mode:
-            write_log_entry(log_id, fmt_id_msg("[video] Батч {} — эмуляция генерации видео", batch_id))
+            write_log_entry(log_id, 'Эмуляция: заимствую видео из пула…')
+            write_log_entry(log_id, fmt_id_msg("[video] Батч {} — эмуляция генерации видео", batch_id), level='silent')
             db_log_update(log_id, 'Видео [эмуляция]', 'running')
             result = db_get_random_real_original_video()
             if result is None:
                 msg = '[эмуляция] Нет видео в пуле — невозможно скопировать оригинал'
                 db_log_update(log_id, msg, 'error')
                 write_log_entry(log_id, msg, level='error')
-                write_log_entry(log_id, f"[video] {msg}")
+                write_log_entry(log_id, f"[video] {msg}", level='silent')
                 raise AppException(batch_id, 'video', msg, log_id)
             donor_movie_id, donor_batch_id, donor_story_id = result
             write_log_entry(log_id, fmt_id_msg("Видео заимствовано из батча: {}", donor_batch_id), level='info')
@@ -182,13 +184,15 @@ def run(batch_id, log_id):
             db_log_update(log_id, 'Видео [эмуляция]', 'ok')
             return
 
+        write_log_entry(log_id, f"{'Возобновление' if resumed else 'Начало'} генерации видео…")
         write_log_entry(log_id, fmt_id_msg("[video] Батч {} ({}) — {} генерации видео",
-                                      batch_id, target, 'возобновление' if resumed else 'начало'))
+                                      batch_id, target, 'возобновление' if resumed else 'начало'), level='silent')
 
         if not client_is_configured('falai'):
             msg = 'FAL_API_KEY не задан — генерация невозможна'
             db_log_update(log_id, msg, 'error')
-            write_log_entry(log_id, f"[video] {msg}")
+            write_log_entry(log_id, msg, level='error')
+            write_log_entry(log_id, f"[video] {msg}", level='silent')
             raise AppException(batch_id, 'video', msg, log_id)
 
         try:
@@ -205,7 +209,8 @@ def run(batch_id, log_id):
             if not pinned_m:
                 msg = fmt_id_msg('Пробная модель {} не найдена', pinned_model_id)
                 db_log_update(log_id, msg, 'error')
-                write_log_entry(log_id, f"[video] {msg}")
+                write_log_entry(log_id, msg, level='error')
+                write_log_entry(log_id, f"[video] {msg}", level='silent')
                 raise AppException(batch_id, 'video', msg, log_id)
             models = [pinned_m]
         else:
@@ -213,14 +218,16 @@ def run(batch_id, log_id):
             if not models:
                 msg = 'Нет активных video-моделей в ai_models (type=text-to-video)'
                 db_log_update(log_id, msg, 'error')
-                write_log_entry(log_id, f"[video] {msg}")
+                write_log_entry(log_id, msg, level='error')
+                write_log_entry(log_id, f"[video] {msg}", level='silent')
                 raise AppException(batch_id, 'video', msg, log_id)
 
         story_text = db_get_story_text(story_id)
         if not story_text:
             msg = fmt_id_msg('Не найден сюжет story_id={}', story_id)
             db_log_update(log_id, msg, 'error')
-            write_log_entry(log_id, f"[video] {msg}")
+            write_log_entry(log_id, msg, level='error')
+            write_log_entry(log_id, f"[video] {msg}", level='silent')
             raise AppException(batch_id, 'video', msg, log_id)
 
         video_post_prompt = cycle_config_get('video_post_prompt').strip()
@@ -282,7 +289,7 @@ def run(batch_id, log_id):
             if cnt == 0:
                 db_update_batch_current_movie_model_id(batch_id, m['id'])
                 write_log_entry(log_id, f"Модель: {model_name}")
-                write_log_entry(log_id, f"[video] Запрос к провайдеру: модель={model_name}, ar={ar_x}:{ar_y}")
+                write_log_entry(log_id, f"[video] Запрос к провайдеру: модель={model_name}, ar={ar_x}:{ar_y}", level='silent')
             else:
                 write_log_entry(log_id, f"[{model_name}] попытка {cnt + 1}/{max_attempts_per_model}", level='warn')
 
@@ -312,7 +319,7 @@ def run(batch_id, log_id):
                 'response_url': r_url,
             })
             write_log_entry(log_id, fmt_id_msg("Запрос принят ({}): {}", model_name, req_id))
-            write_log_entry(log_id, fmt_id_msg("[video] Генерация запущена: request_id={}", req_id))
+            write_log_entry(log_id, fmt_id_msg("[video] Генерация запущена: request_id={}", req_id), level='silent')
 
             video_url, poll_err = client.poll(log_id, s_url, r_url)
             if video_url:
@@ -345,7 +352,8 @@ def run(batch_id, log_id):
         if resume_model_id:
             idx = next((i for i, m in enumerate(models) if str(m['id']) == resume_model_id), None)
             if idx is not None and idx > 0:
-                write_log_entry(log_id, fmt_id_msg("[video] Подхват: первый проход начинается с модели {} (позиция {} из {})", resume_model_id, idx + 1, len(models)))
+                write_log_entry(log_id, fmt_id_msg("Подхват с модели {} (позиция {} из {})", resume_model_id, idx + 1, len(models)))
+                write_log_entry(log_id, fmt_id_msg("[video] Подхват: первый проход начинается с модели {} (позиция {} из {})", resume_model_id, idx + 1, len(models)), level='silent')
             else:
                 resume_unlocked = True
 
@@ -369,44 +377,46 @@ def run(batch_id, log_id):
                 msg = f'Пробная модель {models[0]["name"]} не дала результата ({max_attempts_per_model} попыток)'
                 db_log_update(log_id, msg, 'error')
                 write_log_entry(log_id, msg, level='error')
-                write_log_entry(log_id, f"[video] {msg}")
+                write_log_entry(log_id, f"[video] {msg}", level='silent')
                 raise AppException(batch_id, 'video', msg, log_id)
             else:
                 msg = f'Все активные видео-модели не дали результата после {max_passes} проходов'
                 db_log_update(log_id, msg, 'error')
                 write_log_entry(log_id, msg, level='error')
-                write_log_entry(log_id, f"[video] {msg}")
+                write_log_entry(log_id, f"[video] {msg}", level='silent')
                 db_set_batch_status(batch_id, 'story_ready')
                 return
 
-        write_log_entry(log_id, f"Скачиваю оригинал: {video_url}")
-        write_log_entry(log_id, f"[video] Скачиваю оригинал от провайдера…")
+        write_log_entry(log_id, 'Скачиваю оригинал от провайдера…')
+        write_log_entry(log_id, f"[video] Скачиваю оригинал: {video_url}", level='silent')
         try:
             original_data = falai.download_video(log_id, video_url)
             orig_mb = round(len(original_data) / 1024 / 1024, 1)
             db_create_batch_movie(batch_id, original_data, video_url, used_model_id)
             write_log_entry(log_id, f"Оригинал сохранён ({orig_mb} МБ)")
-            write_log_entry(log_id, f"[video] Оригинал сохранён в БД ({orig_mb} МБ)")
+            write_log_entry(log_id, f"[video] Оригинал сохранён в БД ({orig_mb} МБ)", level='silent')
         except Exception as e:
             msg = f"Ошибка скачивания оригинала: {e}"
             db_log_update(log_id, msg, 'error')
             write_log_entry(log_id, msg, level='error')
-            write_log_entry(log_id, f"[video] {msg}")
+            write_log_entry(log_id, f"[video] {msg}", level='silent')
             raise AppException(batch_id, 'video', msg, log_id)
 
         db_set_batch_status(batch_id, 'video_ready')
         msg = f'Видео сгенерировано ({used_model})' if used_model else 'Видео сгенерировано'
         db_log_update(log_id, msg, 'ok')
-        write_log_entry(log_id, f"URL: {video_url}")
-        write_log_entry(log_id, f"[video] Готово: batch → video_ready, url={video_url[:60]}…")
+        write_log_entry(log_id, 'Готово: batch → video_ready')
+        write_log_entry(log_id, f"[video] URL: {video_url}", level='silent')
 
     except AspectRatioConflictError as e:
         msg = str(e)
         db_log_update(log_id, msg, 'error')
-        write_log_entry(log_id, f"[video] {msg}")
+        write_log_entry(log_id, msg, level='error')
+        write_log_entry(log_id, f"[video] {msg}", level='silent')
         raise AppException(batch_id, 'video', msg, log_id)
     except ProviderFatalError as e:
         msg = f"Фатальная ошибка провайдера: {e}"
         db_log_update(log_id, msg, 'error')
-        write_log_entry(log_id, f"[video] {msg}")
+        write_log_entry(log_id, msg, level='error')
+        write_log_entry(log_id, f"[video] {msg}", level='silent')
         raise AppException(batch_id, 'video', msg, log_id)
