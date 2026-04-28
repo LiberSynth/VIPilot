@@ -164,7 +164,7 @@ def run(batch_id, log_id):
         # Эмуляция: заимствуем оригинальное видео из случайного реального батча в пуле.
         # Используется при разработке, когда дёргать реального провайдера нежелательно.
         if snap.emulation_mode:
-            write_log_entry(log_id, 'Эмуляция: заимствую видео из пула…')
+            write_log_entry(log_id, 'Эмуляция: заимствую видео из пула.')
             write_log_entry(log_id, fmt_id_msg("[video] Батч {} — эмуляция генерации видео", batch_id), level='silent')
             db_log_update(log_id, 'Видео [эмуляция]', 'running')
             result = db_get_random_real_original_video()
@@ -184,7 +184,7 @@ def run(batch_id, log_id):
             db_log_update(log_id, 'Видео [эмуляция]', 'ok')
             return
 
-        write_log_entry(log_id, f"{'Возобновление' if resumed else 'Начало'} генерации видео…")
+        write_log_entry(log_id, f"{'Возобновление' if resumed else 'Начало'} генерации видео.")
         write_log_entry(log_id, fmt_id_msg("[video] Батч {} ({}) — {} генерации видео",
                                       batch_id, target, 'возобновление' if resumed else 'начало'), level='silent')
 
@@ -235,7 +235,7 @@ def run(batch_id, log_id):
             video_post_prompt = apply_prompt_params(video_post_prompt)
             story_text = story_text + '\n\n' + video_post_prompt
 
-        db_log_update(log_id, f"Генерация видео… {'(возобновление)' if resumed else ''}".strip(), 'running')
+        db_log_update(log_id, f"Генерация видео. {'(возобновление)' if resumed else ''}".strip(), 'running')
         write_log_entry(log_id, f"Соотношение сторон: {ar_x}:{ar_y}")
         if is_probe:
             write_log_entry(log_id, f"Пробная модель: {models[0]['name']}, попыток: {max_attempts_per_model}")
@@ -307,7 +307,7 @@ def run(batch_id, log_id):
 
             req_id = sr['request_id']
             # status_url и response_url получены от провайдера в ответ на submit и могут
-            # отличаться от шаблонного паттерна (platform_url/requests/…), поэтому
+            # отличаться от шаблонного паттерна (platform_url/requests/.), поэтому
             # хранятся явно в batch.data, а не восстанавливаются из шаблона при возобновлении.
             s_url  = sr['status_url']
             r_url  = sr['response_url']
@@ -387,7 +387,7 @@ def run(batch_id, log_id):
                 db_set_batch_status(batch_id, 'story_ready')
                 return
 
-        write_log_entry(log_id, 'Скачиваю оригинал от провайдера…')
+        write_log_entry(log_id, 'Скачиваю оригинал от провайдера.')
         write_log_entry(log_id, f"[video] Скачиваю оригинал: {video_url}", level='silent')
         try:
             original_data = falai.download_video(log_id, video_url)

@@ -175,7 +175,7 @@ def run(batch_id, log_id):
         condition_label = (
             "grade = good" if grade_required else "любой grade (включая NULL)"
         )
-        db_log_update(log_id, "Поиск сюжета в пуле…", "running")
+        db_log_update(log_id, "Поиск сюжета в пуле.", "running")
         write_log_entry(
             log_id,
             f"Настройка «Утверждать сюжеты»: {'включена' if approve_stories else 'выключена'}. "
@@ -227,7 +227,7 @@ def run(batch_id, log_id):
                 log_id, fmt_id_msg("[story] Батч {} — {}", batch_id, reason), level='silent'
             )
 
-    write_log_entry(log_id, 'Начало генерации сюжета…')
+    write_log_entry(log_id, 'Начало генерации сюжета.')
     write_log_entry(
         log_id,
         fmt_id_msg(
@@ -236,7 +236,7 @@ def run(batch_id, log_id):
         level='silent',
     )
 
-    db_log_update(log_id, "Генерация сюжета…", "running")
+    db_log_update(log_id, "Генерация сюжета.", "running")
 
     if not client_is_configured('text'):
         msg = "API-ключ текстовой платформы не задан — генерация невозможна"
@@ -352,7 +352,7 @@ def run(batch_id, log_id):
     write_log_entry(log_id, f"Сюжет:\n{result}")
     write_log_entry(
         log_id,
-        f"[story] Сюжет получен: {result[:100]}{'…' if len(result) > 100 else ''}",
+        f"[story] Сюжет получен: {result[:100]}{'.' if len(result) > 100 else ''}",
         level='silent',
     )
 

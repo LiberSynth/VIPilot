@@ -140,7 +140,7 @@ class PlatformBrowser:
         from playwright.sync_api import sync_playwright
 
         tag = f"[{self._platform}_browser]"
-        self._set_status("starting", "Запуск браузера…")
+        self._set_status("starting", "Запуск браузера.")
         os.makedirs(self._profile_dir, exist_ok=True)
         write_log_entry(None, f"{tag} Профиль Chrome: {self._profile_dir}", level='silent')
 
@@ -316,7 +316,7 @@ class PlatformBrowser:
         tag = f"[{self._platform}_pipeline]"
 
         self._pipeline_taking_over = True
-        self._set_status("running", "Публикация…")
+        self._set_status("running", "Публикация.")
 
         with self._lock:
             if self._running:

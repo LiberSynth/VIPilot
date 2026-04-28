@@ -119,10 +119,10 @@ def run(batch_id, log_id):
         write_log_entry(log_id, fmt_id_msg("[transcode] Батч {} ({}) — транскод отключен, пропускаю", batch_id, target), level='silent')
         return
 
-    write_log_entry(log_id, 'Начало транскодирования…')
+    write_log_entry(log_id, 'Начало транскодирования.')
     write_log_entry(log_id, fmt_id_msg("[transcode] Батч {} ({}) — начало транскодирования", batch_id, target), level='silent')
 
-    db_log_update(log_id, 'Транскодирование…', 'running')
+    db_log_update(log_id, 'Транскодирование.', 'running')
 
     original_data = db_get_batch_original_video(batch_id)
     if original_data is None:
@@ -131,8 +131,8 @@ def run(batch_id, log_id):
         raise FatalError(msg)
 
     src_mb = round(len(original_data) / 1024 / 1024, 1)
-    write_log_entry(log_id, f'Оригинал получен из БД ({src_mb} МБ), запускаю ffmpeg…')
-    write_log_entry(log_id, f"[transcode] Оригинал {src_mb} МБ, запускаю ffmpeg…", level='silent')
+    write_log_entry(log_id, f'Оригинал получен из БД ({src_mb} МБ), запускаю ffmpeg.')
+    write_log_entry(log_id, f"[transcode] Оригинал {src_mb} МБ, запускаю ffmpeg.", level='silent')
 
     tmp_src_path = None
     tmp_out_path = None

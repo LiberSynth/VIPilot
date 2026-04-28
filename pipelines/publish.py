@@ -61,12 +61,12 @@ def _call_vk(slug, method, batch_id, log_id, target, step_results):
         return False
     group_id = int(cfg.get('group_id', 236929597))
     if method == 'story':
-        write_log_entry(log_id, 'Публикую историю…')
+        write_log_entry(log_id, 'Публикую историю.')
         write_log_entry(log_id, f"[publish] group_id={group_id}", level='silent')
         video_data = _get_video(batch_id, log_id)
         return vk.publish_story(video_data, group_id, log_id) is not None
     elif method == 'wall':
-        write_log_entry(log_id, 'Публикую на стену…')
+        write_log_entry(log_id, 'Публикую на стену.')
         write_log_entry(log_id, f"[publish] group_id={group_id}", level='silent')
         video_data = _get_video(batch_id, log_id)
         return vk.publish_wall(video_data, group_id, log_id) is not None
@@ -77,7 +77,7 @@ def _call_vk(slug, method, batch_id, log_id, target, step_results):
         if not clip_url:
             write_log_entry(log_id, 'VK clip_wall: clip_url не получен от шага vkvideo — пропуск', level='error')
             return False
-        write_log_entry(log_id, f'VK: Публикую пост с клипом VK Видео…')
+        write_log_entry(log_id, f'VK: Публикую пост с клипом VK Видео.')
         write_log_entry(log_id, f"[publish] clip_url={clip_url}", level='silent')
         return vk.publish_clip_wall(clip_url, pub_title, group_id, log_id) is not None
     else:
@@ -191,7 +191,7 @@ def run(batch_id, log_id):
 
     if parsed is None:
         if batch['type'] == 'movie_probe':
-            db_log_update(log_id, 'Публикация (пробный)…', 'running')
+            db_log_update(log_id, 'Публикация (пробный).', 'running')
             write_log_entry(log_id, 'Пробный батч — публикация на платформу не выполняется')
             write_log_entry(log_id, fmt_id_msg("[publish] Батч {} пробный — публикация пропущена", batch_id), level='silent')
             db_set_batch_status(batch_id, 'movie_probe')
@@ -243,9 +243,9 @@ def run(batch_id, log_id):
 
     if parsed is not None:
         cur_slug, cur_method, cur_phase = parsed
-        log_label = f'Публикация (возобновление {cur_slug}.{cur_method})…'
+        log_label = f'Публикация (возобновление {cur_slug}.{cur_method}).'
     else:
-        log_label = f'Публикация ({target_names})…'
+        log_label = f'Публикация ({target_names}).'
 
     db_log_update(log_id, log_label, 'running')
 
@@ -309,7 +309,7 @@ def run(batch_id, log_id):
             db_log_update(log_id, f'Захват {posting_status} не удался — пропуск', 'ok')
             return
 
-        write_log_entry(log_id, f'Шаг {slug}.{method}: выполняю…')
+        write_log_entry(log_id, f'Шаг {slug}.{method}: выполняю.')
         write_log_entry(log_id, fmt_id_msg("[publish] Батч {}: шаг {}.{} — начало", batch_id, slug, method), level='silent')
 
         step_error = None

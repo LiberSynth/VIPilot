@@ -208,7 +208,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
     try:
         overlay = page.locator("[data-testid='modal-overlay']").first
         if overlay.is_visible():
-            write_log_entry(log_id, "Дзен: Закрываю модальное окно…")
+            write_log_entry(log_id, "Дзен: Закрываю модальное окно.")
             # Сначала пробуем кнопку ×, затем клик по оверлею
             close_x = page.locator(
                 "[data-testid='modal-overlay'] ~ * button, "
@@ -238,7 +238,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
     _dismiss_popups(page, log_id)
 
     # ── Шаг 2: Кнопка «+» (плюсик) в правом верхнем углу ────────────────
-    write_log_entry(log_id, "Дзен: Ищу кнопку «+» для создания публикации…")
+    write_log_entry(log_id, "Дзен: Ищу кнопку «+» для создания публикации.")
     plus_btn = page.locator(
         "[class*='addButton'], "
         "[class*='author-studio-header__addButton'], "
@@ -250,17 +250,17 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
     ).first
     plus_btn.wait_for(state="visible", timeout=15_000)
     plus_btn.click()
-    write_log_entry(log_id, "Дзен: Кнопка «+» нажата, жду меню…")
+    write_log_entry(log_id, "Дзен: Кнопка «+» нажата, жду меню.")
     page.wait_for_timeout(1500)
     _snap(page, batch_id)
 
     # ── Шаг 3: «Загрузить видео» из выпадающего меню ─────────────────────
-    write_log_entry(log_id, "Дзен: Выбираю «Загрузить видео»…")
+    write_log_entry(log_id, "Дзен: Выбираю «Загрузить видео».")
     upload_item = page.get_by_text("Загрузить видео", exact=True).first
     try:
         upload_item.wait_for(state="visible", timeout=8_000)
     except Exception:
-        write_log_entry(log_id, "Дзен: exact-match не нашёл — пробую contains…")
+        write_log_entry(log_id, "Дзен: exact-match не нашёл — пробую contains.")
         upload_item = page.locator("text=Загрузить видео").first
         upload_item.wait_for(state="visible", timeout=5_000)
     upload_item.click()
@@ -269,24 +269,24 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
     _snap(page, batch_id)
 
     # ── Шаг 4: Загружаем файл ────────────────────────────────────────────
-    write_log_entry(log_id, "Дзен: Ищу поле загрузки файла…")
+    write_log_entry(log_id, "Дзен: Ищу поле загрузки файла.")
     # Ждём появления кнопки ДО входа в expect_file_chooser:
     # если войти до того, как кнопка видна, click() зависает внутри with-блока
     # и expect_file_chooser истекает раньше, чем диалог успевает открыться.
     choose_btn = page.get_by_text("Выбрать видео", exact=False).first
     choose_btn.wait_for(state="visible", timeout=20_000)
-    write_log_entry(log_id, "Дзен: Кнопка «Выбрать видео» найдена, открываю диалог выбора файла…")
+    write_log_entry(log_id, "Дзен: Кнопка «Выбрать видео» найдена, открываю диалог выбора файла.")
     with page.expect_file_chooser(timeout=15_000) as fc_info:
         choose_btn.click()
     file_chooser = fc_info.value
     file_chooser.set_files(video_path)
-    write_log_entry(log_id, "Дзен: Файл передан браузеру, жду загрузки…")
+    write_log_entry(log_id, "Дзен: Файл передан браузеру, жду загрузки.")
     _snap(page, batch_id)
 
     # Ждём одно из двух:
     #   a) ?videoEditorPublicationId=...  — редактор открылся, нужно кликать «Опубликовать»
     #   b) ?state=published               — Дзен опубликовал сам, ничего больше не нужно
-    write_log_entry(log_id, "Дзен: Жду открытия редактора видео или авто-публикации…")
+    write_log_entry(log_id, "Дзен: Жду открытия редактора видео или авто-публикации.")
     _editor_opened = False
     _auto_published = False
     try:
@@ -312,7 +312,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
 
     if not _editor_opened:
         # Запасной вариант: ждём поле заголовка или кнопку в диалоге
-        write_log_entry(log_id, "Дзен: URL редактора не появился, жду форму…")
+        write_log_entry(log_id, "Дзен: URL редактора не появился, жду форму.")
         try:
             page.wait_for_selector(
                 "input[placeholder*='аголов'], "
@@ -321,12 +321,12 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
                 timeout=15_000,
             )
         except Exception:
-            write_log_entry(log_id, "Дзен: Форма не обнаружена — продолжаю по таймауту…")
+            write_log_entry(log_id, "Дзен: Форма не обнаружена — продолжаю по таймауту.")
             page.wait_for_timeout(5000)
     _snap(page, batch_id)
 
     # ── Шаг 5: Заполняем теги ────────────────────────────────────────────
-    write_log_entry(log_id, "Дзен: Заполняю теги…")
+    write_log_entry(log_id, "Дзен: Заполняю теги.")
     try:
         tags_input = page.locator(
             "input[placeholder*='теги'], "
@@ -341,10 +341,10 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
         write_log_entry(log_id, "Дзен: Теги заполнены")
         _snap(page, batch_id)
     except Exception as _e:
-        write_log_entry(log_id, "Дзен: Не удалось заполнить теги — продолжаю…")
+        write_log_entry(log_id, "Дзен: Не удалось заполнить теги — продолжаю.")
 
     # ── Шаг 6: Публикуем ─────────────────────────────────────────────────
-    write_log_entry(log_id, "Дзен: Нажимаю «Опубликовать»…")
+    write_log_entry(log_id, "Дзен: Нажимаю «Опубликовать».")
     pub_btn = page.locator("button:has-text('Опубликовать')").first
     pub_btn.wait_for(state="visible", timeout=15_000)
     pub_btn.click()
@@ -406,7 +406,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
             ).first
             if pub_after.is_visible(timeout=300):
                 btn_text = pub_after.inner_text()
-                write_log_entry(log_id, f"Дзен: Нажимаю кнопку подтверждения публикации: «{btn_text}»…")
+                write_log_entry(log_id, f"Дзен: Нажимаю кнопку подтверждения публикации: «{btn_text}».")
                 pub_after.click()
                 page.wait_for_timeout(2000)
                 _snap(page, batch_id)
@@ -467,7 +467,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
                         try:
                             el = frame.locator(sel).first
                             if el.is_visible():
-                                write_log_entry(log_id, f"Дзен: Капча: Playwright-клик {sel!r}…")
+                                write_log_entry(log_id, f"Дзен: Капча: Playwright-клик {sel!r}.")
                                 el.click(force=True, timeout=2000)
                                 page.wait_for_timeout(2000)
                                 captcha_clicked = True
@@ -505,9 +505,9 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
         page.wait_for_timeout(_DIALOG_POLL)
 
     if captcha_clicked:
-        write_log_entry(log_id, "Дзен: Действия в шаге 7 выполнены, жду подтверждения публикации…")
+        write_log_entry(log_id, "Дзен: Действия в шаге 7 выполнены, жду подтверждения публикации.")
     else:
-        write_log_entry(log_id, "Дзен: Шаг 7 завершён (капча/попап не обнаружены), жду подтверждения…")
+        write_log_entry(log_id, "Дзен: Шаг 7 завершён (капча/попап не обнаружены), жду подтверждения.")
 
     # ── Шаг 8: Ожидаем подтверждения публикации ──────────────────────────
     _PUBLISH_CONFIRM_TIMEOUT = 60_000  # ms — полный таймаут ожидания

@@ -36,6 +36,6 @@ def run_batch(batch_id, pipeline, log_id):
 
 def start_batch_thread(batch_id, pipeline, pipeline_name):
     """Создаёт log_id, запускает поток для обработки батча."""
-    log_id = write_log(pipeline_name, f'Запуск пайплайна {pipeline_name}…', status='running', batch_id=batch_id)
+    log_id = write_log(pipeline_name, f'Запуск пайплайна {pipeline_name}.', status='running', batch_id=batch_id)
     t = threading.Thread(target=run_batch, args=(batch_id, pipeline, log_id), daemon=True)
     t.start()

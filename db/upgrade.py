@@ -107,7 +107,7 @@ def _check_chromium() -> tuple[bool, str]:
         p.stop()
         if pathlib.Path(exe).exists():
             return True, f'chromium (playwright): {exe}'
-        write_log_entry(None, '[upgrade] Chromium не найден — устанавливаю через playwright...', level='silent')
+        write_log_entry(None, '[upgrade] Chromium не найден — устанавливаю через playwright.', level='silent')
         if _install_chromium():
             return True, 'chromium: установлен через playwright install chromium'
         return False, 'chromium: не удалось установить через playwright install chromium'
@@ -157,7 +157,7 @@ _POST_MIGRATION_CHECKS = [
 
 def _run_checks(checks, label) -> None:
     """Запускает список проверок. Бросает FatalError или RuntimeError при неудаче."""
-    write_log_entry(None, f'[upgrade] {label}...', level='silent')
+    write_log_entry(None, f'[upgrade] {label}.', level='silent')
     failed = []
     for name, fn in checks:
         try:
