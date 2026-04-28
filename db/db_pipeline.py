@@ -606,3 +606,31 @@ def db_set_batch_title(batch_id: str, title: str) -> None:
                 (title, batch_id),
             )
         conn.commit()
+
+
+def db_set_batch_vkvideo_clip_url(batch_id: str, clip_url: str) -> None:
+    """Сохраняет ссылку на клип VK Видео в batches.data['vkvideo_clip_url']."""
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE batches
+                   SET data = COALESCE(data::jsonb, '{}'::jsonb)
+                           || jsonb_build_object('vkvideo_clip_url', %s::text)
+                 WHERE id = %s
+                """,
+                (clip_url, batch_id),
+            )
+        conn.commit()
+
+
+def db_get_batch_vkvideo_clip_url(batch_id: str) -> str:
+    """Читает ссылку на клип VK Видео из batches.data['vkvideo_clip_url']."""
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT data->>'vkvideo_clip_url' FROM batches WHERE id = %s",
+                (batch_id,),
+            )
+            row = cur.fetchone()
+    return (row[0] or '') if row else ''

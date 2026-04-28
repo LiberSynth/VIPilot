@@ -15,6 +15,7 @@ from db import (
     db_set_batch_status,
     db_claim_batch_status,
     db_set_batch_title,
+    db_get_batch_vkvideo_clip_url,
 )
 from log import db_log_update, db_get_log_entries, write_log_entry
 from pipelines.base import check_cancelled
@@ -55,7 +56,7 @@ def _get_video(batch_id, log_id):
 
 
 
-def _call_vk(slug, method, batch_id, log_id, target, step_results, pub_title):
+def _call_vk(slug, method, batch_id, log_id, target, pub_title):
     cfg = target.get('config') or {}
     if not client_is_configured('vk'):
         write_log_entry(log_id, 'VK_USER_TOKEN не задан', level='error')
@@ -72,10 +73,9 @@ def _call_vk(slug, method, batch_id, log_id, target, step_results, pub_title):
         video_data = _get_video(batch_id, log_id)
         return vk.publish_wall(video_data, group_id, log_id, pub_title) is not None
     elif method == 'clip_wall':
-        vkvideo_result = step_results.get('vkvideo') or {}
-        clip_url = vkvideo_result.get('clip_url', '')
+        clip_url = db_get_batch_vkvideo_clip_url(batch_id)
         if not clip_url:
-            write_log_entry(log_id, 'VK clip_wall: clip_url не получен от шага vkvideo — пропуск', level='error')
+            write_log_entry(log_id, 'VK clip_wall: clip_url не найден в БД — vkvideo не завершился или не записал ссылку', level='error')
             return False
         write_log_entry(log_id, f'VK: Публикую пост с клипом VK Видео.')
         write_log_entry(log_id, f"[publish] clip_url={clip_url}", level='silent')
@@ -85,7 +85,7 @@ def _call_vk(slug, method, batch_id, log_id, target, step_results, pub_title):
         return False
 
 
-def _call_dzen(slug, method, batch_id, log_id, target, step_results, pub_title):
+def _call_dzen(slug, method, batch_id, log_id, target, pub_title):
     cfg = target.get('config') or {}
     target_id = target.get('id')
     if not client_is_configured('dzen', cfg, target_id):
@@ -100,7 +100,7 @@ def _call_dzen(slug, method, batch_id, log_id, target, step_results, pub_title):
     return dzen_client.publish(video_data, cfg, log_id, batch_id=batch_id, target_id=target_id, pub_title=pub_title)
 
 
-def _call_rutube(slug, method, batch_id, log_id, target, step_results, pub_title):
+def _call_rutube(slug, method, batch_id, log_id, target, pub_title):
     cfg = target.get('config') or {}
     target_id = target.get('id')
     if not client_is_configured('rutube', cfg, target_id):
@@ -115,7 +115,7 @@ def _call_rutube(slug, method, batch_id, log_id, target, step_results, pub_title
     return rutube_client.publish(video_data, cfg, log_id, batch_id=batch_id, target_id=target_id, pub_title=pub_title)
 
 
-def _call_vkvideo(slug, method, batch_id, log_id, target, step_results, pub_title):
+def _call_vkvideo(slug, method, batch_id, log_id, target, pub_title):
     cfg = target.get('config') or {}
     target_id = target.get('id')
     if not client_is_configured('vkvideo', cfg, target_id):
@@ -128,9 +128,6 @@ def _call_vkvideo(slug, method, batch_id, log_id, target, step_results, pub_titl
     video_data = _get_video(batch_id, log_id)
 
     result = vkvideo_client.publish(video_data, cfg, log_id, batch_id=batch_id, target_id=target_id, pub_title=pub_title)
-    step_results['vkvideo'] = {
-        'clip_url': result.get('clip_url', ''),
-    }
     return result.get('ok', False)
 
 
@@ -142,13 +139,13 @@ _CLIENTS = {
 }
 
 
-def _call_client(slug, method, batch_id, log_id, target, step_results, pub_title):
+def _call_client(slug, method, batch_id, log_id, target, pub_title):
     """Диспетчеризует вызов клиента по реестру _CLIENTS. Возвращает True при успехе."""
     handler = _CLIENTS.get(slug)
     if handler is None:
         write_log_entry(log_id, f'Платформа «{slug}» не поддерживается', level='warn')
         return False
-    return handler(slug, method, batch_id, log_id, target, step_results, pub_title)
+    return handler(slug, method, batch_id, log_id, target, pub_title)
 
 
 def _parse_composite_status(status: str):
@@ -239,7 +236,7 @@ def run(batch_id, log_id):
             raise AppException(batch_id, 'publish', msg, log_id)
 
     # Проверяем зависимость: vk.clip_wall требует, чтобы vkvideo-таргет
-    # был раньше по списку шагов — иначе step_results['vkvideo'] будет пустым.
+    # был раньше по списку шагов — иначе clip_url не будет записан в БД к моменту шага.
     _vkvideo_positions = {i for i, (s, m, _) in enumerate(steps) if s == 'vkvideo'}
     for _i, (_s, _m, _) in enumerate(steps):
         if _s == 'vk' and _m == 'clip_wall':
@@ -309,7 +306,6 @@ def run(batch_id, log_id):
     any_ok = False
     failed_steps = []
     expected_from = status
-    step_results = {}  # передаётся между шагами: vkvideo → vk (clip_url)
     for step_idx, (slug, method, target) in enumerate(steps):
         if resume_from is not None:
             if (slug, method) != resume_from:
@@ -335,7 +331,7 @@ def run(batch_id, log_id):
 
         step_error = None
         try:
-            ok = _call_client(slug, method, batch_id, log_id, target, step_results, pub_title)
+            ok = _call_client(slug, method, batch_id, log_id, target, pub_title)
         except (DzenSessionMissing, DzenCsrfExpired, RutubeSessionMissing, RutubeCsrfExpired, VkVideoSessionMissing, VkVideoCsrfExpired) as e:
             ok = False
             step_error = str(e)

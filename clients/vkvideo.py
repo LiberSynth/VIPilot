@@ -18,6 +18,7 @@ import shutil
 import tempfile
 import time as _time
 
+from db import db_set_batch_vkvideo_clip_url
 from log import write_log_entry
 from utils.utils import fmt_id_msg
 from routes.api import publication_file_name, hashtags
@@ -92,6 +93,8 @@ def publish(
 
         def _do_publish(page, _ctx):
             _state["clip_url"] = _publish_ui(page, club_id, video_path, pub_title, log_id, batch_id=batch_id)
+            if _state["clip_url"] and batch_id:
+                db_set_batch_vkvideo_clip_url(batch_id, _state["clip_url"])
 
         result = _get_browser("vkvideo").run_pipeline_browser(_do_publish, saved_cookies)
 

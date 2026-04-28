@@ -69,6 +69,8 @@ from .db_pipeline import (
     db_get_active_video_models,
     db_get_video_model_by_id,
     db_set_batch_title,
+    db_set_batch_vkvideo_clip_url,
+    db_get_batch_vkvideo_clip_url,
 )
 from .db_media import (
     db_create_batch_movie,
