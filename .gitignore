@@ -1,11 +1,7 @@
 # Project runtime artifacts
 videos/
 attached_assets/
-
-# Browser profile cache and runtime artifacts
-data/dzen_profile/
-data/rutube_profile/
-data/vkvideo_profile/
+data/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
