@@ -307,7 +307,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
     if _auto_published:
         # Видео уже опубликовано — пропускаем шаги 5-7
         _snap(page, batch_id)
-        write_log_entry(log_id, "Дзен: Публикация завершена!")
+        write_log_entry(log_id, "Дзен: Публикация завершена.")
         return
 
     if not _editor_opened:
@@ -630,4 +630,4 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
         _snap(page, batch_id)
 
     write_log_entry(log_id, f"Дзен: URL после публикации: {page.url}")
-    write_log_entry(log_id, "Дзен: Публикация завершена!")
+    write_log_entry(log_id, "Дзен: Публикация завершена.")

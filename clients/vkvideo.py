@@ -298,7 +298,7 @@ def _publish_ui(page, club_id: str, video_path: str, pub_title: str, log_id, bat
     _snap(page, batch_id)
 
     if _success:
-        write_log_entry(log_id, "VK Видео: Клип опубликован успешно!")
+        write_log_entry(log_id, "VK Видео: Клип опубликован успешно.")
     else:
         write_log_entry(log_id, "VK Видео: Публикация завершена (тост не обнаружен, ошибок нет)")
 

@@ -249,6 +249,6 @@ def _publish_ui(page, video_path: str, log_id, batch_id=None):
     _snap(page, batch_id)
 
     if _success:
-        write_log_entry(log_id, "Рутьюб: Публикация успешна!")
+        write_log_entry(log_id, "Рутьюб: Публикация успешна.")
     else:
         write_log_entry(log_id, "Рутьюб: Публикация завершена (тост не обнаружен, ошибок нет)")
