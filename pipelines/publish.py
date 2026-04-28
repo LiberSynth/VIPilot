@@ -29,7 +29,7 @@ from clients import vkvideo as vkvideo_client
 from clients.vkvideo import VkVideoCsrfExpired, VkVideoSessionMissing
 
 
-def _is_too_early(batch):
+def is_scheduled(batch) -> bool:
     """Возвращает True если батч ещё не наступило время публиковать."""
     sched = batch.get('scheduled_at')
     if sched is None:
