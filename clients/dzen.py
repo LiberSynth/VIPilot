@@ -285,7 +285,6 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
     write_log_entry(log_id, "Дзен: Переход в студию.")
     write_log_entry(log_id, f"[dzen] URL студии: {studio_url}", level='silent')
     page.goto(studio_url, wait_until="domcontentloaded", timeout=_NAV_TIMEOUT)
-    page.wait_for_timeout(2000)
     _snap(page, batch_id)
 
     cur = page.url
@@ -342,7 +341,6 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
     plus_btn.wait_for(state="visible", timeout=15_000)
     plus_btn.click()
     write_log_entry(log_id, "Дзен: Кнопка «+» нажата, жду меню.")
-    page.wait_for_timeout(1500)
     _snap(page, batch_id)
 
     # ── Шаг 3: «Загрузить видео» из выпадающего меню ─────────────────────
@@ -356,7 +354,6 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
         upload_item.wait_for(state="visible", timeout=5_000)
     upload_item.click()
     write_log_entry(log_id, "Дзен: «Загрузить видео» нажато")
-    page.wait_for_timeout(1500)
     _snap(page, batch_id)
 
     # ── Шаг 4: Загружаем файл ────────────────────────────────────────────
@@ -444,7 +441,11 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
     pub_btn = page.locator("button:has-text('Опубликовать')").first
     pub_btn.wait_for(state="visible", timeout=15_000)
     pub_btn.click()
-    page.wait_for_timeout(2000)
+    # Опрашиваем с коротким шагом: выходим, как только появился диалог или капча.
+    for _w in range(4):
+        page.wait_for_timeout(500)
+        if _has_publish_confirm_dialog(page) or _has_captcha_frame(page) or _has_captcha_dom(page):
+            break
     _snap(page, batch_id)
 
     # ── Шаг 7: Обрабатываем три разных элемента (25 секунд) ─────────────
@@ -507,12 +508,17 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
                 pub_after.click()
                 # Ждём реакции страницы короткими шагами — если капча
                 # появилась, прерываем ожидание и сразу переходим к блоку B.
+                _captcha_after_btn = False
                 for _w in range(4):
                     page.wait_for_timeout(500)
                     if _has_captcha_frame(page) or _has_captcha_dom(page):
+                        _captcha_after_btn = True
                         break
                 _snap(page, batch_id)
-                _check_error_toast()
+                # Не проверяем ошибки когда капча только появилась —
+                # inner_text зависнет на 1500 мс зря, а тост в этот момент невидим.
+                if not _captcha_after_btn:
+                    _check_error_toast()
         except DzenApiError:
             raise
         except Exception:

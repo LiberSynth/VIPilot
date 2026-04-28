@@ -152,7 +152,6 @@ def _publish_ui(page, club_id: str, video_path: str, pub_title: str, log_id, bat
     # ── Шаг 1: Переходим в кабинет с параметром uploader ─────────────────
     write_log_entry(log_id, "VK Видео: Переход в кабинет автора.")
     page.goto(cabinet_url, wait_until="domcontentloaded", timeout=_NAV_TIMEOUT)
-    page.wait_for_timeout(3000)
     _snap(page, batch_id)
 
     cur = page.url
@@ -267,7 +266,6 @@ def _publish_ui(page, club_id: str, video_path: str, pub_title: str, log_id, bat
     # ── Шаг 9: Нажимаем «Опубликовать» ───────────────────────────────────
     write_log_entry(log_id, "VK Видео: Нажимаю «Опубликовать».")
     pub_btn.click()
-    page.wait_for_timeout(3000)
     _snap(page, batch_id)
 
     # ── Шаг 10: Проверяем успех (тост «Клип опубликован») ────────────────

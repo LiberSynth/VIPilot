@@ -124,7 +124,6 @@ def _publish_ui(page, video_path: str, log_id, batch_id=None):
     # ── Шаг 1: Переходим в студию ────────────────────────────────────────
     write_log_entry(log_id, "Рутьюб: Переход в студию Рутьюба.")
     page.goto(STUDIO_URL, wait_until="domcontentloaded", timeout=_NAV_TIMEOUT)
-    page.wait_for_timeout(2000)
     _snap(page, batch_id)
 
     cur = page.url
@@ -140,7 +139,6 @@ def _publish_ui(page, video_path: str, log_id, batch_id=None):
     add_btn.wait_for(state="visible", timeout=15_000)
     add_btn.click()
     write_log_entry(log_id, "Рутьюб: Кнопка «+ Добавить» нажата, жду меню.")
-    page.wait_for_timeout(1000)
     _snap(page, batch_id)
 
     # ── Шаг 3: «Загрузить видео или Shorts» из меню ──────────────────────
@@ -154,7 +152,6 @@ def _publish_ui(page, video_path: str, log_id, batch_id=None):
         upload_item.wait_for(state="visible", timeout=5_000)
     upload_item.click()
     write_log_entry(log_id, "Рутьюб: «Загрузить видео или Shorts» нажато")
-    page.wait_for_timeout(1500)
     _snap(page, batch_id)
 
     # ── Шаг 4: Нажимаем «Выбрать файлы» и передаём видео ────────────────
@@ -214,7 +211,6 @@ def _publish_ui(page, video_path: str, log_id, batch_id=None):
     pub_btn = page.locator("button:has-text('Опубликовать')").last
     pub_btn.wait_for(state="visible", timeout=15_000)
     pub_btn.click()
-    page.wait_for_timeout(2000)
     _snap(page, batch_id)
 
     # ── Шаг 8: Проверяем успех (toast «Видео опубликовано») ──────────────
