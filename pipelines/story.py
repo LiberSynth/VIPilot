@@ -131,10 +131,6 @@ def run(batch_id, log_id):
             donor_title = (
                 db_get_story_title(donor_story_id) if donor_story_id else None
             )
-            if donor_title:
-                detail = f"Включен режим «Подбирать видео из пула». Контент будет подобран из пула. Сюжет: «{donor_title}»"
-            else:
-                detail = "Включен режим «Подбирать видео из пула». Контент будет подобран из пула."
             db_log_update(
                 log_id, "Подобрано видео из пула, генерация сюжета не требуется", "ok"
             )
