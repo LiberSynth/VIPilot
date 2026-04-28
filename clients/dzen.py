@@ -117,19 +117,107 @@ def _snap(page, batch_id=None) -> None:
         write_log_entry(None, f"[dzen] _snap: {_e}", level='silent')
 
 
+_CAPTCHA_URL_KEYWORDS = (
+    "not_robot_captcha", "smartcaptcha", "yandexcloud",
+    "captcha.yandex", "recaptcha", "id.vk.com",
+)
+
+_CAPTCHA_DOM_KEYWORDS = (
+    "не робот", "not a robot", "подтвердите", "я не робот",
+    "captcha", "капча",
+)
+
+
 def _has_captcha_frame(page) -> bool:
-    """Возвращает True если в page есть активный iframe капчи."""
+    """Возвращает True если в page есть активный iframe капчи (по URL)."""
     try:
         for frame in page.frames:
             furl = frame.url.lower()
-            if any(kw in furl for kw in (
-                "not_robot_captcha", "smartcaptcha", "yandexcloud",
-                "captcha.yandex", "recaptcha", "id.vk.com",
-            )):
+            if any(kw in furl for kw in _CAPTCHA_URL_KEYWORDS):
                 return True
     except Exception:
         pass
     return False
+
+
+def _has_captcha_dom(page) -> bool:
+    """Резервная проверка: капча обнаружена по тексту страницы или DOM-классам."""
+    try:
+        body = page.locator("body").inner_text(timeout=1000)
+        body_lc = body.lower()
+        if any(kw in body_lc for kw in _CAPTCHA_DOM_KEYWORDS):
+            return True
+    except Exception:
+        pass
+    try:
+        for sel in (
+            "[class*='captcha']",
+            "[class*='Captcha']",
+            "[id*='captcha']",
+            "iframe[src*='captcha']",
+            "iframe[src*='smartcaptcha']",
+        ):
+            try:
+                if page.locator(sel).first.is_visible(timeout=300):
+                    return True
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return False
+
+
+def _try_click_captcha_checkbox(page, log_id) -> bool:
+    """
+    Пытается кликнуть чекбокс капчи «Я не робот» во всех фреймах и в основном.
+    Возвращает True если клик выполнен хотя бы в одном месте.
+    """
+    checkbox_selectors = [
+        'input[type="checkbox"]',
+        '[class*="Checkbox"] input',
+        '[class*="checkbox"] input',
+        'label',
+        "[role='checkbox']",
+    ]
+    clicked = False
+
+    # Перебираем все фреймы (и с совпадением URL, и без)
+    try:
+        for frame in page.frames:
+            furl = frame.url.lower()
+            is_url_match = any(kw in furl for kw in _CAPTCHA_URL_KEYWORDS)
+            # Также пробуем фреймы без URL-совпадения, если DOM-капча обнаружена
+            for js_sel in checkbox_selectors[:3]:
+                try:
+                    done = frame.evaluate(
+                        f'() => {{ const el = document.querySelector({repr(js_sel)}); '
+                        f'if (el) {{ el.click(); return true; }} return false; }}'
+                    )
+                    if done:
+                        write_log_entry(log_id, f"[dzen] Капча: JS-клик {js_sel!r} в фрейме {furl or 'main'}", level='silent')
+                        clicked = True
+                        break
+                except Exception:
+                    pass
+            if clicked:
+                break
+    except Exception:
+        pass
+
+    # Если фреймовый клик не сработал — пробуем основной фрейм напрямую
+    if not clicked:
+        for sel in checkbox_selectors:
+            try:
+                el = page.locator(sel).first
+                if el.is_visible(timeout=300):
+                    el.click(force=True, timeout=2000)
+                    write_log_entry(log_id, f"[dzen] Капча: Playwright-клик {sel!r} в основном фрейме", level='silent')
+                    clicked = True
+                    break
+            except Exception:
+                pass
+
+    return clicked
 
 
 def _has_publish_confirm_dialog(page) -> bool:
@@ -160,7 +248,7 @@ def _dismiss_popups(page, log_id=None) -> None:
             return
     except Exception:
         pass
-    if _has_captcha_frame(page):
+    if _has_captcha_frame(page) or _has_captcha_dom(page):
         return
     if _has_publish_confirm_dialog(page):
         return
@@ -425,74 +513,24 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
         except Exception:
             pass
 
-        # ── B. Капча «Я не робот» — кликаем чекбокс внутри iframe ────────
+        # ── B. Капча «Я не робот» ──────────────────────────────────────────
+        # Детектируем сначала по URL iframe, затем по DOM (резервный метод).
+        # Если капча обнаружена любым способом — пробуем кликнуть чекбокс
+        # через _try_click_captcha_checkbox (все фреймы + основной контекст).
         if not captcha_clicked:
-            try:
-                all_frames = page.frames
-                for frame in all_frames:
-                    if captcha_clicked:
-                        break
-                    furl = frame.url.lower()
-                    # Только фреймы капчи (id.vk.com/not_robot_captcha, smartcaptcha, и т.п.)
-                    is_captcha = any(kw in furl for kw in (
-                        "not_robot_captcha", "smartcaptcha", "yandexcloud",
-                        "captcha.yandex", "recaptcha", "id.vk.com",
-                    ))
-                    if not is_captcha:
-                        continue
-                    write_log_entry(log_id, "Дзен: Капча-фрейм найден")
-                    write_log_entry(log_id, f"[dzen] URL капча-фрейма: {furl}", level='silent')
-                    # Вариант 1: JS-клик напрямую по input[type=checkbox] внутри фрейма.
-                    # Это надёжнее чем Playwright-клик — не зависит от видимости и позиции.
-                    _js_clicked = False
-                    for js_sel in [
-                        'input[type="checkbox"]',
-                        '[class*="Checkbox"] input',
-                        '[class*="checkbox"] input',
-                    ]:
-                        try:
-                            done = frame.evaluate(
-                                f'() => {{ const el = document.querySelector({repr(js_sel)}); '
-                                f'if (el) {{ el.click(); return true; }} return false; }}'
-                            )
-                            if done:
-                                write_log_entry(log_id, f"[dzen] Капча: JS-клик по {js_sel!r} — выполнен", level='silent')
-                                _js_clicked = True
-                                break
-                        except Exception:
-                            pass
-
-                    if _js_clicked:
-                        page.wait_for_timeout(2000)
-                        write_log_entry(log_id, "Дзен: Капча-фрейм пройден.")
-                        write_log_entry(log_id, "[dzen] Капча пройдена через JS-клик.", level='silent')
-                        captcha_clicked = True
-                        _snap(page, batch_id)
-                        break
-
-                    # Вариант 2: Playwright-клик по label (ассоциирован с чекбоксом через for=)
-                    for sel in [
-                        "label",
-                        "input[type='checkbox']",
-                        "[role='checkbox']",
-                    ]:
-                        try:
-                            el = frame.locator(sel).first
-                            if el.is_visible():
-                                write_log_entry(log_id, f"[dzen] Капча: Playwright-клик {sel!r}", level='silent')
-                                el.click(force=True, timeout=2000)
-                                page.wait_for_timeout(2000)
-                                write_log_entry(log_id, "Дзен: Капча-фрейм пройден.")
-                                write_log_entry(log_id, f"[dzen] Капча пройдена через Playwright-клик {sel!r}.", level='silent')
-                                captcha_clicked = True
-                                _snap(page, batch_id)
-                                break
-                        except Exception:
-                            pass
-                    if captcha_clicked:
-                        break
-            except Exception:
-                pass
+            captcha_by_url = _has_captcha_frame(page)
+            captcha_by_dom = not captcha_by_url and _has_captcha_dom(page)
+            if captcha_by_url or captcha_by_dom:
+                method = "URL" if captcha_by_url else "DOM"
+                write_log_entry(log_id, f"Дзен: Обнаружена капча ({method}), пытаюсь нажать «Я не робот».")
+                _clicked = _try_click_captcha_checkbox(page, log_id)
+                if _clicked:
+                    page.wait_for_timeout(2000)
+                    write_log_entry(log_id, "Дзен: Капча — чекбокс нажат, жду проверки.")
+                    captcha_clicked = True
+                    _snap(page, batch_id)
+                else:
+                    write_log_entry(log_id, "Дзен: Капча обнаружена, но кликнуть чекбокс не удалось — жду.")
 
         # ── C. «Уже можно публиковать» — это встроенный текст диалога, НЕ попап.
         #       Закрывать нечего, игнорируем полностью. Escape не отправляем.
