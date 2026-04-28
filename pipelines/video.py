@@ -22,6 +22,7 @@ from db import (
     db_update_batch_current_movie_model_id,
     db_claim_batch_status,
     db_get_story_text,
+    db_get_story_title,
     db_get_active_video_models,
     db_get_video_model_by_id,
     db_save_video_job_and_set_pending,
@@ -184,10 +185,6 @@ def run(batch_id, log_id):
             db_log_update(log_id, 'Видео [эмуляция]', 'ok')
             return
 
-        write_log_entry(log_id, f"{'Возобновление' if resumed else 'Начало'} генерации видео.")
-        write_log_entry(log_id, fmt_id_msg("[video] Батч {} ({}) — {} генерации видео",
-                                      batch_id, target, 'возобновление' if resumed else 'начало'), level='silent')
-
         if not client_is_configured('falai'):
             msg = 'FAL_API_KEY не задан — генерация невозможна'
             db_log_update(log_id, msg, 'error')
@@ -230,6 +227,8 @@ def run(batch_id, log_id):
             write_log_entry(log_id, f"[video] {msg}", level='silent')
             raise AppException(batch_id, 'video', msg, log_id)
 
+        story_title = db_get_story_title(story_id) or '(без названия)'
+
         video_post_prompt = cycle_config_get('video_post_prompt').strip()
         if video_post_prompt:
             video_post_prompt = apply_prompt_params(video_post_prompt)
@@ -242,9 +241,10 @@ def run(batch_id, log_id):
         else:
             write_log_entry(log_id, f"Моделей: {len(models)}, попыток на модель: {max_attempts_per_model}", level='silent')
 
-        used_model    = None
-        used_model_id = None
-        attempt_counts = {}
+        used_model      = None
+        used_model_id   = None
+        attempt_counts  = {}
+        first_model_log = True
 
         def video_callback(m):
             """Один шаг перебора: resume-поллинг или свежий submit → поллинг.
@@ -260,10 +260,20 @@ def run(batch_id, log_id):
 
             Возвращает video_url при успехе или None при неудаче.
             """
-            nonlocal used_model, used_model_id
+            nonlocal used_model, used_model_id, first_model_log
             model_name = m['name']
             cnt = attempt_counts.get(model_name, 0)
             attempt_counts[model_name] = cnt + 1
+
+            if first_model_log:
+                first_model_log = False
+                db_log_update(log_id, f"Генерация видео ({model_name})", 'running')
+                prefix = 'Возобновление' if resumed else 'Начало'
+                write_log_entry(log_id, f"{prefix} генерации видео, сюжет {story_title}, модель {model_name}.")
+                write_log_entry(log_id, fmt_id_msg("[video] Батч {} ({}) — {} генерации видео",
+                                              batch_id, target, 'возобновление' if resumed else 'начало'), level='silent')
+            elif cnt == 0:
+                db_log_update(log_id, f"Генерация видео ({model_name})", 'running')
 
             current_batch = db_get_batch_by_id(batch_id)
             current_data  = (current_batch.get('data') or {}) if current_batch else {}
