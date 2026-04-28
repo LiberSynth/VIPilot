@@ -349,15 +349,14 @@ def run(batch_id, log_id):
             db_set_batch_status(batch_id, 'published')
             db_log_update(log_id, f'Опубликовано ({target_names})', 'ok')
             write_log_entry(log_id, fmt_id_msg("[publish] Батч {} опубликован", batch_id))
-            if log_id:
-                entries = db_get_log_entries(log_id)
-                warn_entries = [e for e in entries if e['level'] in ('warn', 'error')]
-                if warn_entries:
-                    notify_failure(
-                        fmt_id_msg("publish: батч {} опубликован, но в процессе были некритичные ошибки", batch_id),
-                        log_entries=warn_entries,
-                        partial=True,
-                    )
+            entries = db_get_log_entries(log_id)
+            warn_entries = [e for e in entries if e['level'] in ('warn', 'error')]
+            if warn_entries:
+                notify_failure(
+                    fmt_id_msg("publish: батч {} опубликован, но в процессе были некритичные ошибки", batch_id),
+                    log_entries=warn_entries,
+                    partial=True,
+                )
     else:
         abt_msg = f'Ошибка публикации батча в {target_names}'
         db_log_update(log_id, 'Ошибка публикации', 'error')

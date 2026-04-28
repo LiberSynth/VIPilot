@@ -29,8 +29,7 @@ def publish_story(video_data: bytes, group_id: int, log_id) -> int | None:
     }, timeout=15).json()
 
     if 'error' in r:
-        if log_id:
-            write_log_entry(log_id, f"getVideoUploadServer: {r['error']}", level='error')
+        write_log_entry(log_id, f"getVideoUploadServer: {r['error']}", level='error')
         return None
 
     upload_url = r['response']['upload_url']
@@ -46,24 +45,20 @@ def publish_story(video_data: bytes, group_id: int, log_id) -> int | None:
             )
             up.raise_for_status()
             if not up.text.strip():
-                if log_id:
-                    write_log_entry(log_id, f'Пустой ответ CDN (попытка {attempt+1}/3)', level='warn')
+                write_log_entry(log_id, f'Пустой ответ CDN (попытка {attempt+1}/3)', level='warn')
                 time.sleep(5)
                 continue
             up_data = up.json()
             if 'response' not in up_data:
-                if log_id:
-                    write_log_entry(log_id, f'Неожиданный ответ CDN: {up.text[:200]}', level='error')
+                write_log_entry(log_id, f'Неожиданный ответ CDN: {up.text[:200]}', level='error')
                 return None
             upload_result = up_data['response']['upload_result']
             break
         except Exception as e:
-            if log_id:
-                write_log_entry(log_id, f'Ошибка загрузки (попытка {attempt+1}/3): {e}', level='warn')
+            write_log_entry(log_id, f'Ошибка загрузки (попытка {attempt+1}/3): {e}', level='warn')
             time.sleep(5)
     else:
-        if log_id:
-            write_log_entry(log_id, 'Все попытки загрузки истории провалились', level='error')
+        write_log_entry(log_id, 'Все попытки загрузки истории провалились', level='error')
         return None
 
     save = requests.post(f'{_VK_API}/stories.save', data={
@@ -74,12 +69,10 @@ def publish_story(video_data: bytes, group_id: int, log_id) -> int | None:
 
     if 'response' in save:
         story_id = save['response']['items'][0]['id']
-        if log_id:
-            write_log_entry(log_id, fmt_id_msg('История опубликована: id={}', story_id))
+        write_log_entry(log_id, fmt_id_msg('История опубликована: id={}', story_id))
         return story_id
 
-    if log_id:
-        write_log_entry(log_id, f"stories.save: {save.get('error', save)}", level='error')
+    write_log_entry(log_id, f"stories.save: {save.get('error', save)}", level='error')
     return None
 
 
@@ -106,12 +99,10 @@ def publish_clip_wall(clip_url: str, title: str, group_id: int, log_id) -> int |
     """
     attachment = _clip_url_to_attachment(clip_url)
     if not attachment:
-        if log_id:
-            write_log_entry(log_id, f"VK: Не удалось получить attachment из ссылки «{clip_url}»", level='error')
+        write_log_entry(log_id, f"VK: Не удалось получить attachment из ссылки «{clip_url}»", level='error')
         return None
 
-    if log_id:
-        write_log_entry(log_id, fmt_id_msg("VK: Публикую пост с клипом: attachment={}, title={}", attachment, title))
+    write_log_entry(log_id, fmt_id_msg("VK: Публикую пост с клипом: attachment={}, title={}", attachment, title))
 
     post_resp = requests.post(f'{_VK_API}/wall.post', data={
         'owner_id':     -group_id,
@@ -124,12 +115,10 @@ def publish_clip_wall(clip_url: str, title: str, group_id: int, log_id) -> int |
 
     if 'response' in post_resp:
         post_id = post_resp['response']['post_id']
-        if log_id:
-            write_log_entry(log_id, fmt_id_msg('VK: Пост с клипом опубликован: post_id={}', post_id))
+        write_log_entry(log_id, fmt_id_msg('VK: Пост с клипом опубликован: post_id={}', post_id))
         return post_id
 
-    if log_id:
-        write_log_entry(log_id, f"VK: wall.post: {post_resp.get('error', post_resp)}", level='error')
+    write_log_entry(log_id, f"VK: wall.post: {post_resp.get('error', post_resp)}", level='error')
     return None
 
 
@@ -146,8 +135,7 @@ def publish_wall(video_data: bytes, group_id: int, log_id) -> int | None:
     }, timeout=15).json()
 
     if 'error' in save_resp:
-        if log_id:
-            write_log_entry(log_id, f"video.save: {save_resp['error']}", level='error')
+        write_log_entry(log_id, f"video.save: {save_resp['error']}", level='error')
         return None
 
     upload_url = save_resp['response']['upload_url']
@@ -172,10 +160,8 @@ def publish_wall(video_data: bytes, group_id: int, log_id) -> int | None:
 
     if 'response' in post_resp:
         post_id = post_resp['response']['post_id']
-        if log_id:
-            write_log_entry(log_id, f'Пост на стене: post_id={post_id}')
+        write_log_entry(log_id, f'Пост на стене: post_id={post_id}')
         return post_id
 
-    if log_id:
-        write_log_entry(log_id, f"wall.post: {post_resp.get('error', post_resp)}", level='error')
+    write_log_entry(log_id, f"wall.post: {post_resp.get('error', post_resp)}", level='error')
     return None

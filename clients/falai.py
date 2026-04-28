@@ -78,12 +78,11 @@ def build_body(body_tpl, prompt, ar_x, ar_y, video_duration, log_id=None):
                 try:
                     body[field] = val.format(video_duration)
                 except (IndexError, KeyError) as e:
-                    if log_id:
-                        write_log_entry(
-                            log_id,
-                            f"Поле «{field}» шаблона не поддерживает подстановку video_duration — оставляем как есть ({e})",
-                            level='warn',
-                        )
+                    write_log_entry(
+                        log_id,
+                        f"Поле «{field}» шаблона не поддерживает подстановку video_duration — оставляем как есть ({e})",
+                        level='warn',
+                    )
 
     return body
 

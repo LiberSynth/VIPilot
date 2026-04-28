@@ -13,6 +13,7 @@ from utils.utils import parse_hhmm, fmt_id_msg
 
 def run():
     """Планирование: проверяет расписание и создаёт недостающие батчи."""
+    log_id = None
     try:
         cancelled = db_cancel_orphaned_slot_batches()
         for bid in cancelled:
@@ -75,5 +76,5 @@ def run():
                         write_log_entry(log_id, f"[planning] Создан батч: {dt.strftime('%d.%m %H:%M')} UTC")
 
     except Exception as e:
-        write_log_entry(None, f"[planning] Необработанная ошибка: {e}")
+        write_log_entry(log_id, f"[planning] Необработанная ошибка: {e}")
         raise

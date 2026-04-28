@@ -76,8 +76,7 @@ def publish(
 
     saved_cookies = session.get("cookies", [])
 
-    if log_id:
-        write_log_entry(log_id, fmt_id_msg("VK Видео: {} КБ, club_id={}", len(video_data) // 1024, club_id))
+    write_log_entry(log_id, fmt_id_msg("VK Видео: {} КБ, club_id={}", len(video_data) // 1024, club_id))
 
     pub_title = build_publication_title()
     file_name = publication_file_name(pub_title)
@@ -103,8 +102,7 @@ def publish(
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
-    if log_id:
-        write_log_entry(log_id, "VK Видео: клип опубликован успешно")
+    write_log_entry(log_id, "VK Видео: клип опубликован успешно")
     return {"ok": True, "clip_url": _state["clip_url"], "pub_title": pub_title}
 
 
@@ -150,47 +148,40 @@ def _publish_ui(page, club_id: str, video_path: str, pub_title: str, log_id, bat
     cabinet_url = f"https://cabinet.vkvideo.ru/dashboard/@club{club_id}?showUploader=1&isClipUploading=1"
 
     # ── Шаг 1: Переходим в кабинет с параметром uploader ─────────────────
-    if log_id:
-        write_log_entry(log_id, "VK Видео: Переход в кабинет автора…")
+    write_log_entry(log_id, "VK Видео: Переход в кабинет автора…")
     page.goto(cabinet_url, wait_until="domcontentloaded", timeout=_NAV_TIMEOUT)
     page.wait_for_timeout(3000)
     _snap(page, batch_id)
 
     cur = page.url
-    if log_id:
-        write_log_entry(log_id, f"VK Видео: URL после перехода: {cur}")
+    write_log_entry(log_id, f"VK Видео: URL после перехода: {cur}")
     if "vk.com/login" in cur or "/auth" in cur or "passport" in cur:
         raise VkVideoCsrfExpired(
             "Сессия истекла — авторизуйтесь снова в браузере (вкладка «Публикация»)"
         )
 
     # ── Шаг 2: Ждём появления кнопки «Выбрать файл» ──────────────────────
-    if log_id:
-        write_log_entry(log_id, "VK Видео: Жду модал загрузки клипа…")
+    write_log_entry(log_id, "VK Видео: Жду модал загрузки клипа…")
     choose_btn = page.locator("button:has-text('Выбрать файл')").first
     try:
         choose_btn.wait_for(state="visible", timeout=20_000)
     except Exception:
-        if log_id:
-            write_log_entry(log_id, "VK Видео: «Выбрать файл» не появился — пробую альтернативный селектор…")
+        write_log_entry(log_id, "VK Видео: «Выбрать файл» не появился — пробую альтернативный селектор…")
         choose_btn = page.get_by_text("Выбрать файл", exact=False).first
         choose_btn.wait_for(state="visible", timeout=10_000)
 
-    if log_id:
-        write_log_entry(log_id, "VK Видео: Кнопка «Выбрать файл» найдена, загружаю файл…")
+    write_log_entry(log_id, "VK Видео: Кнопка «Выбрать файл» найдена, загружаю файл…")
 
     # ── Шаг 3: Загружаем файл через file chooser ─────────────────────────
     with page.expect_file_chooser(timeout=15_000) as fc_info:
         choose_btn.click()
     file_chooser = fc_info.value
     file_chooser.set_files(video_path)
-    if log_id:
-        write_log_entry(log_id, "VK Видео: Файл передан, жду форму «Публикация клипа»…")
+    write_log_entry(log_id, "VK Видео: Файл передан, жду форму «Публикация клипа»…")
     _snap(page, batch_id)
 
     # ── Шаг 4: Ждём форму «Публикация клипа» (поле Описание) ─────────────
-    if log_id:
-        write_log_entry(log_id, "VK Видео: Жду форму публикации…")
+    write_log_entry(log_id, "VK Видео: Жду форму публикации…")
     _form_ok = False
     try:
         page.wait_for_selector(
@@ -200,26 +191,21 @@ def _publish_ui(page, club_id: str, video_path: str, pub_title: str, log_id, bat
             timeout=_UPLOAD_WAIT,
         )
         _form_ok = True
-        if log_id:
-            write_log_entry(log_id, "VK Видео: Форма публикации открылась")
+        write_log_entry(log_id, "VK Видео: Форма публикации открылась")
     except Exception:
-        if log_id:
-            write_log_entry(log_id, "VK Видео: Ожидание формы истекло — продолжаю…")
+        write_log_entry(log_id, "VK Видео: Ожидание формы истекло — продолжаю…")
         page.wait_for_timeout(5000)
     _snap(page, batch_id)
 
     # ── Шаг 5: Читаем ссылку на клип из DOM ──────────────────────────────
     clip_url = _read_clip_url(page)
     if clip_url:
-        if log_id:
-            write_log_entry(log_id, f"VK Видео: Ссылка на клип: {clip_url}")
+        write_log_entry(log_id, f"VK Видео: Ссылка на клип: {clip_url}")
     else:
-        if log_id:
-            write_log_entry(log_id, "VK Видео: Ссылка на клип не найдена — продолжаю…")
+        write_log_entry(log_id, "VK Видео: Ссылка на клип не найдена — продолжаю…")
 
     # ── Шаг 6: Заполняем поле «Описание» хэштегами ────────────────────────
-    if log_id:
-        write_log_entry(log_id, "VK Видео: Заполняю описание хэштегами…")
+    write_log_entry(log_id, "VK Видео: Заполняю описание хэштегами…")
     try:
         desc_field = page.locator(
             "textarea[placeholder*='клип'], "
@@ -230,17 +216,14 @@ def _publish_ui(page, club_id: str, video_path: str, pub_title: str, log_id, bat
         desc_field.click()
         description = f"{pub_title}. {hashtags()}"
         desc_field.fill(description)
-        if log_id:
-            write_log_entry(log_id, f"VK Видео: Описание заполнено: {description}")
+        write_log_entry(log_id, f"VK Видео: Описание заполнено: {description}")
         _snap(page, batch_id)
     except Exception as _e:
-        if log_id:
-            write_log_entry(log_id, "VK Видео: Не удалось заполнить описание — продолжаю…")
+        write_log_entry(log_id, "VK Видео: Не удалось заполнить описание — продолжаю…")
 
     # ── Шаг 7: Выключаем ненужные переключатели ──────────────────────────
     _TOGGLES_OFF = ["Показать на главной сообщества"]
-    if log_id:
-        write_log_entry(log_id, "VK Видео: Выключаю переключатели…")
+    write_log_entry(log_id, "VK Видео: Выключаю переключатели…")
     for label_text in _TOGGLES_OFF:
         try:
             label = page.locator(f"label:has-text('{label_text}')").first
@@ -250,8 +233,7 @@ def _publish_ui(page, club_id: str, video_path: str, pub_title: str, log_id, bat
             if chk.count() > 0 and chk.first.is_checked():
                 chk.first.click(force=True)
                 page.wait_for_timeout(300)
-                if log_id:
-                    write_log_entry(log_id, f"VK Видео: «{label_text}» — выключено")
+                write_log_entry(log_id, f"VK Видео: «{label_text}» — выключено")
             else:
                 toggle_btn = label.locator("[role='switch'], button").first
                 if toggle_btn.count() > 0:
@@ -259,35 +241,29 @@ def _publish_ui(page, club_id: str, video_path: str, pub_title: str, log_id, bat
                     if aria == "true":
                         toggle_btn.click()
                         page.wait_for_timeout(300)
-                        if log_id:
-                            write_log_entry(log_id, f"VK Видео: «{label_text}» — выключено")
+                        write_log_entry(log_id, f"VK Видео: «{label_text}» — выключено")
                 else:
                     label.click()
                     page.wait_for_timeout(300)
-                    if log_id:
-                        write_log_entry(log_id, f"VK Видео: «{label_text}» — кликнут")
+                    write_log_entry(log_id, f"VK Видео: «{label_text}» — кликнут")
         except Exception as _e:
-            if log_id:
-                write_log_entry(log_id, f"VK Видео: Не удалось выключить «{label_text}» — продолжаю…")
+            write_log_entry(log_id, f"VK Видео: Не удалось выключить «{label_text}» — продолжаю…")
     _snap(page, batch_id)
 
     # ── Шаг 8: Ждём доступную кнопку «Опубликовать» ──────────────────────
-    if log_id:
-        write_log_entry(log_id, "VK Видео: Жду кнопку «Опубликовать»…")
+    write_log_entry(log_id, "VK Видео: Жду кнопку «Опубликовать»…")
     pub_btn = page.locator("button:has-text('Опубликовать')").last
     pub_btn.wait_for(state="visible", timeout=90_000)
     _snap(page, batch_id)
 
     # ── Шаг 9: Нажимаем «Опубликовать» ───────────────────────────────────
-    if log_id:
-        write_log_entry(log_id, "VK Видео: Нажимаю «Опубликовать»…")
+    write_log_entry(log_id, "VK Видео: Нажимаю «Опубликовать»…")
     pub_btn.click()
     page.wait_for_timeout(3000)
     _snap(page, batch_id)
 
     # ── Шаг 10: Проверяем успех (тост «Клип опубликован») ────────────────
-    if log_id:
-        write_log_entry(log_id, "VK Видео: Проверяю результат публикации…")
+    write_log_entry(log_id, "VK Видео: Проверяю результат публикации…")
 
     _SUCCESS_TEXTS = ["Клип опубликован", "опубликован в канале"]
     _ERROR_TEXTS = [
@@ -322,11 +298,9 @@ def _publish_ui(page, club_id: str, video_path: str, pub_title: str, log_id, bat
     _snap(page, batch_id)
 
     if _success:
-        if log_id:
-            write_log_entry(log_id, "VK Видео: Клип опубликован успешно!")
+        write_log_entry(log_id, "VK Видео: Клип опубликован успешно!")
     else:
-        if log_id:
-            write_log_entry(log_id, "VK Видео: Публикация завершена (тост не обнаружен, ошибок нет)")
+        write_log_entry(log_id, "VK Видео: Публикация завершена (тост не обнаружен, ошибок нет)")
 
     if not _form_ok and not _success:
         raise VkVideoApiError(
