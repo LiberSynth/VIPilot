@@ -56,6 +56,8 @@ from db import (
 from log import (
     db_get_monitor,
     db_get_batch_log_entries,
+    db_get_system_log_entries,
+    db_get_orphan_entries,
     log_batch_planned,
     write_log_entry,
 )
@@ -645,6 +647,22 @@ def api_monitor_batch_entries(batch_id):
         return jsonify({"error": "unauthorized"}), 401
     logs = db_get_batch_log_entries(batch_id)
     return jsonify({"logs": logs})
+
+
+@bp.route("/monitor/log/<log_id>/entries")
+def api_monitor_log_entries(log_id):
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    entries = db_get_system_log_entries(log_id)
+    return jsonify({"entries": entries})
+
+
+@bp.route("/monitor/orphan-entries")
+def api_monitor_orphan_entries():
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    entries = db_get_orphan_entries()
+    return jsonify({"entries": entries})
 
 
 @bp.route("/monitor/batch/<batch_id>/delete", methods=["POST"])

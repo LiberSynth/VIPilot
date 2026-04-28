@@ -280,10 +280,13 @@
         '</div>';
       }
       const st = e.status || 'info';
-      return '<div class="monitor-sysgroup-item">' +
-        '<span class="monitor-sysgroup-ts">'  + fmtMsk(e.created_at)                          + '</span>' +
-        '<span class="monitor-sysgroup-pip">' + esc(PIPELINE_LABELS[e.pipeline] || e.pipeline) + '</span>' +
-        '<span class="monitor-sysgroup-msg '  + esc(st) + '">' + esc(e.message || '')          + '</span>' +
+      return '<div class="monitor-sysgroup-item monitor-sysgroup-log-item" data-lid="' + esc(e.id) + '" onclick="monitorToggleSysLog(event,this)">' +
+        '<div class="monitor-sysgroup-log-row">' +
+          '<span class="monitor-sysgroup-ts">'  + fmtMsk(e.created_at)                          + '</span>' +
+          '<span class="monitor-sysgroup-pip">' + esc(PIPELINE_LABELS[e.pipeline] || e.pipeline) + '</span>' +
+          '<span class="monitor-sysgroup-msg '  + esc(st) + '">' + esc(e.message || '')          + '</span>' +
+          '<span class="monitor-syslog-chevron">▼</span>' +
+        '</div>' +
       '</div>';
     }).join('');
 
@@ -346,17 +349,25 @@
   var _seenLids      = {};
   var _seenBids      = {};
   var _firstRender   = true;
-  var _pubFrameCache    = {};  // batchId → blob URL
-  var _pubFrameFetching = {};  // batchId → true (in-flight guard)
-  var _lastRenderedHtml = {};  // key → last rendered HTML string
+  var _pubFrameCache      = {};   // batchId → blob URL
+  var _pubFrameFetching   = {};   // batchId → true (in-flight guard)
+  var _lastRenderedHtml   = {};   // key → last rendered HTML string
+  var _lastMonitorData    = null; // last full response from /api/monitor
+  var _orphanEntriesCache = null; // null = not yet fetched, [] or [...] = fetched
+  var _orphanFetching     = false;
+  var _sysLogEntriesCache = {};   // log_id → entries array (lazy)
+  var _sysLogFetching     = {};   // log_id → true (in-flight guard)
 
   function getOpenState() {
-    var sgkeys = {}, lids = {};
+    var sgkeys = {}, lids = {}, syslids = {};
     document.querySelectorAll('.monitor-sysgroup.open').forEach(function(el) {
       if (el.dataset.sgKey) sgkeys[el.dataset.sgKey] = true;
     });
     document.querySelectorAll('.monitor-log-item.open').forEach(function(el) {
       if (el.dataset.lid) lids[el.dataset.lid] = true;
+    });
+    document.querySelectorAll('.monitor-sysgroup-log-item.open').forEach(function(el) {
+      if (el.dataset.lid) syslids[el.dataset.lid] = true;
     });
     document.querySelectorAll('.monitor-log-item').forEach(function(el) {
       if (el.dataset.lid) _seenLids[el.dataset.lid] = true;
@@ -364,7 +375,7 @@
     document.querySelectorAll('.monitor-batch').forEach(function(el) {
       if (el.dataset.bid) _seenBids[el.dataset.bid] = true;
     });
-    return { sgkeys: sgkeys, lids: lids };
+    return { sgkeys: sgkeys, lids: lids, syslids: syslids };
   }
 
   function restoreOpenState(state) {
@@ -382,6 +393,13 @@
     });
     document.querySelectorAll('.monitor-log-item').forEach(function(el) {
       if (state.lids && state.lids[el.dataset.lid] && !_collapsedLids[el.dataset.lid]) el.classList.add('open');
+    });
+    document.querySelectorAll('.monitor-sysgroup-log-item').forEach(function(el) {
+      var lid = el.dataset.lid;
+      if (lid && state.syslids && state.syslids[lid] && _sysLogEntriesCache[lid]) {
+        _applySysLogEntries(el, lid, _sysLogEntriesCache[lid]);
+        el.classList.add('open');
+      }
     });
   }
 
@@ -460,9 +478,11 @@
   function renderTimeline(data) {
     var el = document.getElementById('monitor-timeline');
     if (!el) return;
+    _lastMonitorData = data;
     _activeBatchIds = Array.isArray(data.active_batch_ids) ? data.active_batch_ids : [];
     var prev   = getOpenState();
-    var groups = buildTimeline(data.batches, data.system, data.orphan_entries);
+    var orphan = _orphanEntriesCache !== null ? _orphanEntriesCache : (data.orphan_entries || []);
+    var groups = buildTimeline(data.batches, data.system, orphan);
     if (groups.length === 0) {
       el.innerHTML = '<div style="font-size:12px;color:#444;padding:4px 0">Нет данных</div>';
       _firstRender = false;
@@ -538,6 +558,10 @@
     if (!_firstRender) autoExpandNewActivity();
     _firstRender = false;
     refreshPublishFrames();
+    if (_orphanEntriesCache === null && !_orphanFetching &&
+        data.has_orphan_entries && (!data.system || !data.system.length)) {
+      _fetchOrphanEntries();
+    }
   }
 
   function refreshMonitor() {
@@ -617,6 +641,35 @@
       });
   }
 
+  function _fetchOrphanEntries() {
+    if (_orphanEntriesCache !== null || _orphanFetching) return;
+    _orphanFetching = true;
+    fetch('/api/monitor/orphan-entries')
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        _orphanFetching     = false;
+        _orphanEntriesCache = data.entries || [];
+        if (_lastMonitorData) renderTimeline(_lastMonitorData);
+      })
+      .catch(function() { _orphanFetching = false; });
+  }
+
+  function _applySysLogEntries(itemEl, lid, entries) {
+    var existing = itemEl.querySelector('.monitor-entries');
+    if (existing) existing.remove();
+    if (!entries.length) return;
+    var html = '<div class="monitor-entries">';
+    entries.forEach(function(en) {
+      var lvl = en.level || 'info';
+      html += '<div class="monitor-entry-row">' +
+        '<span class="monitor-entry-ts">'                      + fmtMsk(en.created_at)   + '</span>' +
+        '<span class="monitor-entry-msg ' + esc(lvl) + '">' + esc(en.message || '') + '</span>' +
+      '</div>';
+    });
+    html += '</div>';
+    itemEl.insertAdjacentHTML('beforeend', html);
+  }
+
   window.monitorToggleBatch = function(e, el) {
     if (e.target.closest('.monitor-batch-body')) return;
     var bid = el.dataset.bid;
@@ -641,6 +694,44 @@
       if (el.classList.contains('open')) delete _collapsedSgKeys[key];
       else _collapsedSgKeys[key] = true;
     }
+    if (el.classList.contains('open')) {
+      _fetchOrphanEntries();
+    }
+  };
+
+  window.monitorToggleSysLog = function(e, el) {
+    e.stopPropagation();
+    if (e.target.closest('.monitor-entries')) return;
+    var lid = el.dataset.lid;
+    if (!lid) return;
+
+    if (_sysLogEntriesCache.hasOwnProperty(lid)) {
+      var cached = _sysLogEntriesCache[lid];
+      if (!cached.length) return;
+      if (!el.querySelector('.monitor-entries')) _applySysLogEntries(el, lid, cached);
+      el.classList.toggle('open');
+      return;
+    }
+
+    if (_sysLogFetching[lid]) return;
+    _sysLogFetching[lid] = true;
+    fetch('/api/monitor/log/' + encodeURIComponent(lid) + '/entries')
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        delete _sysLogFetching[lid];
+        var entries = data.entries || [];
+        _sysLogEntriesCache[lid] = entries;
+        var el2 = document.querySelector('.monitor-sysgroup-log-item[data-lid="' + lid + '"]');
+        if (!el2) return;
+        if (entries.length) {
+          _applySysLogEntries(el2, lid, entries);
+          el2.classList.add('open');
+        } else {
+          var ch = el2.querySelector('.monitor-syslog-chevron');
+          if (ch) ch.style.visibility = 'hidden';
+        }
+      })
+      .catch(function() { delete _sysLogFetching[lid]; });
   };
 
   window.monitorSysCopy = function(btn) {

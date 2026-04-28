@@ -35,7 +35,7 @@ def db_get_monitor(batch_limit=50):
     Возвращает структурированные данные для монитора.
     Первичная таблица — log. Батч появляется только если есть хотя бы одна запись в log.
     - batches: батчи с вложенными log-записями, сортировка по последнему событию DESC
-    - system:  системные события без батча
+    - system:  системные события без батча (без log_entries — они грузятся лениво)
     """
     with get_db() as conn:
         with conn.cursor() as cur:
@@ -87,22 +87,9 @@ def db_get_monitor(batch_limit=50):
 
             cur.execute(
                 """
-                SELECT
-                    l.id, l.pipeline, l.message, l.status, l.created_at,
-                    COALESCE(
-                        json_agg(
-                            json_build_object(
-                                'message',    le.message,
-                                'level',      le.level,
-                                'created_at', le.created_at
-                            ) ORDER BY le.created_at DESC, le.id DESC
-                        ) FILTER (WHERE le.id IS NOT NULL),
-                        '[]'::json
-                    ) AS entries
+                SELECT l.id, l.pipeline, l.message, l.status, l.created_at
                 FROM log l
-                LEFT JOIN log_entries le ON le.log_id = l.id AND le.level != 'silent'
                 WHERE l.batch_id IS NULL
-                GROUP BY l.id
                 ORDER BY l.created_at DESC, l.id DESC
                 LIMIT 100
                 """
@@ -111,14 +98,14 @@ def db_get_monitor(batch_limit=50):
 
             cur.execute(
                 """
-                SELECT message, level, created_at
-                FROM log_entries
-                WHERE log_id IS NULL AND level != 'silent'
-                ORDER BY created_at DESC, id DESC
-                LIMIT 500
+                SELECT EXISTS(
+                    SELECT 1 FROM log_entries
+                    WHERE log_id IS NULL AND level != 'silent'
+                    LIMIT 1
+                )
                 """
             )
-            orphan_rows = cur.fetchall()
+            has_orphan_entries = bool(cur.fetchone()[0])
 
     batches = [
         {
@@ -144,19 +131,60 @@ def db_get_monitor(batch_limit=50):
             "message": r[2],
             "status": r[3],
             "created_at": r[4].isoformat() if r[4] else None,
-            "entries": r[5],
         }
         for r in sys_rows
     ]
-    orphan_entries = [
+    return {"batches": batches, "system": system, "has_orphan_entries": has_orphan_entries}
+
+
+def db_get_system_log_entries(log_id: str) -> list:
+    """Возвращает log_entries для системного лога (без batch_id) по log_id."""
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT le.message, le.level, le.created_at
+                FROM log_entries le
+                JOIN log l ON l.id = le.log_id
+                WHERE le.log_id = %s AND le.level != 'silent' AND l.batch_id IS NULL
+                ORDER BY le.created_at DESC, le.id DESC
+                """,
+                (log_id,),
+            )
+            rows = cur.fetchall()
+    return [
         {
             "message":    r[0],
             "level":      r[1],
             "created_at": r[2].isoformat() if r[2] else None,
         }
-        for r in orphan_rows
+        for r in rows
     ]
-    return {"batches": batches, "system": system, "orphan_entries": orphan_entries}
+
+
+def db_get_orphan_entries(limit: int = 500) -> list:
+    """Возвращает log_entries с log_id IS NULL (осиротевшие записи)."""
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT message, level, created_at
+                FROM log_entries
+                WHERE log_id IS NULL AND level != 'silent'
+                ORDER BY created_at DESC, id DESC
+                LIMIT %s
+                """,
+                (limit,),
+            )
+            rows = cur.fetchall()
+    return [
+        {
+            "message":    r[0],
+            "level":      r[1],
+            "created_at": r[2].isoformat() if r[2] else None,
+        }
+        for r in rows
+    ]
 
 
 def db_get_batch_log_entries(batch_id: str) -> list:

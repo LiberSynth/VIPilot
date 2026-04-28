@@ -538,6 +538,19 @@
     padding: 5px 14px; border-bottom: 1px solid #0f0f18;
   }
   .monitor-sysgroup-item:last-child { border-bottom: none; }
+  .monitor-sysgroup-log-item { display: block; cursor: pointer; padding: 0; }
+  .monitor-sysgroup-log-item:hover { background: rgba(255,255,255,.03); }
+  .monitor-sysgroup-log-row {
+    display: flex; align-items: baseline; gap: 8px; padding: 5px 14px;
+  }
+  .monitor-syslog-chevron {
+    margin-left: auto; flex-shrink: 0;
+    color: #505068; font-size: 9px;
+    transition: transform .2s;
+  }
+  .monitor-sysgroup-log-item.open .monitor-syslog-chevron { transform: rotate(180deg); }
+  .monitor-sysgroup-log-item .monitor-entries { display: none; padding-left: 14px; }
+  .monitor-sysgroup-log-item.open .monitor-entries { display: block; }
   .monitor-sysgroup-ts  { color: #6868a0; flex-shrink: 0; font-variant-numeric: tabular-nums; }
   .monitor-sysgroup-pip { color: #8080a8; flex-shrink: 0; }
   .monitor-sysgroup-pip.orphan-pip { color: #404058; }
