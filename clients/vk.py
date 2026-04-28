@@ -50,8 +50,9 @@ def publish_story(video_data: bytes, group_id: int, log_id) -> int | None:
                 continue
             up_data = up.json()
             if 'response' not in up_data:
-                write_log_entry(log_id, f'Неожиданный ответ CDN: {up.text[:200]}', level='error')
-                return None
+                write_log_entry(log_id, f'Неожиданный ответ CDN (попытка {attempt+1}/3): {up.text[:200]}', level='warn')
+                time.sleep(5)
+                continue
             upload_result = up_data['response']['upload_result']
             break
         except Exception as e:
@@ -143,12 +144,30 @@ def publish_wall(video_data: bytes, group_id: int, log_id) -> int | None:
     owner_id   = save_resp['response']['owner_id']
     filename = publication_file_name(pub_title)
 
-    up = requests.post(
-        upload_url,
-        files={'video_file': (filename, io.BytesIO(video_data), 'video/mp4')},
-        timeout=300,
-    )
-    up.raise_for_status()
+    for attempt in range(3):
+        try:
+            up = requests.post(
+                upload_url,
+                files={'video_file': (filename, io.BytesIO(video_data), 'video/mp4')},
+                timeout=300,
+            )
+            up.raise_for_status()
+            if not up.text.strip():
+                write_log_entry(log_id, f'Пустой ответ CDN wall (попытка {attempt+1}/3)', level='warn')
+                time.sleep(5)
+                continue
+            up_data = up.json()
+            if 'response' not in up_data:
+                write_log_entry(log_id, f'Неожиданный ответ CDN wall (попытка {attempt+1}/3): {up.text[:200]}', level='warn')
+                time.sleep(5)
+                continue
+            break
+        except Exception as e:
+            write_log_entry(log_id, f'Ошибка загрузки wall (попытка {attempt+1}/3): {e}', level='warn')
+            time.sleep(5)
+    else:
+        write_log_entry(log_id, 'Все попытки загрузки видео на стену провалились', level='error')
+        return None
 
     post_resp = requests.post(f'{_VK_API}/wall.post', data={
         'owner_id':     -group_id,
