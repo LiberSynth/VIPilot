@@ -239,6 +239,20 @@ def run(batch_id, log_id):
             write_log_entry(log_id, f"[publish] {msg}", level='silent')
             raise AppException(batch_id, 'publish', msg, log_id)
 
+    # Проверяем зависимость: vk.clip_wall требует, чтобы vkvideo-таргет
+    # был раньше по списку шагов — иначе step_results['vkvideo'] будет пустым.
+    _vkvideo_positions = {i for i, (s, m, _) in enumerate(steps) if s == 'vkvideo'}
+    for _i, (_s, _m, _) in enumerate(steps):
+        if _s == 'vk' and _m == 'clip_wall':
+            if not any(vi < _i for vi in _vkvideo_positions):
+                _msg = ('vk.clip_wall зависит от таргета vkvideo, '
+                        'но vkvideo отсутствует или стоит позже в списке таргетов — '
+                        'исправьте порядок таргетов в настройках')
+                write_log_entry(log_id, _msg, level='error')
+                write_log_entry(log_id, fmt_id_msg("[publish] Батч {}: {}", batch_id, _msg), level='silent')
+                db_log_update(log_id, _msg, 'error')
+                raise AppException(batch_id, 'publish', _msg, log_id)
+
     target_names = ', '.join(t['name'] for t in active_targets)
 
     if parsed is not None:
@@ -306,7 +320,7 @@ def run(batch_id, log_id):
         if not db_claim_batch_status(batch_id, expected_from, posting_status):
             write_log_entry(log_id, 'Батч уже захвачен другим процессом — пропуск')
             write_log_entry(log_id, fmt_id_msg("[publish] Батч {} уже захвачен другим процессом для {} — пропуск", batch_id, posting_status), level='silent')
-            db_log_update(log_id, f'Захват {posting_status} не удался — пропуск', 'ok')
+            db_log_update(log_id, f'Захват {posting_status} не удался — пропуск', 'warn')
             return
 
         write_log_entry(log_id, f'Шаг {slug}.{method}: выполняю.')
