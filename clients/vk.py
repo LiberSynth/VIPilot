@@ -12,14 +12,14 @@ import requests
 
 from log import write_log_entry
 from utils.utils import fmt_id_msg
-from routes.api import build_publication_title, publication_file_name
+from routes.api import publication_file_name
 
 _VK_TOKEN = os.environ.get('VK_USER_TOKEN', '')
 _VK_API   = 'https://api.vk.com/method'
 _VK_VER   = '5.131'
 
 
-def publish_story(video_data: bytes, group_id: int, log_id) -> int | None:
+def publish_story(video_data: bytes, group_id: int, log_id, pub_title: str = "") -> int | None:
     """Публикует видео как историю ВКонтакте. Возвращает story_id или None."""
     r = requests.post(f'{_VK_API}/stories.getVideoUploadServer', data={
         'group_id':    group_id,
@@ -33,7 +33,6 @@ def publish_story(video_data: bytes, group_id: int, log_id) -> int | None:
         return None
 
     upload_url = r['response']['upload_url']
-    pub_title = build_publication_title()
     filename = publication_file_name(pub_title)
 
     for attempt in range(3):
@@ -123,9 +122,8 @@ def publish_clip_wall(clip_url: str, title: str, group_id: int, log_id) -> int |
     return None
 
 
-def publish_wall(video_data: bytes, group_id: int, log_id) -> int | None:
+def publish_wall(video_data: bytes, group_id: int, log_id, pub_title: str = "") -> int | None:
     """Публикует видео на стену сообщества ВКонтакте. Возвращает post_id или None."""
-    pub_title = build_publication_title()
     save_resp = requests.post(f'{_VK_API}/video.save', data={
         'group_id':     group_id,
         'name':         pub_title,

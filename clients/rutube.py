@@ -12,7 +12,7 @@ import time as _time
 
 from log import write_log_entry
 from utils.utils import fmt_id_msg
-from routes.api import build_publication_title, publication_file_name
+from routes.api import publication_file_name
 
 
 _NAV_TIMEOUT  = 30_000   # ms — таймаут навигации
@@ -44,6 +44,7 @@ def publish(
     log_id,
     batch_id=None,
     target_id: str | None = None,
+    pub_title: str = "",
 ) -> bool:
     """
     Публикует видео на Рутьюб через веб-интерфейс.
@@ -74,7 +75,6 @@ def publish(
     write_log_entry(log_id, "Рутьюб: Публикация запущена.")
     write_log_entry(log_id, fmt_id_msg("[rutube] {} КБ, person_id={}", len(video_data) // 1024, person_id), level='silent')
 
-    pub_title = build_publication_title()
     file_name = publication_file_name(pub_title)
     write_log_entry(log_id, f"[rutube] Заголовок: {pub_title}, файл: {file_name}", level='silent')
     tmp_dir = tempfile.mkdtemp()

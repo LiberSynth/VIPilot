@@ -14,12 +14,13 @@ from db import (
     db_get_batch_original_video,
     db_set_batch_status,
     db_claim_batch_status,
+    db_set_batch_title,
 )
 from log import db_log_update, db_get_log_entries, write_log_entry
 from pipelines.base import check_cancelled
 from common.exceptions import AppException
 from utils.utils import fmt_id_msg
-from routes.api import client_is_configured
+from routes.api import client_is_configured, build_publication_title
 from clients import vk
 from clients import dzen as dzen_client
 from clients.dzen import DzenCsrfExpired, DzenSessionMissing
@@ -54,7 +55,7 @@ def _get_video(batch_id, log_id):
 
 
 
-def _call_vk(slug, method, batch_id, log_id, target, step_results):
+def _call_vk(slug, method, batch_id, log_id, target, step_results, pub_title):
     cfg = target.get('config') or {}
     if not client_is_configured('vk'):
         write_log_entry(log_id, 'VK_USER_TOKEN не задан', level='error')
@@ -64,16 +65,15 @@ def _call_vk(slug, method, batch_id, log_id, target, step_results):
         write_log_entry(log_id, 'Публикую историю.')
         write_log_entry(log_id, f"[publish] group_id={group_id}", level='silent')
         video_data = _get_video(batch_id, log_id)
-        return vk.publish_story(video_data, group_id, log_id) is not None
+        return vk.publish_story(video_data, group_id, log_id, pub_title) is not None
     elif method == 'wall':
         write_log_entry(log_id, 'Публикую на стену.')
         write_log_entry(log_id, f"[publish] group_id={group_id}", level='silent')
         video_data = _get_video(batch_id, log_id)
-        return vk.publish_wall(video_data, group_id, log_id) is not None
+        return vk.publish_wall(video_data, group_id, log_id, pub_title) is not None
     elif method == 'clip_wall':
         vkvideo_result = step_results.get('vkvideo') or {}
-        clip_url  = vkvideo_result.get('clip_url', '')
-        pub_title = vkvideo_result.get('pub_title', '')
+        clip_url = vkvideo_result.get('clip_url', '')
         if not clip_url:
             write_log_entry(log_id, 'VK clip_wall: clip_url не получен от шага vkvideo — пропуск', level='error')
             return False
@@ -85,7 +85,7 @@ def _call_vk(slug, method, batch_id, log_id, target, step_results):
         return False
 
 
-def _call_dzen(slug, method, batch_id, log_id, target, step_results):
+def _call_dzen(slug, method, batch_id, log_id, target, step_results, pub_title):
     cfg = target.get('config') or {}
     target_id = target.get('id')
     if not client_is_configured('dzen', cfg, target_id):
@@ -97,10 +97,10 @@ def _call_dzen(slug, method, batch_id, log_id, target, step_results):
 
     video_data = _get_video(batch_id, log_id)
 
-    return dzen_client.publish(video_data, cfg, log_id, batch_id=batch_id, target_id=target_id)
+    return dzen_client.publish(video_data, cfg, log_id, batch_id=batch_id, target_id=target_id, pub_title=pub_title)
 
 
-def _call_rutube(slug, method, batch_id, log_id, target, step_results):
+def _call_rutube(slug, method, batch_id, log_id, target, step_results, pub_title):
     cfg = target.get('config') or {}
     target_id = target.get('id')
     if not client_is_configured('rutube', cfg, target_id):
@@ -112,10 +112,10 @@ def _call_rutube(slug, method, batch_id, log_id, target, step_results):
 
     video_data = _get_video(batch_id, log_id)
 
-    return rutube_client.publish(video_data, cfg, log_id, batch_id=batch_id, target_id=target_id)
+    return rutube_client.publish(video_data, cfg, log_id, batch_id=batch_id, target_id=target_id, pub_title=pub_title)
 
 
-def _call_vkvideo(slug, method, batch_id, log_id, target, step_results):
+def _call_vkvideo(slug, method, batch_id, log_id, target, step_results, pub_title):
     cfg = target.get('config') or {}
     target_id = target.get('id')
     if not client_is_configured('vkvideo', cfg, target_id):
@@ -127,10 +127,9 @@ def _call_vkvideo(slug, method, batch_id, log_id, target, step_results):
 
     video_data = _get_video(batch_id, log_id)
 
-    result = vkvideo_client.publish(video_data, cfg, log_id, batch_id=batch_id, target_id=target_id)
+    result = vkvideo_client.publish(video_data, cfg, log_id, batch_id=batch_id, target_id=target_id, pub_title=pub_title)
     step_results['vkvideo'] = {
-        'clip_url':  result.get('clip_url', ''),
-        'pub_title': result.get('pub_title', ''),
+        'clip_url': result.get('clip_url', ''),
     }
     return result.get('ok', False)
 
@@ -143,13 +142,13 @@ _CLIENTS = {
 }
 
 
-def _call_client(slug, method, batch_id, log_id, target, step_results):
+def _call_client(slug, method, batch_id, log_id, target, step_results, pub_title):
     """Диспетчеризует вызов клиента по реестру _CLIENTS. Возвращает True при успехе."""
     handler = _CLIENTS.get(slug)
     if handler is None:
         write_log_entry(log_id, f'Платформа «{slug}» не поддерживается', level='warn')
         return False
-    return handler(slug, method, batch_id, log_id, target, step_results)
+    return handler(slug, method, batch_id, log_id, target, step_results, pub_title)
 
 
 def _parse_composite_status(status: str):
@@ -303,10 +302,14 @@ def run(batch_id, log_id):
                 write_log_entry(log_id, fmt_id_msg("[publish] Батч {} опубликован (возобновление)", batch_id), level='silent')
                 return
 
+    pub_title = batch.get('title') or ''
+    if pub_title:
+        write_log_entry(log_id, f"[publish] Заголовок публикации (из БД): {pub_title}", level='silent')
+
     any_ok = False
     failed_steps = []
     expected_from = status
-    step_results = {}  # передаётся между шагами: vkvideo → vk (clip_url, pub_title)
+    step_results = {}  # передаётся между шагами: vkvideo → vk (clip_url)
     for step_idx, (slug, method, target) in enumerate(steps):
         if resume_from is not None:
             if (slug, method) != resume_from:
@@ -323,12 +326,16 @@ def run(batch_id, log_id):
             db_log_update(log_id, f'Захват {posting_status} не удался — пропуск', 'warn')
             return
 
+        if not pub_title:
+            pub_title = build_publication_title()
+            write_log_entry(log_id, f"[publish] Заголовок публикации (новый): {pub_title}", level='silent')
+
         write_log_entry(log_id, f'Шаг {slug}.{method}: выполняю.')
         write_log_entry(log_id, fmt_id_msg("[publish] Батч {}: шаг {}.{} — начало", batch_id, slug, method), level='silent')
 
         step_error = None
         try:
-            ok = _call_client(slug, method, batch_id, log_id, target, step_results)
+            ok = _call_client(slug, method, batch_id, log_id, target, step_results, pub_title)
         except (DzenSessionMissing, DzenCsrfExpired, RutubeSessionMissing, RutubeCsrfExpired, VkVideoSessionMissing, VkVideoCsrfExpired) as e:
             ok = False
             step_error = str(e)
@@ -354,6 +361,7 @@ def run(batch_id, log_id):
         expected_from = published_status
 
     if any_ok:
+        db_set_batch_title(batch_id, pub_title)
         if failed_steps:
             fail_list = ', '.join(failed_steps)
             db_set_batch_status(batch_id, 'published_partially')

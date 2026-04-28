@@ -33,6 +33,15 @@ from log.log import write_log_entry
 # Следующая миграция: _m084_...
 
 
+def _m088_batches_title(cur):
+    """Добавляет колонку title в таблицу batches для хранения заголовка публикации.
+    Deployed: —
+    """
+    cur.execute("""
+        ALTER TABLE batches ADD COLUMN IF NOT EXISTS title TEXT
+    """)
+
+
 def _m087_publication_counter(cur):
     """Добавляет начальное значение счётчика публикаций в таблицу environment.
     Deployed: —
@@ -456,6 +465,7 @@ MIGRATIONS = [
     (85, _m085_cycle_config_to_kv),
     (86, _m086_user_role_links_pk),
     (87, _m087_publication_counter),
+    (88, _m088_batches_title),
 ]
 
 

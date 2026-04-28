@@ -68,6 +68,7 @@ from .db_pipeline import (
     db_get_text_model_by_id,
     db_get_active_video_models,
     db_get_video_model_by_id,
+    db_set_batch_title,
 )
 from .db_media import (
     db_create_batch_movie,

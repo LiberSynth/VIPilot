@@ -20,7 +20,7 @@ import time as _time
 
 from log import write_log_entry
 from utils.utils import fmt_id_msg
-from routes.api import build_publication_title, publication_file_name, hashtags
+from routes.api import publication_file_name, hashtags
 
 
 _NAV_TIMEOUT  = 30_000   # ms — таймаут навигации
@@ -49,6 +49,7 @@ def publish(
     log_id,
     batch_id=None,
     target_id: str | None = None,
+    pub_title: str = "",
 ) -> bool:
     """
     Публикует клип на VK Видео через веб-интерфейс кабинета автора.
@@ -79,7 +80,6 @@ def publish(
     write_log_entry(log_id, "VK Видео: Публикация запущена.")
     write_log_entry(log_id, fmt_id_msg("[vkvideo] {} КБ, club_id={}", len(video_data) // 1024, club_id), level='silent')
 
-    pub_title = build_publication_title()
     file_name = publication_file_name(pub_title)
     write_log_entry(log_id, f"[vkvideo] Заголовок: {pub_title}, файл: {file_name}", level='silent')
     tmp_dir = tempfile.mkdtemp()
@@ -105,7 +105,7 @@ def publish(
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
     write_log_entry(log_id, "VK Видео: клип опубликован успешно")
-    return {"ok": True, "clip_url": _state["clip_url"], "pub_title": pub_title}
+    return {"ok": True, "clip_url": _state["clip_url"]}
 
 
 # ---------------------------------------------------------------------------

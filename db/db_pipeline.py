@@ -370,7 +370,7 @@ def db_get_batch_by_id(batch_id):
                 SELECT b.id, b.scheduled_at, b.type, b.story_id,
                        m.url AS video_url, b.status, b.data,
                        m.model_id AS video_model_id,
-                       b.movie_id
+                       b.movie_id, b.title
                 FROM batches b
                 LEFT JOIN movies m ON m.id = b.movie_id
                 WHERE b.id = %s
@@ -596,3 +596,13 @@ def db_get_video_model_by_id(model_id: str):
         "submit_url": f"{platform_url}/{model_url}",
         "allowed_durations": durations_map.get(mid, [0]),
     }
+
+
+def db_set_batch_title(batch_id: str, title: str) -> None:
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE batches SET title = %s WHERE id = %s",
+                (title, batch_id),
+            )
+        conn.commit()
