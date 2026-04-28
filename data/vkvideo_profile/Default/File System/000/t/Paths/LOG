@@ -1,0 +1,4 @@
+2026/04/28-12:26:07.921 143 Creating DB /home/runner/workspace/data/vkvideo_profile/Default/File System/000/t/Paths since it was missing.
+2026/04/28-12:26:07.935 143 Reusing MANIFEST /home/runner/workspace/data/vkvideo_profile/Default/File System/000/t/Paths/MANIFEST-000001
+2026/04/28-12:26:07.935 143 Recovering log #3
+2026/04/28-12:26:07.936 143 Reusing old log /home/runner/workspace/data/vkvideo_profile/Default/File System/000/t/Paths/000003.log 

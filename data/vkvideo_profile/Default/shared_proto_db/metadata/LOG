@@ -1,0 +1,4 @@
+2026/04/28-12:26:01.176 143 Creating DB /home/runner/workspace/data/vkvideo_profile/Default/shared_proto_db/metadata since it was missing.
+2026/04/28-12:26:01.864 143 Reusing MANIFEST /home/runner/workspace/data/vkvideo_profile/Default/shared_proto_db/metadata/MANIFEST-000001
+2026/04/28-12:26:01.864 143 Recovering log #3
+2026/04/28-12:26:01.868 143 Reusing old log /home/runner/workspace/data/vkvideo_profile/Default/shared_proto_db/metadata/000003.log 

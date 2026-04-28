@@ -1,0 +1,8 @@
+2026/04/28-12:26:07.694 130 Creating DB /home/runner/workspace/data/vkvideo_profile/Default/IndexedDB/https_vkvideo.ru_0.indexeddb.leveldb since it was missing.
+2026/04/28-12:26:07.700 130 Reusing MANIFEST /home/runner/workspace/data/vkvideo_profile/Default/IndexedDB/https_vkvideo.ru_0.indexeddb.leveldb/MANIFEST-000001
+2026/04/28-12:26:07.701 130 Recovering log #4
+2026/04/28-12:26:07.705 130 Reusing old log /home/runner/workspace/data/vkvideo_profile/Default/IndexedDB/https_vkvideo.ru_0.indexeddb.leveldb/000004.log 
+2026/04/28-12:26:09.290 149 Level-0 table #6: started
+2026/04/28-12:26:09.294 149 Level-0 table #6: 33932 bytes OK
+2026/04/28-12:26:09.299 149 Delete type=0 #4
+2026/04/28-12:26:09.306 130 Manual compaction at level-0 from '\x00\x08\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x09\x00\x00\x00' @ 0 : 0; will stop at (end)
