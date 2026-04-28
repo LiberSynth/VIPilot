@@ -75,6 +75,7 @@ def publish(
     # Пишем видео во временный файл с именем = заголовок (Дзен автоподставляет имя файла)
     pub_title = build_publication_title()
     file_name = publication_file_name(pub_title)
+    write_log_entry(log_id, f"[dzen] Заголовок: {pub_title}, файл: {file_name}", level='silent')
     tmp_dir = tempfile.mkdtemp()
     video_path = os.path.join(tmp_dir, file_name)
     try:
@@ -283,6 +284,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
     file_chooser = fc_info.value
     file_chooser.set_files(video_path)
     write_log_entry(log_id, "Дзен: Файл передан браузеру, жду загрузки.")
+    write_log_entry(log_id, f"[dzen] Файл: {os.path.basename(video_path)}", level='silent')
     _snap(page, batch_id)
 
     # Ждём одно из двух:
@@ -331,6 +333,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
 
     # ── Шаг 5: Заполняем теги ────────────────────────────────────────────
     write_log_entry(log_id, "Дзен: Заполняю теги.")
+    write_log_entry(log_id, f"[dzen] Теги: {tags()}", level='silent')
     try:
         tags_input = page.locator(
             "input[placeholder*='теги'], "
@@ -346,6 +349,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
         _snap(page, batch_id)
     except Exception as _e:
         write_log_entry(log_id, "Дзен: Не удалось заполнить теги — продолжаю.")
+        write_log_entry(log_id, f"[dzen] Ошибка тегов: {_e}", level='silent')
 
     # ── Шаг 6: Публикуем ─────────────────────────────────────────────────
     write_log_entry(log_id, "Дзен: Нажимаю «Опубликовать».")
@@ -437,6 +441,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
                     if not is_captcha:
                         continue
                     write_log_entry(log_id, "Дзен: Капча-фрейм найден")
+                    write_log_entry(log_id, f"[dzen] URL капча-фрейма: {furl}", level='silent')
                     # Вариант 1: JS-клик напрямую по input[type=checkbox] внутри фрейма.
                     # Это надёжнее чем Playwright-клик — не зависит от видимости и позиции.
                     _js_clicked = False
@@ -526,6 +531,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
         state_label = "state=published" if "state=published" in url_before else "state=pending"
         confirmed = True
         write_log_entry(log_id, f"Дзен: URL → {state_label} — публикация подтверждена.")
+        write_log_entry(log_id, f"[dzen] Полный URL: {url_before}", level='silent')
 
     # CSS-селекторы (только чистый CSS, без text= — они несовместимы с wait_for_selector)
     css_success_selector = (
@@ -566,6 +572,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
             if el.is_visible():
                 confirmed = True
                 write_log_entry(log_id, "Дзен: Уведомление об успешной публикации получено (CSS).")
+                write_log_entry(log_id, f"[dzen] URL: {page.url}", level='silent')
                 break
         except Exception:
             pass
@@ -616,6 +623,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
             state_label = "state=published" if "state=published" in url_after else "state=pending"
             confirmed = True
             write_log_entry(log_id, f"Дзен: URL → {state_label} — публикация подтверждена (финал).")
+            write_log_entry(log_id, f"[dzen] Полный URL: {url_after}", level='silent')
         else:
             video_url_pattern = re.search(r"/video/|/shorts/|/watch\?", url_after)
             if video_url_pattern and url_after != url_before:

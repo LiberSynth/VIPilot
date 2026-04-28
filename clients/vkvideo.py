@@ -81,6 +81,7 @@ def publish(
 
     pub_title = build_publication_title()
     file_name = publication_file_name(pub_title)
+    write_log_entry(log_id, f"[vkvideo] Заголовок: {pub_title}, файл: {file_name}", level='silent')
     tmp_dir = tempfile.mkdtemp()
     video_path = os.path.join(tmp_dir, file_name)
     try:
@@ -179,6 +180,7 @@ def _publish_ui(page, club_id: str, video_path: str, pub_title: str, log_id, bat
     file_chooser = fc_info.value
     file_chooser.set_files(video_path)
     write_log_entry(log_id, "VK Видео: Файл передан, жду форму «Публикация клипа».")
+    write_log_entry(log_id, f"[vkvideo] Файл: {os.path.basename(video_path)}", level='silent')
     _snap(page, batch_id)
 
     # ── Шаг 4: Ждём форму «Публикация клипа» (поле Описание) ─────────────
@@ -208,6 +210,7 @@ def _publish_ui(page, club_id: str, video_path: str, pub_title: str, log_id, bat
 
     # ── Шаг 6: Заполняем поле «Описание» хэштегами ────────────────────────
     write_log_entry(log_id, "VK Видео: Заполняю описание хэштегами.")
+    write_log_entry(log_id, f"[vkvideo] Хэштеги: {hashtags()}", level='silent')
     try:
         desc_field = page.locator(
             "textarea[placeholder*='клип'], "
@@ -223,6 +226,7 @@ def _publish_ui(page, club_id: str, video_path: str, pub_title: str, log_id, bat
         _snap(page, batch_id)
     except Exception as _e:
         write_log_entry(log_id, "VK Видео: Не удалось заполнить описание — продолжаю.")
+        write_log_entry(log_id, f"[vkvideo] Ошибка описания: {_e}", level='silent')
 
     # ── Шаг 7: Выключаем ненужные переключатели ──────────────────────────
     _TOGGLES_OFF = ["Показать на главной сообщества"]
@@ -251,6 +255,7 @@ def _publish_ui(page, club_id: str, video_path: str, pub_title: str, log_id, bat
                     write_log_entry(log_id, f"VK Видео: «{label_text}» — кликнут")
         except Exception as _e:
             write_log_entry(log_id, f"VK Видео: Не удалось выключить «{label_text}» — продолжаю.")
+            write_log_entry(log_id, f"[vkvideo] Ошибка переключателя: {_e}", level='silent')
     _snap(page, batch_id)
 
     # ── Шаг 8: Ждём доступную кнопку «Опубликовать» ──────────────────────
@@ -302,8 +307,10 @@ def _publish_ui(page, club_id: str, video_path: str, pub_title: str, log_id, bat
 
     if _success:
         write_log_entry(log_id, "VK Видео: Клип опубликован успешно.")
+        write_log_entry(log_id, f"[vkvideo] URL: {page.url}", level='silent')
     else:
         write_log_entry(log_id, "VK Видео: Публикация завершена (тост не обнаружен, ошибок нет)")
+        write_log_entry(log_id, f"[vkvideo] URL: {page.url}", level='silent')
 
     if not _form_ok and not _success:
         raise VkVideoApiError(

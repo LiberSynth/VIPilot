@@ -76,6 +76,7 @@ def publish(
 
     pub_title = build_publication_title()
     file_name = publication_file_name(pub_title)
+    write_log_entry(log_id, f"[rutube] Заголовок: {pub_title}, файл: {file_name}", level='silent')
     tmp_dir = tempfile.mkdtemp()
     video_path = os.path.join(tmp_dir, file_name)
     try:
@@ -166,6 +167,7 @@ def _publish_ui(page, video_path: str, log_id, batch_id=None):
     file_chooser = fc_info.value
     file_chooser.set_files(video_path)
     write_log_entry(log_id, "Рутьюб: Файл передан браузеру, жду загрузки.")
+    write_log_entry(log_id, f"[rutube] Файл: {os.path.basename(video_path)}", level='silent')
     _snap(page, batch_id)
 
     # ── Шаг 5: Ждём завершения загрузки (появление «Модерация») ─────────
@@ -198,6 +200,7 @@ def _publish_ui(page, video_path: str, log_id, batch_id=None):
         write_log_entry(log_id, f"Рутьюб: Категория «{_CATEGORY}» выбрана")
     except Exception as _e:
         write_log_entry(log_id, "Рутьюб: Не удалось выбрать категорию — продолжаю.")
+        write_log_entry(log_id, f"[rutube] Ошибка категории: {_e}", level='silent')
     _snap(page, batch_id)
 
     if not _cat_ok and not _upload_ok:
@@ -251,5 +254,7 @@ def _publish_ui(page, video_path: str, log_id, batch_id=None):
 
     if _success:
         write_log_entry(log_id, "Рутьюб: Публикация успешна.")
+        write_log_entry(log_id, f"[rutube] URL: {page.url}", level='silent')
     else:
         write_log_entry(log_id, "Рутьюб: Публикация завершена (тост не обнаружен, ошибок нет)")
+        write_log_entry(log_id, f"[rutube] URL: {page.url}", level='silent')
