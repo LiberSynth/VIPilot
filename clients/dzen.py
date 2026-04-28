@@ -441,11 +441,18 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
     pub_btn = page.locator("button:has-text('Опубликовать')").first
     pub_btn.wait_for(state="visible", timeout=15_000)
     pub_btn.click()
-    # Опрашиваем с коротким шагом: выходим, как только появился диалог или капча.
-    for _w in range(4):
-        page.wait_for_timeout(500)
-        if _has_publish_confirm_dialog(page) or _has_captcha_frame(page) or _has_captcha_dom(page):
-            break
+    # Ждём появления диалога подтверждения или капчи до 12 секунд.
+    # Если за 12 сек ничего не появилось — продолжаем в шаг 7.
+    _CONFIRM_OR_CAPTCHA_SEL = (
+        "button:has-text('Опубликовать после подтверждения'), "
+        "button:has-text('Опубликовать после обработки'), "
+        "iframe[src*='captcha'], iframe[src*='smartcaptcha'], "
+        "[class*='captcha'], [class*='Captcha'], [id*='captcha']"
+    )
+    try:
+        page.wait_for_selector(_CONFIRM_OR_CAPTCHA_SEL, timeout=12_000)
+    except Exception:
+        pass
     _snap(page, batch_id)
 
     # ── Шаг 7: Обрабатываем три разных элемента (25 секунд) ─────────────
@@ -492,14 +499,13 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
         # ── A. Кнопки подтверждения публикации ────────────────────────────
         # Дзен показывает одну из двух кнопок после нажатия «Опубликовать»:
         #   • «Опубликовать после подтверждения» — видео ещё обрабатывается
-        #   • «Опубликовать» — видео готово (может совпадать с текстом формы,
-        #                       но форма к этому моменту уже скрыта)
-        # «Опубликовать после обработки» — старый вариант текста, оставляем на всякий случай.
+        #   • «Опубликовать после обработки» — старый вариант текста
+        # Широкий «button:has-text('Опубликовать')» намеренно исключён —
+        # он совпадает с кнопкой формы, которая ещё может быть видима.
         try:
             pub_after = page.locator(
                 "button:has-text('Опубликовать после подтверждения'), "
-                "button:has-text('Опубликовать после обработки'), "
-                "button:has-text('Опубликовать')"
+                "button:has-text('Опубликовать после обработки')"
             ).first
             if pub_after.is_visible(timeout=300):
                 btn_text = pub_after.inner_text()
