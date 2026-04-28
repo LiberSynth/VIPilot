@@ -301,6 +301,7 @@ def run(batch_id, log_id):
 
     pub_title = batch.get('title') or ''
     if pub_title:
+        write_log_entry(log_id, f'Заголовок публикации (из БД): «{pub_title}»')
         write_log_entry(log_id, f"[publish] Заголовок публикации (из БД): {pub_title}", level='silent')
 
     any_ok = False
@@ -324,6 +325,8 @@ def run(batch_id, log_id):
 
         if not pub_title:
             pub_title = build_publication_title()
+            db_set_batch_title(batch_id, pub_title)
+            write_log_entry(log_id, f'Заголовок публикации: «{pub_title}»')
             write_log_entry(log_id, f"[publish] Заголовок публикации (новый): {pub_title}", level='silent')
 
         write_log_entry(log_id, f'Шаг {slug}.{method}: выполняю.')
@@ -357,7 +360,6 @@ def run(batch_id, log_id):
         expected_from = published_status
 
     if any_ok:
-        db_set_batch_title(batch_id, pub_title)
         if failed_steps:
             fail_list = ', '.join(failed_steps)
             db_set_batch_status(batch_id, 'published_partially')
