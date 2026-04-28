@@ -505,7 +505,12 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
                 write_log_entry(log_id, "Дзен: Нажимаю кнопку подтверждения публикации.")
                 write_log_entry(log_id, f"[dzen] Текст кнопки: «{btn_text}»", level='silent')
                 pub_after.click()
-                page.wait_for_timeout(2000)
+                # Ждём реакции страницы короткими шагами — если капча
+                # появилась, прерываем ожидание и сразу переходим к блоку B.
+                for _w in range(4):
+                    page.wait_for_timeout(500)
+                    if _has_captcha_frame(page) or _has_captcha_dom(page):
+                        break
                 _snap(page, batch_id)
                 _check_error_toast()
         except DzenApiError:
