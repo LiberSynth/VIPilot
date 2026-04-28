@@ -1,17 +1,18 @@
+/* ── Единое состояние: ID активного сюжета в карточке ── */
+/* null — карточка пуста (ничего не открыто или фиктивная строка нового черновика) */
+/* guid — открыт существующий сюжет или черновик уже сохранён в БД              */
+var _activeStoryId = null;
+
 /* ── Автосохранение черновика сюжета ── */
 var resetDraftStoryId;
 var setDraftStoryFromRecord;
-var getDraftStoryId;
 (function() {
-  var _draftStoryId = null;
   var _draftTimer = null;
   var _draftSaving = false;
   var _draftPendingRetry = false;
 
-  getDraftStoryId = function() { return _draftStoryId; };
-
   resetDraftStoryId = function() {
-    _draftStoryId = null;
+    _activeStoryId = null;
     _draftSaving = false;
     _draftPendingRetry = false;
     clearTimeout(_draftTimer);
@@ -22,7 +23,7 @@ var getDraftStoryId;
     var contentEl = document.getElementById('draft-story-content');
     if (titleEl) titleEl.value = story.title || '';
     if (contentEl) contentEl.value = story.content || '';
-    _draftStoryId = story.id;
+    _activeStoryId = story.id;
     _draftSaving = false;
     _draftPendingRetry = false;
     clearTimeout(_draftTimer);
@@ -35,7 +36,7 @@ var getDraftStoryId;
     var title = titleEl.value;
     var content = contentEl.value;
     if (!title && !content) return;
-    if (_draftSaving && !_draftStoryId) {
+    if (_draftSaving && !_activeStoryId) {
       _draftPendingRetry = true;
       return;
     }
@@ -43,12 +44,12 @@ var getDraftStoryId;
     fetch('/production/story/draft', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ story_id: _draftStoryId, title: title, content: content }),
+      body: JSON.stringify({ story_id: _activeStoryId, title: title, content: content }),
     })
     .then(function(r) { return r.ok ? r.json() : null; })
     .then(function(d) {
       if (d && d.story_id) {
-        _draftStoryId = d.story_id;
+        _activeStoryId = d.story_id;
         if (typeof loadStoryList === 'function') loadStoryList();
       }
       _draftSaving = false;
@@ -89,7 +90,6 @@ var getDraftStoryId;
 /* ── Список сюжетов в панели Сценариста ── */
 (function() {
   var _currentStories = [];
-  var _expandedStoryId = null;
   var GRADE_CYCLE = ['good', 'bad', null];
   var GRADE_LABELS = { good: 'хорошо', bad: 'плохо', 'null': 'не указано' };
   var GRADE_COLORS = {
@@ -158,7 +158,6 @@ var getDraftStoryId;
     container.insertBefore(fakeRow, container.firstChild);
     var expandEl = fakeRow.querySelector('.story-expand');
     if (expandEl) _attachCardToExpand(expandEl);
-    _expandedStoryId = '__new__';
     fakeRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     if (focusTitle) {
       var titleEl = document.getElementById('draft-story-title');
@@ -167,7 +166,7 @@ var getDraftStoryId;
   }
 
   /* Экспозиция для других модулей */
-  window.setExpandedStoryId = function(id) { _expandedStoryId = id; };
+  window.setExpandedStoryId = function(id) { _activeStoryId = id; };
 
   function updateStoriesCount(n) {
     var el = document.getElementById('stories-count');
@@ -212,7 +211,8 @@ var getDraftStoryId;
     if (!container) return;
 
     var savedFocus = _saveFocus();
-    var prevExpandedId = _expandedStoryId;
+    var prevActiveId = _activeStoryId;
+    var hadFakeRow = !!container.querySelector('.story-row[data-id="__new__"]');
     _detachCard();
 
     if (!stories || stories.length === 0) {
@@ -220,7 +220,7 @@ var getDraftStoryId;
       window._currentStoriesList = [];
       _setExportStoriesBtnEnabled(false);
       updateStoriesCount(0);
-      _expandedStoryId = null;
+      _activeStoryId = null;
       container.innerHTML = '<div class="stories-empty">Нет сюжетов</div>';
       return;
     }
@@ -353,17 +353,17 @@ var getDraftStoryId;
       var header = row.querySelector('.story-row-header');
       if (!header) return;
       header.addEventListener('click', function() {
-        if (_expandedStoryId === storyId) {
+        if (_activeStoryId === storyId) {
           row.classList.remove('story-row--expanded');
           _detachCard();
-          _expandedStoryId = null;
+          _activeStoryId = null;
         } else {
-          if (_expandedStoryId) {
+          if (_activeStoryId) {
             var cur = container.querySelector('.story-row--expanded');
             if (cur) cur.classList.remove('story-row--expanded');
             _detachCard();
           }
-          _expandedStoryId = storyId;
+          _activeStoryId = storyId;
           row.classList.add('story-row--expanded');
           var expandEl = row.querySelector('.story-expand');
           if (expandEl) _attachCardToExpand(expandEl);
@@ -376,31 +376,18 @@ var getDraftStoryId;
     });
 
     /* ── Восстановление раскрытой строки после перерисовки ── */
-    if (prevExpandedId === '__new__') {
-      var draftId = typeof getDraftStoryId === 'function' ? getDraftStoryId() : null;
-      if (draftId) {
-        var realRow = container.querySelector('.story-row[data-id="' + draftId + '"]');
-        if (realRow) {
-          _expandedStoryId = draftId;
-          realRow.classList.add('story-row--expanded');
-          var expandEl2 = realRow.querySelector('.story-expand');
-          if (expandEl2) _attachCardToExpand(expandEl2);
-        } else {
-          _expandedStoryId = null;
-        }
-      } else {
-        _insertFakeRow(container);
-      }
-    } else if (prevExpandedId) {
-      var expandRow = container.querySelector('.story-row[data-id="' + prevExpandedId + '"]');
+    if (prevActiveId) {
+      var expandRow = container.querySelector('.story-row[data-id="' + prevActiveId + '"]');
       if (expandRow) {
-        _expandedStoryId = prevExpandedId;
+        _activeStoryId = prevActiveId;
         expandRow.classList.add('story-row--expanded');
-        var expandEl3 = expandRow.querySelector('.story-expand');
-        if (expandEl3) _attachCardToExpand(expandEl3);
+        var expandEl2 = expandRow.querySelector('.story-expand');
+        if (expandEl2) _attachCardToExpand(expandEl2);
       } else {
-        _expandedStoryId = null;
+        _activeStoryId = null;
       }
+    } else if (hadFakeRow) {
+      _insertFakeRow(container);
     }
 
     _restoreFocus(savedFocus);
@@ -419,9 +406,9 @@ var getDraftStoryId;
           .then(function(r) { return r.ok ? r.json() : r.json().then(function(d) { throw d; }); })
           .then(function() {
             dlg.close();
-            if (_expandedStoryId === storyId) {
+            if (_activeStoryId === storyId) {
               _detachCard();
-              _expandedStoryId = null;
+              _activeStoryId = null;
             }
             if (typeof window.loadStoryList === 'function') window.loadStoryList();
           })
@@ -501,8 +488,7 @@ var getDraftStoryId;
       if (onlyBad && onlyBad.checked) params.set('only_bad', '1');
       if (onlyPinned && onlyPinned.checked) params.set('only_pinned', '1');
     }
-    var pinId = typeof getDraftStoryId === 'function' ? getDraftStoryId() : null;
-    if (pinId) params.set('pin_id', pinId);
+    if (_activeStoryId) params.set('pin_id', _activeStoryId);
     return params.toString();
   }
 
@@ -600,11 +586,10 @@ var getDraftStoryId;
     btn.addEventListener('click', function() {
       var container = document.getElementById('stories-list');
       if (!container) return;
-      if (_expandedStoryId) {
+      if (_activeStoryId) {
         var cur = container.querySelector('.story-row--expanded');
         if (cur) cur.classList.remove('story-row--expanded');
         _detachCard();
-        _expandedStoryId = null;
       }
       if (typeof resetDraftStoryId === 'function') resetDraftStoryId();
       var titleEl = document.getElementById('draft-story-title');
