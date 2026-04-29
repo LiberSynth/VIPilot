@@ -1,3 +1,4 @@
+import json
 import time
 from utils.version import VERSION as APP_VERSION
 from flask import (
@@ -171,6 +172,9 @@ def root_page():
     vk_publish_story     = bool(_vk_pm.get("story",     0))
     vk_publish_wall      = bool(_vk_pm.get("wall",      0))
     vk_publish_clip_wall = bool(_vk_pm.get("clip_wall", 0))
+    vk_target_id = vk_target["id"] if vk_target else None
+    _vk_tc = (vk_target.get("config") or {}).get("targets_config") if vk_target else None
+    vk_targets_config_json = json.dumps(_vk_tc, ensure_ascii=False, indent=2) if _vk_tc is not None else ""
     video_duration     = max(1, min(60, cycle_config_get("video_duration")))
     video_post_prompt  = cycle_config_get("video_post_prompt")
     buffer_hours       = max(1, min(720, int(settings_get("buffer_hours", "24"))))
@@ -192,18 +196,24 @@ def root_page():
     dzen_publisher_id = dzen_config.get("publisher_id", "")
     dzen_target_id = dzen_target["id"] if dzen_target else None
     dzen_active    = bool(dzen_target.get("active")) if dzen_target else False
+    _dzen_tc = dzen_config.get("targets_config") if dzen_target else None
+    dzen_targets_config_json = json.dumps(_dzen_tc, ensure_ascii=False, indent=2) if _dzen_tc is not None else ""
 
     rutube_target     = db_get_target_by_name("Rutube")
     rutube_config     = rutube_target.get("config") or {} if rutube_target else {}
     rutube_person_id  = rutube_config.get("person_id", "")
     rutube_target_id  = rutube_target["id"] if rutube_target else None
     rutube_active     = bool(rutube_target.get("active")) if rutube_target else False
+    _rutube_tc = rutube_config.get("targets_config") if rutube_target else None
+    rutube_targets_config_json = json.dumps(_rutube_tc, ensure_ascii=False, indent=2) if _rutube_tc is not None else ""
 
     vkvideo_target    = db_get_target_by_name("VK Видео")
     vkvideo_config    = vkvideo_target.get("config") or {} if vkvideo_target else {}
     vkvideo_club_id   = vkvideo_config.get("club_id", "")
     vkvideo_target_id = vkvideo_target["id"] if vkvideo_target else None
     vkvideo_active    = bool(vkvideo_target.get("active")) if vkvideo_target else False
+    _vkvideo_tc = vkvideo_config.get("targets_config") if vkvideo_target else None
+    vkvideo_targets_config_json = json.dumps(_vkvideo_tc, ensure_ascii=False, indent=2) if _vkvideo_tc is not None else ""
 
     active_targets  = db_get_active_targets()
     target          = active_targets[0] if active_targets else None
@@ -249,16 +259,21 @@ def root_page():
         target_id=target_id,
         aspect_ratio_x=aspect_ratio_x,
         aspect_ratio_y=aspect_ratio_y,
+        vk_target_id=vk_target_id,
+        vk_targets_config_json=vk_targets_config_json,
         dzen_target_id=dzen_target_id,
         dzen_publisher_id=dzen_publisher_id,
+        dzen_targets_config_json=dzen_targets_config_json,
         vk_active=vk_active,
         dzen_active=dzen_active,
         rutube_target_id=rutube_target_id,
         rutube_person_id=rutube_person_id,
         rutube_active=rutube_active,
+        rutube_targets_config_json=rutube_targets_config_json,
         vkvideo_target_id=vkvideo_target_id,
         vkvideo_club_id=vkvideo_club_id,
         vkvideo_active=vkvideo_active,
+        vkvideo_targets_config_json=vkvideo_targets_config_json,
         publish_order=publish_order,
         app_version=APP_VERSION,
         nav_modules=_nav_modules("root"),

@@ -89,6 +89,7 @@
 
       {% if slug == 'vk' %}
       <div class="card{% if not vk_active %} target-disabled{% endif %}"{% if not loop.first %} style="margin-top:12px"{% endif %}>
+        <input type="hidden" id="vk_target_id" value="{{ vk_target_id or '' }}">
         <div class="card-title">Публикация в ВКонтакте</div>
         <div class="card-title" style="font-size:13px;font-weight:500;margin-top:0;margin-bottom:6px;color:var(--text-muted,#888)">Соотношение сторон</div>
         <div class="ar-wrap">
@@ -150,6 +151,11 @@
             <span class="toggle-track"></span>
           </label>
         </div>
+        <div style="margin-top:14px">
+          <div class="hint" style="margin-bottom:2px;color:#e8e8f0">Параметры (targets_config)</div>
+          <textarea id="vk-target-body" placeholder="JSON-параметры таргета" autocomplete="off">{{ vk_targets_config_json }}</textarea>
+          <div id="vk-target-body-error" style="display:none;color:#f55;font-size:12px;margin-top:4px"></div>
+        </div>
       </div>
       {% endif %}
 
@@ -180,6 +186,11 @@
                style="position:absolute;inset:0;background:rgba(10,10,20,.85);display:flex;align-items:center;justify-content:center;color:#aaa;font-size:14px">
             Загрузка…
           </div>
+        </div>
+        <div style="margin-top:14px">
+          <div class="hint" style="margin-bottom:2px;color:#e8e8f0">Параметры (targets_config)</div>
+          <textarea id="dzen-target-body" placeholder="JSON-параметры таргета" autocomplete="off">{{ dzen_targets_config_json }}</textarea>
+          <div id="dzen-target-body-error" style="display:none;color:#f55;font-size:12px;margin-top:4px"></div>
         </div>
       </div>
       {% endif %}
@@ -212,6 +223,11 @@
             Загрузка…
           </div>
         </div>
+        <div style="margin-top:14px">
+          <div class="hint" style="margin-bottom:2px;color:#e8e8f0">Параметры (targets_config)</div>
+          <textarea id="rutube-target-body" placeholder="JSON-параметры таргета" autocomplete="off">{{ rutube_targets_config_json }}</textarea>
+          <div id="rutube-target-body-error" style="display:none;color:#f55;font-size:12px;margin-top:4px"></div>
+        </div>
       </div>
       {% endif %}
 
@@ -242,6 +258,11 @@
                style="position:absolute;inset:0;background:rgba(10,10,20,.85);display:flex;align-items:center;justify-content:center;color:#aaa;font-size:14px">
             Загрузка…
           </div>
+        </div>
+        <div style="margin-top:14px">
+          <div class="hint" style="margin-bottom:2px;color:#e8e8f0">Параметры (targets_config)</div>
+          <textarea id="vkvideo-target-body" placeholder="JSON-параметры таргета" autocomplete="off">{{ vkvideo_targets_config_json }}</textarea>
+          <div id="vkvideo-target-body-error" style="display:none;color:#f55;font-size:12px;margin-top:4px"></div>
         </div>
       </div>
       {% endif %}

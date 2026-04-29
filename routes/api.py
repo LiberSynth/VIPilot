@@ -47,6 +47,7 @@ from db import (
     db_set_model_grade,
     db_set_model_note,
     db_set_model_body,
+    db_set_target_config_body,
     db_delete_batch,
     db_get_batch_status,
     db_delete_story,
@@ -450,6 +451,18 @@ def api_video_model_body(model_id):
     if not isinstance(body, dict):
         return jsonify({"error": "body must be a JSON object"}), 400
     ok = db_set_model_body(model_id, body)
+    return jsonify({"ok": ok})
+
+
+@bp.route("/targets/<target_id>/targets-config", methods=["POST"])
+def api_target_config_body(target_id):
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    data = request.get_json(silent=True) or {}
+    body = data.get("targets_config")
+    if not isinstance(body, dict):
+        return jsonify({"error": "targets_config must be a JSON object"}), 400
+    ok = db_set_target_config_body(target_id, body)
     return jsonify({"ok": ok})
 
 

@@ -253,3 +253,56 @@ function uploadUpdatePackage(btn) {
   };
   input.click();
 }
+
+(function() {
+  var _bodyTimers = {};
+
+  function _saveTargetBodyIfValid(areaEl, errorEl, targetId) {
+    var val = areaEl.value;
+    if (!val.trim()) {
+      areaEl.classList.remove('input-error');
+      if (errorEl) { errorEl.style.display = 'none'; errorEl.textContent = ''; }
+      return;
+    }
+    var parsed;
+    try {
+      parsed = JSON.parse(val);
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) throw new Error('not an object');
+    } catch (e) {
+      areaEl.classList.add('input-error');
+      if (errorEl) { errorEl.style.display = 'block'; errorEl.textContent = 'Невалидный JSON'; }
+      return;
+    }
+    areaEl.classList.remove('input-error');
+    if (errorEl) { errorEl.style.display = 'none'; errorEl.textContent = ''; }
+    fetch('/api/targets/' + encodeURIComponent(targetId) + '/targets-config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ targets_config: parsed })
+    });
+  }
+
+  function attachTargetBodyListener(areaId, errorId, targetIdElId) {
+    var areaEl  = document.getElementById(areaId);
+    var errorEl = document.getElementById(errorId);
+    var tidEl   = document.getElementById(targetIdElId);
+    if (!areaEl || !tidEl) return;
+    var tid = tidEl.value;
+    if (!tid) return;
+    areaEl.addEventListener('input', function() {
+      clearTimeout(_bodyTimers[areaId]);
+      _bodyTimers[areaId] = setTimeout(function() {
+        _saveTargetBodyIfValid(areaEl, errorEl, tid);
+      }, 800);
+    });
+    areaEl.addEventListener('blur', function() {
+      clearTimeout(_bodyTimers[areaId]);
+      _saveTargetBodyIfValid(areaEl, errorEl, tid);
+    });
+  }
+
+  attachTargetBodyListener('vk-target-body',     'vk-target-body-error',     'vk_target_id');
+  attachTargetBodyListener('dzen-target-body',    'dzen-target-body-error',   'dzen_target_id');
+  attachTargetBodyListener('rutube-target-body',  'rutube-target-body-error', 'rutube_target_id');
+  attachTargetBodyListener('vkvideo-target-body', 'vkvideo-target-body-error','vkvideo_target_id');
+})();

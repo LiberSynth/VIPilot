@@ -421,6 +421,20 @@ def db_set_model_body(model_id: str, body: dict):
     return True
 
 
+def db_set_target_config_body(target_id: str, body: dict):
+    import json
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE targets"
+                " SET config = COALESCE(config, '{}') || jsonb_build_object('targets_config', %s::jsonb)"
+                " WHERE id = %s::uuid",
+                (json.dumps(body), target_id),
+            )
+        conn.commit()
+    return True
+
+
 def db_get_distinct_batch_statuses():
     with get_db() as conn:
         with conn.cursor() as cur:
