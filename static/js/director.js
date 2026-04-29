@@ -162,6 +162,8 @@
       _expandedMovieId = null;
       _stopActiveBatchPoll();
       _setHint(_HINT_DEFAULT);
+      var wrap = document.getElementById('director-video-wrap');
+      if (wrap) { var vid = wrap.querySelector('video'); if (vid) vid.pause(); }
     },
     canAddNew: false,
     emptyHtml: '<div class="stories-empty">Нет видео</div>',
