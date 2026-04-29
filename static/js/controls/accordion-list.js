@@ -12,6 +12,13 @@ class AccordionList {
     this._canAddNew      = opts.canAddNew      || false;
     this._onNewRowReady  = opts.onNewRowReady  || null;
     this._emptyHtml      = opts.emptyHtml      || '<div class="stories-empty">Нет записей</div>';
+    this._rowClassFn        = opts.rowClassFn        || null;
+    this._onExpandOnRerender= opts.onExpandOnRerender || false;
+
+    this._gradeLabels    = opts.gradeLabels    || null;
+    this._gradeColors    = opts.gradeColors    || null;
+    this._gradeTextColors= opts.gradeTextColors|| null;
+    this._gradeCycle     = opts.gradeCycle     || null;
 
     this._activeId         = null;
     this._gradeReqCounters = {};
@@ -30,6 +37,11 @@ class AccordionList {
   setActiveId(id) { this._activeId = id; }
   getData()       { return this._data; }
 
+  _gl()  { return this._gradeLabels    || AccordionList.GRADE_LABELS; }
+  _gc()  { return this._gradeColors    || AccordionList.GRADE_COLORS; }
+  _gtc() { return this._gradeTextColors|| AccordionList.GRADE_TEXT_COLORS; }
+  _gcy() { return this._gradeCycle     || AccordionList.GRADE_CYCLE; }
+
   updateCount(n) {
     var el = document.getElementById(this._countId);
     if (!el) return;
@@ -43,22 +55,47 @@ class AccordionList {
 
   _saveFocus() {
     var ae   = document.activeElement;
+    if (!ae) return null;
     var card = this._getCard();
-    if (!ae || !card || !card.contains(ae)) return null;
-    return {
-      id:    ae.id,
-      start: ae.selectionStart != null ? ae.selectionStart : null,
-      end:   ae.selectionEnd   != null ? ae.selectionEnd   : null,
-    };
+    if (card && card.contains(ae)) {
+      return {
+        id:    ae.id,
+        start: ae.selectionStart != null ? ae.selectionStart : null,
+        end:   ae.selectionEnd   != null ? ae.selectionEnd   : null,
+      };
+    }
+    var container = this._getList();
+    if (container && container.contains(ae) && ae.dataset && ae.dataset.modelId) {
+      return {
+        modelId:    ae.dataset.modelId,
+        modelField: ae.dataset.modelField,
+        start: ae.selectionStart != null ? ae.selectionStart : null,
+        end:   ae.selectionEnd   != null ? ae.selectionEnd   : null,
+      };
+    }
+    return null;
   }
 
   _restoreFocus(saved) {
-    if (!saved || !saved.id) return;
-    var el = document.getElementById(saved.id);
-    if (!el) return;
-    el.focus();
-    if (saved.start !== null) {
-      try { el.setSelectionRange(saved.start, saved.end); } catch (e) {}
+    if (!saved) return;
+    if (saved.id) {
+      var el = document.getElementById(saved.id);
+      if (!el) return;
+      el.focus();
+      if (saved.start !== null) {
+        try { el.setSelectionRange(saved.start, saved.end); } catch (e) {}
+      }
+      return;
+    }
+    if (saved.modelId) {
+      var container = this._getList();
+      if (!container) return;
+      var el2 = container.querySelector('[data-model-id="' + saved.modelId + '"][data-model-field="' + saved.modelField + '"]');
+      if (!el2) return;
+      el2.focus();
+      if (saved.start !== null) {
+        try { el2.setSelectionRange(saved.start, saved.end); } catch (e) {}
+      }
     }
   }
 
@@ -81,14 +118,14 @@ class AccordionList {
   }
 
   _renderGradeBadge(item) {
-    var LABELS  = AccordionList.GRADE_LABELS;
-    var COLORS  = AccordionList.GRADE_COLORS;
-    var TCOLORS = AccordionList.GRADE_TEXT_COLORS;
+    var LABELS  = this._gl();
+    var COLORS  = this._gc();
+    var TCOLORS = this._gtc();
     var grade   = item.grade !== undefined ? item.grade : null;
     var gk      = AccordionList.gradeKey(grade);
     var label   = LABELS[gk] || gk;
     var inlineStyle = gk !== 'null'
-      ? 'style="background:' + COLORS[gk] + ';color:' + TCOLORS[gk] + '" '
+      ? 'style="background:' + (COLORS[gk] || '') + ';color:' + (TCOLORS[gk] || '') + '" '
       : '';
     return '<button class="story-grade-badge" data-id="' + item.id + '" data-grade="' + gk + '" '
       + inlineStyle
@@ -100,7 +137,8 @@ class AccordionList {
     var gradeBadge  = this._renderGradeBadge(item);
     var titleHtml   = this._renderTitle(item) + ' ' + gradeBadge;
     var buttonsHtml = this._renderButtons(item);
-    return '<div class="story-row" data-id="' + item.id + '">'
+    var extraClass  = this._rowClassFn ? (' ' + this._rowClassFn(item)) : '';
+    return '<div class="story-row' + extraClass + '" data-id="' + item.id + '">'
       + '<div class="story-row-header">'
         + '<div class="story-title">' + titleHtml + '</div>'
         + '<div class="story-row-right">' + buttonsHtml
@@ -112,9 +150,9 @@ class AccordionList {
   }
 
   _applyGradeToBadge(btn, gk) {
-    var LABELS  = AccordionList.GRADE_LABELS;
-    var COLORS  = AccordionList.GRADE_COLORS;
-    var TCOLORS = AccordionList.GRADE_TEXT_COLORS;
+    var LABELS  = this._gl();
+    var COLORS  = this._gc();
+    var TCOLORS = this._gtc();
     btn.setAttribute('data-grade', gk);
     btn.style.background = gk !== 'null' ? (COLORS[gk]  || '') : '';
     btn.style.color      = gk !== 'null' ? (TCOLORS[gk] || '') : '';
@@ -127,7 +165,10 @@ class AccordionList {
     container.querySelectorAll('.story-row-header').forEach(function(header) {
       var row = header.closest('.story-row');
       if (!row || row.getAttribute('data-id') === '__new__') return;
-      header.addEventListener('click', function() {
+      header.addEventListener('click', function(e) {
+        if (e.target.closest('.story-grade-badge')) return;
+        if (e.target.closest('[data-role]')) return;
+        if (e.target.closest('button:not(.story-chevron)')) return;
         self._toggleRow(row.getAttribute('data-id'));
       });
     });
@@ -238,7 +279,13 @@ class AccordionList {
         this._activeId = prevActiveId;
         expandRow.classList.add('story-row--expanded');
         var expandEl2 = expandRow.querySelector('.story-expand');
-        if (expandEl2) this._attachCardToExpand(expandEl2);
+        if (expandEl2) {
+          this._attachCardToExpand(expandEl2);
+          if (this._onExpandOnRerender) {
+            var item2 = this._findItem(prevActiveId);
+            if (this._onExpand) this._onExpand(item2, expandEl2);
+          }
+        }
       } else {
         this._activeId = null;
       }
@@ -279,7 +326,7 @@ class AccordionList {
 
   cycleGrade(btn) {
     var self         = this;
-    var CYCLE        = AccordionList.GRADE_CYCLE;
+    var CYCLE        = this._gcy();
     var itemId       = btn.getAttribute('data-id');
     var currentAttr  = btn.getAttribute('data-grade');
     var current      = currentAttr === 'null' ? null : currentAttr;
@@ -301,7 +348,10 @@ class AccordionList {
     .then(function(d) {
       if (myReqId !== self._gradeReqCounters[itemId]) return;
       if (d && d.ok) {
-        self._applyGradeToBadge(btn, AccordionList.gradeKey(d.grade !== undefined ? d.grade : null));
+        var confirmed = d.grade !== undefined ? d.grade : next;
+        self._applyGradeToBadge(btn, AccordionList.gradeKey(confirmed));
+        var item = self._findItem(itemId);
+        if (item) item.grade = confirmed;
       } else {
         self._applyGradeToBadge(btn, AccordionList.gradeKey(prevAttr === 'null' ? null : prevAttr));
       }

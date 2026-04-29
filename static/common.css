@@ -680,49 +680,30 @@
   .dev-sub.open .dev-sub-body { display: block; }
 
   /* ── Model list ── */
-  .model-list { display: flex; flex-direction: column; gap: 6px; }
   .model-loading { font-size: 13px; color: #555; padding: 8px 0; }
-  .model-item {
-    display: flex; align-items: center; gap: 10px;
-    background: #0f0f13; border: 1px solid #1e1e2e;
-    border-radius: 10px; padding: 10px 12px;
-    transition: border-color .15s;
-  }
-  .model-item.model-active { border-color: rgba(62,207,142,.35); }
-  .model-item.model-item--active { border-color: rgba(74,124,247,.55); background: #0f0f1a; }
-  .model-radio {
-    width: 18px; height: 18px; border-radius: 4px;
-    border: 2px solid #2a2a38; flex-shrink: 0; cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    transition: border-color .15s;
-  }
-  .model-item.model-active .model-radio { border-color: #3ecf8e; }
-  .model-radio-dot {
-    width: 10px; height: 10px; border-radius: 2px;
-    background: #3ecf8e; display: none;
-  }
-  .model-item.model-active .model-radio-dot { display: block; }
-  .model-name {
-    flex: 1; font-size: 13px; color: #c8c8e0;
-    font-family: 'SF Mono', 'Fira Code', monospace;
-    word-break: break-all; min-width: 0;
-  }
-  .model-item.model-active .model-name { color: #fff; }
   .model-drag-handle {
     color: #333; font-size: 14px; cursor: grab; flex-shrink: 0;
     padding: 0 2px; line-height: 1; user-select: none;
     -webkit-user-select: none; transition: color .15s;
   }
   .model-drag-handle:active { cursor: grabbing; }
-  .model-item:hover .model-drag-handle { color: #555; }
-  .model-item.dragging { opacity: .4; }
-  .model-item.drag-over-top {
-    border-top: 2px solid #4a7cf7;
-    border-radius: 10px 10px 10px 10px;
+  .story-row:hover .model-drag-handle { color: #555; }
+  .story-row.dragging { opacity: .4; }
+  .story-row.drag-over-top { border-top: 2px solid #4a7cf7; }
+  .story-row.drag-over-bottom { border-bottom: 2px solid #4a7cf7; }
+  .story-row--model-active { border-color: rgba(62,207,142,.35); }
+  .model-radio-widget {
+    width: 18px; height: 18px; border-radius: 4px;
+    border: 2px solid #2a2a38; flex-shrink: 0; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: border-color .15s;
   }
-  .model-item.drag-over-bottom {
-    border-bottom: 2px solid #4a7cf7;
+  .model-radio-widget--active { border-color: #3ecf8e; }
+  .model-radio-dot {
+    width: 10px; height: 10px; border-radius: 2px;
+    background: #3ecf8e; display: none;
   }
+  .model-radio-widget--active .model-radio-dot { display: block; }
 
   /* ── Publish times list ── */
   .pt-item-row { display: flex; align-items: center; gap: 8px; }
@@ -765,7 +746,6 @@
 
   /* Probe button */
   .model-probe-btn {
-    margin-left: auto; margin-right: 4px;
     background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.1);
     cursor: pointer; color: #8888b0; padding: 3px; border-radius: 5px;
     width: 22px; height: 22px; display: flex; align-items: center; justify-content: center;
