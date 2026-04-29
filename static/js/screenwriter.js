@@ -702,7 +702,7 @@ var setDraftStoryFromRecord;
 
     input.addEventListener('input', function() {
       clearTimeout(_debounce);
-      _debounce = setTimeout(_doSearch, 500);
+      _debounce = setTimeout(_doSearch, 400);
     });
 
     var _origLoad = window.loadStoryList;
