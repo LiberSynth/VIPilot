@@ -1157,8 +1157,7 @@ def api_production_movies_upload():
     filename = f.filename
     if filename.lower().endswith(".mp4"):
         filename = filename[:-4]
-    words = filename.split()[:4]
-    title = " ".join(words) or "Без названия"
+    title = filename or "Без названия"
     video_data = f.read()
     from db import db_create_manual_movie
 
