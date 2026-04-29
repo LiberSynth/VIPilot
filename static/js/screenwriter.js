@@ -702,6 +702,15 @@ var setDraftStoryFromRecord;
       clearTimeout(_debounce);
       _debounce = setTimeout(_doSearch, 500);
     });
+
+    var _origLoad = window.loadStoryList;
+    window.loadStoryList = function() {
+      if (btn.classList.contains('on') && input.value.trim()) {
+        _doSearch();
+      } else if (typeof _origLoad === 'function') {
+        _origLoad();
+      }
+    };
   }
 
   if (document.readyState === 'loading') {
