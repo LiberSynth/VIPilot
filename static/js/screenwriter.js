@@ -650,13 +650,11 @@ var setDraftStoryFromRecord;
   }
 })();
 
-/* ── Кнопка поиска и строка поиска по сюжетам ── */
+/* ── Клиентский фильтр сюжетов ── */
 (function() {
-  function initSearchStoriesBtn() {
-    var btn   = document.getElementById('btn-client-filter');
-    var row   = document.getElementById('story-search-row');
+  function initStoryClientFilter() {
     var input = document.getElementById('story-search-input');
-    if (!btn || !row || !input) return;
+    if (!input) return;
 
     var _debounce = null;
 
@@ -688,18 +686,6 @@ var setDraftStoryFromRecord;
       });
     }
 
-    btn.addEventListener('click', function() {
-      var isOn = btn.classList.toggle('on');
-      row.style.display = isOn ? '' : 'none';
-      if (isOn) {
-        input.focus();
-      } else {
-        input.value = '';
-        clearTimeout(_debounce);
-        window.loadStoryList();
-      }
-    });
-
     input.addEventListener('input', function() {
       clearTimeout(_debounce);
       _debounce = setTimeout(_doSearch, 400);
@@ -707,7 +693,7 @@ var setDraftStoryFromRecord;
 
     var _origLoad = window.loadStoryList;
     window.loadStoryList = function() {
-      if (btn.classList.contains('on') && input.value.trim()) {
+      if (input.value.trim()) {
         _doSearch();
       } else if (typeof _origLoad === 'function') {
         _origLoad();
@@ -716,9 +702,9 @@ var setDraftStoryFromRecord;
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initSearchStoriesBtn);
+    document.addEventListener('DOMContentLoaded', initStoryClientFilter);
   } else {
-    initSearchStoriesBtn();
+    initStoryClientFilter();
   }
 })();
 

@@ -484,10 +484,8 @@
 /* ── Клиентский фильтр роликов ── */
 (function() {
   function initMovieClientFilter() {
-    var btn   = document.getElementById('btn-movie-client-filter');
-    var row   = document.getElementById('movie-search-row');
     var input = document.getElementById('movie-search-input');
-    if (!btn || !row || !input) return;
+    if (!input) return;
 
     var _debounce = null;
 
@@ -519,18 +517,6 @@
       });
     }
 
-    btn.addEventListener('click', function() {
-      var isOn = btn.classList.toggle('on');
-      row.style.display = isOn ? '' : 'none';
-      if (isOn) {
-        input.focus();
-      } else {
-        input.value = '';
-        clearTimeout(_debounce);
-        window.loadMovieList();
-      }
-    });
-
     input.addEventListener('input', function() {
       clearTimeout(_debounce);
       _debounce = setTimeout(_doSearch, 400);
@@ -538,7 +524,7 @@
 
     var _origLoad = window.loadMovieList;
     window.loadMovieList = function(callback) {
-      if (btn.classList.contains('on') && input.value.trim()) {
+      if (input.value.trim()) {
         _doSearch();
         if (typeof callback === 'function') callback();
       } else if (typeof _origLoad === 'function') {
