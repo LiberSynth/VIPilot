@@ -891,6 +891,7 @@
   .story-model-name {
     font-size: 11px; color: #7878a0; font-weight: 400;
   }
+  .story-title-dim { opacity: 0.4; }
   .story-row-right {
     display: flex; align-items: center; gap: 6px; flex-shrink: 0;
   }

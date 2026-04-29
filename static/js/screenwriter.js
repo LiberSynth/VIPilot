@@ -170,7 +170,9 @@ var setDraftStoryFromRecord;
       var modelLabel = item.model_name
         ? ' <span class="story-model-name">(' + AccordionList.escapeHtml(item.model_name) + ')</span>'
         : '';
-      return AccordionList.escapeHtml(item.title || '(без названия)') + modelLabel;
+      var titleHtml = AccordionList.escapeHtml(item.title || '(без названия)');
+      if (item._dim) titleHtml = '<span class="story-title-dim">' + titleHtml + '</span>';
+      return titleHtml + modelLabel;
     },
     renderButtons: function(item) {
       return _renderStoryIcons(item) + _renderPinBtn(item) + _renderDeleteBtn(item) + _renderExportBtn(item);
@@ -297,6 +299,8 @@ var setDraftStoryFromRecord;
     if (_activeStoryId) params.set('pin_id', _activeStoryId);
     return params.toString();
   }
+
+  window._getStoryFilterParams = getFilterParams;
 
   window.loadStoryList = function() {
     var container = document.getElementById('stories-list');
@@ -655,6 +659,32 @@ var setDraftStoryFromRecord;
 
     var _debounce = null;
 
+    function _doSearch() {
+      var q = input.value.trim().toLowerCase();
+      if (!q) {
+        window.loadStoryList();
+        return;
+      }
+      var filterQs = (window._getStoryFilterParams ? window._getStoryFilterParams() : '');
+      var filterParams = new URLSearchParams(filterQs);
+      filterParams.delete('pin_id');
+      var filterIdsUrl = '/production/stories/filter-ids?' + filterParams.toString();
+      Promise.all([
+        fetch('/production/stories?show_used=1&show_bad=1').then(function(r) { return r.ok ? r.json() : []; }),
+        fetch(filterIdsUrl).then(function(r) { return r.ok ? r.json() : { ids: [] }; }),
+      ]).then(function(results) {
+        var allStories = results[0];
+        var filterIds = new Set(results[1].ids || []);
+        var matched = allStories.filter(function(s) {
+          return (s.title || '').toLowerCase().indexOf(q) !== -1;
+        });
+        matched.forEach(function(s) { s._dim = !filterIds.has(s.id); });
+        renderStories(matched);
+      }).catch(function() {
+        window.loadStoryList();
+      });
+    }
+
     btn.addEventListener('click', function() {
       var isOn = btn.classList.toggle('on');
       row.style.display = isOn ? '' : 'none';
@@ -663,14 +693,13 @@ var setDraftStoryFromRecord;
       } else {
         input.value = '';
         clearTimeout(_debounce);
+        window.loadStoryList();
       }
     });
 
     input.addEventListener('input', function() {
       clearTimeout(_debounce);
-      _debounce = setTimeout(function() {
-        /* фильтрация будет добавлена позже */
-      }, 500);
+      _debounce = setTimeout(_doSearch, 500);
     });
   }
 

@@ -33,6 +33,7 @@ from db import (
     cycle_config_get,
     cycle_config_set,
     db_get_stories_list,
+    db_get_story_ids_by_filter,
     db_get_stories_pool,
     db_count_good_pool,
     db_set_story_grade,
@@ -902,6 +903,28 @@ def api_production_story_pin(story_id):
     if not ok:
         return jsonify({"error": "not found"}), 404
     return jsonify({"ok": True})
+
+
+@production_bp.route("/production/stories/filter-ids", methods=["GET"])
+def api_production_stories_filter_ids():
+    err = _production_auth_check()
+    if err:
+        return err
+    show_used = request.args.get("show_used", "1") != "0"
+    show_bad = request.args.get("show_bad", "1") != "0"
+    for_approval = request.args.get("for_approval", "0") == "1"
+    only_pinned = request.args.get("only_pinned", "0") == "1"
+    only_bad = request.args.get("only_bad", "0") == "1"
+    approve_movies = cycle_config_get("approve_movies")
+    ids = db_get_story_ids_by_filter(
+        show_used=show_used,
+        show_bad=show_bad,
+        for_approval=for_approval,
+        only_pinned=only_pinned,
+        only_bad=only_bad,
+        approve_movies=approve_movies,
+    )
+    return jsonify({"ids": ids})
 
 
 @production_bp.route("/production/stories/pool", methods=["GET"])

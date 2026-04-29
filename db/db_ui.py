@@ -78,21 +78,21 @@ def db_get_batch_logs(batch_id):
     }
 
 
-def db_get_stories_list(show_used=True, show_bad=True, for_approval=False, pin_id=None, approve_movies: bool = True, only_pinned: bool = False, only_bad: bool = False):
-    from common.statuses import FINAL_BATCH_STATUSES
-    final_statuses_sql = ', '.join(f"'{s}'" for s in FINAL_BATCH_STATUSES)
+def _build_stories_used_expr(approve_movies: bool) -> str:
     if approve_movies:
-        used_expr = """EXISTS (
+        return """EXISTS (
                         SELECT 1 FROM batches b
                         JOIN movies m ON m.id = b.movie_id
                         WHERE b.story_id = s.id AND b.movie_id IS NOT NULL
                           AND m.grade = 'good'
                     )"""
-    else:
-        used_expr = """EXISTS (
+    return """EXISTS (
                         SELECT 1 FROM batches b
                         WHERE b.story_id = s.id AND b.movie_id IS NOT NULL
                     )"""
+
+
+def _build_stories_where(used_expr: str, show_used: bool, show_bad: bool, for_approval: bool, only_pinned: bool, only_bad: bool, pin_id=None):
     filter_conditions = []
     if for_approval:
         filter_conditions.append("s.grade IS NULL")
@@ -117,6 +117,26 @@ def db_get_stories_list(show_used=True, show_bad=True, for_approval=False, pin_i
         where_clause = "WHERE " + " AND ".join(filter_conditions)
     else:
         where_clause = ""
+    return where_clause, params
+
+
+def db_get_story_ids_by_filter(show_used=True, show_bad=True, for_approval=False, only_pinned=False, only_bad=False, approve_movies=True) -> list:
+    used_expr = _build_stories_used_expr(approve_movies)
+    where_clause, params = _build_stories_where(used_expr, show_used, show_bad, for_approval, only_pinned, only_bad)
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                f"SELECT s.id::text FROM stories s {where_clause} ORDER BY s.created_at DESC, s.id DESC",
+                params or None,
+            )
+            return [row[0] for row in cur.fetchall()]
+
+
+def db_get_stories_list(show_used=True, show_bad=True, for_approval=False, pin_id=None, approve_movies: bool = True, only_pinned: bool = False, only_bad: bool = False):
+    from common.statuses import FINAL_BATCH_STATUSES
+    final_statuses_sql = ', '.join(f"'{s}'" for s in FINAL_BATCH_STATUSES)
+    used_expr = _build_stories_used_expr(approve_movies)
+    where_clause, params = _build_stories_where(used_expr, show_used, show_bad, for_approval, only_pinned, only_bad, pin_id)
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(f"""
