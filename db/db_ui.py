@@ -184,20 +184,22 @@ def db_get_stories_list(show_used=True, show_bad=True, for_approval=False, pin_i
     ]
 
 
-def db_get_movies_list(show_published=True, show_bad=True, for_approval=False, pin_id=None):
-    _published_check = """EXISTS (
+_MOVIES_PUBLISHED_CHECK = """EXISTS (
         SELECT 1 FROM batches b2
         WHERE b2.movie_id = m.id
           AND (b2.status IN ('published', 'published_partially')
                OR b2.status LIKE '%%.published')
     )"""
+
+
+def _build_movies_where(show_published: bool, show_bad: bool, for_approval: bool, pin_id=None):
     filter_conditions = []
     if for_approval:
         filter_conditions.append("m.grade IS NULL")
-        filter_conditions.append(f"NOT ({_published_check})")
+        filter_conditions.append(f"NOT ({_MOVIES_PUBLISHED_CHECK})")
     else:
         if not show_published:
-            filter_conditions.append(f"NOT ({_published_check})")
+            filter_conditions.append(f"NOT ({_MOVIES_PUBLISHED_CHECK})")
         if not show_bad:
             filter_conditions.append("m.grade = 'good'")
     params = []
@@ -209,6 +211,22 @@ def db_get_movies_list(show_published=True, show_bad=True, for_approval=False, p
         where_clause = "WHERE " + " AND ".join(filter_conditions)
     else:
         where_clause = ""
+    return where_clause, params
+
+
+def db_get_movie_ids_by_filter(show_published=True, show_bad=True, for_approval=False) -> list:
+    where_clause, params = _build_movies_where(show_published, show_bad, for_approval)
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                f"SELECT m.id::text FROM movies m {where_clause} ORDER BY m.created_at DESC, m.id DESC",
+                params or None,
+            )
+            return [row[0] for row in cur.fetchall()]
+
+
+def db_get_movies_list(show_published=True, show_bad=True, for_approval=False, pin_id=None):
+    where_clause, params = _build_movies_where(show_published, show_bad, for_approval, pin_id)
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(f"""
@@ -224,7 +242,7 @@ def db_get_movies_list(show_published=True, show_bad=True, for_approval=False, p
                         LIMIT 1
                     ) AS story_title,
                     vm.name AS model_name,
-                    {_published_check} AS published,
+                    {_MOVIES_PUBLISHED_CHECK} AS published,
                     (
                         SELECT b2.id::text
                         FROM batches b2

@@ -90,7 +90,9 @@ from .db_ui import (
     db_get_user_by_login,
     db_get_role_modules,
     db_get_movies_list,
+    db_get_movie_ids_by_filter,
 )
+
 from .db_service import (
     db_cleanup_log_entries,
     db_cleanup_logs,

@@ -39,6 +39,7 @@ from db import (
     db_set_story_grade,
     db_set_story_pinned,
     db_get_movies_list,
+    db_get_movie_ids_by_filter,
     db_set_movie_grade,
     db_upsert_story_draft,
     db_update_story_content,
@@ -971,6 +972,22 @@ def api_production_env_set():
 
 
 _PRODUCTION_GRADE_CYCLE = ["good", "bad", None]
+
+
+@production_bp.route("/production/movies/filter-ids", methods=["GET"])
+def api_production_movies_filter_ids():
+    err = _production_auth_check()
+    if err:
+        return err
+    for_approval = request.args.get("for_approval") == "1"
+    show_published = request.args.get("show_published", "1") != "0"
+    show_bad = request.args.get("show_bad", "1") != "0"
+    ids = db_get_movie_ids_by_filter(
+        show_published=show_published,
+        show_bad=show_bad,
+        for_approval=for_approval,
+    )
+    return jsonify({"ids": ids})
 
 
 @production_bp.route("/production/movies", methods=["GET"])

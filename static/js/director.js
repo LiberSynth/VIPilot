@@ -93,6 +93,8 @@
     return params.toString();
   }
 
+  window._getMovieFilterParams = getFilterParams;
+
   /* ── плеер ── */
   function loadMovieInPlayer(movieId, forceNoAutoplay) {
     var wrap = document.getElementById('director-video-wrap');
@@ -143,7 +145,9 @@
       var modelLabel = item.model_name
         ? ' <span class="story-model-name">(' + AccordionList.escapeHtml(item.model_name) + ')</span>'
         : '';
-      return AccordionList.escapeHtml(item.story_title || '(без названия)') + modelLabel;
+      var titleHtml = AccordionList.escapeHtml(item.story_title || '(без названия)');
+      if (item._dim) titleHtml = '<span class="story-title-dim">' + titleHtml + '</span>';
+      return titleHtml + modelLabel;
     },
     renderButtons: function(item) {
       return _renderPublishedIcon(item) + _renderInfoBtn(item) + _renderMovieDeleteBtn(item);
@@ -196,6 +200,8 @@
     _accordionList.render(movies || []);
     if (movies && movies.length) _bindMovieListButtons(container);
   }
+
+  window._renderMovies = renderMovies;
 
   function selectMovie(movieId, forceNoAutoplay) {
     _forceNoAutoplay = !!forceNoAutoplay;
@@ -472,5 +478,78 @@
     document.addEventListener('DOMContentLoaded', initDirector);
   } else {
     initDirector();
+  }
+})();
+
+/* ── Клиентский фильтр роликов ── */
+(function() {
+  function initMovieClientFilter() {
+    var btn   = document.getElementById('btn-movie-client-filter');
+    var row   = document.getElementById('movie-search-row');
+    var input = document.getElementById('movie-search-input');
+    if (!btn || !row || !input) return;
+
+    var _debounce = null;
+
+    function _doSearch() {
+      var q = input.value.trim().toLowerCase();
+      if (!q) {
+        window.loadMovieList();
+        return;
+      }
+      var filterQs = (window._getMovieFilterParams ? window._getMovieFilterParams() : '');
+      var filterParams = new URLSearchParams(filterQs);
+      filterParams.delete('pin_id');
+      var filterIdsUrl = '/production/movies/filter-ids?' + filterParams.toString();
+      Promise.all([
+        fetch('/production/movies?show_published=1&show_bad=1').then(function(r) { return r.ok ? r.json() : []; }),
+        fetch(filterIdsUrl).then(function(r) { return r.ok ? r.json() : { ids: [] }; }),
+      ]).then(function(results) {
+        var allMovies = results[0];
+        var filterIds = new Set(results[1].ids || []);
+        var words = q.split(/\s+/).filter(Boolean);
+        var matched = allMovies.filter(function(m) {
+          var t = (m.story_title || '').toLowerCase();
+          return words.every(function(w) { return t.indexOf(w) !== -1; });
+        });
+        matched.forEach(function(m) { m._dim = !filterIds.has(m.id); });
+        if (typeof window._renderMovies === 'function') window._renderMovies(matched);
+      }).catch(function() {
+        window.loadMovieList();
+      });
+    }
+
+    btn.addEventListener('click', function() {
+      var isOn = btn.classList.toggle('on');
+      row.style.display = isOn ? '' : 'none';
+      if (isOn) {
+        input.focus();
+      } else {
+        input.value = '';
+        clearTimeout(_debounce);
+        window.loadMovieList();
+      }
+    });
+
+    input.addEventListener('input', function() {
+      clearTimeout(_debounce);
+      _debounce = setTimeout(_doSearch, 400);
+    });
+
+    var _origLoad = window.loadMovieList;
+    window.loadMovieList = function(callback) {
+      if (btn.classList.contains('on') && input.value.trim()) {
+        _doSearch();
+        if (typeof callback === 'function') callback();
+      } else if (typeof _origLoad === 'function') {
+        _origLoad(callback);
+      }
+    };
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initMovieClientFilter);
+  } else {
+    initMovieClientFilter();
   }
 })();
