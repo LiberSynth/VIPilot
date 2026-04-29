@@ -699,6 +699,8 @@ var setDraftStoryFromRecord;
       .then(function(models) {
         _models = (models || []).filter(function(m) { return m.active; });
         buildList();
+        var cntEl = document.getElementById('screenwriter-model-count');
+        if (cntEl) cntEl.textContent = 'Записей: ' + _models.length;
       })
       .catch(function() {});
   }

@@ -51,7 +51,10 @@
         <span class="story-generate-count-label">штук</span>
       </div>
       <div style="margin-top:8px">
-        <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block">Модель</label>
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:4px">
+          <label class="setting-label" style="font-size:12px;margin-bottom:0">Модель</label>
+          <span id="screenwriter-model-count" style="font-size:12px; color:#888; background:rgba(255,255,255,.07); border-radius:10px; padding:1px 8px;"></span>
+        </div>
         <div class="cust-select" id="screenwriter-model-wrap">
           <button type="button" class="cust-select-btn" id="screenwriter-model-btn">
             <span id="screenwriter-model-label">Подобрать</span>
@@ -141,7 +144,10 @@
       <input type="hidden" id="director-story-id" value="">
       <textarea id="director-story-content" style="width:100%; box-sizing:border-box; resize:vertical"></textarea>
       <div style="margin-top:8px">
-        <div class="hint" style="margin-bottom:4px">Модель</div>
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:4px">
+          <div class="hint" style="margin-bottom:0">Модель</div>
+          <span id="director-model-count" style="font-size:12px; color:#888; background:rgba(255,255,255,.07); border-radius:10px; padding:1px 8px;"></span>
+        </div>
         <div class="cust-select" id="director-video-model-wrap">
           <button type="button" class="cust-select-btn" id="director-video-model-btn">
             <span id="director-video-model-label">Подобрать</span>
@@ -386,6 +392,8 @@
           });
           list.appendChild(opt);
         });
+        var cntEl = document.getElementById('director-model-count');
+        if (cntEl) cntEl.textContent = 'Записей: ' + active.length;
       });
   }
 
