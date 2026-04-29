@@ -32,7 +32,7 @@ from db import (
 )
 from log import db_log_update, write_log_entry
 from pipelines.base import check_cancelled
-from common.exceptions import AppException, FatalError
+from common.exceptions import FatalError
 from utils.utils import fmt_id_msg
 
 

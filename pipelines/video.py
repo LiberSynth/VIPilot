@@ -10,7 +10,6 @@ Pipeline 3 — Генерация видео.
                                                   → video_error
 """
 
-import time
 
 import common.environment as environment
 from utils.prompt_params import apply_prompt_params
