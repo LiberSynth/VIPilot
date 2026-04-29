@@ -47,18 +47,17 @@ MIGRATIONS = [
 
 def run_migrations():
     """Применяет все незапущенные миграции. Каждая в отдельной транзакции."""
-    conn = get_db()
-    try:
+    with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute("SELECT value FROM settings WHERE key = 'db_version'")
             row = cur.fetchone()
             current = int(row[0]) if row else 0
-        conn.commit()
 
-        for version, fn in MIGRATIONS:
-            if version <= current:
-                continue
-            try:
+    for version, fn in MIGRATIONS:
+        if version <= current:
+            continue
+        try:
+            with get_db() as conn:
                 with conn.cursor() as cur:
                     fn(cur)
                     cur.execute(
@@ -66,11 +65,7 @@ def run_migrations():
                         " ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
                         (str(version),),
                     )
-                conn.commit()
-                write_log_entry(None, f"[DB] Миграция {version} применена", level='silent')
-            except Exception as e:
-                conn.rollback()
-                write_log_entry(None, f"[DB] Ошибка миграции {version}: {e}", level='silent')
-                raise
-    finally:
-        conn.close()
+            write_log_entry(None, f"[DB] Миграция {version} применена", level='silent')
+        except Exception as e:
+            write_log_entry(None, f"[DB] Ошибка миграции {version}: {e}", level='silent')
+            raise
