@@ -883,8 +883,7 @@
   #card-story-draft { display: block; }
   .story-title {
     flex: 1; font-size: 13px; color: #c8c8e0;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    min-width: 0;
+    min-width: 0; word-break: break-word;
   }
   .story-model-name {
     font-size: 11px; color: #7878a0; font-weight: 400;
