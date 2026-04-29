@@ -101,29 +101,33 @@
           </button>
         </div>
       </div>
-      <div id="story-search-row" style="display:none; margin-top:7px; margin-bottom:6px">
-        <input type="text" id="story-search-input" placeholder="Поиск по сюжетам..." autocomplete="off" style="width:100%; box-sizing:border-box">
+      <div style="display:flex; gap:10px; align-items:flex-start; margin-top:7px; margin-bottom:10px">
+        <div id="story-search-row" style="display:none; flex:1; min-width:0">
+          <input type="text" id="story-search-input" placeholder="Поиск по сюжетам..." autocomplete="off" style="width:100%; box-sizing:border-box">
+        </div>
+        <div style="flex-shrink:0; margin-left:auto; display:flex; flex-direction:column; gap:6px">
+          <label class="sw-filter-row" for="filter-for-approval">
+            <span class="sw-filter-label">На утверждение</span>
+            <input class="sw-filter-check" type="checkbox" id="filter-for-approval" {% if screenwriter_for_approval %}checked{% endif %}>
+          </label>
+          <label class="sw-filter-row" for="filter-only-good">
+            <span class="sw-filter-label">Только хорошие</span>
+            <input class="sw-filter-check" type="checkbox" id="filter-only-good" {% if screenwriter_only_good %}checked{% endif %}>
+          </label>
+          <label class="sw-filter-row" for="filter-only-bad">
+            <span class="sw-filter-label">Только плохие</span>
+            <input class="sw-filter-check" type="checkbox" id="filter-only-bad" {% if screenwriter_only_bad %}checked{% endif %}>
+          </label>
+          <label class="sw-filter-row" for="filter-only-pinned">
+            <span class="sw-filter-label">Только закреплённые</span>
+            <input class="sw-filter-check" type="checkbox" id="filter-only-pinned" {% if screenwriter_only_pinned %}checked{% endif %}>
+          </label>
+          <label class="sw-filter-row" for="filter-show-used">
+            <span class="sw-filter-label">Использованные</span>
+            <input class="sw-filter-check" type="checkbox" id="filter-show-used" {% if screenwriter_show_used %}checked{% endif %}>
+          </label>
+        </div>
       </div>
-      <label class="sw-filter-row" style="margin-top:7px; margin-bottom:6px" for="filter-for-approval">
-        <span class="sw-filter-label">На утверждение</span>
-        <input class="sw-filter-check" type="checkbox" id="filter-for-approval" {% if screenwriter_for_approval %}checked{% endif %}>
-      </label>
-      <label class="sw-filter-row" style="margin-bottom:6px" for="filter-only-good">
-        <span class="sw-filter-label">Только хорошие</span>
-        <input class="sw-filter-check" type="checkbox" id="filter-only-good" {% if screenwriter_only_good %}checked{% endif %}>
-      </label>
-      <label class="sw-filter-row" style="margin-bottom:6px" for="filter-only-bad">
-        <span class="sw-filter-label">Только плохие</span>
-        <input class="sw-filter-check" type="checkbox" id="filter-only-bad" {% if screenwriter_only_bad %}checked{% endif %}>
-      </label>
-      <label class="sw-filter-row" style="margin-bottom:6px" for="filter-only-pinned">
-        <span class="sw-filter-label">Только закреплённые</span>
-        <input class="sw-filter-check" type="checkbox" id="filter-only-pinned" {% if screenwriter_only_pinned %}checked{% endif %}>
-      </label>
-      <label class="sw-filter-row" style="margin-bottom:10px" for="filter-show-used">
-        <span class="sw-filter-label">Использованные</span>
-        <input class="sw-filter-check" type="checkbox" id="filter-show-used" {% if screenwriter_show_used %}checked{% endif %}>
-      </label>
       <div id="stories-list" class="stories-list">
         <div class="stories-loading">Загрузка...</div>
       </div>
