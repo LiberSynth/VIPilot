@@ -1251,8 +1251,7 @@ def api_production_story_generate():
 
 @bp.route("/publication-counter/reset", methods=["POST"])
 def reset_publication_counter():
-    err = _auth_required()
-    if err:
-        return err
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
     env_set("publication_counter", "0")
     return jsonify({"ok": True})
