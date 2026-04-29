@@ -10,8 +10,8 @@ SECTIONS = [
     {"name": "environment",     "fields": ["key", "value"],                                                          "pk": "key"},
     {"name": "cycle_config",    "fields": ["key", "value"],                                                          "pk": "key"},
     {"name": "ai_platforms",    "fields": ["id", "name", "url", "env_key_name"],                                     "pk": "id"},
-    {"name": "ai_models",       "fields": ["id", "platform_id", "name", "url", "body", "type", "price", "order", "active", "grade", "note"], "pk": "id", "jsonb_fields": ["body"], "full_replace": True},
-    {"name": "model_durations", "fields": ["id", "model_id", "duration"],                                            "pk": "id", "full_replace": True},
+    {"name": "ai_models",       "fields": ["id", "platform_id", "name", "url", "body", "type", "price"],            "pk": "id", "jsonb_fields": ["body"]},
+    {"name": "model_durations", "fields": ["id", "model_id", "duration"],                                            "pk": "id"},
     {"name": "targets",         "fields": ["id", "name", "aspect_ratio_x", "aspect_ratio_y", "active", "order", "transcode", "config", "slug"], "pk": "id", "jsonb_fields": ["config"]},
     {"name": "users",           "fields": ["id", "name", "login", "password"],                                       "pk": "id"},
     {"name": "user_roles",      "fields": ["id", "name", "slug", "module"],                                          "pk": "id"},
@@ -49,25 +49,6 @@ def import_package(stream):
             quoted_pk = f'"{pk}"'
 
             yaml_records = data.get(table) or []
-
-            if section.get("full_replace"):
-                cur.execute(f"SELECT COUNT(*) FROM {table}")
-                deleted = cur.fetchone()[0]
-                cur.execute(f"DELETE FROM {table}")
-                inserted = 0
-                placeholders = ", ".join(["%s"] * len(fields))
-                for rec in yaml_records:
-                    if rec.get(pk) is None:
-                        continue
-                    values = [_to_db(f, rec.get(f), jsonb_fields) for f in fields]
-                    cur.execute(
-                        f'INSERT INTO {table} ({", ".join(quoted_fields)}) VALUES ({placeholders})',
-                        values,
-                    )
-                    inserted += 1
-                summary[table] = {"inserted": inserted, "updated": 0, "deleted": deleted}
-                continue
-
             yaml_map = {str(rec[pk]): rec for rec in yaml_records if rec.get(pk) is not None}
 
             cur.execute(f"SELECT {quoted_pk} FROM {table}")

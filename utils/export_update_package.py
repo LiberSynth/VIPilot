@@ -26,7 +26,7 @@ SECTIONS = [
     },
     {
         "name": "ai_models",
-        "fields": ["id", "platform_id", "name", "url", "body", "type", "price", "order", "active", "grade", "note"],
+        "fields": ["id", "platform_id", "name", "url", "body", "type", "price"],
         "jsonb_fields": ["body"],
     },
     {
