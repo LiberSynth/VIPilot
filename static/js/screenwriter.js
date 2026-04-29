@@ -653,7 +653,7 @@ var setDraftStoryFromRecord;
 /* ── Кнопка поиска и строка поиска по сюжетам ── */
 (function() {
   function initSearchStoriesBtn() {
-    var btn   = document.getElementById('btn-search-stories');
+    var btn   = document.getElementById('btn-client-filter');
     var row   = document.getElementById('story-search-row');
     var input = document.getElementById('story-search-input');
     if (!btn || !row || !input) return;
