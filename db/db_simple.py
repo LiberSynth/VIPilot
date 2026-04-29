@@ -426,9 +426,7 @@ def db_set_target_config_body(target_id: str, body: dict):
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "UPDATE targets"
-                " SET config = COALESCE(config, '{}') || jsonb_build_object('targets_config', %s::jsonb)"
-                " WHERE id = %s::uuid",
+                "UPDATE targets SET config = %s::jsonb WHERE id = %s::uuid",
                 (json.dumps(body), target_id),
             )
         conn.commit()

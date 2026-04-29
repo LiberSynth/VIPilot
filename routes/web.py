@@ -173,7 +173,7 @@ def root_page():
     vk_publish_wall      = bool(_vk_pm.get("wall",      0))
     vk_publish_clip_wall = bool(_vk_pm.get("clip_wall", 0))
     vk_target_id = vk_target["id"] if vk_target else None
-    _vk_tc = (vk_target.get("config") or {}).get("targets_config") if vk_target else None
+    _vk_tc = vk_target.get("config") if vk_target else None
     vk_targets_config_json = json.dumps(_vk_tc, ensure_ascii=False, indent=2) if _vk_tc is not None else ""
     video_duration     = max(1, min(60, cycle_config_get("video_duration")))
     video_post_prompt  = cycle_config_get("video_post_prompt")
@@ -196,7 +196,7 @@ def root_page():
     dzen_publisher_id = dzen_config.get("publisher_id", "")
     dzen_target_id = dzen_target["id"] if dzen_target else None
     dzen_active    = bool(dzen_target.get("active")) if dzen_target else False
-    _dzen_tc = dzen_config.get("targets_config") if dzen_target else None
+    _dzen_tc = dzen_target.get("config") if dzen_target else None
     dzen_targets_config_json = json.dumps(_dzen_tc, ensure_ascii=False, indent=2) if _dzen_tc is not None else ""
 
     rutube_target     = db_get_target_by_name("Rutube")
@@ -204,7 +204,7 @@ def root_page():
     rutube_person_id  = rutube_config.get("person_id", "")
     rutube_target_id  = rutube_target["id"] if rutube_target else None
     rutube_active     = bool(rutube_target.get("active")) if rutube_target else False
-    _rutube_tc = rutube_config.get("targets_config") if rutube_target else None
+    _rutube_tc = rutube_target.get("config") if rutube_target else None
     rutube_targets_config_json = json.dumps(_rutube_tc, ensure_ascii=False, indent=2) if _rutube_tc is not None else ""
 
     vkvideo_target    = db_get_target_by_name("VK Видео")
@@ -212,7 +212,7 @@ def root_page():
     vkvideo_club_id   = vkvideo_config.get("club_id", "")
     vkvideo_target_id = vkvideo_target["id"] if vkvideo_target else None
     vkvideo_active    = bool(vkvideo_target.get("active")) if vkvideo_target else False
-    _vkvideo_tc = vkvideo_config.get("targets_config") if vkvideo_target else None
+    _vkvideo_tc = vkvideo_target.get("config") if vkvideo_target else None
     vkvideo_targets_config_json = json.dumps(_vkvideo_tc, ensure_ascii=False, indent=2) if _vkvideo_tc is not None else ""
 
     active_targets  = db_get_active_targets()
