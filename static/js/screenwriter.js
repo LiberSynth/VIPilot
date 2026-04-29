@@ -697,7 +697,7 @@ var setDraftStoryFromRecord;
     fetch('/api/text-models')
       .then(function(r) { return r.ok ? r.json() : []; })
       .then(function(models) {
-        _models = (models || []).filter(function(m) { return m.grade === 'good'; });
+        _models = (models || []).filter(function(m) { return m.active; });
         buildList();
       })
       .catch(function() {});
