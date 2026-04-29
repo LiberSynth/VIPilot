@@ -384,12 +384,13 @@
       renderButtons: function(item) {
         var dur = makeDurationIndicatorHtml(item, _videoDuration);
         var radioActive = item.active ? ' model-radio-widget--active' : '';
-        var html = (dur || '');
-        html += '<div class="model-radio-widget' + radioActive + '" data-role="activate-btn" data-model-id="' + item.id + '" title="Активировать/деактивировать">'
-          + '<div class="model-radio-dot"></div></div>';
+        var html = '';
         if (item.price) {
           html += '<span style="font-size:11px;color:#888;padding-right:4px;white-space:nowrap;">' + escHtml(String(item.price)) + '</span>';
         }
+        html += (dur || '');
+        html += '<div class="model-radio-widget' + radioActive + '" data-role="activate-btn" data-model-id="' + item.id + '" title="Активировать/деактивировать">'
+          + '<div class="model-radio-dot"></div></div>';
         html += '<button class="model-probe-btn" data-role="probe-btn" data-model-id="' + item.id + '" data-model-name="' + escHtml(item.name || '') + '" title="Пробный запрос">'
           + '<svg viewBox="0 0 16 16" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="4,2 13,8 4,14"/></svg></button>';
         html += '<div class="model-drag-handle" title="Перетащить">⠿</div>';
