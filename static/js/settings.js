@@ -49,11 +49,6 @@ function collectAllSettings(activeTab) {
     const approveVal = chkApproveStories ? (chkApproveStories.checked ? '1' : '0') : (hidApproveStories ? hidApproveStories.value : '0');
     data.set('approve_stories', approveVal);
   }
-  setIfExists('vk_publish_story',    'vk_story_pub_hidden');
-  setIfExists('vk_publish_wall',     'vk_wall_pub_hidden');
-  setIfExists('vk_publish_clip_wall','vk_clip_wall_pub_hidden');
-  setIfExists('aspect_ratio_x',   'ar-x');
-  setIfExists('aspect_ratio_y',   'ar-y');
   setIfExists('target_id',        'target_id');
   setIfExists('notify_email',     'notify_email');
   setIfExists('notify_phone',     'notify_phone');
@@ -68,55 +63,12 @@ function collectAllSettings(activeTab) {
   return data;
 }
 
-function updateAR() {
-  const xEl = document.getElementById('ar-x');
-  const yEl = document.getElementById('ar-y');
-  const rect = document.getElementById('ar-rect');
-  if (!xEl || !yEl || !rect) return;
-  const x = Math.max(1, parseInt(xEl.value) || 1);
-  const y = Math.max(1, parseInt(yEl.value) || 1);
-  const maxSide = 64;
-  let w, h;
-  if (x >= y) { w = maxSide; h = Math.round(maxSide * y / x); }
-  else        { h = maxSide; w = Math.round(maxSide * x / y); }
-  rect.style.width  = w + 'px';
-  rect.style.height = h + 'px';
-  document.querySelectorAll('.ar-preset').forEach(function(btn) {
-    const parts = btn.textContent.split(':').map(Number);
-    btn.classList.toggle('active', parts[0] === x && parts[1] === y);
-  });
-  savePublishSettings();
-}
-
-function setAR(x, y) {
-  const xEl = document.getElementById('ar-x');
-  const yEl = document.getElementById('ar-y');
-  if (xEl) xEl.value = x;
-  if (yEl) yEl.value = y;
-  updateAR();
-}
-updateAR();
-
 function onApproveStoriesToggle(chk) {
   const hid   = document.getElementById('approve_stories_hidden');
   const badge = document.getElementById('approve-stories-badge');
   if (hid)   hid.value            = chk.checked ? '1' : '0';
   if (badge) badge.style.display  = chk.checked ? ''  : 'none';
   saveStorySettings();
-}
-
-function onVkMethodToggle(changedChk) {
-  const ids = [
-    { chk: 'vk_story_pub_check',     hid: 'vk_story_pub_hidden' },
-    { chk: 'vk_wall_pub_check',      hid: 'vk_wall_pub_hidden' },
-    { chk: 'vk_clip_wall_pub_check', hid: 'vk_clip_wall_pub_hidden' },
-  ];
-  ids.forEach(o => {
-    const el  = document.getElementById(o.chk);
-    const hid = document.getElementById(o.hid);
-    if (el && hid) hid.value = el.checked ? '1' : '0';
-  });
-  savePublishSettings();
 }
 
 var _requestSaveTimer = null;

@@ -347,39 +347,6 @@
   .story-generate-count-label {
     font-size: 13px; color: #8888b0; align-self: center;
   }
-  /* ── Aspect ratio control ── */
-  .ar-wrap { display: flex; align-items: center; gap: 16px; margin-top: 14px; }
-  .ar-preview-box {
-    width: 72px; height: 72px;
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
-  }
-  .ar-rect {
-    background: linear-gradient(135deg, rgba(74,124,247,.25), rgba(111,74,247,.25));
-    border: 1.5px solid rgba(74,124,247,.55);
-    border-radius: 5px;
-    transition: width .2s, height .2s;
-  }
-  .ar-inputs { display: flex; align-items: center; gap: 8px; flex: 1; }
-  input[type="number"].ar-num {
-    width: 64px; padding: 12px 0; text-align: center;
-    background: #0f0f13; border: 1px solid #2a2a38; border-radius: 10px;
-    color: #fff; font-size: 14px; font-weight: 700; font-family: inherit;
-    font-variant-numeric: tabular-nums; outline: none;
-    transition: border-color .2s; -moz-appearance: textfield;
-  }
-  input[type="number"].ar-num::-webkit-inner-spin-button { -webkit-appearance: none; }
-  input[type="number"].ar-num:focus { border-color: #4a7cf7; }
-  .ar-sep { font-size: 22px; font-weight: 300; color: #555; flex-shrink: 0; }
-  .ar-presets { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
-  .ar-preset {
-    font-size: 12px; padding: 5px 10px;
-    background: #0f0f13; border: 1px solid #2a2a38; border-radius: 7px;
-    color: #888; cursor: pointer; font-family: inherit;
-    transition: border-color .15s, color .15s;
-  }
-  .ar-preset:hover { border-color: #4a7cf7; color: #4a7cf7; }
-  .ar-preset.active { border-color: #4a7cf7; color: #4a7cf7; background: rgba(74,124,247,.1); }
   .btn-secondary {
     width: 100%; background: transparent; color: #4a7cf7;
     border: 1px solid rgba(74,124,247,.4); border-radius: 9px;

@@ -22,9 +22,7 @@ from db import (
     cycle_config_set,
     db_get_active_targets,
     db_get_all_targets,
-    db_update_target_aspect_ratio,
     db_get_target_by_name,
-    db_update_target_publish_method_by_slug,
     db_get_user_by_login,
     db_get_role_modules,
 )
@@ -168,10 +166,6 @@ def root_page():
     notify_phone       = settings_get("notify_phone", "")
     vk_target  = db_get_target_by_name("VKontakte")
     vk_active  = bool(vk_target.get("active")) if vk_target else False
-    _vk_pm     = (vk_target.get("config") or {}).get("publish_method", {}) if vk_target else {}
-    vk_publish_story     = bool(_vk_pm.get("story",     0))
-    vk_publish_wall      = bool(_vk_pm.get("wall",      0))
-    vk_publish_clip_wall = bool(_vk_pm.get("clip_wall", 0))
     vk_target_id = vk_target["id"] if vk_target else None
     _vk_tc = vk_target.get("config") if vk_target else None
     vk_targets_config_json = json.dumps(_vk_tc, ensure_ascii=False, indent=2) if _vk_tc is not None else ""
@@ -218,8 +212,6 @@ def root_page():
     active_targets  = db_get_active_targets()
     target          = active_targets[0] if active_targets else None
     target_id       = target["id"] if target else None
-    aspect_ratio_x  = target["aspect_ratio_x"] if target else 9
-    aspect_ratio_y  = target["aspect_ratio_y"] if target else 16
     _known_slugs    = {"vk", "dzen", "rutube", "vkvideo"}
     publish_order   = [
         t["slug"] for t in db_get_all_targets()
@@ -239,9 +231,6 @@ def root_page():
         use_donor=use_donor,
         notify_email=notify_email,
         notify_phone=notify_phone,
-        vk_publish_story=vk_publish_story,
-        vk_publish_wall=vk_publish_wall,
-        vk_publish_clip_wall=vk_publish_clip_wall,
         video_duration=video_duration,
         video_post_prompt=video_post_prompt,
         buffer_hours=buffer_hours,
@@ -257,8 +246,6 @@ def root_page():
         deep_debugging=deep_debugging,
         workflow_state=workflow_state,
         target_id=target_id,
-        aspect_ratio_x=aspect_ratio_x,
-        aspect_ratio_y=aspect_ratio_y,
         vk_target_id=vk_target_id,
         vk_targets_config_json=vk_targets_config_json,
         dzen_target_id=dzen_target_id,
@@ -383,27 +370,6 @@ def save():
         settings_set("notify_email", request.form.get("notify_email", "").strip())
     if "notify_phone" in request.form:
         settings_set("notify_phone", request.form.get("notify_phone", "").strip())
-
-    if any(k in request.form for k in ("vk_publish_story", "vk_publish_wall", "vk_publish_clip_wall")):
-        vk_story_raw     = request.form.get("vk_publish_story",     "0")
-        vk_wall_raw      = request.form.get("vk_publish_wall",      "0")
-        vk_clip_wall_raw = request.form.get("vk_publish_clip_wall", "0")
-        db_update_target_publish_method_by_slug("vk", {
-            "story":     1 if vk_story_raw     == "1" else 0,
-            "wall":      1 if vk_wall_raw      == "1" else 0,
-            "clip_wall": 1 if vk_clip_wall_raw == "1" else 0,
-        })
-
-    ar_target_id = request.form.get("target_id", "").strip()
-    ar_x_raw = request.form.get("aspect_ratio_x", "").strip()
-    ar_y_raw = request.form.get("aspect_ratio_y", "").strip()
-    if ar_target_id and ar_x_raw and ar_y_raw:
-        try:
-            ax, ay = int(ar_x_raw), int(ar_y_raw)
-            if ax > 0 and ay > 0:
-                db_update_target_aspect_ratio(ar_target_id, ax, ay)
-        except (ValueError, TypeError):
-            pass
 
     vid_dur_str = request.form.get("video_duration")
     if vid_dur_str is not None:

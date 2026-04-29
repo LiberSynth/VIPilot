@@ -91,66 +91,6 @@
       <div class="card{% if not vk_active %} target-disabled{% endif %}"{% if not loop.first %} style="margin-top:12px"{% endif %}>
         <input type="hidden" id="vk_target_id" value="{{ vk_target_id or '' }}">
         <div class="card-title">Публикация в ВКонтакте</div>
-        <div class="card-title" style="font-size:13px;font-weight:500;margin-top:0;margin-bottom:6px;color:var(--text-muted,#888)">Соотношение сторон</div>
-        <div class="ar-wrap">
-          <div class="ar-preview-box">
-            <div class="ar-rect" id="ar-rect"></div>
-          </div>
-          <div style="flex:1">
-            <div class="ar-inputs">
-              <input type="number" class="ar-num" id="ar-x" name="aspect_ratio_x"
-                     value="{{ aspect_ratio_x }}" min="1" max="99" oninput="updateAR()" autocomplete="off">
-              <span class="ar-sep">:</span>
-              <input type="number" class="ar-num" id="ar-y" name="aspect_ratio_y"
-                     value="{{ aspect_ratio_y }}" min="1" max="99" oninput="updateAR()" autocomplete="off">
-            </div>
-            <div class="ar-presets">
-              <button type="button" class="ar-preset" onclick="setAR(9,16)">9:16</button>
-              <button type="button" class="ar-preset" onclick="setAR(16,9)">16:9</button>
-              <button type="button" class="ar-preset" onclick="setAR(1,1)">1:1</button>
-              <button type="button" class="ar-preset" onclick="setAR(4,5)">4:5</button>
-              <button type="button" class="ar-preset" onclick="setAR(4,3)">4:3</button>
-            </div>
-          </div>
-        </div>
-        <div style="border-top:1px solid var(--border,rgba(255,255,255,.07));margin:14px 0 0"></div>
-        <div class="hint" style="margin-top:10px">Хотя бы одна опция должна быть включена.</div>
-        <div class="toggle-row" style="margin-top:10px">
-          <div>
-            <div class="toggle-label">Публиковать историю</div>
-            <div class="hint" style="margin-top:2px">Клип берётся из файла видео в батче.</div>
-          </div>
-          <label class="toggle-wrap">
-            <input type="hidden" name="vk_publish_story" id="vk_story_pub_hidden" value="{{ '1' if vk_publish_story else '0' }}">
-            <input type="checkbox" id="vk_story_pub_check" {% if vk_publish_story %}checked{% endif %}
-                   onchange="onVkMethodToggle(this)">
-            <span class="toggle-track"></span>
-          </label>
-        </div>
-        <div class="toggle-row" style="margin-top:10px">
-          <div>
-            <div class="toggle-label">Публиковать на стену</div>
-            <div class="hint" style="margin-top:2px">Клип берётся из файла видео в батче.</div>
-          </div>
-          <label class="toggle-wrap">
-            <input type="hidden" name="vk_publish_wall" id="vk_wall_pub_hidden" value="{{ '1' if vk_publish_wall else '0' }}">
-            <input type="checkbox" id="vk_wall_pub_check" {% if vk_publish_wall %}checked{% endif %}
-                   onchange="onVkMethodToggle(this)">
-            <span class="toggle-track"></span>
-          </label>
-        </div>
-        <div class="toggle-row" style="margin-top:10px">
-          <div>
-            <div class="toggle-label">Пост с клипом VK Видео</div>
-            <div class="hint" style="margin-top:2px">Клип публикуется по ссылке из VK Видео.</div>
-          </div>
-          <label class="toggle-wrap">
-            <input type="hidden" name="vk_publish_clip_wall" id="vk_clip_wall_pub_hidden" value="{{ '1' if vk_publish_clip_wall else '0' }}">
-            <input type="checkbox" id="vk_clip_wall_pub_check" {% if vk_publish_clip_wall %}checked{% endif %}
-                   onchange="onVkMethodToggle(this)">
-            <span class="toggle-track"></span>
-          </label>
-        </div>
         <div style="margin-top:14px">
           <div class="hint" style="margin-bottom:2px;color:#e8e8f0">Конфиг</div>
           <textarea id="vk-target-body" placeholder="JSON-параметры таргета" autocomplete="off">{{ vk_targets_config_json }}</textarea>
