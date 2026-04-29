@@ -676,8 +676,10 @@ var setDraftStoryFromRecord;
       ]).then(function(results) {
         var allStories = results[0];
         var filterIds = new Set(results[1].ids || []);
+        var words = q.split(/\s+/).filter(Boolean);
         var matched = allStories.filter(function(s) {
-          return (s.title || '').toLowerCase().indexOf(q) !== -1;
+          var t = (s.title || '').toLowerCase();
+          return words.every(function(w) { return t.indexOf(w) !== -1; });
         });
         matched.forEach(function(s) { s._dim = !filterIds.has(s.id); });
         if (typeof window._renderStories === 'function') window._renderStories(matched);
