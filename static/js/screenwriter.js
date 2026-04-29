@@ -89,106 +89,6 @@ var setDraftStoryFromRecord;
 
 /* ── Список сюжетов в панели Сценариста ── */
 (function() {
-  var _currentStories = [];
-  var GRADE_CYCLE = ['good', 'bad', null];
-  var GRADE_LABELS = { good: 'хорошо', bad: 'плохо', 'null': 'не указано' };
-  var GRADE_COLORS = {
-    good: 'rgba(62,207,142,.18)',
-    bad:  'rgba(255,80,80,.18)',
-    'null': 'rgba(255,255,255,.1)',
-  };
-  var GRADE_TEXT_COLORS = {
-    good: '#3ecf8e',
-    bad:  '#ff6060',
-    'null': '#888',
-  };
-  function gradeKey(g) { return g === null || g === undefined ? 'null' : g; }
-
-  /* ── Управление карточкой-синглтоном ── */
-  function _getCard() { return document.getElementById('card-story-draft'); }
-  function _getHolder() { return document.getElementById('story-card-holder'); }
-
-  function _saveFocus() {
-    var ae = document.activeElement;
-    var card = _getCard();
-    if (!ae || !card || !card.contains(ae)) return null;
-    return {
-      id: ae.id,
-      start: ae.selectionStart != null ? ae.selectionStart : null,
-      end:   ae.selectionEnd   != null ? ae.selectionEnd   : null,
-    };
-  }
-
-  function _restoreFocus(saved) {
-    if (!saved || !saved.id) return;
-    var el = document.getElementById(saved.id);
-    if (!el) return;
-    el.focus();
-    if (saved.start !== null) {
-      try { el.setSelectionRange(saved.start, saved.end); } catch (e) {}
-    }
-  }
-
-  function _detachCard() {
-    var card = _getCard();
-    var holder = _getHolder();
-    if (card && holder && card.parentNode !== holder) holder.appendChild(card);
-  }
-
-  function _attachCardToExpand(expandEl) {
-    var card = _getCard();
-    if (card && expandEl) expandEl.appendChild(card);
-  }
-
-  function _insertFakeRow(container, focusTitle) {
-    var existing = container.querySelector('.story-row[data-id="__new__"]');
-    if (existing) existing.remove();
-    var chevronSvg = '<svg viewBox="0 0 12 7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 1l5 5 5-5"/></svg>';
-    var fakeRow = document.createElement('div');
-    fakeRow.className = 'story-row story-row--expanded';
-    fakeRow.setAttribute('data-id', '__new__');
-    fakeRow.innerHTML =
-      '<div class="story-row-header">' +
-        '<div class="story-title" style="color:#888;font-style:italic">Новый сюжет</div>' +
-        '<div class="story-row-right">' +
-          '<span class="story-chevron">' + chevronSvg + '</span>' +
-        '</div>' +
-      '</div>' +
-      '<div class="story-expand"></div>';
-    container.insertBefore(fakeRow, container.firstChild);
-    var expandEl = fakeRow.querySelector('.story-expand');
-    if (expandEl) _attachCardToExpand(expandEl);
-    fakeRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    if (focusTitle) {
-      var titleEl = document.getElementById('draft-story-title');
-      if (titleEl) titleEl.focus();
-    }
-  }
-
-  /* Экспозиция для других модулей */
-  window.setExpandedStoryId = function(id) { _activeStoryId = id; };
-
-  function updateStoriesCount(n) {
-    var el = document.getElementById('stories-count');
-    if (!el) return;
-    var mod10 = n % 10, mod100 = n % 100;
-    var word;
-    if (mod100 >= 11 && mod100 <= 14) {
-      word = 'записей';
-    } else if (mod10 === 1) {
-      word = 'запись';
-    } else if (mod10 >= 2 && mod10 <= 4) {
-      word = 'записи';
-    } else {
-      word = 'записей';
-    }
-    el.textContent = n + ' ' + word;
-  }
-
-  function escapeHtml(str) {
-    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  }
-
   function _setExportStoriesBtnEnabled(enabled) {
     var btn = document.getElementById('btn-export-stories');
     if (!btn) return;
@@ -199,115 +99,100 @@ var setDraftStoryFromRecord;
     }
   }
 
-  function _findStory(id) {
-    for (var j = 0; j < _currentStories.length; j++) {
-      if (String(_currentStories[j].id) === String(id)) return _currentStories[j];
+  function _renderStoryIcons(s) {
+    var icons = '';
+    if (s.used) {
+      icons += '<span class="story-icon story-icon-used" title="Использован в производстве">'
+        + '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">'
+        + '<polyline points="2,8 6,12 14,4"/></svg></span>';
     }
-    return null;
+    if (s.ai_generated && s.manual_changed) {
+      icons += '<span class="story-icon story-icon-ai-manual" title="Сгенерировано AI, отредактировано вручную">'
+        + '<svg viewBox="0 0 26 24" fill="none" stroke="none" stroke-linecap="round" stroke-linejoin="round">'
+        + '<path d="M14 21v-1.5a3.5 3.5 0 0 0-3.5-3.5H3.5A3.5 3.5 0 0 0 0 19.5V21" stroke="#fbbf24" stroke-width="1.7"/>'
+        + '<circle cx="8.5" cy="7.5" r="3.8" stroke="#fbbf24" stroke-width="1.7"/>'
+        + '<path d="M21 1 L22.1 4.4 L25.5 5.5 L22.1 6.6 L21 10 L19.9 6.6 L16.5 5.5 L19.9 4.4 Z" fill="#ffffff"/>'
+        + '</svg></span>';
+    } else if (s.manual_changed) {
+      icons += '<span class="story-icon story-icon-manual" title="Написано вручную">'
+        + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'
+        + '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>';
+    } else {
+      icons += '<span class="story-icon story-icon-ai" title="Сгенерировано AI">'
+        + '<svg viewBox="0 0 16 16" fill="currentColor" stroke="none">'
+        + '<path d="M8 1 L9.3 6.7 L15 8 L9.3 9.3 L8 15 L6.7 9.3 L1 8 L6.7 6.7 Z"/></svg></span>';
+    }
+    return icons;
   }
 
-  function renderStories(stories) {
-    var container = document.getElementById('stories-list');
-    if (!container) return;
+  function _renderPinBtn(s) {
+    var pinTitle = s.pinned ? 'Закреплён' : 'Закрепить';
+    return '<button class="story-icon story-pin-btn' + (s.pinned ? ' story-pin-btn--active' : '')
+      + '" data-id="' + s.id + '" data-pinned="' + (s.pinned ? '1' : '0') + '" title="' + pinTitle + '">'
+      + '<svg viewBox="0 0 16 16" fill="' + (s.pinned ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">'
+      + '<line x1="8" y1="10" x2="8" y2="15"/>'
+      + '<path d="M5 2 L5 7 L2 10 L14 10 L11 7 L11 2 Z"/>'
+      + '<line x1="5" y1="2" x2="11" y2="2"/>'
+      + '</svg></button>';
+  }
 
-    var savedFocus = _saveFocus();
-    var prevActiveId = _activeStoryId;
-    var hadFakeRow = !!container.querySelector('.story-row[data-id="__new__"]');
-    _detachCard();
+  function _renderDeleteBtn(s) {
+    var deleteDisabled = s.pinned || s.has_movie || s.has_active_batch;
+    var deleteBlockReason = deleteDisabled
+      ? (s.pinned ? 'Сюжет закреплён' : (s.has_movie ? 'К сюжету привязано готовое видео' : 'У сюжета есть активный батч'))
+      : '';
+    var deleteTitle = deleteDisabled
+      ? (s.pinned ? 'Нельзя удалить: сюжет закреплён' : (s.has_movie ? 'Нельзя удалить: к сюжету привязано видео' : 'Нельзя удалить: есть активный батч'))
+      : 'Удалить';
+    var storyTitleEsc = AccordionList.escapeHtml(s.title || '(без названия)');
+    return '<button class="story-icon story-delete-btn' + (deleteDisabled ? ' btn-blocked' : '')
+      + '" data-id="' + s.id + '" data-title="' + storyTitleEsc + '"'
+      + (deleteDisabled ? ' data-block-reason="' + AccordionList.escapeHtml(deleteBlockReason) + '"' : '')
+      + ' title="' + deleteTitle + '">'
+      + '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">'
+      + '<polyline points="2,4 14,4"/><path d="M6 4V2h4v2"/><rect x="3" y="4" width="10" height="10" rx="1.5"/><line x1="6" y1="7" x2="6" y2="11"/><line x1="10" y1="7" x2="10" y2="11"/>'
+      + '</svg></button>';
+  }
 
-    if (!stories || stories.length === 0) {
-      _currentStories = [];
-      window._currentStoriesList = [];
-      _setExportStoriesBtnEnabled(false);
-      updateStoriesCount(0);
+  function _renderExportBtn(s) {
+    return '<button class="story-icon story-export-btn" data-id="' + s.id
+      + '" title="Трассировка: накапливаются в буфере, сброс через 10 с">'
+      + (window.EXPORT_STORY_SVG || '') + '</button>';
+  }
+
+  var _accordionList = new AccordionList({
+    listId:   'stories-list',
+    cardId:   'card-story-draft',
+    holderId: 'story-card-holder',
+    countId:  'stories-count',
+    gradeUrl: function(id) { return '/production/story/' + id + '/grade'; },
+    renderTitle: function(item) {
+      var modelLabel = item.model_name
+        ? ' <span class="story-model-name">(' + AccordionList.escapeHtml(item.model_name) + ')</span>'
+        : '';
+      return AccordionList.escapeHtml(item.title || '(без названия)') + modelLabel;
+    },
+    renderButtons: function(item) {
+      return _renderStoryIcons(item) + _renderPinBtn(item) + _renderDeleteBtn(item) + _renderExportBtn(item);
+    },
+    onExpand: function(item) {
+      _activeStoryId = item ? item.id : null;
+      if (item && typeof setDraftStoryFromRecord === 'function') setDraftStoryFromRecord(item);
+      if (typeof window.loadStoryList === 'function') window.loadStoryList();
+    },
+    onCollapse: function() {
       _activeStoryId = null;
-      container.innerHTML = '<div class="stories-empty">Нет сюжетов</div>';
-      return;
-    }
+    },
+    canAddNew: true,
+    emptyHtml: '<div class="stories-empty">Нет сюжетов</div>',
+  });
 
-    _currentStories = stories;
-    window._currentStoriesList = stories;
-    _setExportStoriesBtnEnabled(true);
-    updateStoriesCount(stories.length);
+  window.setExpandedStoryId = function(id) {
+    _activeStoryId = id;
+    _accordionList.setActiveId(id);
+  };
 
-    var chevronSvg = '<svg viewBox="0 0 12 7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 1l5 5 5-5"/></svg>';
-    var html = '';
-    for (var i = 0; i < stories.length; i++) {
-      var s = stories[i];
-      var grade = s.grade !== undefined ? s.grade : null;
-      var gk = gradeKey(grade);
-      var label = GRADE_LABELS[gk] || gk;
-      var bg = GRADE_COLORS[gk] || 'rgba(255,255,255,.07)';
-      var tc = GRADE_TEXT_COLORS[gk] || '#aaa';
-      var icons = '';
-      if (s.used) {
-        icons += '<span class="story-icon story-icon-used" title="Использован в производстве">' +
-          '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
-          '<polyline points="2,8 6,12 14,4"/></svg></span>';
-      }
-      if (s.ai_generated && s.manual_changed) {
-        icons += '<span class="story-icon story-icon-ai-manual" title="Сгенерировано AI, отредактировано вручную">' +
-          '<svg viewBox="0 0 26 24" fill="none" stroke="none" stroke-linecap="round" stroke-linejoin="round">' +
-          '<path d="M14 21v-1.5a3.5 3.5 0 0 0-3.5-3.5H3.5A3.5 3.5 0 0 0 0 19.5V21" stroke="#fbbf24" stroke-width="1.7"/>' +
-          '<circle cx="8.5" cy="7.5" r="3.8" stroke="#fbbf24" stroke-width="1.7"/>' +
-          '<path d="M21 1 L22.1 4.4 L25.5 5.5 L22.1 6.6 L21 10 L19.9 6.6 L16.5 5.5 L19.9 4.4 Z" fill="#ffffff"/>' +
-          '</svg></span>';
-      } else if (s.manual_changed) {
-        icons += '<span class="story-icon story-icon-manual" title="Написано вручную">' +
-          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
-          '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>';
-      } else {
-        icons += '<span class="story-icon story-icon-ai" title="Сгенерировано AI">' +
-          '<svg viewBox="0 0 16 16" fill="currentColor" stroke="none">' +
-          '<path d="M8 1 L9.3 6.7 L15 8 L9.3 9.3 L8 15 L6.7 9.3 L1 8 L6.7 6.7 Z"/></svg></span>';
-      }
-      var modelLabel = s.model_name ? ' <span class="story-model-name">(' + escapeHtml(s.model_name) + ')</span>' : '';
-      var inlineStyle = gk !== 'null'
-        ? 'style="background:' + bg + ';color:' + tc + '" '
-        : '';
-      var gradeBadge = '<button class="story-grade-badge" data-id="' + s.id + '" data-grade="' + gk + '" ' +
-        inlineStyle +
-        'title="Оценка: ' + label + '. Нажмите для смены">' +
-        label + '</button>';
-      var exportBtn = '<button class="story-icon story-export-btn" data-id="' + s.id + '" title="Трассировка: накапливаются в буфере, сброс через 10 с">' +
-        (window.EXPORT_STORY_SVG || '') + '</button>';
-      var pinTitle = s.pinned ? 'Закреплён' : 'Закрепить';
-      var pinBtn = '<button class="story-icon story-pin-btn' + (s.pinned ? ' story-pin-btn--active' : '') + '" data-id="' + s.id + '" data-pinned="' + (s.pinned ? '1' : '0') + '" title="' + pinTitle + '">' +
-        '<svg viewBox="0 0 16 16" fill="' + (s.pinned ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
-        '<line x1="8" y1="10" x2="8" y2="15"/>' +
-        '<path d="M5 2 L5 7 L2 10 L14 10 L11 7 L11 2 Z"/>' +
-        '<line x1="5" y1="2" x2="11" y2="2"/>' +
-        '</svg></button>';
-      var deleteDisabled = s.pinned || s.has_movie || s.has_active_batch;
-      var deleteBlockReason = deleteDisabled
-        ? (s.pinned ? 'Сюжет закреплён' : (s.has_movie ? 'К сюжету привязано готовое видео' : 'У сюжета есть активный батч'))
-        : '';
-      var deleteTitle = deleteDisabled
-        ? (s.pinned ? 'Нельзя удалить: сюжет закреплён' : (s.has_movie ? 'Нельзя удалить: к сюжету привязано видео' : 'Нельзя удалить: есть активный батч'))
-        : 'Удалить';
-      var storyTitleEsc = escapeHtml(s.title || '(без названия)');
-      var deleteBtn = '<button class="story-icon story-delete-btn' + (deleteDisabled ? ' btn-blocked' : '') + '" data-id="' + s.id + '" data-title="' + storyTitleEsc + '"' + (deleteDisabled ? ' data-block-reason="' + escapeHtml(deleteBlockReason) + '"' : '') + ' title="' + deleteTitle + '">' +
-        '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
-        '<polyline points="2,4 14,4"/><path d="M6 4V2h4v2"/><rect x="3" y="4" width="10" height="10" rx="1.5"/><line x1="6" y1="7" x2="6" y2="11"/><line x1="10" y1="7" x2="10" y2="11"/>' +
-        '</svg></button>';
-      html += '<div class="story-row" data-id="' + s.id + '" data-used="' + (s.used ? '1' : '0') + '">' +
-        '<div class="story-row-header">' +
-          '<div class="story-title">' + escapeHtml(s.title || '(без названия)') + modelLabel + ' ' + gradeBadge + '</div>' +
-          '<div class="story-row-right">' + icons + pinBtn + deleteBtn + exportBtn +
-            '<button class="story-chevron" title="Развернуть">' + chevronSvg + '</button>' +
-          '</div>' +
-        '</div>' +
-        '<div class="story-expand"></div>' +
-      '</div>';
-    }
-    container.innerHTML = html;
-
-    container.querySelectorAll('.story-grade-badge').forEach(function(btn) {
-      btn.addEventListener('click', function(e) {
-        e.stopPropagation();
-        cycleGrade(btn);
-      });
-    });
+  function _bindListButtons(container) {
     container.querySelectorAll('.story-pin-btn').forEach(function(btn) {
       btn.addEventListener('click', function(e) {
         e.stopPropagation();
@@ -316,7 +201,7 @@ var setDraftStoryFromRecord;
         fetch('/production/story/' + storyId + '/pin', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pinned: !currentPinned })
+          body: JSON.stringify({ pinned: !currentPinned }),
         }).then(function() {
           if (typeof window.loadStoryList === 'function') window.loadStoryList();
         });
@@ -346,57 +231,12 @@ var setDraftStoryFromRecord;
         _openDeleteStoryDialog(storyId, storyTitle, btn);
       });
     });
-
-    /* ── Аккордеон: клик по заголовку строки ── */
-    container.querySelectorAll('.story-row').forEach(function(row) {
-      var storyId = row.getAttribute('data-id');
-      var header = row.querySelector('.story-row-header');
-      if (!header) return;
-      header.addEventListener('click', function() {
-        if (_activeStoryId === storyId) {
-          row.classList.remove('story-row--expanded');
-          _detachCard();
-          _activeStoryId = null;
-        } else {
-          if (_activeStoryId) {
-            var cur = container.querySelector('.story-row--expanded');
-            if (cur) cur.classList.remove('story-row--expanded');
-            _detachCard();
-          }
-          _activeStoryId = storyId;
-          row.classList.add('story-row--expanded');
-          var expandEl = row.querySelector('.story-expand');
-          if (expandEl) _attachCardToExpand(expandEl);
-          var storyObj = _findStory(storyId);
-          if (storyObj && typeof setDraftStoryFromRecord === 'function') setDraftStoryFromRecord(storyObj);
-          row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-          if (typeof window.loadStoryList === 'function') window.loadStoryList();
-        }
-      });
-    });
-
-    /* ── Восстановление раскрытой строки после перерисовки ── */
-    if (prevActiveId) {
-      var expandRow = container.querySelector('.story-row[data-id="' + prevActiveId + '"]');
-      if (expandRow) {
-        _activeStoryId = prevActiveId;
-        expandRow.classList.add('story-row--expanded');
-        var expandEl2 = expandRow.querySelector('.story-expand');
-        if (expandEl2) _attachCardToExpand(expandEl2);
-      } else {
-        _activeStoryId = null;
-      }
-    } else if (hadFakeRow) {
-      _insertFakeRow(container);
-    }
-
-    _restoreFocus(savedFocus);
   }
 
   function _openDeleteStoryDialog(storyId, storyTitle, triggerBtn) {
     new ConfirmDialog({
       title:        'Удалить сюжет?',
-      text:         'Сюжет «' + escapeHtml(storyTitle) + '» и все связанные батчи, лог и записи лога будут удалены безвозвратно.',
+      text:         'Сюжет «' + AccordionList.escapeHtml(storyTitle) + '» и все связанные батчи, лог и записи лога будут удалены безвозвратно.',
       confirmLabel: 'Удалить',
       triggerBtn:   triggerBtn,
       onConfirm: function(btn, dlg) {
@@ -407,7 +247,7 @@ var setDraftStoryFromRecord;
           .then(function() {
             dlg.close();
             if (_activeStoryId === storyId) {
-              _detachCard();
+              _accordionList.collapse();
               _activeStoryId = null;
             }
             if (typeof window.loadStoryList === 'function') window.loadStoryList();
@@ -421,56 +261,22 @@ var setDraftStoryFromRecord;
     }).open();
   }
 
-  var _storyGradeReqCounters = {};
-  function cycleGrade(btn) {
-    var storyId = btn.getAttribute('data-id');
-    var currentGradeAttr = btn.getAttribute('data-grade');
-    var currentGrade = currentGradeAttr === 'null' ? null : currentGradeAttr;
-    var idx = GRADE_CYCLE.indexOf(currentGrade);
-    var nextGrade = GRADE_CYCLE[(idx + 1) % GRADE_CYCLE.length];
-    var prevAttr = currentGradeAttr;
-    _storyGradeReqCounters[storyId] = (_storyGradeReqCounters[storyId] || 0) + 1;
-    var myReqId = _storyGradeReqCounters[storyId];
-    var nextGk = gradeKey(nextGrade);
-    btn.setAttribute('data-grade', nextGk);
-    btn.style.background = nextGk !== 'null' ? (GRADE_COLORS[nextGk] || '') : '';
-    btn.style.color = nextGk !== 'null' ? (GRADE_TEXT_COLORS[nextGk] || '') : '';
-    btn.textContent = GRADE_LABELS[nextGk] || nextGk;
-    btn.title = 'Оценка: ' + (GRADE_LABELS[nextGk] || nextGk) + '. Нажмите для смены';
-    fetch('/production/story/' + storyId + '/grade', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ grade: nextGrade }),
-    })
-    .then(function(r) { return r.ok ? r.json() : null; })
-    .then(function(d) {
-      if (myReqId !== _storyGradeReqCounters[storyId]) return;
-      if (d && d.ok) {
-        var grade = d.grade !== undefined ? d.grade : null;
-        var gk = gradeKey(grade);
-        btn.setAttribute('data-grade', gk);
-        btn.style.background = gk !== 'null' ? (GRADE_COLORS[gk] || '') : '';
-        btn.style.color = gk !== 'null' ? (GRADE_TEXT_COLORS[gk] || '') : '';
-        btn.textContent = GRADE_LABELS[gk] || gk;
-        btn.title = 'Оценка: ' + (GRADE_LABELS[gk] || gk) + '. Нажмите для смены';
-      } else {
-        var prevGk = gradeKey(prevAttr === 'null' ? null : prevAttr);
-        btn.setAttribute('data-grade', prevGk);
-        btn.style.background = prevGk !== 'null' ? (GRADE_COLORS[prevGk] || '') : '';
-        btn.style.color = prevGk !== 'null' ? (GRADE_TEXT_COLORS[prevGk] || '') : '';
-        btn.textContent = GRADE_LABELS[prevGk] || prevGk;
-        btn.title = 'Оценка: ' + (GRADE_LABELS[prevGk] || prevGk) + '. Нажмите для смены';
-      }
-    })
-    .catch(function() {
-      if (myReqId !== _storyGradeReqCounters[storyId]) return;
-      var prevGk = gradeKey(prevAttr === 'null' ? null : prevAttr);
-      btn.setAttribute('data-grade', prevGk);
-      btn.style.background = prevGk !== 'null' ? (GRADE_COLORS[prevGk] || '') : '';
-      btn.style.color = prevGk !== 'null' ? (GRADE_TEXT_COLORS[prevGk] || '') : '';
-      btn.textContent = GRADE_LABELS[prevGk] || prevGk;
-      btn.title = 'Оценка: ' + (GRADE_LABELS[prevGk] || prevGk) + '. Нажмите для смены';
-    });
+  function renderStories(stories) {
+    var container = document.getElementById('stories-list');
+    if (!container) return;
+
+    if (!stories || stories.length === 0) {
+      window._currentStoriesList = [];
+      _setExportStoriesBtnEnabled(false);
+      _activeStoryId = null;
+      _accordionList.render([]);
+      return;
+    }
+
+    window._currentStoriesList = stories;
+    _setExportStoriesBtnEnabled(true);
+    _accordionList.render(stories);
+    _bindListButtons(container);
   }
 
   function getFilterParams() {
@@ -586,18 +392,14 @@ var setDraftStoryFromRecord;
     btn.addEventListener('click', function() {
       var container = document.getElementById('stories-list');
       if (!container) return;
-      if (_activeStoryId) {
-        var cur = container.querySelector('.story-row--expanded');
-        if (cur) cur.classList.remove('story-row--expanded');
-        _detachCard();
-      }
+      _accordionList.collapse();
       if (typeof resetDraftStoryId === 'function') resetDraftStoryId();
       var titleEl = document.getElementById('draft-story-title');
       var contentEl = document.getElementById('draft-story-content');
       if (titleEl) titleEl.value = '';
       if (contentEl) contentEl.value = '';
       if (typeof window.updateDraftWordCount === 'function') window.updateDraftWordCount();
-      _insertFakeRow(container, true);
+      _accordionList.insertFakeRow(true);
     });
   }
 
