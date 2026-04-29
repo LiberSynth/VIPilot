@@ -102,9 +102,6 @@
         </div>
       </div>
       <div style="display:flex; gap:10px; align-items:flex-start; margin-top:7px; margin-bottom:10px">
-        <div id="story-search-row" style="display:none; flex:1; min-width:0">
-          <input type="text" id="story-search-input" placeholder="Поиск по сюжетам..." autocomplete="off" style="width:100%; box-sizing:border-box">
-        </div>
         <div style="flex-shrink:0; margin-left:auto; display:flex; flex-direction:column; gap:6px">
           <label class="sw-filter-row" for="filter-for-approval">
             <span class="sw-filter-label">На утверждение</span>
@@ -127,6 +124,9 @@
             <input class="sw-filter-check" type="checkbox" id="filter-show-used" {% if screenwriter_show_used %}checked{% endif %}>
           </label>
         </div>
+      </div>
+      <div id="story-search-row" style="display:none; margin-bottom:8px">
+        <input type="text" id="story-search-input" placeholder="Поиск по сюжетам..." autocomplete="off" style="width:100%; box-sizing:border-box">
       </div>
       <div id="stories-list" class="stories-list">
         <div class="stories-loading">Загрузка...</div>
