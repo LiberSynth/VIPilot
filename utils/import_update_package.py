@@ -7,7 +7,7 @@ import yaml
 
 SECTIONS = [
     {"name": "settings",        "fields": ["key", "value"],                                                          "pk": "key"},
-    {"name": "environment",     "fields": ["key", "value"],                                                          "pk": "key"},
+    {"name": "environment",     "fields": ["key"],                                          "pk": "key", "insert_only": True},
     {"name": "cycle_config",    "fields": ["key", "value"],                                                          "pk": "key"},
     {"name": "ai_platforms",    "fields": ["id", "name", "url", "env_key_name"],                                     "pk": "id"},
     {"name": "ai_models",       "fields": ["id", "platform_id", "name", "url", "body", "type", "price"],            "pk": "id", "jsonb_fields": ["body"]},
@@ -45,6 +45,7 @@ def import_package(stream):
             fields = section["fields"]
             pk = section["pk"]
             jsonb_fields = set(section.get("jsonb_fields", []))
+            insert_only = section.get("insert_only", False)
             quoted_fields = [f'"{f}"' for f in fields]
             quoted_pk = f'"{pk}"'
 
@@ -65,7 +66,7 @@ def import_package(stream):
                         values,
                     )
                     inserted += 1
-                else:
+                elif not insert_only:
                     set_clause = ", ".join(f"{qf} = %s" for qf in quoted_fields)
                     cur.execute(
                         f"UPDATE {table} SET {set_clause} WHERE {quoted_pk} = %s",
@@ -73,10 +74,11 @@ def import_package(stream):
                     )
                     updated += 1
 
-            for db_pk in db_pks:
-                if db_pk not in yaml_map:
-                    cur.execute(f"DELETE FROM {table} WHERE {quoted_pk} = %s", (db_pk,))
-                    deleted += 1
+            if not insert_only:
+                for db_pk in db_pks:
+                    if db_pk not in yaml_map:
+                        cur.execute(f"DELETE FROM {table} WHERE {quoted_pk} = %s", (db_pk,))
+                        deleted += 1
 
             summary[table] = {"inserted": inserted, "updated": updated, "deleted": deleted}
 

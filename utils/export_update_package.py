@@ -13,7 +13,7 @@ SECTIONS = [
     },
     {
         "name": "environment",
-        "fields": ["key", "value"],
+        "fields": ["key"],
     },
     {
         "name": "cycle_config",
