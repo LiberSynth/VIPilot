@@ -40,7 +40,10 @@
     </div>
 
     <div class="card" style="margin-top:12px">
-      <div class="card-title">Модели</div>
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:4px">
+        <div class="card-title" style="margin-bottom:0">Модели</div>
+        <span id="text-model-count" style="font-size:12px; color:#888; background:rgba(255,255,255,.07); border-radius:10px; padding:1px 8px;"></span>
+      </div>
       <div class="hint" style="margin-bottom:8px">Активируйте одну или несколько. Порядок задаёт очерёдность перебора при сбое.</div>
       <div class="stories-list" id="text-model-list">
         <div class="model-loading">Загрузка...</div>

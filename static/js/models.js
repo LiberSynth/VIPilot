@@ -366,7 +366,8 @@
     if (!listEl || _videoAccordion) return;
 
     _videoAccordion = new AccordionList({
-      listId: 'model-list',
+      listId:   'model-list',
+      countId:  'video-model-count',
       gradeUrl: function(id) { return '/api/video-models/' + encodeURIComponent(id) + '/grade'; },
       gradeLabels:    _MODEL_GRADE_LABELS,
       gradeColors:    _MODEL_GRADE_COLORS,
@@ -492,7 +493,8 @@
     if (!listEl || _textAccordion) return;
 
     _textAccordion = new AccordionList({
-      listId: 'text-model-list',
+      listId:  'text-model-list',
+      countId: 'text-model-count',
       gradeUrl: function(id) { return '/api/text-models/' + encodeURIComponent(id) + '/grade'; },
       gradeLabels:    _MODEL_GRADE_LABELS,
       gradeColors:    _MODEL_GRADE_COLORS,
