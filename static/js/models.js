@@ -131,6 +131,35 @@
     return wrap;
   }
 
+  /**
+   * bindExpandSave — autosave delegation for model expand panels.
+   *
+   * Attaches a single delegated listener to `container` so that any
+   * note/body textarea rendered inside its accordion rows (now or in the
+   * future) is autosaved without re-binding on every expand.
+   *
+   * Usage pattern:
+   *   var container = document.getElementById('<list-id>');
+   *   bindExpandSave(container, <accordionInstance>);
+   *
+   * Textarea requirements (set by makeExpandContent):
+   *   data-model-id    — row identifier
+   *   data-model-field — "note" or "body"
+   *   data-model-url   — POST endpoint for the field
+   *
+   * Behaviour:
+   *   note  — debounced 800 ms POST on input; plain text, no validation.
+   *   body  — debounced 800 ms POST on input + immediate POST on blur;
+   *            value must be a valid JSON object or the field is marked
+   *            with .input-error and a [data-role="body-error"] message.
+   *
+   * Called for:
+   *   #model-list      — video models  (panel_models / panel_videomodel)
+   *   #text-model-list — text models   (panel_story / screenwriter)
+   *
+   * Add a matching bindExpandSave call whenever a new panel introduces
+   * its own model accordion with note/body expand content.
+   */
   function bindExpandSave(container, accordion) {
     var noteTimers = {};
     var bodyTimers = {};
