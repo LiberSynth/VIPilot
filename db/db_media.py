@@ -136,17 +136,26 @@ def db_get_random_real_original_video() -> tuple[str, str, str | None] | None:
 def db_create_manual_movie(title: str, video_data: bytes) -> str:
     """Создаёт сюжет, батч movie_probe и ролик из файла в одной транзакции.
 
+    Если в stories уже есть запись с таким же title — переиспользует её.
     Батч сразу переводится в статус video_ready, минуя pending.
     Возвращает batch_id.
     """
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "INSERT INTO stories (model_id, title, content, grade, manual_changed)"
-                " VALUES (NULL, %s, '', 'good', TRUE) RETURNING id",
+                "SELECT id FROM stories WHERE title = %s LIMIT 1",
                 (title,),
             )
-            story_id = cur.fetchone()[0]
+            row = cur.fetchone()
+            if row:
+                story_id = row[0]
+            else:
+                cur.execute(
+                    "INSERT INTO stories (model_id, title, content, grade, manual_changed)"
+                    " VALUES (NULL, %s, '', 'good', TRUE) RETURNING id",
+                    (title,),
+                )
+                story_id = cur.fetchone()[0]
             cur.execute(
                 "INSERT INTO batches (type, story_id) VALUES ('movie_probe', %s) RETURNING id",
                 (story_id,),
