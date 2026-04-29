@@ -568,6 +568,9 @@
   .cycle-float-btn.pending svg * { stroke: #ffb400; }
   .cycle-float-btn:disabled { opacity: .35; cursor: not-allowed; pointer-events: auto; }
   .cycle-float-btn.btn-blocked { opacity: .35; }
+  .cycle-float-btn.on { border-color: rgba(74,124,247,.55); background: rgba(74,124,247,.12); }
+  .cycle-float-btn.on svg * { stroke: #7090f0; }
+  .cycle-float-btn.on:hover { background: rgba(74,124,247,.18); }
   @keyframes btn-pending-pulse { 0%,100% { opacity:1; } 50% { opacity:.4; } }
   @keyframes bar-indeterminate { 0%{left:-40%;width:40%} 60%{left:60%;width:40%} 100%{left:100%;width:0} }
 

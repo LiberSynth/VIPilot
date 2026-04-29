@@ -645,6 +645,42 @@ var setDraftStoryFromRecord;
   }
 })();
 
+/* ── Кнопка поиска и строка поиска по сюжетам ── */
+(function() {
+  function initSearchStoriesBtn() {
+    var btn   = document.getElementById('btn-search-stories');
+    var row   = document.getElementById('story-search-row');
+    var input = document.getElementById('story-search-input');
+    if (!btn || !row || !input) return;
+
+    var _debounce = null;
+
+    btn.addEventListener('click', function() {
+      var isOn = btn.classList.toggle('on');
+      row.style.display = isOn ? '' : 'none';
+      if (isOn) {
+        input.focus();
+      } else {
+        input.value = '';
+        clearTimeout(_debounce);
+      }
+    });
+
+    input.addEventListener('input', function() {
+      clearTimeout(_debounce);
+      _debounce = setTimeout(function() {
+        /* фильтрация будет добавлена позже */
+      }, 500);
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initSearchStoriesBtn);
+  } else {
+    initSearchStoriesBtn();
+  }
+})();
+
 /* ── Комбобокс выбора текстовой модели в блоке Сценарий ── */
 (function() {
   var _models = [];
