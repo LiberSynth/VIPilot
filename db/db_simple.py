@@ -215,8 +215,9 @@ def db_set_target_session_context(target_id: str, state: dict) -> bool:
                 "UPDATE targets SET session_context = %s::jsonb WHERE id = %s::uuid",
                 (json.dumps(state), target_id),
             )
+            updated = cur.rowcount > 0
         conn.commit()
-    return True
+    return updated
 
 
 def db_get_target_session_context_saved_at(target_id: str) -> str | None:
