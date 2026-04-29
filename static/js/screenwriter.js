@@ -301,6 +301,7 @@ var setDraftStoryFromRecord;
   }
 
   window._getStoryFilterParams = getFilterParams;
+  window._renderStories = renderStories;
 
   window.loadStoryList = function() {
     var container = document.getElementById('stories-list');
@@ -679,7 +680,7 @@ var setDraftStoryFromRecord;
           return (s.title || '').toLowerCase().indexOf(q) !== -1;
         });
         matched.forEach(function(s) { s._dim = !filterIds.has(s.id); });
-        renderStories(matched);
+        if (typeof window._renderStories === 'function') window._renderStories(matched);
       }).catch(function() {
         window.loadStoryList();
       });
