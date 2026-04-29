@@ -120,7 +120,7 @@ def icon_preview():
 
 
 @bp.route("/", methods=["GET", "POST"])
-@limiter.limit("10 per minute")
+@limiter.limit("10 per minute", exempt_when=lambda: request.method != "POST")
 def login():
     if is_authenticated():
         return _redirect_after_login()
