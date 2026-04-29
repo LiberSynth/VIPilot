@@ -1247,3 +1247,12 @@ def api_production_story_generate():
         batch_id, "Генерация сюжета вручную", "Запуск по запросу пользователя"
     )
     return jsonify({"batch_id": batch_id})
+
+
+@bp.route("/publication-counter/reset", methods=["POST"])
+def reset_publication_counter():
+    err = _auth_required()
+    if err:
+        return err
+    env_set("publication_counter", "0")
+    return jsonify({"ok": True})

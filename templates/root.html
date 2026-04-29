@@ -368,6 +368,10 @@
         <button type="button" class="btn-secondary" onclick="uploadUpdatePackage(this)">Загрузить статический пакет</button>
         <div class="hint" style="margin-top:6px">Загружает update_package.yaml и синхронизирует справочные таблицы: новые записи добавляются, существующие обновляются, лишние удаляются.</div>
       </div>
+      <div style="margin-top:8px;padding-top:8px;border-top:1px solid #1e1e28">
+        <button type="button" id="btn-reset-pub-counter" class="btn-secondary" onclick="openResetPublicationCounterDialog(this)">Обнулить счётчик публикаций</button>
+        <div class="hint" style="margin-top:6px">Сбрасывает publication_counter в 0. Следующая публикация получит номер 1.</div>
+      </div>
     </div>
 
   </div>

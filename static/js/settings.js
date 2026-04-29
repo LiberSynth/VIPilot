@@ -167,6 +167,31 @@ function validateLifetimes() {
   });
 })();
 
+function openResetPublicationCounterDialog(btn) {
+  new ConfirmDialog({
+    title: 'Обнулить счётчик публикаций?',
+    text: 'publication_counter будет сброшен в 0. Следующая публикация получит номер 1.',
+    confirmLabel: 'Обнулить',
+    cancelLabel: 'Отмена',
+    confirmStyle: 'danger',
+    triggerBtn: btn,
+    onConfirm: function(confirmBtn, dlg) {
+      confirmBtn.disabled = true;
+      fetch('/api/publication-counter/reset', { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+          dlg.close();
+          if (data.ok) {
+            showToast('Счётчик обнулён', 'success');
+          } else {
+            showToast('Ошибка: ' + (data.error || 'неизвестная'), 'error');
+          }
+        })
+        .catch(() => { dlg.close(); showToast('Ошибка запроса', 'error'); });
+    },
+  }).open();
+}
+
 function downloadUpdatePackage(btn) {
   btn.disabled = true;
   const a = document.createElement('a');
