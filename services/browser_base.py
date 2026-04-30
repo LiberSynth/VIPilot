@@ -312,12 +312,20 @@ class PlatformBrowser:
         Запускает fn(page, context) в новом браузере с куками из cookies.
         БЛОКИРУЕТ вызывающий поток — вызывать из фонового потока пайплайна.
         Возвращает {"ok": bool, "result": ..., "error": str|None}.
-        Авторизационный браузер не останавливается — он работает независимо.
         """
         tag = f"[{self._platform}_pipeline]"
 
         self._pipeline_taking_over = True
         self._set_status("running", "Публикация.")
+
+        with self._lock:
+            if self._running:
+                self._running = False
+        if self._thread and self._thread.is_alive():
+            self._thread.join(timeout=5)
+
+        with self._lock:
+            self._running = True
 
         result: dict = {"ok": False, "error": "Неизвестная ошибка"}
 
@@ -360,11 +368,8 @@ class PlatformBrowser:
 
         self._pipeline_taking_over = False
         with self._lock:
-            thread_alive = self._thread is not None and self._thread.is_alive()
-            if not thread_alive:
-                self._running = False
-        if not thread_alive:
-            self._set_status("stopped")
+            self._running = False
+        self._set_status("stopped")
 
         return result
 
