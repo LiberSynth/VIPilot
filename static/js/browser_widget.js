@@ -30,6 +30,9 @@ function createBrowserWidget(slug) {
   var active     = false;
   var firstFrame = false;
 
+  var STATE = { IDLE: 'idle', STARTING: 'starting', OPEN: 'open', STOPPING: 'stopping' };
+  var state = STATE.IDLE;
+
   var API = '/api/' + slug + '-browser/';
 
   function getTargetId() {
@@ -128,8 +131,10 @@ function createBrowserWidget(slug) {
         ctx.drawImage(img, 0, 0);
         if (!firstFrame) {
           firstFrame = true;
-          overlay.style.display = 'none';
-          setSessionControls(true);
+          if (state === STATE.STARTING) {
+            overlay.style.display = 'none';
+            applyState(STATE.OPEN);
+          }
         }
       };
       img.src = 'data:image/jpeg;base64,' + data;
@@ -138,16 +143,11 @@ function createBrowserWidget(slug) {
     sse.onerror = function () {};
   }
 
-  function setSessionControls(enabled) {
-    if (btnStart) btnStart.disabled = enabled;
-    if (btnSave)  btnSave.disabled  = !enabled;
-    if (btnStop)  btnStop.disabled  = !enabled;
-  }
-
-  function setStarting() {
-    if (btnStart) btnStart.disabled = true;
-    if (btnSave)  btnSave.disabled  = true;
-    if (btnStop)  btnStop.disabled  = false;
+  function applyState(s) {
+    state = s;
+    if (btnStart) btnStart.disabled = (s !== STATE.IDLE);
+    if (btnSave)  btnSave.disabled  = (s !== STATE.OPEN);
+    if (btnStop)  btnStop.disabled  = (s === STATE.IDLE || s === STATE.STOPPING);
   }
 
   function handleStopped() {
@@ -157,11 +157,11 @@ function createBrowserWidget(slug) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     overlay.style.display = 'none';
     overlay.textContent = '';
-    setSessionControls(false);
+    applyState(STATE.IDLE);
   }
 
   function browserOpen() {
-    if (active) return;
+    if (state !== STATE.IDLE) return;
     var tid = getTargetId();
     if (!tid) return;
 
@@ -175,10 +175,15 @@ function createBrowserWidget(slug) {
     })
       .then(function (r) { return r.json(); })
       .then(function (data) {
-        if (!data.ok) return;
+        if (!data.ok) {
+          overlay.style.display = 'none';
+          overlay.textContent = '';
+          applyState(STATE.IDLE);
+          return;
+        }
         active = true;
         firstFrame = false;
-        setStarting();
+        applyState(STATE.STARTING);
         connectStream();
         var url = getStudioUrl();
         if (url) {
@@ -187,13 +192,17 @@ function createBrowserWidget(slug) {
           }, 1200);
         }
       })
-      .catch(function () {});
+      .catch(function () {
+        overlay.style.display = 'none';
+        overlay.textContent = '';
+        applyState(STATE.IDLE);
+      });
   }
 
   function browserStop() {
-    if (!active) return;
+    if (state === STATE.IDLE || state === STATE.STOPPING) return;
     active = false;
-    setSessionControls(false);
+    applyState(STATE.STOPPING);
     overlay.style.display = 'flex';
     overlay.textContent = 'Закрытие…';
     fetch(API + 'stop', { method: 'POST' }).catch(function () {});
@@ -202,9 +211,12 @@ function createBrowserWidget(slug) {
   }
 
   function saveSession() {
+    if (state !== STATE.OPEN) return;
     var tid = getTargetId();
     if (!tid) return;
-    setSessionControls(false);
+    applyState(STATE.STOPPING);
+    overlay.style.display = 'flex';
+    overlay.textContent = 'Сохранение сессии…';
 
     fetch(API + 'save-session', {
       method: 'POST',
@@ -214,15 +226,21 @@ function createBrowserWidget(slug) {
       .then(function (r) { return r.json(); })
       .then(function (data) {
         if (data.ok) {
+          active = false;
           showToast('Сессия сохранена', 'success');
-          browserStop();
+          fetch(API + 'stop', { method: 'POST' }).catch(function () {});
+          // SSE дожидается STOPPED → handleStopped() сбросит состояние.
         } else {
-          setSessionControls(true);
+          overlay.style.display = 'none';
+          overlay.textContent = '';
+          applyState(STATE.OPEN);
           showToast('Ошибка: ' + (data.error || 'Не удалось сохранить'), 'error');
         }
       })
       .catch(function () {
-        setSessionControls(true);
+        overlay.style.display = 'none';
+        overlay.textContent = '';
+        applyState(STATE.OPEN);
         showToast('Ошибка соединения', 'error');
       });
   }
@@ -230,7 +248,7 @@ function createBrowserWidget(slug) {
   function _showPipelineWidget() {
     active = true;
     firstFrame = false;
-    setSessionControls(true);
+    applyState(STATE.STOPPING);
     overlay.style.display = 'flex';
     overlay.textContent = 'Публикация…';
     connectStream();
