@@ -141,22 +141,20 @@ class PlatformBrowser:
 
         tag = f"[{self._platform}_browser]"
         self._set_status("starting", "Запуск браузера.")
-        os.makedirs(self._profile_dir, exist_ok=True)
-        write_log_entry(None, f"{tag} Профиль Chrome: {self._profile_dir}", level='silent')
 
         try:
             with sync_playwright() as pw:
-                context = pw.chromium.launch_persistent_context(
-                    user_data_dir=self._profile_dir,
+                browser = pw.chromium.launch(
                     headless=True,
                     args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
+                )
+                context = browser.new_context(
                     viewport={"width": self._VIEWPORT_W, "height": self._VIEWPORT_H},
                     user_agent=self._USER_AGENT,
                     locale="ru-RU",
                 )
 
-                # Загружаем куки из БД для данного target_id, чтобы браузер
-                # сразу открывался авторизованным — без повторного входа.
+                # Загружаем куки из БД — браузер сразу открывается авторизованным.
                 try:
                     from db import db_get_target_session_context
                     saved = db_get_target_session_context(target_id)
@@ -164,7 +162,7 @@ class PlatformBrowser:
                         context.add_cookies(saved["cookies"])
                         write_log_entry(
                             None,
-                            f"{tag} Загружено {len(saved['cookies'])} куков из БД для target={target_id}",
+                            f"{tag} Загружено {len(saved['cookies'])} куков из БД",
                             level='silent',
                         )
                 except Exception as _e:
@@ -237,6 +235,7 @@ class PlatformBrowser:
                     time.sleep(0.2)
 
                 context.close()
+                browser.close()
 
         except Exception as e:
             self._set_status("error", str(e))
