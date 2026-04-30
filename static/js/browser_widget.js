@@ -169,6 +169,11 @@ function createBrowserWidget(slug) {
       .catch(function () {});
   }
 
+  function browserStop() {
+    fetch(API + 'stop', { method: 'POST' }).catch(function () {});
+    handleStopped();
+  }
+
   function saveSession() {
     var tid = getTargetId();
     if (!tid) return;
@@ -184,6 +189,7 @@ function createBrowserWidget(slug) {
         if (btnSave) btnSave.disabled = false;
         if (data.ok) {
           showToast('Сессия сохранена', 'success');
+          browserStop();
         } else {
           showToast('Ошибка: ' + (data.error || 'Не удалось сохранить'), 'error');
         }
@@ -232,4 +238,5 @@ function createBrowserWidget(slug) {
 
   window[slug + 'BrowserOpen']        = browserOpen;
   window[slug + 'BrowserSaveSession'] = saveSession;
+  window[slug + 'BrowserStop']        = browserStop;
 }
