@@ -4,6 +4,18 @@ from log.log import write_log_entry
 from utils.utils import fmt_id_msg
 
 
+def db_interrupt_stale_logs():
+    """При старте приложения переводит все 'running'-записи лога в 'interrupted'.
+
+    Вызывать один раз при инициализации, до запуска пайплайнов.
+    Предотвращает «висячие» синие значки в мониторе после рестарта сервера.
+    """
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE log SET status = 'interrupted' WHERE status = 'running'")
+        conn.commit()
+
+
 def db_log_update(log_id, message, status):
     """Обновляет message и status существующей записи лога."""
     with get_db() as conn:
