@@ -256,42 +256,11 @@ function createBrowserWidget(slug) {
       });
   }
 
-  function _showPipelineWidget() {
-    active = true;
-    firstFrame = false;
-    applyState(STATE.STOPPING);
-    overlay.style.display = 'flex';
-    overlay.textContent = 'Публикация…';
-    connectStream();
-  }
-
-  setInterval(function () {
-    if (active) return;
-    var panel = document.getElementById('panel-publish');
-    if (!panel || !panel.classList.contains('active')) return;
-    var tid = getTargetId();
-    if (!tid) return;
-    fetch(API + 'status?target_id=' + encodeURIComponent(tid))
-      .then(function (r) { return r.json(); })
-      .then(function (data) {
-        var st = data && data.browser && data.browser.status;
-        if (st === 'running' && !active) {
-          _showPipelineWidget();
-        }
-      })
-      .catch(function () {});
-  }, 2500);
-
   window.addEventListener('beforeunload', function () {
     if (active) {
       fetch(API + 'stop', { method: 'POST', keepalive: true }).catch(function () {});
     }
   });
-
-  var _origSwitchPanel = window.switchPanel;
-  window.switchPanel = function (name) {
-    if (_origSwitchPanel) _origSwitchPanel(name);
-  };
 
   window._browserWidgetRegistry[slug]  = browserStop;
   window[slug + 'BrowserOpen']        = browserOpen;
