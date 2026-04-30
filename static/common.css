@@ -289,8 +289,13 @@
   .card.emulation-active { border-color: rgba(245,166,35,.35); }
   .card.card--editing-new { border-color: rgba(245,166,35,.35); }
   .card.card--editing-existing { border-color: rgba(62,207,142,.35); }
-  .card.target-disabled { filter: grayscale(1) opacity(0.55); pointer-events: none; user-select: none; }
-  .card.target-disabled > .card-title:first-child::after {
+  .card-header {
+    display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;
+  }
+  .card-header .card-title { margin-bottom: 0; }
+
+  .card.target-disabled .card-body { filter: grayscale(1) opacity(0.55); pointer-events: none; user-select: none; }
+  .card.target-disabled .card-header .card-title::after {
     content: 'Отключен';
     display: inline-block;
     margin-left: 8px;

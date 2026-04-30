@@ -434,6 +434,17 @@ def db_set_target_config_body(target_id: str, body: dict):
     return True
 
 
+def db_set_target_active(target_id: str, active: bool) -> bool:
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE targets SET active = %s WHERE id = %s::uuid",
+                (active, target_id),
+            )
+        conn.commit()
+    return True
+
+
 def db_get_distinct_batch_statuses():
     with get_db() as conn:
         with conn.cursor() as cur:

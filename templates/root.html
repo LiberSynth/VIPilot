@@ -90,11 +90,19 @@
       {% if slug == 'vk' %}
       <div class="card{% if not vk_active %} target-disabled{% endif %}"{% if not loop.first %} style="margin-top:12px"{% endif %}>
         <input type="hidden" id="vk_target_id" value="{{ vk_target_id or '' }}">
-        <div class="card-title">Публикация в ВКонтакте</div>
-        <div style="margin-top:14px">
-          <div class="hint" style="margin-bottom:2px;color:#e8e8f0">Конфиг</div>
-          <textarea id="vk-target-body" placeholder="JSON-параметры таргета" autocomplete="off">{{ vk_targets_config_json }}</textarea>
-          <div id="vk-target-body-error" style="display:none;color:#f55;font-size:12px;margin-top:4px"></div>
+        <div class="card-header">
+          <div class="card-title">Публикация в ВКонтакте</div>
+          <label class="toggle-wrap">
+            <input type="checkbox" id="vk-active-toggle"{% if vk_active %} checked{% endif %}>
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        <div class="card-body">
+          <div style="margin-top:14px">
+            <div class="hint" style="margin-bottom:2px;color:#e8e8f0">Конфиг</div>
+            <textarea id="vk-target-body" placeholder="JSON-параметры таргета" autocomplete="off">{{ vk_targets_config_json }}</textarea>
+            <div id="vk-target-body-error" style="display:none;color:#f55;font-size:12px;margin-top:4px"></div>
+          </div>
         </div>
       </div>
       {% endif %}
@@ -105,32 +113,39 @@
            {% if not loop.first %}style="margin-top:12px"{% endif %}
            data-studio-url="{% if dzen_publisher_id %}https://dzen.ru/profile/editor/id/{{ dzen_publisher_id }}/{% endif %}">
         <input type="hidden" id="dzen_target_id" value="{{ dzen_target_id or '' }}">
-        <div class="card-title">Публикация в Дзен</div>
-
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
-          <div class="hint" style="flex:1;margin:0">
-            Используется браузерная автоматизация Playwrite.<br>
-            Если браузер не авторизован — войдите в аккаунт Яндекса.
-            После входа нажмите <b>Сохранить сессию</b>.
-          </div>
-          <button class="btn-run-now" id="dzen-btn-save"
-                  onclick="dzenBrowserSaveSession()"
-                  style="font-size:13px;padding:7px 14px;white-space:nowrap">Сохранить сессию</button>
+        <div class="card-header">
+          <div class="card-title">Публикация в Дзен</div>
+          <label class="toggle-wrap">
+            <input type="checkbox" id="dzen-active-toggle"{% if dzen_active %} checked{% endif %}>
+            <span class="toggle-track"></span>
+          </label>
         </div>
-
-        <div id="dzen-browser-wrap" style="position:relative;border-radius:6px;overflow:hidden;border:1px solid var(--border,rgba(255,255,255,.12))">
-          <canvas id="dzen-browser-canvas"
-                  style="display:block;width:100%;cursor:pointer"
-                  tabindex="0"></canvas>
-          <div id="dzen-browser-overlay"
-               style="position:absolute;inset:0;background:rgba(10,10,20,.85);display:flex;align-items:center;justify-content:center;color:#aaa;font-size:14px">
-            Загрузка…
+        <div class="card-body">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
+            <div class="hint" style="flex:1;margin:0">
+              Используется браузерная автоматизация Playwrite.<br>
+              Если браузер не авторизован — войдите в аккаунт Яндекса.
+              После входа нажмите <b>Сохранить сессию</b>.
+            </div>
+            <button class="btn-run-now" id="dzen-btn-save"
+                    onclick="dzenBrowserSaveSession()"
+                    style="font-size:13px;padding:7px 14px;white-space:nowrap">Сохранить сессию</button>
           </div>
-        </div>
-        <div style="margin-top:14px">
-          <div class="hint" style="margin-bottom:2px;color:#e8e8f0">Конфиг</div>
-          <textarea id="dzen-target-body" placeholder="JSON-параметры таргета" autocomplete="off">{{ dzen_targets_config_json }}</textarea>
-          <div id="dzen-target-body-error" style="display:none;color:#f55;font-size:12px;margin-top:4px"></div>
+
+          <div id="dzen-browser-wrap" style="position:relative;border-radius:6px;overflow:hidden;border:1px solid var(--border,rgba(255,255,255,.12))">
+            <canvas id="dzen-browser-canvas"
+                    style="display:block;width:100%;cursor:pointer"
+                    tabindex="0"></canvas>
+            <div id="dzen-browser-overlay"
+                 style="position:absolute;inset:0;background:rgba(10,10,20,.85);display:flex;align-items:center;justify-content:center;color:#aaa;font-size:14px">
+              Загрузка…
+            </div>
+          </div>
+          <div style="margin-top:14px">
+            <div class="hint" style="margin-bottom:2px;color:#e8e8f0">Конфиг</div>
+            <textarea id="dzen-target-body" placeholder="JSON-параметры таргета" autocomplete="off">{{ dzen_targets_config_json }}</textarea>
+            <div id="dzen-target-body-error" style="display:none;color:#f55;font-size:12px;margin-top:4px"></div>
+          </div>
         </div>
       </div>
       {% endif %}
@@ -141,32 +156,39 @@
            {% if not loop.first %}style="margin-top:12px"{% endif %}
            data-studio-url="{% if rutube_person_id %}https://studio.rutube.ru/{% endif %}">
         <input type="hidden" id="rutube_target_id" value="{{ rutube_target_id or '' }}">
-        <div class="card-title">Публикация в Рутьюб</div>
-
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
-          <div class="hint" style="flex:1;margin:0">
-            Используется браузерная автоматизация Playwrite.<br>
-            Если браузер не авторизован — войдите в аккаунт Рутьюба.
-            После входа нажмите <b>Сохранить сессию</b>.
-          </div>
-          <button class="btn-run-now" id="rutube-btn-save"
-                  onclick="rutubeBrowserSaveSession()"
-                  style="font-size:13px;padding:7px 14px;white-space:nowrap">Сохранить сессию</button>
+        <div class="card-header">
+          <div class="card-title">Публикация в Рутьюб</div>
+          <label class="toggle-wrap">
+            <input type="checkbox" id="rutube-active-toggle"{% if rutube_active %} checked{% endif %}>
+            <span class="toggle-track"></span>
+          </label>
         </div>
-
-        <div id="rutube-browser-wrap" style="position:relative;border-radius:6px;overflow:hidden;border:1px solid var(--border,rgba(255,255,255,.12))">
-          <canvas id="rutube-browser-canvas"
-                  style="display:block;width:100%;cursor:pointer"
-                  tabindex="0"></canvas>
-          <div id="rutube-browser-overlay"
-               style="position:absolute;inset:0;background:rgba(10,10,20,.85);display:flex;align-items:center;justify-content:center;color:#aaa;font-size:14px">
-            Загрузка…
+        <div class="card-body">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
+            <div class="hint" style="flex:1;margin:0">
+              Используется браузерная автоматизация Playwrite.<br>
+              Если браузер не авторизован — войдите в аккаунт Рутьюба.
+              После входа нажмите <b>Сохранить сессию</b>.
+            </div>
+            <button class="btn-run-now" id="rutube-btn-save"
+                    onclick="rutubeBrowserSaveSession()"
+                    style="font-size:13px;padding:7px 14px;white-space:nowrap">Сохранить сессию</button>
           </div>
-        </div>
-        <div style="margin-top:14px">
-          <div class="hint" style="margin-bottom:2px;color:#e8e8f0">Конфиг</div>
-          <textarea id="rutube-target-body" placeholder="JSON-параметры таргета" autocomplete="off">{{ rutube_targets_config_json }}</textarea>
-          <div id="rutube-target-body-error" style="display:none;color:#f55;font-size:12px;margin-top:4px"></div>
+
+          <div id="rutube-browser-wrap" style="position:relative;border-radius:6px;overflow:hidden;border:1px solid var(--border,rgba(255,255,255,.12))">
+            <canvas id="rutube-browser-canvas"
+                    style="display:block;width:100%;cursor:pointer"
+                    tabindex="0"></canvas>
+            <div id="rutube-browser-overlay"
+                 style="position:absolute;inset:0;background:rgba(10,10,20,.85);display:flex;align-items:center;justify-content:center;color:#aaa;font-size:14px">
+              Загрузка…
+            </div>
+          </div>
+          <div style="margin-top:14px">
+            <div class="hint" style="margin-bottom:2px;color:#e8e8f0">Конфиг</div>
+            <textarea id="rutube-target-body" placeholder="JSON-параметры таргета" autocomplete="off">{{ rutube_targets_config_json }}</textarea>
+            <div id="rutube-target-body-error" style="display:none;color:#f55;font-size:12px;margin-top:4px"></div>
+          </div>
         </div>
       </div>
       {% endif %}
@@ -177,32 +199,39 @@
            {% if not loop.first %}style="margin-top:12px"{% endif %}
            data-studio-url="">
         <input type="hidden" id="vkvideo_target_id" value="{{ vkvideo_target_id or '' }}">
-        <div class="card-title">Публикация в VK Видео</div>
-
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
-          <div class="hint" style="flex:1;margin:0">
-            Используется браузерная автоматизация Playwrite.<br>
-            Если браузер не авторизован — войдите в аккаунт VK.
-            После входа нажмите <b>Сохранить сессию</b>.
-          </div>
-          <button class="btn-run-now" id="vkvideo-btn-save"
-                  onclick="vkvideoBrowserSaveSession()"
-                  style="font-size:13px;padding:7px 14px;white-space:nowrap">Сохранить сессию</button>
+        <div class="card-header">
+          <div class="card-title">Публикация в VK Видео</div>
+          <label class="toggle-wrap">
+            <input type="checkbox" id="vkvideo-active-toggle"{% if vkvideo_active %} checked{% endif %}>
+            <span class="toggle-track"></span>
+          </label>
         </div>
-
-        <div id="vkvideo-browser-wrap" style="position:relative;border-radius:6px;overflow:hidden;border:1px solid var(--border,rgba(255,255,255,.12))">
-          <canvas id="vkvideo-browser-canvas"
-                  style="display:block;width:100%;cursor:pointer"
-                  tabindex="0"></canvas>
-          <div id="vkvideo-browser-overlay"
-               style="position:absolute;inset:0;background:rgba(10,10,20,.85);display:flex;align-items:center;justify-content:center;color:#aaa;font-size:14px">
-            Загрузка…
+        <div class="card-body">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
+            <div class="hint" style="flex:1;margin:0">
+              Используется браузерная автоматизация Playwrite.<br>
+              Если браузер не авторизован — войдите в аккаунт VK.
+              После входа нажмите <b>Сохранить сессию</b>.
+            </div>
+            <button class="btn-run-now" id="vkvideo-btn-save"
+                    onclick="vkvideoBrowserSaveSession()"
+                    style="font-size:13px;padding:7px 14px;white-space:nowrap">Сохранить сессию</button>
           </div>
-        </div>
-        <div style="margin-top:14px">
-          <div class="hint" style="margin-bottom:2px;color:#e8e8f0">Конфиг</div>
-          <textarea id="vkvideo-target-body" placeholder="JSON-параметры таргета" autocomplete="off">{{ vkvideo_targets_config_json }}</textarea>
-          <div id="vkvideo-target-body-error" style="display:none;color:#f55;font-size:12px;margin-top:4px"></div>
+
+          <div id="vkvideo-browser-wrap" style="position:relative;border-radius:6px;overflow:hidden;border:1px solid var(--border,rgba(255,255,255,.12))">
+            <canvas id="vkvideo-browser-canvas"
+                    style="display:block;width:100%;cursor:pointer"
+                    tabindex="0"></canvas>
+            <div id="vkvideo-browser-overlay"
+                 style="position:absolute;inset:0;background:rgba(10,10,20,.85);display:flex;align-items:center;justify-content:center;color:#aaa;font-size:14px">
+              Загрузка…
+            </div>
+          </div>
+          <div style="margin-top:14px">
+            <div class="hint" style="margin-bottom:2px;color:#e8e8f0">Конфиг</div>
+            <textarea id="vkvideo-target-body" placeholder="JSON-параметры таргета" autocomplete="off">{{ vkvideo_targets_config_json }}</textarea>
+            <div id="vkvideo-target-body-error" style="display:none;color:#f55;font-size:12px;margin-top:4px"></div>
+          </div>
         </div>
       </div>
       {% endif %}

@@ -282,4 +282,34 @@ function uploadUpdatePackage(btn) {
   attachTargetBodyListener('dzen-target-body',    'dzen-target-body-error',   'dzen_target_id');
   attachTargetBodyListener('rutube-target-body',  'rutube-target-body-error', 'rutube_target_id');
   attachTargetBodyListener('vkvideo-target-body', 'vkvideo-target-body-error','vkvideo_target_id');
+
+  function attachTargetActiveToggle(toggleId, targetIdElId) {
+    var toggle  = document.getElementById(toggleId);
+    var tidEl   = document.getElementById(targetIdElId);
+    if (!toggle || !tidEl) return;
+    var tid = tidEl.value;
+    if (!tid) return;
+    toggle.addEventListener('change', function() {
+      var active = toggle.checked;
+      var card = toggle.closest('.card');
+      fetch('/api/targets/' + encodeURIComponent(tid) + '/active', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active: active })
+      }).then(function(r) { return r.json(); }).then(function(data) {
+        if (data.ok && card) {
+          card.classList.toggle('target-disabled', !active);
+        } else if (!data.ok) {
+          toggle.checked = !active;
+        }
+      }).catch(function() {
+        toggle.checked = !active;
+      });
+    });
+  }
+
+  attachTargetActiveToggle('vk-active-toggle',     'vk_target_id');
+  attachTargetActiveToggle('dzen-active-toggle',    'dzen_target_id');
+  attachTargetActiveToggle('rutube-active-toggle',  'rutube_target_id');
+  attachTargetActiveToggle('vkvideo-active-toggle', 'vkvideo_target_id');
 })();

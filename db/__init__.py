@@ -33,6 +33,7 @@ from .db_simple import (
     db_set_model_note,
     db_set_model_body,
     db_set_target_config_body,
+    db_set_target_active,
     db_get_distinct_batch_statuses,
     db_get_last_pipeline_run,
     db_get_graded_stories,
