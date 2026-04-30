@@ -243,7 +243,7 @@ def root_page():
             "account": "VK",
             "active": vkvideo_active,
             "target_id": vkvideo_target_id,
-            "studio_url": "",
+            "studio_url": f"https://cabinet.vkvideo.ru/dashboard/@club{vkvideo_club_id}" if vkvideo_club_id else "",
             "config_json": vkvideo_targets_config_json,
         },
     }
