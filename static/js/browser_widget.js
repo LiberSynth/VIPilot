@@ -10,9 +10,7 @@
  *   window.dzenBrowserSaveSession()
  */
 
-function createBrowserWidget(slug, opts) {
-  opts = opts || {};
-  var autoStart = opts.autoStart !== false;
+function createBrowserWidget(slug) {
   var VIEWPORT_W = 1280;
   var VIEWPORT_H = 720;
 
@@ -230,17 +228,7 @@ function createBrowserWidget(slug, opts) {
   var _origSwitchPanel = window.switchPanel;
   window.switchPanel = function (name) {
     if (_origSwitchPanel) _origSwitchPanel(name);
-    if (name === 'publish' && !active && autoStart) {
-      browserOpen();
-    }
   };
-
-  document.addEventListener('DOMContentLoaded', function () {
-    var panel = document.getElementById('panel-publish');
-    if (panel && panel.classList.contains('active') && !active && autoStart) {
-      browserOpen();
-    }
-  });
 
   window[slug + 'BrowserOpen']        = browserOpen;
   window[slug + 'BrowserSaveSession'] = saveSession;
