@@ -9,19 +9,21 @@ from common.exceptions import FatalError
 def db_insert_log(pipeline, message, status="info", batch_id=None):
     """Вставляет запись в таблицу log. Возвращает log_id (str).
 
-    Если batch_id задан и новая запись создаётся со статусом 'running' —
-    все существующие 'running'-записи того же (batch_id, pipeline) переводятся
-    в 'interrupted' в одной транзакции, чтобы не было «висячих» running-значков
-    после рестарта сервера.
+    Если batch_id задан и status == 'running' — сначала проверяет, есть ли уже
+    'running'-запись для того же (batch_id, pipeline). Если есть — возвращает её id
+    без создания новой записи. Это предотвращает дублирование логов после рестарта.
     """
     with get_db() as conn:
         with conn.cursor() as cur:
             if batch_id is not None and status == 'running':
                 cur.execute(
-                    "UPDATE log SET status = 'interrupted'"
-                    " WHERE batch_id = %s AND pipeline = %s AND status = 'running'",
+                    "SELECT id FROM log WHERE batch_id = %s AND pipeline = %s AND status = 'running'"
+                    " ORDER BY id DESC LIMIT 1",
                     (batch_id, pipeline),
                 )
+                row = cur.fetchone()
+                if row:
+                    return str(row[0])
             cur.execute(
                 """
                 INSERT INTO log (batch_id, pipeline, message, status)
