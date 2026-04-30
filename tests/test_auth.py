@@ -96,9 +96,6 @@ class TestApiBlueprintAuth:
     def test_post_clear_history(self, client):
         _assert_401(client.post("/api/clear_history"))
 
-    def test_post_clear_all_data(self, client):
-        _assert_401(client.post("/api/clear_all_data"))
-
     def test_get_workflow_state(self, client):
         _assert_401(client.get("/api/workflow/state"))
 

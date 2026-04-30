@@ -276,21 +276,6 @@ def db_clear_all_history():
     return {"log_entries": le, "logs": ll, "batches": bl}
 
 
-def db_clear_all_data() -> list[str]:
-    from psycopg2 import sql as psql
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT table_name FROM information_schema.tables "
-                "WHERE table_schema = 'public' AND table_type = 'BASE TABLE'"
-            )
-            tables = [r[0] for r in cur.fetchall()]
-            for table in tables:
-                cur.execute(psql.SQL("TRUNCATE {}").format(psql.Identifier(table)))
-        conn.commit()
-    return tables
-
-
 def db_cleanup_video_data(file_lifetime_days: int) -> int:
     with get_db() as conn:
         with conn.cursor() as cur:

@@ -202,40 +202,6 @@ function refreshMoviePoolCount() {
   setInterval(refreshMoviePoolCount, 10000);
 })();
 
-function openClearAllDataDialog() {
-  var PHRASE = 'Я осознанно подтверждаю действие';
-  new ConfirmDialog({
-    title: 'Очистить все данные?',
-    text:
-      'Будут очищены все таблицы базы данных без исключения. Все батчи, логи, сюжеты, видео, модели и настройки будут удалены. Действие нельзя отменить.<br>' +
-      'Для подтверждения действия введите текст "Я осознанно подтверждаю действие" ниже и нажмите кнопку Очистить.<br>' +
-      '<input type="text" id="_cd-guard-input" autocomplete="off">',
-    confirmLabel: 'Очистить',
-    confirmStyle: 'background:#b05820',
-    onConfirm: function(btn, dlg) {
-      btn.disabled    = true;
-      btn.textContent = 'Удаляем…';
-      fetch('/api/clear_all_data', { method: 'POST' })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-          dlg.close();
-          if (data.ok) {
-            showToast('Все данные очищены: таблиц ' + (data.tables ? data.tables.length : 0), 'success');
-          } else {
-            showToast('Ошибка: ' + (data.error || 'неизвестная ошибка'), 'error');
-          }
-        })
-        .catch(function() { dlg.close(); showToast('Ошибка соединения', 'error'); });
-    },
-  }).open();
-  var inp        = document.getElementById('_cd-guard-input');
-  var confirmBtn = document.getElementById('_cd-confirm');
-  confirmBtn.disabled = true;
-  inp.addEventListener('input', function() {
-    confirmBtn.disabled = inp.value !== PHRASE;
-  });
-}
-
 function openClearHistoryDialog() {
   var PHRASE = 'Я осознанно подтверждаю действие';
   new ConfirmDialog({
