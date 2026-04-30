@@ -378,9 +378,24 @@ def _m091_reseed_targets(cur):
 # Реестр миграций — добавляйте только в конец, никогда не переиспользуйте номера
 # ---------------------------------------------------------------------------
 
+def _m092_reseed_ai_platforms(cur):
+    cur.execute("DELETE FROM ai_platforms")
+    cur.executemany(
+        "INSERT INTO ai_platforms (id, name, url, env_key_name) VALUES (%s, %s, %s, %s)",
+        [
+            ('0c8d1e1c-fe65-45d3-a1c3-be69e7941e17', 'fal.ai',     'https://queue.fal.run',                         'FAL_API_KEY'),
+            ('1b696238-1fdd-4b95-bff0-86a37be13c78', 'OpenRouter', 'https://openrouter.ai/api/v1/chat/completions', 'OPENROUTER_API_KEY'),
+            ('38df0351-44cb-4249-be63-a067444dc66f', 'SkyReels',   'https://api-gateway.skyreels.ai',               'SKYREELS_API_KEY'),
+            ('8be57991-bf7a-4594-b436-a0805e163256', 'DeepSeek',   'https://api.deepseek.com/chat/completions',     'DEEPSEEK_API_KEY'),
+            ('a19ca46d-0ddf-4735-b400-0c8c18ff5485', 'Grok',       'https://api.x.ai/v1',                          'XAI_API_KEY'),
+        ],
+    )
+
+
 MIGRATIONS = [
     (90, _m090_seed_ai_models),
     (91, _m091_reseed_targets),
+    (92, _m092_reseed_ai_platforms),
 ]
 
 
