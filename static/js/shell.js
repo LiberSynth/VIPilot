@@ -139,4 +139,6 @@ function loadGoodPoolCount() {
     }
   }
   loadGoodPoolCount();
+  var btnHamburger = document.getElementById('btn-hamburger');
+  if (btnHamburger) btnHamburger.addEventListener('click', openSidebar);
 })();
