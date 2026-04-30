@@ -10,6 +10,8 @@
  *   window.dzenBrowserSaveSession()
  */
 
+window._browserWidgetRegistry = window._browserWidgetRegistry || {};
+
 function createBrowserWidget(slug) {
   var VIEWPORT_W = 1280;
   var VIEWPORT_H = 720;
@@ -160,10 +162,19 @@ function createBrowserWidget(slug) {
     applyState(STATE.IDLE);
   }
 
+  function stopOthers() {
+    var registry = window._browserWidgetRegistry;
+    Object.keys(registry).forEach(function (key) {
+      if (key !== slug) registry[key]();
+    });
+  }
+
   function browserOpen() {
     if (state !== STATE.IDLE) return;
     var tid = getTargetId();
     if (!tid) return;
+
+    stopOthers();
 
     overlay.style.display = 'flex';
     overlay.textContent = 'Загрузка…';
@@ -282,6 +293,7 @@ function createBrowserWidget(slug) {
     if (_origSwitchPanel) _origSwitchPanel(name);
   };
 
+  window._browserWidgetRegistry[slug]  = browserStop;
   window[slug + 'BrowserOpen']        = browserOpen;
   window[slug + 'BrowserSaveSession'] = saveSession;
   window[slug + 'BrowserStop']        = browserStop;
