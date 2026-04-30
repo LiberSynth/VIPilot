@@ -61,7 +61,6 @@ class PlatformBrowser:
         self._save_result: Optional[dict] = None
 
         self._current_target_id: Optional[str] = None
-        self._pipeline_taking_over: bool = False
 
         self._batch_frames: dict = {}
         self._batch_frames_lock  = threading.Lock()
@@ -240,8 +239,7 @@ class PlatformBrowser:
             write_log_entry(None, f"{tag} Критическая ошибка: {e}", level='silent')
             return
 
-        if not self._pipeline_taking_over:
-            self._set_status("stopped")
+        self._set_status("stopped")
 
     # ------------------------------------------------------------------
     # Public API
@@ -327,19 +325,6 @@ class PlatformBrowser:
         Возвращает {"ok": bool, "result": ..., "error": str|None}.
         """
         tag = f"[{self._platform}_pipeline]"
-
-        self._pipeline_taking_over = True
-        self._set_status("running", "Публикация.")
-
-        with self._lock:
-            if self._running:
-                self._running = False
-        if self._thread and self._thread.is_alive():
-            self._thread.join(timeout=5)
-
-        with self._lock:
-            self._running = True
-
         result: dict = {"ok": False, "error": "Неизвестная ошибка"}
 
         try:
@@ -378,11 +363,6 @@ class PlatformBrowser:
 
         except Exception as e:
             result = {"ok": False, "error": f"Playwright: {e}"}
-
-        self._pipeline_taking_over = False
-        with self._lock:
-            self._running = False
-        self._set_status("stopped")
 
         return result
 
