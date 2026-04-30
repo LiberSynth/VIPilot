@@ -193,6 +193,7 @@ function createBrowserWidget(slug) {
   function browserStop() {
     if (!active) return;
     active = false;
+    setSessionControls(false);
     overlay.style.display = 'flex';
     overlay.textContent = 'Закрытие…';
     fetch(API + 'stop', { method: 'POST' }).catch(function () {});
