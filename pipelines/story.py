@@ -36,6 +36,7 @@ def run(batch_id, log_id):
     snap = environment.snapshot()
     batch = db_get_batch_by_id(batch_id)
     if not batch:
+        db_log_update(log_id, "Батч не найден", "error")
         return
 
     # Два допустимых входных статуса:
@@ -44,10 +45,12 @@ def run(batch_id, log_id):
     #                     возвращаем 0 строк → выходим.
     # - story_generating: пайплайн был прерван после CAS. Подхватываем без повторного CAS.
     if batch["status"] not in ("pending", "story_generating"):
+        db_log_update(log_id, "Пайплайн уже выполнен — пропуск", "ok")
         return
 
     if batch["status"] == "pending":
         if not db_claim_batch_status(batch_id, 'pending', 'story_generating'):
+            db_log_update(log_id, "Захват батча не удался — пропуск", "cancelled")
             return
 
     # is_probe: батч создан вручную (story_probe — тест текстовой модели,

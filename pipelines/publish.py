@@ -175,6 +175,7 @@ def run(batch_id, log_id):
     snap = environment.snapshot()
     batch = db_get_batch_by_id(batch_id)
     if not batch:
+        db_log_update(log_id, "Батч не найден", "error")
         return
 
     status = batch['status']
@@ -183,6 +184,7 @@ def run(batch_id, log_id):
     parsed = _parse_composite_status(status)
 
     if parsed is None and status != 'transcode_ready':
+        db_log_update(log_id, "Пайплайн уже выполнен — пропуск", "ok")
         return
 
     if parsed is None:
@@ -320,7 +322,7 @@ def run(batch_id, log_id):
         if not db_claim_batch_status(batch_id, expected_from, posting_status):
             write_log_entry(log_id, 'Батч уже захвачен другим процессом — пропуск')
             write_log_entry(log_id, fmt_id_msg("[publish] Батч {} уже захвачен другим процессом для {} — пропуск", batch_id, posting_status), level='silent')
-            db_log_update(log_id, f'Захват {posting_status} не удался — пропуск', 'warn')
+            db_log_update(log_id, f'Захват {posting_status} не удался — пропуск', 'cancelled')
             return
 
         if not pub_title:

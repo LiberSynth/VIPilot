@@ -59,6 +59,7 @@ def run(batch_id, log_id):
     try:
         batch = db_get_batch_by_id(batch_id)
         if not batch:
+            db_log_update(log_id, "Батч не найден", "error")
             return
 
         status = batch['status']
@@ -77,8 +78,10 @@ def run(batch_id, log_id):
             resumed = False
             if status == 'story_ready':
                 if not db_claim_batch_status(batch_id, 'story_ready', 'video_generating'):
+                    db_log_update(log_id, "Захват батча не удался — пропуск", "cancelled")
                     return
         else:
+            db_log_update(log_id, "Пайплайн уже выполнен — пропуск", "ok")
             return
 
         # is_probe: батч создан вручную для тестирования конкретной модели (movie_probe).

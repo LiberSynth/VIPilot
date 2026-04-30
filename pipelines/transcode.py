@@ -90,13 +90,16 @@ def run(batch_id, log_id):
     snap = environment.snapshot()
     batch = db_get_batch_by_id(batch_id)
     if not batch:
+        db_log_update(log_id, "Батч не найден", "error")
         return
 
     if batch['status'] not in ('video_ready', 'transcoding'):
+        db_log_update(log_id, "Пайплайн уже выполнен — пропуск", "ok")
         return
 
     if batch['status'] == 'video_ready':
         if not db_claim_batch_status(batch_id, 'video_ready', 'transcoding'):
+            db_log_update(log_id, "Захват батча не удался — пропуск", "cancelled")
             return
 
     is_probe = batch['type'] == 'movie_probe'
