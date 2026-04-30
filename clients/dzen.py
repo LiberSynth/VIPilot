@@ -181,12 +181,9 @@ def _try_click_captcha_checkbox(page, log_id) -> bool:
     ]
     clicked = False
 
-    # Перебираем все фреймы (и с совпадением URL, и без)
     try:
         for frame in page.frames:
             furl = frame.url.lower()
-            is_url_match = any(kw in furl for kw in _CAPTCHA_URL_KEYWORDS)
-            # Также пробуем фреймы без URL-совпадения, если DOM-капча обнаружена
             for js_sel in checkbox_selectors[:3]:
                 try:
                     done = frame.evaluate(
@@ -204,7 +201,6 @@ def _try_click_captcha_checkbox(page, log_id) -> bool:
     except Exception:
         pass
 
-    # Если фреймовый клик не сработал — пробуем основной фрейм напрямую
     if not clicked:
         for sel in checkbox_selectors:
             try:
@@ -232,21 +228,77 @@ def _has_publish_confirm_dialog(page) -> bool:
     return False
 
 
-def _dismiss_popups(page, log_id=None) -> None:
+# ---------------------------------------------------------------------------
+# Известные ожидаемые элементы — список признаков и действий
+#
+# Каждая запись: (имя, detect(page)->bool, handle(page, log_id, batch_id)->None)
+# handle=None означает «обнаружен, действий не требует — просто не закрывать».
+# Всё, что не попало в этот список — закрывается без разбора (_dismiss_unknown).
+# ---------------------------------------------------------------------------
+
+def _detect_captcha(page) -> bool:
+    return _has_captcha_frame(page) or _has_captcha_dom(page)
+
+
+def _detect_confirm_dialog(page) -> bool:
+    return _has_publish_confirm_dialog(page)
+
+
+def _detect_file_input(page) -> bool:
+    """input[type=file] в DOM — нативный диалог уже закрыт после set_files(), не трогаем."""
+    try:
+        return page.locator('input[type="file"]').count() > 0
+    except Exception:
+        return False
+
+
+def _handle_captcha_element(page, log_id, batch_id) -> None:
     """
-    Закрывает любые видимые диалоги/попапы без разбора.
-    Исключения (не трогаем):
-      1. Активная капча-iframe — иначе сломаем прохождение капчи.
-      2. Диалог подтверждения публикации — кнопка «Опубликовать после обработки»
-         или «Опубликовать после подтверждения» видна в DOM.
-    Примечание: input[type="file"] — это HTML-элемент формы, а не нативный
-    диалог выбора файла. Нативный диалог уже закрыт после set_files().
-    Поэтому его присутствие в DOM не является защитным условием.
+    Обрабатывает капчу «Я не робот»: кликает чекбокс, ждёт исчезновения.
+    Бросает DzenApiError если капча не прошла за 30 сек.
     """
-    if _has_captcha_frame(page) or _has_captcha_dom(page):
+    write_log_entry(log_id, "Дзен: Обнаружена капча, пытаюсь нажать «Я не робот».")
+    _clicked = _try_click_captcha_checkbox(page, log_id)
+    if not _clicked:
+        write_log_entry(log_id, "Дзен: Капча обнаружена, но кликнуть чекбокс не удалось.")
         return
-    if _has_publish_confirm_dialog(page):
-        return
+    write_log_entry(log_id, "Дзен: Капча — чекбокс нажат, жду исчезновения.")
+    _snap(page, batch_id)
+    _deadline = _time.monotonic() + 30
+    while _time.monotonic() < _deadline:
+        page.wait_for_timeout(1_000)
+        if not _detect_captcha(page):
+            write_log_entry(log_id, "Дзен: Капча пройдена.")
+            _snap(page, batch_id)
+            return
+    _snap(page, batch_id)
+    raise DzenApiError("Капча не прошла за 30 сек — публикация невозможна.")
+
+
+def _handle_confirm_element(page, log_id, batch_id) -> None:
+    """Обрабатывает диалог подтверждения публикации: кликает кнопку."""
+    for text in ("Опубликовать после подтверждения", "Опубликовать после обработки"):
+        try:
+            btn = page.locator(f"button:has-text('{text}')").first
+            if btn.is_visible(timeout=300):
+                write_log_entry(log_id, f"Дзен: Нажимаю «{text}».")
+                write_log_entry(log_id, f"[dzen] Кнопка подтверждения: «{text}»", level='silent')
+                btn.click()
+                _snap(page, batch_id)
+                return
+        except Exception:
+            pass
+
+
+_EXPECTED_ELEMENTS = [
+    ("captcha",       _detect_captcha,       _handle_captcha_element),
+    ("confirm",       _detect_confirm_dialog, _handle_confirm_element),
+    ("file_input",    _detect_file_input,     None),
+]
+
+
+def _dismiss_unknown(page, log_id=None) -> None:
+    """Закрывает неизвестный попап/диалог/хинт: Escape + стандартные кнопки закрытия."""
     try:
         page.keyboard.press("Escape")
         page.wait_for_timeout(200)
@@ -269,6 +321,22 @@ def _dismiss_popups(page, log_id=None) -> None:
                 break
         except Exception:
             pass
+
+
+def _handle_popups(page, log_id=None, batch_id=None) -> None:
+    """
+    Проверяет страницу на попапы, хинты, тултипы и диалоги.
+    Сначала сверяет со списком _EXPECTED_ELEMENTS — если совпадение найдено,
+    вызывает соответствующий обработчик и возвращает управление.
+    Если ни один известный элемент не обнаружен — закрывает неизвестный попап.
+    """
+    for name, detect, handle in _EXPECTED_ELEMENTS:
+        if detect(page):
+            write_log_entry(log_id, f"[dzen] Ожидаемый элемент: {name}", level='silent')
+            if handle is not None:
+                handle(page, log_id, batch_id)
+            return
+    _dismiss_unknown(page, log_id)
 
 
 def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None):
@@ -319,8 +387,8 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
     except Exception:
         pass
 
-    # Перед шагом 2: сбрасываем любые оставшиеся диалоги
-    _dismiss_popups(page, log_id)
+    # Перед шагом 2: обрабатываем любые попапы/диалоги/хинты
+    _handle_popups(page, log_id, batch_id)
 
     # ── Шаг 2: Кнопка «+» (плюсик) в правом верхнем углу ────────────────
     write_log_entry(log_id, "Дзен: Ищу кнопку «+» для создания публикации.")
@@ -387,7 +455,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
             write_log_entry(log_id, "Дзен: Редактор видео открылся.")
             write_log_entry(log_id, f"[dzen] URL редактора: {_cur}", level='silent')
             break
-        _dismiss_popups(page, log_id)
+        _handle_popups(page, log_id, batch_id)
         page.wait_for_timeout(1_500)
 
     if _auto_published:
@@ -450,17 +518,12 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
         pass
     _snap(page, batch_id)
 
-    # ── Шаг 7: Обрабатываем три разных элемента (25 секунд) ─────────────
-    #
-    # A. Кнопка «Опубликовать после обработки» — нажать немедленно при появлении.
-    # B. Капча VK «Я не робот» (iframe id.vk.com/not_robot_captcha) — кликнуть
-    #    ТОЛЬКО чекбокс внутри iframe капчи, не трогать ничего снаружи.
-    # C. «Уже можно публиковать» — это просто текст внизу диалога, НЕ попап.
-    #    Закрывать нечего, игнорируем. Escape не слать — он убьёт капчу.
-    #
+    # ── Шаг 7: Обрабатываем попапы, диалоги, хинты (25 секунд) ──────────
+    # Каждую итерацию вызываем _handle_popups — он сверяет со списком
+    # _EXPECTED_ELEMENTS (капча, диалог подтверждения, файловый input)
+    # и либо обрабатывает известный элемент, либо закрывает неизвестный.
     _DIALOG_WINDOW = 25_000  # ms
     _DIALOG_POLL   = 2_000   # ms
-    captcha_clicked = False
 
     # Тексты, которые Дзен показывает в тост-ошибках при неудаче публикации.
     _DZEN_ERROR_TEXTS = [
@@ -488,83 +551,16 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
             pass
 
     _dialog_deadline = _time.monotonic() + _DIALOG_WINDOW / 1000
+    _step7_done = False
 
     while _time.monotonic() < _dialog_deadline:
+        # Обрабатываем любые попапы/диалоги/хинты через единый список ожидаемых элементов.
+        # DzenApiError из _handle_captcha_element пробросится наружу автоматически.
+        _handle_popups(page, log_id, batch_id)
 
-        # ── A. Кнопки подтверждения публикации ────────────────────────────
-        # Дзен показывает одну из двух кнопок после нажатия «Опубликовать»:
-        #   • «Опубликовать после подтверждения» — видео ещё обрабатывается
-        #   • «Опубликовать после обработки» — старый вариант текста
-        # Широкий «button:has-text('Опубликовать')» намеренно исключён —
-        # он совпадает с кнопкой формы, которая ещё может быть видима.
-        try:
-            pub_after = page.locator(
-                "button:has-text('Опубликовать после подтверждения'), "
-                "button:has-text('Опубликовать после обработки')"
-            ).first
-            if pub_after.is_visible(timeout=300):
-                btn_text = pub_after.inner_text()
-                write_log_entry(log_id, "Дзен: Нажимаю кнопку подтверждения публикации.")
-                write_log_entry(log_id, f"[dzen] Текст кнопки: «{btn_text}»", level='silent')
-                pub_after.click()
-                # Ждём реакции страницы короткими шагами — если капча
-                # появилась, прерываем ожидание и сразу переходим к блоку B.
-                _captcha_after_btn = False
-                for _w in range(4):
-                    page.wait_for_timeout(500)
-                    if _has_captcha_frame(page) or _has_captcha_dom(page):
-                        _captcha_after_btn = True
-                        break
-                _snap(page, batch_id)
-                # Не проверяем ошибки когда капча только появилась —
-                # inner_text зависнет на 1500 мс зря, а тост в этот момент невидим.
-                if not _captcha_after_btn:
-                    _check_error_toast()
-        except DzenApiError:
-            raise
-        except Exception:
-            pass
+        _check_error_toast()
 
-        # ── B. Капча «Я не робот» ──────────────────────────────────────────
-        # Детектируем сначала по URL iframe, затем по DOM (резервный метод).
-        # Если капча обнаружена любым способом — пробуем кликнуть чекбокс
-        # через _try_click_captcha_checkbox (все фреймы + основной контекст).
-        if not captcha_clicked:
-            captcha_by_url = _has_captcha_frame(page)
-            captcha_by_dom = not captcha_by_url and _has_captcha_dom(page)
-            if captcha_by_url or captcha_by_dom:
-                method = "URL" if captcha_by_url else "DOM"
-                write_log_entry(log_id, f"Дзен: Обнаружена капча ({method}), пытаюсь нажать «Я не робот».")
-                _clicked = _try_click_captcha_checkbox(page, log_id)
-                if _clicked:
-                    write_log_entry(log_id, "Дзен: Капча — чекбокс нажат, жду исчезновения капчи.")
-                    captcha_clicked = True
-                    _snap(page, batch_id)
-                    # Ждём пока капча исчезнет — максимум 30 секунд
-                    _cap_deadline = _time.monotonic() + 30
-                    _cap_gone = False
-                    while _time.monotonic() < _cap_deadline:
-                        page.wait_for_timeout(1_000)
-                        if not _has_captcha_frame(page) and not _has_captcha_dom(page):
-                            _cap_gone = True
-                            write_log_entry(log_id, "Дзен: Капча пройдена.")
-                            _snap(page, batch_id)
-                            break
-                    if not _cap_gone:
-                        write_log_entry(log_id, "Дзен: Капча не исчезла за 30 сек — продолжаю.")
-                        _snap(page, batch_id)
-                else:
-                    write_log_entry(log_id, "Дзен: Капча обнаружена, но кликнуть чекбокс не удалось — жду.")
-
-        # ── C. «Уже можно публиковать» — это встроенный текст диалога, НЕ попап.
-        #       Закрывать нечего, игнорируем полностью. Escape не отправляем.
-
-        # ── D. Закрываем любые другие неизвестные попапы/диалоги ──────────
-        #       _dismiss_popups сама охраняет капчу и диалог загрузки файла.
-        if not captcha_clicked:
-            _dismiss_popups(page, log_id)
-
-        # ── Проверяем финальное подтверждение публикации ──────────────────
+        # Проверяем финальное подтверждение публикации
         try:
             success_now = page.locator(
                 "[class*='toast']:has-text('опубликован'), "
@@ -572,18 +568,15 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
                 "[data-testid='publish-success']"
             ).first
             if success_now.is_visible():
-                write_log_entry(log_id, "Дзен: Публикация подтверждена ещё в шаге 6.")
-                captcha_clicked = True
+                write_log_entry(log_id, "Дзен: Публикация подтверждена в шаге 7.")
+                _step7_done = True
                 break
         except Exception:
             pass
 
         page.wait_for_timeout(_DIALOG_POLL)
 
-    if captcha_clicked:
-        write_log_entry(log_id, "Дзен: Действия в шаге 7 выполнены, жду подтверждения публикации.")
-    else:
-        write_log_entry(log_id, "Дзен: Шаг 7 завершён (капча/попап не обнаружены), жду подтверждения.")
+    write_log_entry(log_id, "Дзен: Шаг 7 завершён, жду подтверждения публикации.")
 
     # ── Шаг 8: Ожидаем подтверждения публикации ──────────────────────────
     _PUBLISH_CONFIRM_TIMEOUT = 60_000  # ms — полный таймаут ожидания
@@ -659,6 +652,9 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
 
         # 2b. Проверка тост-ошибок Дзена — завершаем сразу, не ждём таймаута
         _check_error_toast()
+
+        # 2c. Обрабатываем попапы/диалоги/хинты (капча может появиться и здесь)
+        _handle_popups(page, log_id, batch_id)
 
         # 3. Проверка URL
         url_now = page.url
