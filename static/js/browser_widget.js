@@ -137,7 +137,10 @@ function createBrowserWidget(slug) {
 
   function handleStopped() {
     active = false;
+    firstFrame = false;
     if (sse) { sse.close(); sse = null; }
+    overlay.style.display = 'flex';
+    overlay.textContent = '';
   }
 
   function browserOpen() {
