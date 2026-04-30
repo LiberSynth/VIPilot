@@ -154,6 +154,22 @@ class PlatformBrowser:
                     user_agent=self._USER_AGENT,
                     locale="ru-RU",
                 )
+
+                # Загружаем куки из БД для данного target_id, чтобы браузер
+                # сразу открывался авторизованным — без повторного входа.
+                try:
+                    from db import db_get_target_session_context
+                    saved = db_get_target_session_context(target_id)
+                    if saved and saved.get("cookies"):
+                        context.add_cookies(saved["cookies"])
+                        write_log_entry(
+                            None,
+                            f"{tag} Загружено {len(saved['cookies'])} куков из БД для target={target_id}",
+                            level='silent',
+                        )
+                except Exception as _e:
+                    write_log_entry(None, f"{tag} Не удалось загрузить куки из БД: {_e}", level='silent')
+
                 page = context.new_page()
 
                 # active_page[0] всегда указывает на последнюю открытую вкладку.
