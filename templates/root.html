@@ -121,18 +121,20 @@
           </label>
         </div>
         <div class="card-body">
-          <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
-            <div class="hint" style="flex:1;margin:0">
+          <div style="margin-bottom:12px">
+            <div class="hint" style="margin-bottom:8px">
               Используется браузерная автоматизация Playwrite.<br>
               Если браузер не авторизован — войдите в аккаунт Яндекса.
               После входа нажмите <b>Сохранить сессию</b>.
             </div>
-            <button class="btn-run-now" id="dzen-btn-start"
-                    onclick="dzenBrowserOpen()"
-                    style="font-size:13px;padding:7px 14px;white-space:nowrap">Начать авторизацию</button>
-            <button class="btn-run-now" id="dzen-btn-save"
-                    onclick="dzenBrowserSaveSession()"
-                    style="font-size:13px;padding:7px 14px;white-space:nowrap">Сохранить сессию</button>
+            <div style="display:flex;gap:8px">
+              <button class="btn-run-now" id="dzen-btn-start"
+                      onclick="dzenBrowserOpen()"
+                      style="font-size:13px;padding:7px 14px;white-space:nowrap">Начать авторизацию</button>
+              <button class="btn-run-now" id="dzen-btn-save"
+                      onclick="dzenBrowserSaveSession()"
+                      style="font-size:13px;padding:7px 14px;white-space:nowrap">Сохранить сессию</button>
+            </div>
           </div>
 
           <div id="dzen-browser-wrap" style="position:relative;border-radius:6px;overflow:hidden;border:1px solid var(--border,rgba(255,255,255,.12))">
@@ -140,8 +142,7 @@
                     style="display:block;width:100%;cursor:pointer"
                     tabindex="0"></canvas>
             <div id="dzen-browser-overlay"
-                 style="position:absolute;inset:0;background:rgba(10,10,20,.85);display:flex;align-items:center;justify-content:center;color:#aaa;font-size:14px">
-              Загрузка…
+                 style="position:absolute;inset:0;background:rgba(10,10,20,.85);display:none;align-items:center;justify-content:center;color:#aaa;font-size:14px">
             </div>
           </div>
           <div style="margin-top:14px">
