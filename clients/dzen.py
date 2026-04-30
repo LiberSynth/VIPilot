@@ -537,10 +537,22 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
                 write_log_entry(log_id, f"Дзен: Обнаружена капча ({method}), пытаюсь нажать «Я не робот».")
                 _clicked = _try_click_captcha_checkbox(page, log_id)
                 if _clicked:
-                    page.wait_for_timeout(2000)
-                    write_log_entry(log_id, "Дзен: Капча — чекбокс нажат, жду проверки.")
+                    write_log_entry(log_id, "Дзен: Капча — чекбокс нажат, жду исчезновения капчи.")
                     captcha_clicked = True
                     _snap(page, batch_id)
+                    # Ждём пока капча исчезнет — максимум 30 секунд
+                    _cap_deadline = _time.monotonic() + 30
+                    _cap_gone = False
+                    while _time.monotonic() < _cap_deadline:
+                        page.wait_for_timeout(1_000)
+                        if not _has_captcha_frame(page) and not _has_captcha_dom(page):
+                            _cap_gone = True
+                            write_log_entry(log_id, "Дзен: Капча пройдена.")
+                            _snap(page, batch_id)
+                            break
+                    if not _cap_gone:
+                        write_log_entry(log_id, "Дзен: Капча не исчезла за 30 сек — продолжаю.")
+                        _snap(page, batch_id)
                 else:
                     write_log_entry(log_id, "Дзен: Капча обнаружена, но кликнуть чекбокс не удалось — жду.")
 
@@ -693,12 +705,11 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
 
     if not confirmed:
         _check_error_toast()  # бросает DzenApiError если есть явная ошибка
-        msg = (
-            "Подтверждение публикации не получено за 60 с, "
-            "но явных ошибок нет — публикация предположительно выполнена"
-        )
-        write_log_entry(log_id, f"Дзен: {msg}")
         _snap(page, batch_id)
+        raise DzenApiError(
+            "Подтверждение публикации не получено за 60 с — "
+            "видео предположительно в черновиках. Проверьте вручную."
+        )
 
     write_log_entry(log_id, f"[dzen] URL после публикации: {page.url}", level='silent')
     write_log_entry(log_id, "Дзен: Публикация завершена.")
