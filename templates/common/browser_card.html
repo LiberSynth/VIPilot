@@ -24,9 +24,11 @@
                 style="font-size:13px;padding:7px 14px;white-space:nowrap">Начать авторизацию</button>
         <button type="button" class="btn-run-now" id="{{ t.slug }}-btn-save"
                 onclick="{{ t.slug }}BrowserSaveSession()"
+                disabled
                 style="font-size:13px;padding:7px 14px;white-space:nowrap">Сохранить сессию</button>
         <button type="button" class="btn-run-now" id="{{ t.slug }}-btn-stop"
                 onclick="{{ t.slug }}BrowserStop()"
+                disabled
                 style="font-size:13px;padding:7px 14px;white-space:nowrap">Отмена</button>
       </div>
     </div>

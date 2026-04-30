@@ -17,6 +17,7 @@ function createBrowserWidget(slug) {
   var canvas  = document.getElementById(slug + '-browser-canvas');
   var overlay = document.getElementById(slug + '-browser-overlay');
   var btnSave = document.getElementById(slug + '-btn-save');
+  var btnStop = document.getElementById(slug + '-btn-stop');
 
   if (!canvas) return;
 
@@ -135,6 +136,11 @@ function createBrowserWidget(slug) {
     sse.onerror = function () {};
   }
 
+  function setSessionControls(enabled) {
+    if (btnSave) btnSave.disabled = !enabled;
+    if (btnStop) btnStop.disabled = !enabled;
+  }
+
   function handleStopped() {
     active = false;
     firstFrame = false;
@@ -142,6 +148,7 @@ function createBrowserWidget(slug) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     overlay.style.display = 'none';
     overlay.textContent = '';
+    setSessionControls(false);
   }
 
   function browserOpen() {
@@ -162,6 +169,7 @@ function createBrowserWidget(slug) {
         if (!data.ok) return;
         active = true;
         firstFrame = false;
+        setSessionControls(true);
         connectStream();
         var url = getStudioUrl();
         if (url) {
@@ -186,7 +194,7 @@ function createBrowserWidget(slug) {
   function saveSession() {
     var tid = getTargetId();
     if (!tid) return;
-    if (btnSave) btnSave.disabled = true;
+    setSessionControls(false);
 
     fetch(API + 'save-session', {
       method: 'POST',
@@ -195,16 +203,16 @@ function createBrowserWidget(slug) {
     })
       .then(function (r) { return r.json(); })
       .then(function (data) {
-        if (btnSave) btnSave.disabled = false;
         if (data.ok) {
           showToast('Сессия сохранена', 'success');
           browserStop();
         } else {
+          setSessionControls(true);
           showToast('Ошибка: ' + (data.error || 'Не удалось сохранить'), 'error');
         }
       })
       .catch(function () {
-        if (btnSave) btnSave.disabled = false;
+        setSessionControls(true);
         showToast('Ошибка соединения', 'error');
       });
   }
@@ -212,6 +220,7 @@ function createBrowserWidget(slug) {
   function _showPipelineWidget() {
     active = true;
     firstFrame = false;
+    setSessionControls(true);
     overlay.style.display = 'flex';
     overlay.textContent = 'Публикация…';
     connectStream();
