@@ -32,13 +32,11 @@ class PlatformBrowser:
     def __init__(
         self,
         platform_name: str,
-        profile_dir: str,
         start_url: str,
         cookie_domains: list,
         thread_name: str,
     ):
         self._platform      = platform_name
-        self._profile_dir   = profile_dir
         self._start_url     = start_url
         self._cookie_domains = cookie_domains
         self._thread_name   = thread_name

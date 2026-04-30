@@ -9,30 +9,23 @@
     b.start(target_id)
 """
 
-import os
-
 from services.browser_base import PlatformBrowser
-
-_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 _CONFIGS = {
     "dzen": dict(
         platform_name="dzen",
-        profile_dir=os.path.join(_PROJECT_ROOT, "data", "dzen_profile"),
         start_url="https://dzen.ru",
         cookie_domains=["https://dzen.ru", "https://yandex.ru"],
         thread_name="dzen-browser",
     ),
     "rutube": dict(
         platform_name="rutube",
-        profile_dir=os.path.join(_PROJECT_ROOT, "data", "rutube_profile"),
         start_url="https://studio.rutube.ru/",
         cookie_domains=["https://rutube.ru"],
         thread_name="rutube-browser",
     ),
     "vkvideo": dict(
         platform_name="vkvideo",
-        profile_dir=os.path.join(_PROJECT_ROOT, "data", "vkvideo_profile"),
         start_url="https://vkvideo.ru/",
         cookie_domains=["https://vkvideo.ru", "https://vk.com", "https://cabinet.vkvideo.ru"],
         thread_name="vkvideo-browser",
