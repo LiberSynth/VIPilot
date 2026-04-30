@@ -155,6 +155,7 @@ def _publish_ui(page, club_id: str, video_path: str, pub_title: str, log_id, bat
     # ── Шаг 1: Переходим в кабинет с параметром uploader ─────────────────
     write_log_entry(log_id, "VK Видео: Переход в кабинет автора.")
     page.goto(cabinet_url, wait_until="domcontentloaded", timeout=_NAV_TIMEOUT)
+    _snap(page, batch_id)
 
     cur = page.url
     write_log_entry(log_id, f"[vkvideo] URL после перехода: {cur}", level='silent')
@@ -165,22 +166,13 @@ def _publish_ui(page, club_id: str, video_path: str, pub_title: str, log_id, bat
 
     # ── Шаг 2: Ждём появления кнопки «Выбрать файл» ──────────────────────
     write_log_entry(log_id, "VK Видео: Жду модал загрузки клипа.")
-    choose_btn = None
-    _deadline = 60.0
-    _t0 = _time.monotonic()
-    while _time.monotonic() - _t0 < _deadline:
-        _snap(page, batch_id)
-        b1 = page.locator("button:has-text('Выбрать файл')").first
-        if b1.is_visible(timeout=500):
-            choose_btn = b1
-            break
-        b2 = page.get_by_text("Выбрать файл", exact=False).first
-        if b2.is_visible(timeout=500):
-            choose_btn = b2
-            break
-        page.wait_for_timeout(1_500)
-    if choose_btn is None:
-        raise Exception("VK Видео: кнопка «Выбрать файл» не появилась за 60 секунд")
+    choose_btn = page.locator("button:has-text('Выбрать файл')").first
+    try:
+        choose_btn.wait_for(state="visible", timeout=30_000)
+    except Exception:
+        write_log_entry(log_id, "VK Видео: «Выбрать файл» не появился — пробую альтернативный селектор.")
+        choose_btn = page.get_by_text("Выбрать файл", exact=False).first
+        choose_btn.wait_for(state="visible", timeout=30_000)
 
     write_log_entry(log_id, "VK Видео: Кнопка «Выбрать файл» найдена, загружаю файл.")
 
@@ -237,6 +229,36 @@ def _publish_ui(page, club_id: str, video_path: str, pub_title: str, log_id, bat
     except Exception as _e:
         write_log_entry(log_id, "VK Видео: Не удалось заполнить описание — продолжаю.")
         write_log_entry(log_id, f"[vkvideo] Ошибка описания: {_e}", level='silent')
+
+    # ── Шаг 7: Выключаем ненужные переключатели ──────────────────────────
+    _TOGGLES_OFF = ["Показать на главной сообщества"]
+    write_log_entry(log_id, "VK Видео: Выключаю переключатели.")
+    for label_text in _TOGGLES_OFF:
+        try:
+            label = page.locator(f"label:has-text('{label_text}')").first
+            if label.count() == 0 or not label.is_visible(timeout=3_000):
+                continue
+            chk = label.locator("input[type='checkbox']")
+            if chk.count() > 0 and chk.first.is_checked():
+                chk.first.click(force=True)
+                page.wait_for_timeout(300)
+                write_log_entry(log_id, f"VK Видео: «{label_text}» — выключено")
+            else:
+                toggle_btn = label.locator("[role='switch'], button").first
+                if toggle_btn.count() > 0:
+                    aria = toggle_btn.get_attribute("aria-checked")
+                    if aria == "true":
+                        toggle_btn.click()
+                        page.wait_for_timeout(300)
+                        write_log_entry(log_id, f"VK Видео: «{label_text}» — выключено")
+                else:
+                    label.click()
+                    page.wait_for_timeout(300)
+                    write_log_entry(log_id, f"VK Видео: «{label_text}» — кликнут")
+        except Exception as _e:
+            write_log_entry(log_id, f"VK Видео: Не удалось выключить «{label_text}» — продолжаю.")
+            write_log_entry(log_id, f"[vkvideo] Ошибка переключателя: {_e}", level='silent')
+    _snap(page, batch_id)
 
     # ── Шаг 8: Ждём доступную кнопку «Опубликовать» ──────────────────────
     write_log_entry(log_id, "VK Видео: Жду кнопку «Опубликовать».")
