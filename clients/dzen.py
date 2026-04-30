@@ -236,18 +236,13 @@ def _dismiss_popups(page, log_id=None) -> None:
     """
     Закрывает любые видимые диалоги/попапы без разбора.
     Исключения (не трогаем):
-      1. Диалог загрузки файла — input[type=file] в DOM сигнализирует,
-         что Дзен показывает страницу/модалку загрузки видео; Escape
-         закроет её до того, как файл будет передан браузеру.
-      2. Активная капча-iframe — иначе сломаем прохождение капчи.
-      3. Диалог подтверждения публикации — кнопка «Опубликовать после обработки»
+      1. Активная капча-iframe — иначе сломаем прохождение капчи.
+      2. Диалог подтверждения публикации — кнопка «Опубликовать после обработки»
          или «Опубликовать после подтверждения» видна в DOM.
+    Примечание: input[type="file"] — это HTML-элемент формы, а не нативный
+    диалог выбора файла. Нативный диалог уже закрыт после set_files().
+    Поэтому его присутствие в DOM не является защитным условием.
     """
-    try:
-        if page.locator('input[type="file"]').count() > 0:
-            return
-    except Exception:
-        pass
     if _has_captcha_frame(page) or _has_captcha_dom(page):
         return
     if _has_publish_confirm_dialog(page):
@@ -375,25 +370,25 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
     # Ждём одно из двух:
     #   a) ?videoEditorPublicationId=...  — редактор открылся, нужно кликать «Опубликовать»
     #   b) ?state=published               — Дзен опубликовал сам, ничего больше не нужно
+    # Во время ожидания периодически закрываем любые неожиданные попапы.
     write_log_entry(log_id, "Дзен: Жду открытия редактора видео или авто-публикации.")
     _editor_opened = False
     _auto_published = False
-    try:
-        page.wait_for_url(
-            re.compile(r"videoEditorPublicationId|state=published"),
-            timeout=_UPLOAD_WAIT,
-        )
+    _url_deadline = _time.monotonic() + _UPLOAD_WAIT / 1000
+    while _time.monotonic() < _url_deadline:
         _cur = page.url
         if "state=published" in _cur:
             _auto_published = True
             write_log_entry(log_id, "Дзен: Видео опубликовано автоматически.")
             write_log_entry(log_id, f"[dzen] URL авто-публикации: {_cur}", level='silent')
-        else:
+            break
+        if "videoEditorPublicationId" in _cur:
             _editor_opened = True
             write_log_entry(log_id, "Дзен: Редактор видео открылся.")
             write_log_entry(log_id, f"[dzen] URL редактора: {_cur}", level='silent')
-    except Exception:
-        pass
+            break
+        _dismiss_popups(page, log_id)
+        page.wait_for_timeout(1_500)
 
     if _auto_published:
         # Видео уже опубликовано — пропускаем шаги 5-7
