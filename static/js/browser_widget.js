@@ -129,6 +129,7 @@ function createBrowserWidget(slug) {
         if (!firstFrame) {
           firstFrame = true;
           overlay.style.display = 'none';
+          setSessionControls(true);
         }
       };
       img.src = 'data:image/jpeg;base64,' + data;
@@ -141,6 +142,12 @@ function createBrowserWidget(slug) {
     if (btnStart) btnStart.disabled = enabled;
     if (btnSave)  btnSave.disabled  = !enabled;
     if (btnStop)  btnStop.disabled  = !enabled;
+  }
+
+  function setStarting() {
+    if (btnStart) btnStart.disabled = true;
+    if (btnSave)  btnSave.disabled  = true;
+    if (btnStop)  btnStop.disabled  = false;
   }
 
   function handleStopped() {
@@ -171,7 +178,7 @@ function createBrowserWidget(slug) {
         if (!data.ok) return;
         active = true;
         firstFrame = false;
-        setSessionControls(true);
+        setStarting();
         connectStream();
         var url = getStudioUrl();
         if (url) {
