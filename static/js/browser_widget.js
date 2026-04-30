@@ -14,10 +14,11 @@ function createBrowserWidget(slug) {
   var VIEWPORT_W = 1280;
   var VIEWPORT_H = 720;
 
-  var canvas  = document.getElementById(slug + '-browser-canvas');
-  var overlay = document.getElementById(slug + '-browser-overlay');
-  var btnSave = document.getElementById(slug + '-btn-save');
-  var btnStop = document.getElementById(slug + '-btn-stop');
+  var canvas   = document.getElementById(slug + '-browser-canvas');
+  var overlay  = document.getElementById(slug + '-browser-overlay');
+  var btnStart = document.getElementById(slug + '-btn-start');
+  var btnSave  = document.getElementById(slug + '-btn-save');
+  var btnStop  = document.getElementById(slug + '-btn-stop');
 
   if (!canvas) return;
 
@@ -137,8 +138,9 @@ function createBrowserWidget(slug) {
   }
 
   function setSessionControls(enabled) {
-    if (btnSave) btnSave.disabled = !enabled;
-    if (btnStop) btnStop.disabled = !enabled;
+    if (btnStart) btnStart.disabled = enabled;
+    if (btnSave)  btnSave.disabled  = !enabled;
+    if (btnStop)  btnStop.disabled  = !enabled;
   }
 
   function handleStopped() {
