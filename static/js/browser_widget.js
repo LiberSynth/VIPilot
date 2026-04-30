@@ -16,6 +16,7 @@ function createBrowserWidget(slug) {
 
   var canvas  = document.getElementById(slug + '-browser-canvas');
   var overlay = document.getElementById(slug + '-browser-overlay');
+  var wrap    = document.getElementById(slug + '-browser-wrap');
   var btnSave = document.getElementById(slug + '-btn-save');
 
   if (!canvas) return;
@@ -139,7 +140,8 @@ function createBrowserWidget(slug) {
     active = false;
     firstFrame = false;
     if (sse) { sse.close(); sse = null; }
-    overlay.style.display = 'flex';
+    if (wrap) wrap.style.display = 'none';
+    overlay.style.display = 'none';
     overlay.textContent = '';
   }
 
@@ -148,6 +150,7 @@ function createBrowserWidget(slug) {
     var tid = getTargetId();
     if (!tid) return;
 
+    if (wrap) wrap.style.display = '';
     overlay.style.display = 'flex';
     overlay.textContent = 'Загрузка…';
 
@@ -173,8 +176,13 @@ function createBrowserWidget(slug) {
   }
 
   function browserStop() {
+    if (!active) return;
+    active = false;
+    overlay.style.display = 'flex';
+    overlay.textContent = 'Закрытие…';
     fetch(API + 'stop', { method: 'POST' }).catch(function () {});
-    handleStopped();
+    // SSE остаётся открытым — дожидается сообщения STOPPED, после чего
+    // handleStopped() скроет обёртку и сбросит состояние.
   }
 
   function saveSession() {
@@ -206,6 +214,7 @@ function createBrowserWidget(slug) {
   function _showPipelineWidget() {
     active = true;
     firstFrame = false;
+    if (wrap) wrap.style.display = '';
     overlay.style.display = 'flex';
     overlay.textContent = 'Публикация…';
     connectStream();
