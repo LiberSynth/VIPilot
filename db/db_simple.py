@@ -7,29 +7,24 @@ from common.exceptions import FatalError
 
 
 def db_insert_log(pipeline, message, status="info", batch_id=None):
-    """Вставляет запись в таблицу log. Возвращает log_id (str).
-
-    Если batch_id задан и status == 'running' — сначала проверяет, есть ли уже
-    'running'-запись для того же (batch_id, pipeline). Если есть — возвращает её id
-    без создания новой записи. Это предотвращает дублирование логов после рестарта.
-    """
+    """INSERT если записи для (batch_id, pipeline) нет, иначе UPDATE. Возвращает log_id (str)."""
     with get_db() as conn:
         with conn.cursor() as cur:
-            if batch_id is not None and status == 'running':
+            if batch_id is not None:
                 cur.execute(
-                    "SELECT id FROM log WHERE batch_id = %s AND pipeline = %s AND status = 'running'"
-                    " ORDER BY id DESC LIMIT 1",
+                    "SELECT id FROM log WHERE batch_id = %s AND pipeline = %s ORDER BY id DESC LIMIT 1",
                     (batch_id, pipeline),
                 )
                 row = cur.fetchone()
                 if row:
+                    cur.execute(
+                        "UPDATE log SET message = %s, status = %s WHERE id = %s",
+                        (message, status, row[0]),
+                    )
+                    conn.commit()
                     return str(row[0])
             cur.execute(
-                """
-                INSERT INTO log (batch_id, pipeline, message, status)
-                VALUES (%s, %s, %s, %s)
-                RETURNING id
-                """,
+                "INSERT INTO log (batch_id, pipeline, message, status) VALUES (%s, %s, %s, %s) RETURNING id",
                 (batch_id, pipeline, message, status),
             )
             log_id = cur.fetchone()[0]
