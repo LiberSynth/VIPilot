@@ -108,6 +108,8 @@
         if (e.key === 'Enter' && input.value) addScheduleSlot();
       });
     }
+    var btnRunNow = document.getElementById('btn-run-now');
+    if (btnRunNow) btnRunNow.addEventListener('click', runNow);
   })();
 
   (function() {
