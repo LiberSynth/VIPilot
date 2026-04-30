@@ -81,6 +81,7 @@
   {{ panel_video(video_duration, video_fails_to_next) }}
 
   <!-- ══ ПУБЛИКАЦИЯ ══ -->
+  {% from 'common/browser_card.html' import browser_card %}
   <div id="panel-publish" class="tab-panel">
     <form id="publish-form" style="margin-top:0">
       <input type="hidden" id="target_id" name="target_id" value="{{ target_id or '' }}">
@@ -107,140 +108,8 @@
       </div>
       {% endif %}
 
-      {% if slug == 'dzen' %}
-      <div class="card{% if not dzen_active %} target-disabled{% endif %}"
-           id="dzen-browser-card"
-           {% if not loop.first %}style="margin-top:12px"{% endif %}
-           data-studio-url="{% if dzen_publisher_id %}https://dzen.ru/profile/editor/id/{{ dzen_publisher_id }}/{% endif %}">
-        <input type="hidden" id="dzen_target_id" value="{{ dzen_target_id or '' }}">
-        <div class="card-header">
-          <div class="card-title">Публикация в Дзен</div>
-          <label class="toggle-wrap">
-            <input type="checkbox" id="dzen-active-toggle"{% if dzen_active %} checked{% endif %}>
-            <span class="toggle-track"></span>
-          </label>
-        </div>
-        <div class="card-body">
-          <div style="margin-bottom:12px">
-            <div class="hint" style="margin-bottom:8px">
-              Используется браузерная автоматизация Playwrite.<br>
-              Если браузер не авторизован — войдите в аккаунт Яндекса.
-              После входа нажмите <b>Сохранить сессию</b>.
-            </div>
-            <div style="display:flex;gap:8px">
-              <button type="button" class="btn-run-now" id="dzen-btn-start"
-                      onclick="dzenBrowserOpen()"
-                      style="font-size:13px;padding:7px 14px;white-space:nowrap">Начать авторизацию</button>
-              <button type="button" class="btn-run-now" id="dzen-btn-save"
-                      onclick="dzenBrowserSaveSession()"
-                      style="font-size:13px;padding:7px 14px;white-space:nowrap">Сохранить сессию</button>
-              <button type="button" class="btn-run-now" id="dzen-btn-stop"
-                      onclick="dzenBrowserStop()"
-                      style="font-size:13px;padding:7px 14px;white-space:nowrap">Отмена</button>
-            </div>
-          </div>
-
-          <div id="dzen-browser-wrap" style="position:relative;border-radius:6px;overflow:hidden;border:1px solid var(--border,rgba(255,255,255,.12))">
-            <canvas id="dzen-browser-canvas"
-                    style="display:block;width:100%;cursor:pointer"
-                    tabindex="0"></canvas>
-            <div id="dzen-browser-overlay"
-                 style="position:absolute;inset:0;background:rgba(10,10,20,.85);display:none;align-items:center;justify-content:center;color:#aaa;font-size:14px">
-            </div>
-          </div>
-          <div style="margin-top:14px">
-            <div class="hint" style="margin-bottom:2px;color:#e8e8f0">Конфиг</div>
-            <textarea id="dzen-target-body" placeholder="JSON-параметры таргета" autocomplete="off">{{ dzen_targets_config_json }}</textarea>
-            <div id="dzen-target-body-error" style="display:none;color:#f55;font-size:12px;margin-top:4px"></div>
-          </div>
-        </div>
-      </div>
-      {% endif %}
-
-      {% if slug == 'rutube' %}
-      <div class="card{% if not rutube_active %} target-disabled{% endif %}"
-           id="rutube-browser-card"
-           {% if not loop.first %}style="margin-top:12px"{% endif %}
-           data-studio-url="{% if rutube_person_id %}https://studio.rutube.ru/{% endif %}">
-        <input type="hidden" id="rutube_target_id" value="{{ rutube_target_id or '' }}">
-        <div class="card-header">
-          <div class="card-title">Публикация в Рутьюб</div>
-          <label class="toggle-wrap">
-            <input type="checkbox" id="rutube-active-toggle"{% if rutube_active %} checked{% endif %}>
-            <span class="toggle-track"></span>
-          </label>
-        </div>
-        <div class="card-body">
-          <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
-            <div class="hint" style="flex:1;margin:0">
-              Используется браузерная автоматизация Playwrite.<br>
-              Если браузер не авторизован — войдите в аккаунт Рутьюба.
-              После входа нажмите <b>Сохранить сессию</b>.
-            </div>
-            <button type="button" class="btn-run-now" id="rutube-btn-save"
-                    onclick="rutubeBrowserSaveSession()"
-                    style="font-size:13px;padding:7px 14px;white-space:nowrap">Сохранить сессию</button>
-          </div>
-
-          <div id="rutube-browser-wrap" style="position:relative;border-radius:6px;overflow:hidden;border:1px solid var(--border,rgba(255,255,255,.12))">
-            <canvas id="rutube-browser-canvas"
-                    style="display:block;width:100%;cursor:pointer"
-                    tabindex="0"></canvas>
-            <div id="rutube-browser-overlay"
-                 style="position:absolute;inset:0;background:rgba(10,10,20,.85);display:flex;align-items:center;justify-content:center;color:#aaa;font-size:14px">
-              Загрузка…
-            </div>
-          </div>
-          <div style="margin-top:14px">
-            <div class="hint" style="margin-bottom:2px;color:#e8e8f0">Конфиг</div>
-            <textarea id="rutube-target-body" placeholder="JSON-параметры таргета" autocomplete="off">{{ rutube_targets_config_json }}</textarea>
-            <div id="rutube-target-body-error" style="display:none;color:#f55;font-size:12px;margin-top:4px"></div>
-          </div>
-        </div>
-      </div>
-      {% endif %}
-
-      {% if slug == 'vkvideo' %}
-      <div class="card{% if not vkvideo_active %} target-disabled{% endif %}"
-           id="vkvideo-browser-card"
-           {% if not loop.first %}style="margin-top:12px"{% endif %}
-           data-studio-url="">
-        <input type="hidden" id="vkvideo_target_id" value="{{ vkvideo_target_id or '' }}">
-        <div class="card-header">
-          <div class="card-title">Публикация в VK Видео</div>
-          <label class="toggle-wrap">
-            <input type="checkbox" id="vkvideo-active-toggle"{% if vkvideo_active %} checked{% endif %}>
-            <span class="toggle-track"></span>
-          </label>
-        </div>
-        <div class="card-body">
-          <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
-            <div class="hint" style="flex:1;margin:0">
-              Используется браузерная автоматизация Playwrite.<br>
-              Если браузер не авторизован — войдите в аккаунт VK.
-              После входа нажмите <b>Сохранить сессию</b>.
-            </div>
-            <button type="button" class="btn-run-now" id="vkvideo-btn-save"
-                    onclick="vkvideoBrowserSaveSession()"
-                    style="font-size:13px;padding:7px 14px;white-space:nowrap">Сохранить сессию</button>
-          </div>
-
-          <div id="vkvideo-browser-wrap" style="position:relative;border-radius:6px;overflow:hidden;border:1px solid var(--border,rgba(255,255,255,.12))">
-            <canvas id="vkvideo-browser-canvas"
-                    style="display:block;width:100%;cursor:pointer"
-                    tabindex="0"></canvas>
-            <div id="vkvideo-browser-overlay"
-                 style="position:absolute;inset:0;background:rgba(10,10,20,.85);display:flex;align-items:center;justify-content:center;color:#aaa;font-size:14px">
-              Загрузка…
-            </div>
-          </div>
-          <div style="margin-top:14px">
-            <div class="hint" style="margin-bottom:2px;color:#e8e8f0">Конфиг</div>
-            <textarea id="vkvideo-target-body" placeholder="JSON-параметры таргета" autocomplete="off">{{ vkvideo_targets_config_json }}</textarea>
-            <div id="vkvideo-target-body-error" style="display:none;color:#f55;font-size:12px;margin-top:4px"></div>
-          </div>
-        </div>
-      </div>
+      {% if slug in browser_targets %}
+      {{ browser_card(browser_targets[slug], loop.first) }}
       {% endif %}
 
       {% endfor %}

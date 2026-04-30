@@ -1,0 +1,48 @@
+{% macro browser_card(t, is_first) %}
+<div class="card{% if not t.active %} target-disabled{% endif %}"
+     id="{{ t.slug }}-browser-card"
+     {% if not is_first %}style="margin-top:12px"{% endif %}
+     data-studio-url="{{ t.studio_url }}">
+  <input type="hidden" id="{{ t.slug }}_target_id" value="{{ t.target_id or '' }}">
+  <div class="card-header">
+    <div class="card-title">{{ t.title }}</div>
+    <label class="toggle-wrap">
+      <input type="checkbox" id="{{ t.slug }}-active-toggle"{% if t.active %} checked{% endif %}>
+      <span class="toggle-track"></span>
+    </label>
+  </div>
+  <div class="card-body">
+    <div style="margin-bottom:12px">
+      <div class="hint" style="margin-bottom:8px">
+        Используется браузерная автоматизация Playwright.<br>
+        Если браузер не авторизован — войдите в аккаунт {{ t.account }}.
+        После входа нажмите <b>Сохранить сессию</b>.
+      </div>
+      <div style="display:flex;gap:8px">
+        <button type="button" class="btn-run-now" id="{{ t.slug }}-btn-start"
+                onclick="{{ t.slug }}BrowserOpen()"
+                style="font-size:13px;padding:7px 14px;white-space:nowrap">Начать авторизацию</button>
+        <button type="button" class="btn-run-now" id="{{ t.slug }}-btn-save"
+                onclick="{{ t.slug }}BrowserSaveSession()"
+                style="font-size:13px;padding:7px 14px;white-space:nowrap">Сохранить сессию</button>
+        <button type="button" class="btn-run-now" id="{{ t.slug }}-btn-stop"
+                onclick="{{ t.slug }}BrowserStop()"
+                style="font-size:13px;padding:7px 14px;white-space:nowrap">Отмена</button>
+      </div>
+    </div>
+    <div id="{{ t.slug }}-browser-wrap" style="position:relative;border-radius:6px;overflow:hidden;border:1px solid var(--border,rgba(255,255,255,.12))">
+      <canvas id="{{ t.slug }}-browser-canvas"
+              style="display:block;width:100%;cursor:pointer"
+              tabindex="0"></canvas>
+      <div id="{{ t.slug }}-browser-overlay"
+           style="position:absolute;inset:0;background:rgba(10,10,20,.85);display:none;align-items:center;justify-content:center;color:#aaa;font-size:14px">
+      </div>
+    </div>
+    <div style="margin-top:14px">
+      <div class="hint" style="margin-bottom:2px;color:#e8e8f0">Конфиг</div>
+      <textarea id="{{ t.slug }}-target-body" placeholder="JSON-параметры таргета" autocomplete="off">{{ t.config_json }}</textarea>
+      <div id="{{ t.slug }}-target-body-error" style="display:none;color:#f55;font-size:12px;margin-top:4px"></div>
+    </div>
+  </div>
+</div>
+{% endmacro %}

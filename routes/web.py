@@ -218,6 +218,36 @@ def root_page():
         if t["slug"] in _known_slugs
     ]
 
+    browser_targets = {
+        "dzen": {
+            "slug": "dzen",
+            "title": "Публикация в Дзен",
+            "account": "Яндекса",
+            "active": dzen_active,
+            "target_id": dzen_target_id,
+            "studio_url": f"https://dzen.ru/profile/editor/id/{dzen_publisher_id}/" if dzen_publisher_id else "",
+            "config_json": dzen_targets_config_json,
+        },
+        "rutube": {
+            "slug": "rutube",
+            "title": "Публикация в Рутьюб",
+            "account": "Рутьюба",
+            "active": rutube_active,
+            "target_id": rutube_target_id,
+            "studio_url": "https://studio.rutube.ru/" if rutube_person_id else "",
+            "config_json": rutube_targets_config_json,
+        },
+        "vkvideo": {
+            "slug": "vkvideo",
+            "title": "Публикация в VK Видео",
+            "account": "VK",
+            "active": vkvideo_active,
+            "target_id": vkvideo_target_id,
+            "studio_url": "",
+            "config_json": vkvideo_targets_config_json,
+        },
+    }
+
     _save_last_page()
     resp = make_response(render_template(
         "root.html",
@@ -262,6 +292,7 @@ def root_page():
         vkvideo_active=vkvideo_active,
         vkvideo_targets_config_json=vkvideo_targets_config_json,
         publish_order=publish_order,
+        browser_targets=browser_targets,
         app_version=APP_VERSION,
         nav_modules=_nav_modules("root"),
     ))
