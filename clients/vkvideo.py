@@ -172,7 +172,7 @@ def _publish_ui(page, club_id: str, video_path: str, pub_title: str, log_id, bat
     except Exception:
         write_log_entry(log_id, "VK Видео: «Выбрать файл» не появился — пробую альтернативный селектор.")
         choose_btn = page.get_by_text("Выбрать файл", exact=False).first
-        choose_btn.wait_for(state="visible", timeout=10_000)
+        choose_btn.wait_for(state="visible", timeout=30_000)
 
     write_log_entry(log_id, "VK Видео: Кнопка «Выбрать файл» найдена, загружаю файл.")
 
