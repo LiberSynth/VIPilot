@@ -222,7 +222,7 @@
     const partialStatuses = ['published_partially'];
     const waitStatuses    = ['story_ready', 'video_pending', 'video_ready', 'transcode_ready'];
     const errorStatuses   = ['error', 'video_error', 'transcode_error', 'publish_error', 'fatal_error'];
-    const finalStatuses   = doneStatuses.concat(partialStatuses).concat(errorStatuses).concat(['cancelled']);
+    const finalStatuses   = doneStatuses.concat(partialStatuses).concat(errorStatuses).concat(['cancelled', 'donated', 'reserved']);
     const isFinal         = finalStatuses.indexOf(bs) >= 0;
     const isActive        = !isFinal && (
                               logs.some(function(l) { return l.status === 'running'; })
