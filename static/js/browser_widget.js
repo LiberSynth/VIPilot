@@ -10,7 +10,9 @@
  *   window.dzenBrowserSaveSession()
  */
 
-function createBrowserWidget(slug) {
+function createBrowserWidget(slug, opts) {
+  opts = opts || {};
+  var autoStart = opts.autoStart !== false;
   var VIEWPORT_W = 1280;
   var VIEWPORT_H = 720;
 
@@ -228,14 +230,14 @@ function createBrowserWidget(slug) {
   var _origSwitchPanel = window.switchPanel;
   window.switchPanel = function (name) {
     if (_origSwitchPanel) _origSwitchPanel(name);
-    if (name === 'publish' && !active) {
+    if (name === 'publish' && !active && autoStart) {
       browserOpen();
     }
   };
 
   document.addEventListener('DOMContentLoaded', function () {
     var panel = document.getElementById('panel-publish');
-    if (panel && panel.classList.contains('active') && !active) {
+    if (panel && panel.classList.contains('active') && !active && autoStart) {
       browserOpen();
     }
   });

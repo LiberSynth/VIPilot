@@ -127,6 +127,9 @@
               Если браузер не авторизован — войдите в аккаунт Яндекса.
               После входа нажмите <b>Сохранить сессию</b>.
             </div>
+            <button class="btn-run-now" id="dzen-btn-start"
+                    onclick="dzenBrowserOpen()"
+                    style="font-size:13px;padding:7px 14px;white-space:nowrap">Начать авторизацию</button>
             <button class="btn-run-now" id="dzen-btn-save"
                     onclick="dzenBrowserSaveSession()"
                     style="font-size:13px;padding:7px 14px;white-space:nowrap">Сохранить сессию</button>
@@ -434,7 +437,7 @@
 <script src="/static/js/modals.js"></script>
 <script src="/static/js/browser_widget.js"></script>
 <script>
-  createBrowserWidget('dzen');
+  createBrowserWidget('dzen', { autoStart: false });
   createBrowserWidget('rutube');
   createBrowserWidget('vkvideo');
 </script>
