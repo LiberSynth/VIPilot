@@ -183,6 +183,7 @@ class PlatformBrowser:
                     write_log_entry(None, f"{tag} Ошибка навигации: {e}", level='silent')
 
                 self._set_status("running")
+                write_log_entry(None, f"{tag} Браузер запущен.", level='info')
 
                 while self._running:
                     if self._save_request_event.is_set():
@@ -197,6 +198,11 @@ class PlatformBrowser:
                                 self._save_result = {"ok": True, "error": None}
                                 write_log_entry(
                                     None,
+                                    f"{tag} Сессия сохранена.",
+                                    level='info',
+                                )
+                                write_log_entry(
+                                    None,
                                     fmt_id_msg(
                                         f"{tag} Сессия сохранена в БД: {len(cookies)} куков, target={{}}",
                                         self._current_target_id,
@@ -205,8 +211,18 @@ class PlatformBrowser:
                                 )
                             else:
                                 self._save_result = {"ok": False, "error": "Ошибка записи в БД"}
+                                write_log_entry(
+                                    None,
+                                    f"{tag} Ошибка сохранения сессии: запись в БД не удалась.",
+                                    level='info',
+                                )
                         except Exception as e:
                             self._save_result = {"ok": False, "error": str(e)}
+                            write_log_entry(
+                                None,
+                                f"{tag} Ошибка сохранения сессии: {e}",
+                                level='info',
+                            )
                         self._save_done_event.set()
 
                     cur_page = active_page[0]
@@ -236,18 +252,21 @@ class PlatformBrowser:
 
         except Exception as e:
             self._set_status("error", str(e))
-            write_log_entry(None, f"{tag} Критическая ошибка: {e}", level='silent')
+            write_log_entry(None, f"{tag} Критическая ошибка: {e}", level='info')
             return
 
         self._set_status("stopped")
+        write_log_entry(None, f"{tag} Браузер остановлен.", level='info')
 
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
 
     def start(self, target_id: str) -> dict:
+        tag = f"[{self._platform}_browser]"
         with self._lock:
             if self._running:
+                write_log_entry(None, f"{tag} Старт запрошен — браузер уже запущен.", level='info')
                 return {"ok": True, "already": True}
 
             self._running           = True
@@ -262,6 +281,13 @@ class PlatformBrowser:
                 except queue.Empty:
                     break
 
+            write_log_entry(None, f"{tag} Запуск браузера.", level='info')
+            write_log_entry(
+                None,
+                fmt_id_msg(f"{tag} Запуск браузера для target={{}}", target_id),
+                level='silent',
+            )
+
             self._thread = threading.Thread(
                 target=self._browser_loop,
                 args=(target_id,),
@@ -273,8 +299,10 @@ class PlatformBrowser:
         return {"ok": True, "already": False}
 
     def stop(self) -> dict:
+        tag = f"[{self._platform}_browser]"
         with self._lock:
             self._running = False
+        write_log_entry(None, f"{tag} Остановка запрошена.", level='info')
         return {"ok": True}
 
     def send_event(self, ev: dict) -> bool:
@@ -285,8 +313,10 @@ class PlatformBrowser:
             return False
 
     def request_save(self, target_id: str) -> dict:
+        tag = f"[{self._platform}_browser]"
         info = self.get_status()
         if info["status"] != "running":
+            write_log_entry(None, f"{tag} Сохранение сессии невозможно: браузер не запущен.", level='info')
             return {"ok": False, "error": "Браузер не запущен"}
 
         self._save_result = None
@@ -294,6 +324,7 @@ class PlatformBrowser:
         self._save_request_event.set()
 
         if not self._save_done_event.wait(timeout=10):
+            write_log_entry(None, f"{tag} Таймаут сохранения сессии.", level='info')
             return {"ok": False, "error": "Таймаут сохранения сессии"}
 
         return self._save_result or {"ok": False, "error": "Неизвестная ошибка"}
