@@ -29,7 +29,6 @@ from db import (
     db_get_batch_original_video,
     db_save_transcoded_data,
     db_set_batch_status,
-    db_close_pipeline_logs,
 )
 from log import db_log_update, write_log_entry
 from pipelines.base import check_cancelled
@@ -176,7 +175,6 @@ def run(batch_id, log_id):
 
     msg = f'Транскодировано (H.264, {out_mb} МБ)'
     db_log_update(log_id, msg, 'ok')
-    db_close_pipeline_logs(batch_id, 'transcode', log_id)
     write_log_entry(log_id, msg)
     db_save_transcoded_data(batch_id, video_data)
     db_set_batch_status(batch_id, 'transcode_ready')

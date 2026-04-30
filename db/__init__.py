@@ -96,7 +96,6 @@ from .db_ui import (
 
 from .db_service import (
     db_interrupt_stale_logs,
-    db_close_pipeline_logs,
     db_cleanup_log_entries,
     db_cleanup_logs,
     db_cleanup_batches,

@@ -5,49 +5,14 @@ from utils.utils import fmt_id_msg
 
 
 def db_interrupt_stale_logs():
-    """При старте приложения исправляет 'running'-записи лога:
-
-    1. Логи, у которых батч уже в финальном статусе → 'ok'
-       (батч завершился успешно, но лог не обновился из-за рестарта).
-    2. Остальные 'running'-логи → 'interrupted'
-       (батч был в работе, пайплайн прерван рестартом сервера).
+    """При старте приложения переводит все 'running'-записи лога в 'interrupted'.
 
     Вызывать один раз при инициализации, до запуска пайплайнов.
+    Предотвращает «висячие» синие значки в мониторе после рестарта сервера.
     """
-    _FINAL_STATUSES = (
-        'movie_probe', 'story_probe', 'transcode_ready',
-        'published', 'published_partially',
-        'cancelled', 'donated',
-    )
     with get_db() as conn:
         with conn.cursor() as cur:
-            cur.execute(
-                """
-                UPDATE log SET status = 'ok'
-                WHERE status = 'running'
-                  AND batch_id IN (
-                      SELECT id FROM batches WHERE status = ANY(%s)
-                  )
-                """,
-                (_FINAL_STATUSES,),
-            )
             cur.execute("UPDATE log SET status = 'interrupted' WHERE status = 'running'")
-        conn.commit()
-
-
-def db_close_pipeline_logs(batch_id: str, pipeline: str, exclude_log_id: str):
-    """Переводит все 'running'-записи пайплайна для батча в 'ok', кроме текущей.
-
-    Вызывается при успешном завершении пайплайна, чтобы дочистить дубли,
-    возникшие при параллельном деплое или двойном запуске.
-    """
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "UPDATE log SET status = 'ok'"
-                " WHERE batch_id = %s AND pipeline = %s AND status = 'running' AND id != %s",
-                (batch_id, pipeline, exclude_log_id),
-            )
         conn.commit()
 
 
