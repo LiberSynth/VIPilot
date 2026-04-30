@@ -358,12 +358,29 @@ def _m090_seed_ai_models(cur):
     )
 
 
+def _m091_reseed_targets(cur):
+    cur.execute("DELETE FROM targets")
+    cur.executemany(
+        """
+        INSERT INTO targets (id, name, aspect_ratio_x, aspect_ratio_y, active, transcode, config, slug, "order")
+        VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s)
+        """,
+        [
+            ('691d67b7-ff29-48cf-af77-0bff68986fa2', 'Дзен',      9, 16, True,  True,  '{"publisher_id": "69d3ec6ae9ff6e1b8d5c6326", "publish_method": {"longs": 0, "shorts": 1}}', 'dzen',    1),
+            ('c9a72974-85ff-49b2-9526-f3891285efc5', 'Rutube',     9, 16, True,  True,  '{"person_id": "17858415", "publish_method": {"shorts": 1, "videos": 0}}',                   'rutube',  2),
+            ('1c3a59a9-95af-4f81-9c57-b8a2a90616c8', 'VK Видео',  9, 16, True,  True,  '{"club_id": 236929597, "publish_method": {"clips": 1, "videos": 0}}',                       'vkvideo', 3),
+            ('b62dde43-69fa-4a82-89e7-52ed67654703', 'VKontakte', 9, 16, True,  True,  '{"group_id": 236929597, "publish_method": {"wall": 0, "story": 1, "clip_wall": 1}}',        'vk',      4),
+        ],
+    )
+
+
 # ---------------------------------------------------------------------------
 # Реестр миграций — добавляйте только в конец, никогда не переиспользуйте номера
 # ---------------------------------------------------------------------------
 
 MIGRATIONS = [
     (90, _m090_seed_ai_models),
+    (91, _m091_reseed_targets),
 ]
 
 
