@@ -210,6 +210,7 @@ def db_get_batch_log_entries(batch_id: str) -> list:
                 """
                 SELECT
                     l.id::text,
+                    l.pipeline,
                     COALESCE(
                         json_agg(
                             json_build_object(
@@ -217,19 +218,19 @@ def db_get_batch_log_entries(batch_id: str) -> list:
                                 'level',      le.level,
                                 'created_at', le.created_at
                             ) ORDER BY le.created_at ASC, le.id ASC
-                        ) FILTER (WHERE le.id IS NOT NULL),
+                        ) FILTER (WHERE le.id IS NOT NULL AND le.level != 'silent'),
                         '[]'::json
                     ) AS entries
                 FROM log l
                 LEFT JOIN log_entries le ON le.log_id = l.id
                 WHERE l.batch_id = %s
-                GROUP BY l.id
+                GROUP BY l.id, l.pipeline
                 ORDER BY l.created_at, l.id
                 """,
                 (batch_id,),
             )
             rows = cur.fetchall()
-    return [{"id": r[0], "entries": r[1]} for r in rows]
+    return [{"id": r[0], "pipeline": r[1], "entries": r[2]} for r in rows]
 
 
 def db_cleanup_log_entries(log_lifetime_days: int) -> int:
