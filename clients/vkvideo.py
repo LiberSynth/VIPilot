@@ -188,14 +188,9 @@ def _publish_ui(page, club_id: str, video_path: str, pub_title: str, log_id, bat
 
     # ── Шаг 2: Ждём появления кнопки «Выбрать файл» ──────────────────────
     write_log_entry(log_id, "VK Видео: Жду модал загрузки клипа.")
-    choose_btn = page.locator("button:has-text('Выбрать файл')").first
+    choose_btn = page.get_by_text("Выбрать файл", exact=False).first
     _snap(page, batch_id)
-    try:
-        _wait_visible(choose_btn, 180_000, page, batch_id)
-    except Exception:
-        write_log_entry(log_id, "VK Видео: «Выбрать файл» не появился — пробую альтернативный селектор.")
-        choose_btn = page.get_by_text("Выбрать файл", exact=False).first
-        _wait_visible(choose_btn, 180_000, page, batch_id)
+    _wait_visible(choose_btn, 180_000, page, batch_id)
     _snap(page, batch_id)
 
     write_log_entry(log_id, "VK Видео: Кнопка «Выбрать файл» найдена, загружаю файл.")
