@@ -260,10 +260,10 @@ def _publish_ui(page, club_id: str, video_path: str, pub_title: str, log_id, bat
             write_log_entry(log_id, f"[vkvideo] Ошибка переключателя: {_e}", level='silent')
     _snap(page, batch_id)
 
-    # ── Шаг 8: Ждём доступную кнопку «Опубликовать» ──────────────────────
-    write_log_entry(log_id, "VK Видео: Жду кнопку «Опубликовать».")
+    # ── Шаг 8: Ждём активную кнопку «Опубликовать» ───────────────────────
+    write_log_entry(log_id, "VK Видео: Жду кнопку «Опубликовать» (ожидаю загрузки и обработки видео).")
     pub_btn = page.locator("button:has-text('Опубликовать')").last
-    pub_btn.wait_for(state="visible", timeout=90_000)
+    pub_btn.wait_for(state="enabled", timeout=_UPLOAD_WAIT)
     _snap(page, batch_id)
 
     # ── Шаг 9: Нажимаем «Опубликовать» ───────────────────────────────────
