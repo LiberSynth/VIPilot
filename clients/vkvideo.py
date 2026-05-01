@@ -260,6 +260,43 @@ def _publish_ui(page, club_id: str, video_path: str, pub_title: str, log_id, bat
             write_log_entry(log_id, f"[vkvideo] Ошибка переключателя: {_e}", level='silent')
     _snap(page, batch_id)
 
+    # ── Шаг 7b: Включаем «Опубликовать на стене сообщества» ──────────────
+    _TOGGLES_ON = [
+        "Опубликовать на стене сообщества",
+        "Показать на стене сообщества",
+        "Опубликовать на стене",
+        "Показать на стене",
+    ]
+    write_log_entry(log_id, "VK Видео: Включаю публикацию на стене сообщества.")
+    _wall_enabled = False
+    for label_text in _TOGGLES_ON:
+        try:
+            label = page.locator(f"label:has-text('{label_text}')").first
+            if label.count() == 0 or not label.is_visible(timeout=2_000):
+                continue
+            chk = label.locator("input[type='checkbox']")
+            if chk.count() > 0:
+                if not chk.first.is_checked():
+                    chk.first.click(force=True)
+                    page.wait_for_timeout(300)
+                write_log_entry(log_id, f"VK Видео: «{label_text}» — включено")
+                _wall_enabled = True
+                break
+            toggle_btn = label.locator("[role='switch'], button").first
+            if toggle_btn.count() > 0:
+                aria = toggle_btn.get_attribute("aria-checked")
+                if aria != "true":
+                    toggle_btn.click()
+                    page.wait_for_timeout(300)
+                write_log_entry(log_id, f"VK Видео: «{label_text}» — включено")
+                _wall_enabled = True
+                break
+        except Exception as _e:
+            write_log_entry(log_id, f"[vkvideo] Ошибка переключателя стены «{label_text}»: {_e}", level='silent')
+    if not _wall_enabled:
+        write_log_entry(log_id, "VK Видео: Переключатель стены не найден — пропускаю.")
+    _snap(page, batch_id)
+
     # ── Шаг 8: Ждём активную кнопку «Опубликовать» ───────────────────────
     write_log_entry(log_id, "VK Видео: Жду кнопку «Опубликовать» (ожидаю загрузки и обработки видео).")
     pub_btn = page.locator("button:has-text('Опубликовать')").last
