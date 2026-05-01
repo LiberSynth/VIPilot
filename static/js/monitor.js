@@ -640,30 +640,10 @@
 
   function _injectEntriesIntoDOM(batchEl, logsData, openLids) {
     var lidsToOpen = openLids || {};
-
-    var pipMap   = {};
-    var pipOrder = [];
     logsData.forEach(function(logInfo) {
-      var pip = logInfo.pipeline || logInfo.id;
-      if (!pipMap[pip]) {
-        pipMap[pip] = { id: logInfo.id, entries: [] };
-        pipOrder.push(pip);
-      }
-      if (logInfo.entries) {
-        logInfo.entries.forEach(function(e) { pipMap[pip].entries.push(e); });
-      }
-    });
-    pipOrder.forEach(function(pip) {
-      pipMap[pip].entries.sort(function(a, b) {
-        return (a.created_at || '').localeCompare(b.created_at || '');
-      });
-    });
-
-    pipOrder.forEach(function(pip) {
-      var info = pipMap[pip];
-      var li   = batchEl.querySelector('.monitor-log-item[data-lid="' + info.id + '"]');
+      var li = batchEl.querySelector('.monitor-log-item[data-lid="' + logInfo.id + '"]');
       if (!li) return;
-      if (!info.entries.length) return;
+      if (!logInfo.entries || !logInfo.entries.length) return;
       var existingDiv   = li.querySelector('.monitor-entries');
       var existingCount = existingDiv ? existingDiv.querySelectorAll('.monitor-entry-row').length : 0;
       var headerTop = li.querySelector('.monitor-log-header-top');
@@ -671,15 +651,15 @@
         headerTop.insertAdjacentHTML('beforeend', '<span class="monitor-log-chevron">▼</span>');
       }
       if (!existingDiv) {
-        var html = info.entries.map(_buildEntryRow).join('');
+        var html = logInfo.entries.map(_buildEntryRow).join('');
         li.insertAdjacentHTML('beforeend', '<div class="monitor-entries">' + html + '</div>');
       } else {
-        var newEntries = info.entries.slice(existingCount);
+        var newEntries = logInfo.entries.slice(existingCount);
         if (newEntries.length) {
           existingDiv.insertAdjacentHTML('beforeend', newEntries.map(_buildEntryRow).join(''));
         }
       }
-      if (lidsToOpen[info.id]) li.classList.add('open');
+      if (lidsToOpen[logInfo.id]) li.classList.add('open');
     });
   }
 
