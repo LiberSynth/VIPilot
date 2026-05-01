@@ -160,6 +160,7 @@ def root_page():
     log_lifetime       = parse_long_lifetime(settings_get("log_lifetime", "365"))
     entries_lifetime   = parse_long_lifetime(settings_get("entries_lifetime", "30"), default=30)
     file_lifetime      = parse_file_lifetime(settings_get("file_lifetime", "7"))
+    publication_counter = int(env_get("publication_counter", "0") or "0")
     emulation_mode     = environment.emulation_mode
     use_donor          = environment.use_donor
     notify_email       = settings_get("notify_email", "")
@@ -293,6 +294,7 @@ def root_page():
         vkvideo_targets_config_json=vkvideo_targets_config_json,
         publish_order=publish_order,
         browser_targets=browser_targets,
+        publication_counter=publication_counter,
         app_version=APP_VERSION,
         nav_modules=_nav_modules("root"),
     ))

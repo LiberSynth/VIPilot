@@ -117,10 +117,8 @@ class TestApiBlueprintAuth:
     def test_post_workflow_approve_movies(self, client):
         _assert_401(client.post("/api/workflow/approve_movies"))
 
-    def test_post_publication_counter_reset(self, client):
-        """The endpoint that previously called an undefined function (_auth_required)
-        and returned 500 instead of 401."""
-        _assert_401(client.post("/api/publication-counter/reset"))
+    def test_post_publication_counter_set(self, client):
+        _assert_401(client.post("/api/publication-counter/set"))
 
     def test_post_cycle_config_words_per_second(self, client):
         _assert_401(client.post("/api/cycle-config/words-per-second"))

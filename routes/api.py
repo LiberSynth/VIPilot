@@ -1245,9 +1245,13 @@ def api_production_story_generate():
     return jsonify({"batch_id": batch_id})
 
 
-@bp.route("/publication-counter/reset", methods=["POST"])
-def reset_publication_counter():
+@bp.route("/publication-counter/set", methods=["POST"])
+def set_publication_counter():
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
-    env_set("publication_counter", "0")
+    data = request.get_json(silent=True) or {}
+    val = data.get("value")
+    if val is None or not isinstance(val, int) or val < 0:
+        return jsonify({"ok": False, "error": "value must be a non-negative integer"}), 400
+    env_set("publication_counter", str(val))
     return jsonify({"ok": True})
