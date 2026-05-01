@@ -259,6 +259,7 @@ def _publish_ui(page, club_id: str, video_path: str, pub_title: str, log_id, bat
 
     # ── Шаг 9: Нажимаем «Опубликовать» (click ждёт enabled автоматически) ─
     write_log_entry(log_id, "VK Видео: Нажимаю «Опубликовать».")
+    _snap(page, batch_id)
     pub_btn.click(timeout=_UPLOAD_WAIT)
     _snap(page, batch_id)
 
