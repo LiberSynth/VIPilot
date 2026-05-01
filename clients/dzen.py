@@ -401,7 +401,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
         "button[title*='Создать'], "
         "button[aria-label*='Create']"
     ).first
-    plus_btn.wait_for(state="visible", timeout=15_000)
+    plus_btn.wait_for(state="visible", timeout=180_000)
     plus_btn.click()
     write_log_entry(log_id, "Дзен: Кнопка «+» нажата, жду меню.")
     _snap(page, batch_id)
@@ -410,11 +410,11 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
     write_log_entry(log_id, "Дзен: Выбираю «Загрузить видео».")
     upload_item = page.get_by_text("Загрузить видео", exact=True).first
     try:
-        upload_item.wait_for(state="visible", timeout=8_000)
+        upload_item.wait_for(state="visible", timeout=180_000)
     except Exception:
         write_log_entry(log_id, "Дзен: exact-match не нашёл — пробую contains.")
         upload_item = page.locator("text=Загрузить видео").first
-        upload_item.wait_for(state="visible", timeout=5_000)
+        upload_item.wait_for(state="visible", timeout=180_000)
     upload_item.click()
     write_log_entry(log_id, "Дзен: «Загрузить видео» нажато")
     _snap(page, batch_id)
@@ -425,9 +425,9 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
     # если войти до того, как кнопка видна, click() зависает внутри with-блока
     # и expect_file_chooser истекает раньше, чем диалог успевает открыться.
     choose_btn = page.get_by_text("Выбрать видео", exact=False).first
-    choose_btn.wait_for(state="visible", timeout=20_000)
+    choose_btn.wait_for(state="visible", timeout=180_000)
     write_log_entry(log_id, "Дзен: Кнопка «Выбрать видео» найдена, открываю диалог выбора файла.")
-    with page.expect_file_chooser(timeout=15_000) as fc_info:
+    with page.expect_file_chooser(timeout=180_000) as fc_info:
         choose_btn.click()
     file_chooser = fc_info.value
     file_chooser.set_files(video_path)
@@ -502,7 +502,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
     # ── Шаг 6: Публикуем ─────────────────────────────────────────────────
     write_log_entry(log_id, "Дзен: Нажимаю «Опубликовать».")
     pub_btn = page.locator("button:has-text('Опубликовать')").first
-    pub_btn.wait_for(state="visible", timeout=15_000)
+    pub_btn.wait_for(state="enabled", timeout=180_000)
     pub_btn.click()
     # Ждём появления диалога подтверждения или капчи до 12 секунд.
     # Если за 12 сек ничего не появилось — продолжаем в шаг 7.

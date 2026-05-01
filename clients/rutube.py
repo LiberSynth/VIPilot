@@ -136,7 +136,7 @@ def _publish_ui(page, video_path: str, log_id, batch_id=None):
     # ── Шаг 2: Кнопка «+ Добавить» ───────────────────────────────────────
     write_log_entry(log_id, "Рутьюб: Ищу кнопку «+ Добавить».")
     add_btn = page.locator("button:has-text('Добавить')").first
-    add_btn.wait_for(state="visible", timeout=15_000)
+    add_btn.wait_for(state="visible", timeout=180_000)
     add_btn.click()
     write_log_entry(log_id, "Рутьюб: Кнопка «+ Добавить» нажата, жду меню.")
     _snap(page, batch_id)
@@ -145,11 +145,11 @@ def _publish_ui(page, video_path: str, log_id, batch_id=None):
     write_log_entry(log_id, "Рутьюб: Выбираю «Загрузить видео или Shorts».")
     upload_item = page.get_by_text("Загрузить видео или Shorts", exact=False).first
     try:
-        upload_item.wait_for(state="visible", timeout=8_000)
+        upload_item.wait_for(state="visible", timeout=180_000)
     except Exception:
         write_log_entry(log_id, "Рутьюб: exact-match не нашёл — пробую contains.")
         upload_item = page.get_by_text("Загрузить видео", exact=False).first
-        upload_item.wait_for(state="visible", timeout=5_000)
+        upload_item.wait_for(state="visible", timeout=180_000)
     upload_item.click()
     write_log_entry(log_id, "Рутьюб: «Загрузить видео или Shorts» нажато")
     _snap(page, batch_id)
@@ -157,9 +157,9 @@ def _publish_ui(page, video_path: str, log_id, batch_id=None):
     # ── Шаг 4: Нажимаем «Выбрать файлы» и передаём видео ────────────────
     write_log_entry(log_id, "Рутьюб: Ищу поле загрузки файла.")
     choose_btn = page.get_by_text("Выбрать файлы", exact=False).first
-    choose_btn.wait_for(state="visible", timeout=20_000)
+    choose_btn.wait_for(state="visible", timeout=180_000)
     write_log_entry(log_id, "Рутьюб: Кнопка «Выбрать файлы» найдена, открываю диалог выбора файла.")
-    with page.expect_file_chooser(timeout=15_000) as fc_info:
+    with page.expect_file_chooser(timeout=180_000) as fc_info:
         choose_btn.click()
     file_chooser = fc_info.value
     file_chooser.set_files(video_path)
@@ -209,7 +209,7 @@ def _publish_ui(page, video_path: str, log_id, batch_id=None):
     # ── Шаг 7: Нажимаем «Опубликовать» ───────────────────────────────────
     write_log_entry(log_id, "Рутьюб: Нажимаю «Опубликовать».")
     pub_btn = page.locator("button:has-text('Опубликовать')").last
-    pub_btn.wait_for(state="visible", timeout=15_000)
+    pub_btn.wait_for(state="enabled", timeout=180_000)
     pub_btn.click()
     _snap(page, batch_id)
 
