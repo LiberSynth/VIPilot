@@ -502,8 +502,8 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
     # ── Шаг 6: Публикуем ─────────────────────────────────────────────────
     write_log_entry(log_id, "Дзен: Нажимаю «Опубликовать».")
     pub_btn = page.locator("button:has-text('Опубликовать')").first
-    pub_btn.wait_for(state="enabled", timeout=180_000)
-    pub_btn.click()
+    pub_btn.wait_for(state="visible", timeout=180_000)
+    pub_btn.click(timeout=180_000)
     # Ждём появления диалога подтверждения или капчи до 12 секунд.
     # Если за 12 сек ничего не появилось — продолжаем в шаг 7.
     _CONFIRM_OR_CAPTCHA_SEL = (

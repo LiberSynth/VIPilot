@@ -209,8 +209,8 @@ def _publish_ui(page, video_path: str, log_id, batch_id=None):
     # ── Шаг 7: Нажимаем «Опубликовать» ───────────────────────────────────
     write_log_entry(log_id, "Рутьюб: Нажимаю «Опубликовать».")
     pub_btn = page.locator("button:has-text('Опубликовать')").last
-    pub_btn.wait_for(state="enabled", timeout=180_000)
-    pub_btn.click()
+    pub_btn.wait_for(state="visible", timeout=180_000)
+    pub_btn.click(timeout=180_000)
     _snap(page, batch_id)
 
     # ── Шаг 8: Проверяем успех (toast «Видео опубликовано») ──────────────

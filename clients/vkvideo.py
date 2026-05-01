@@ -263,12 +263,12 @@ def _publish_ui(page, club_id: str, video_path: str, pub_title: str, log_id, bat
     # ── Шаг 8: Ждём активную кнопку «Опубликовать» ───────────────────────
     write_log_entry(log_id, "VK Видео: Жду кнопку «Опубликовать» (ожидаю загрузки и обработки видео).")
     pub_btn = page.locator("button:has-text('Опубликовать')").last
-    pub_btn.wait_for(state="enabled", timeout=_UPLOAD_WAIT)
+    pub_btn.wait_for(state="visible", timeout=_UPLOAD_WAIT)
     _snap(page, batch_id)
 
-    # ── Шаг 9: Нажимаем «Опубликовать» ───────────────────────────────────
+    # ── Шаг 9: Нажимаем «Опубликовать» (click ждёт enabled автоматически) ─
     write_log_entry(log_id, "VK Видео: Нажимаю «Опубликовать».")
-    pub_btn.click()
+    pub_btn.click(timeout=_UPLOAD_WAIT)
     _snap(page, batch_id)
 
     # ── Шаг 10: Проверяем успех (тост «Клип опубликован») ────────────────
