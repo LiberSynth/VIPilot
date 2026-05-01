@@ -175,6 +175,7 @@ def _publish_ui(page, club_id: str, video_path: str, pub_title: str, log_id, bat
 
     # ── Шаг 1: Переходим в кабинет с параметром uploader ─────────────────
     write_log_entry(log_id, "VK Видео: Переход в кабинет автора.")
+    _snap(page, batch_id)
     page.goto(cabinet_url, wait_until="domcontentloaded", timeout=_NAV_TIMEOUT)
     _snap(page, batch_id)
 
@@ -188,16 +189,19 @@ def _publish_ui(page, club_id: str, video_path: str, pub_title: str, log_id, bat
     # ── Шаг 2: Ждём появления кнопки «Выбрать файл» ──────────────────────
     write_log_entry(log_id, "VK Видео: Жду модал загрузки клипа.")
     choose_btn = page.locator("button:has-text('Выбрать файл')").first
+    _snap(page, batch_id)
     try:
         _wait_visible(choose_btn, 180_000, page, batch_id)
     except Exception:
         write_log_entry(log_id, "VK Видео: «Выбрать файл» не появился — пробую альтернативный селектор.")
         choose_btn = page.get_by_text("Выбрать файл", exact=False).first
         _wait_visible(choose_btn, 180_000, page, batch_id)
+    _snap(page, batch_id)
 
     write_log_entry(log_id, "VK Видео: Кнопка «Выбрать файл» найдена, загружаю файл.")
 
     # ── Шаг 3: Загружаем файл через file chooser ─────────────────────────
+    _snap(page, batch_id)
     with page.expect_file_chooser(timeout=180_000) as fc_info:
         choose_btn.click()
     file_chooser = fc_info.value
@@ -209,6 +213,7 @@ def _publish_ui(page, club_id: str, video_path: str, pub_title: str, log_id, bat
     # ── Шаг 4: Ждём форму «Публикация клипа» (поле Описание) ─────────────
     write_log_entry(log_id, "VK Видео: Жду форму публикации.")
     _form_ok = False
+    _snap(page, batch_id)
     try:
         page.wait_for_selector(
             "textarea[placeholder*='клип'], "
@@ -224,7 +229,9 @@ def _publish_ui(page, club_id: str, video_path: str, pub_title: str, log_id, bat
     _snap(page, batch_id)
 
     # ── Шаг 5: Читаем ссылку на клип из DOM ──────────────────────────────
+    _snap(page, batch_id)
     clip_url = _read_clip_url(page)
+    _snap(page, batch_id)
     if clip_url:
         write_log_entry(log_id, "VK Видео: Ссылка на клип получена.")
         write_log_entry(log_id, f"[vkvideo] Ссылка на клип: {clip_url}", level='silent')
@@ -240,7 +247,9 @@ def _publish_ui(page, club_id: str, video_path: str, pub_title: str, log_id, bat
             "textarea[placeholder*='Клип'], "
             "[placeholder*='клип']"
         ).first
+        _snap(page, batch_id)
         desc_field.wait_for(state="visible", timeout=5_000)
+        _snap(page, batch_id)
         desc_field.click()
         description = f"{pub_title}. {hashtags()}"
         desc_field.fill(description)
@@ -254,6 +263,7 @@ def _publish_ui(page, club_id: str, video_path: str, pub_title: str, log_id, bat
     # ── Шаг 8: Ждём активную кнопку «Опубликовать» ───────────────────────
     write_log_entry(log_id, "VK Видео: Жду кнопку «Опубликовать» (ожидаю загрузки и обработки видео).")
     pub_btn = page.locator("button:has-text('Опубликовать')").last
+    _snap(page, batch_id)
     pub_btn.wait_for(state="visible", timeout=_UPLOAD_WAIT)
     _snap(page, batch_id)
 
