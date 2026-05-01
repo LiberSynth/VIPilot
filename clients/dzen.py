@@ -184,6 +184,8 @@ def _try_click_captcha_checkbox(page, log_id) -> bool:
     try:
         for frame in page.frames:
             furl = frame.url.lower()
+            if not any(kw in furl for kw in _CAPTCHA_URL_KEYWORDS):
+                continue
             for js_sel in checkbox_selectors[:3]:
                 try:
                     done = frame.evaluate(
