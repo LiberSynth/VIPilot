@@ -120,7 +120,7 @@
       : (log.pipeline === 'transcode' || log.pipeline === 'transcoding') ? 'H.264'
       : null;
     const modelTag   = modelName ? '<span class="monitor-log-model">' + esc(modelName) + '</span>' : '';
-    const hasEntries = log.entries && log.entries.length > 0;
+    const hasEntries = log.has_entries || (log.entries && log.entries.length > 0);
     const chevron    = hasEntries ? '<span class="monitor-log-chevron">▼</span>' : '';
     const comment    = log.message ? '<div class="monitor-log-comment">' + esc(log.message) + '</div>' : '';
 
@@ -546,6 +546,20 @@
             newNode.querySelectorAll('.monitor-log-item').forEach(function(li) {
               if (prev.lids && prev.lids[li.dataset.lid]) li.classList.add('open');
             });
+            existing.querySelectorAll('.monitor-log-item').forEach(function(oldLi) {
+              var lid = oldLi.dataset.lid;
+              if (!lid) return;
+              var oldEntries = oldLi.querySelector('.monitor-entries');
+              if (!oldEntries) return;
+              var newLi = newNode.querySelector('.monitor-log-item[data-lid="' + lid + '"]');
+              if (!newLi) return;
+              var headerTop = newLi.querySelector('.monitor-log-header-top');
+              if (headerTop && !headerTop.querySelector('.monitor-log-chevron')) {
+                headerTop.insertAdjacentHTML('beforeend', '<span class="monitor-log-chevron">▼</span>');
+              }
+              newLi.appendChild(oldEntries);
+              if (oldLi.classList.contains('open')) newLi.classList.add('open');
+            });
           }
           el.replaceChild(newNode, existing);
           _lastRenderedHtml[key] = newHtml;
@@ -616,28 +630,35 @@
     return lines;
   }
 
+  function _buildEntryRow(en) {
+    var lvl = en.level || 'info';
+    return '<div class="monitor-entry-row">' +
+      '<span class="monitor-entry-ts">'                      + fmtMsk(en.created_at)   + '</span>' +
+      '<span class="monitor-entry-msg ' + esc(lvl) + '">' + esc(en.message || '') + '</span>' +
+    '</div>';
+  }
+
   function _injectEntriesIntoDOM(batchEl, logsData, openLids) {
     var lidsToOpen = openLids || {};
     logsData.forEach(function(logInfo) {
       var li = batchEl.querySelector('.monitor-log-item[data-lid="' + logInfo.id + '"]');
       if (!li) return;
       if (!logInfo.entries || !logInfo.entries.length) return;
-      var existingDiv = li.querySelector('.monitor-entries');
-      if (existingDiv) existingDiv.remove();
-      var html = '';
-      logInfo.entries.forEach(function(en) {
-        var lvl = en.level || 'info';
-        html += '<div class="monitor-entry-row">' +
-                  '<span class="monitor-entry-ts">'                        + fmtMsk(en.created_at)   + '</span>' +
-                  '<span class="monitor-entry-msg ' + esc(lvl) + '">' + esc(en.message || '') + '</span>' +
-                '</div>';
-      });
-      var entriesDiv = '<div class="monitor-entries">' + html + '</div>';
+      var existingDiv  = li.querySelector('.monitor-entries');
+      var existingCount = existingDiv ? existingDiv.querySelectorAll('.monitor-entry-row').length : 0;
       var headerTop = li.querySelector('.monitor-log-header-top');
       if (headerTop && !headerTop.querySelector('.monitor-log-chevron')) {
         headerTop.insertAdjacentHTML('beforeend', '<span class="monitor-log-chevron">▼</span>');
       }
-      li.insertAdjacentHTML('beforeend', entriesDiv);
+      if (!existingDiv) {
+        var html = logInfo.entries.map(_buildEntryRow).join('');
+        li.insertAdjacentHTML('beforeend', '<div class="monitor-entries">' + html + '</div>');
+      } else {
+        var newEntries = logInfo.entries.slice(existingCount);
+        if (newEntries.length) {
+          existingDiv.insertAdjacentHTML('beforeend', newEntries.map(_buildEntryRow).join(''));
+        }
+      }
       if (lidsToOpen[logInfo.id]) li.classList.add('open');
     });
   }
