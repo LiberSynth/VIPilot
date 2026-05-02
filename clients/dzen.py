@@ -296,40 +296,10 @@ def _handle_confirm_element(page, log_id, batch_id) -> None:
             pass
 
 
-def _detect_already_publishable(page) -> bool:
-    """Определяет попап/хинт «Уже можно публиковать» от Дзена."""
-    try:
-        return page.locator(":text('Уже можно публиковать')").first.is_visible(timeout=300)
-    except Exception:
-        return False
-
-
-def _handle_already_publishable(page, log_id, batch_id) -> None:
-    """Закрывает попап «Уже можно публиковать» кнопкой × рядом с заголовком."""
-    try:
-        for sel in [
-            "button[aria-label*='lose'], button[aria-label*='закр']",
-            "button:has-text('×'), button:has-text('✕'), button:has-text('✗')",
-        ]:
-            btn = page.locator(sel).first
-            if btn.is_visible(timeout=400):
-                btn.click()
-                write_log_entry(log_id, "Дзен: Закрыл подсказку «Уже можно публиковать».")
-                _snap(page, batch_id)
-                return
-        page.keyboard.press("Escape")
-        page.wait_for_timeout(300)
-        write_log_entry(log_id, "Дзен: Закрыл подсказку «Уже можно публиковать» (Escape).")
-        _snap(page, batch_id)
-    except Exception as _e:
-        write_log_entry(log_id, f"[dzen] _handle_already_publishable: {_e}", level='silent')
-
-
 _EXPECTED_ELEMENTS = [
-    ("captcha",             _detect_captcha,              _handle_captcha_element),
-    ("confirm",             _detect_confirm_dialog,       _handle_confirm_element),
-    ("already_publishable", _detect_already_publishable,  _handle_already_publishable),
-    ("file_input",          _detect_file_input,           None),
+    ("captcha",    _detect_captcha,        _handle_captcha_element),
+    ("confirm",    _detect_confirm_dialog, _handle_confirm_element),
+    ("file_input", _detect_file_input,     None),
 ]
 
 
@@ -619,6 +589,10 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
             write_log_entry(log_id, "Дзен: Форма не обнаружена — продолжаю по таймауту.")
             page.wait_for_timeout(5000)
     _snap(page, batch_id)
+
+    # Редактор открылся — закрываем все неожиданные попапы (любые подсказки,
+    # хинты, уведомления Дзена), которые могут мешать заполнению формы.
+    _handle_popups(page, log_id, batch_id)
 
     # ── Шаг 5: Заполняем теги ────────────────────────────────────────────
     write_log_entry(log_id, "Дзен: Заполняю теги.")
