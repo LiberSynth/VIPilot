@@ -395,6 +395,13 @@ class PlatformBrowser:
         except Exception as e:
             result = {"ok": False, "error": f"Playwright: {e}"}
 
+        # Браузер пайплайна закрыт — сигнализируем SSE-стриму, чтобы виджет сбросился.
+        # Если _browser_loop активен, он переопределит статус сам при следующей итерации
+        # (через stop() в finally клиента), иначе frame_generator получит "stopped"
+        # и пошлёт "STOPPED" клиенту → handleStopped() очистит canvas.
+        if not self._running:
+            self._set_status("stopped")
+
         return result
 
     def frame_generator(self):
