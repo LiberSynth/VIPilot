@@ -911,6 +911,16 @@
   window.monitorSysCopy = function(btn) {
     const sg = btn.closest('.monitor-sysgroup');
     if (!sg) return;
+    if (sg.classList.contains('open')) {
+      var lines = [];
+      sg.querySelectorAll('.monitor-sysgroup-orphan-item').forEach(function(row) {
+        const ts  = row.querySelector('.monitor-sysgroup-ts')  ? row.querySelector('.monitor-sysgroup-ts').textContent.trim()  : '';
+        const msg = row.querySelector('.monitor-sysgroup-msg') ? row.querySelector('.monitor-sysgroup-msg').textContent.trim() : '';
+        lines.push('[' + ts + '] ' + msg);
+      });
+      _monitorCopyText(lines.join('\n'), btn);
+      return;
+    }
     _fetchOrphansFor(sg.dataset.sgBefore || null, sg.dataset.sgAfter || null).then(function(entries) {
       var lines = entries.map(function(e) {
         return '[' + fmtMsk(e.created_at) + '] ' + (e.message || '');
