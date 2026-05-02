@@ -281,12 +281,11 @@
     '</div>';
   }
 
-  function renderSysGroup(items, posKey, dateBefore, dateAfter) {
+  function renderSysGroup(items, posKey, dateBefore, dateAfter, orphanCount, orphanMinAt) {
     const key      = posKey || '';
-    const n        = items.length;
-    const headTime = n > 0 ? items[n - 1].created_at : null;
-    const sub      = n === 0 ? '…'
-                   : n + ' ' + (n === 1 ? 'событие' : n < 5 ? 'события' : 'событий');
+    const n        = (orphanCount != null) ? orphanCount : items.length;
+    const headTime = orphanMinAt || (items.length > 0 ? items[items.length - 1].created_at : null);
+    const sub      = n > 0 ? ('Событий ' + n) : '…';
 
     const rows = items.map(function(e) {
       if (e._orphan) {
@@ -347,7 +346,7 @@
       }
     });
 
-    // Вычисляем posKey, dateBefore, dateAfter для sysgroup из system-логов; добавляем кэшированные orphan-записи
+    // Вычисляем posKey, dateBefore, dateAfter, _orphanCount, _orphanMinAt для sysgroup из system-логов
     for (var i = 0; i < groups.length; i++) {
       if (groups[i].type !== 'sysgroup') continue;
       var prevBatch = null, nextBatch = null;
@@ -358,9 +357,11 @@
         if (groups[k].type === 'batch') { nextBatch = groups[k].data; break; }
       }
       var posKey = (prevBatch ? prevBatch.batch_id : 'top') + ':' + (nextBatch ? nextBatch.batch_id : 'bottom');
-      groups[i]._posKey     = posKey;
-      groups[i]._dateBefore = prevBatch ? prevBatch.created_at : null;
-      groups[i]._dateAfter  = nextBatch ? nextBatch.created_at : null;
+      groups[i]._posKey       = posKey;
+      groups[i]._dateBefore   = prevBatch ? prevBatch.created_at  : null;
+      groups[i]._dateAfter    = nextBatch ? nextBatch.created_at  : null;
+      groups[i]._orphanCount  = prevBatch ? (prevBatch.orphan_count  || 0)    : 0;
+      groups[i]._orphanMinAt  = prevBatch ? (prevBatch.orphan_min_at || null) : null;
       var cached = (_windowOrphansCache[posKey] || []).map(function(e) {
         return Object.assign({}, e, { _orphan: true });
       });
@@ -385,11 +386,13 @@
       insertions.push({
         index: i + 1,
         group: {
-          type:         'sysgroup',
-          items:        cached2,
-          _posKey:      posKey2,
-          _dateBefore:  groups[i].data.created_at,
-          _dateAfter:   nextBatch2 ? nextBatch2.created_at : null,
+          type:          'sysgroup',
+          items:         cached2,
+          _posKey:       posKey2,
+          _dateBefore:   groups[i].data.created_at,
+          _dateAfter:    nextBatch2 ? nextBatch2.created_at  : null,
+          _orphanCount:  groups[i].data.orphan_count  || 0,
+          _orphanMinAt:  groups[i].data.orphan_min_at || null,
         },
       });
     }
@@ -402,16 +405,18 @@
         if (groups[i].type === 'batch') { firstBatch = groups[i].data; break; }
       }
       if (!(groups.length > 0 && groups[0].type === 'sysgroup')) {
-        var topKey     = 'top:' + (firstBatch ? firstBatch.batch_id : 'bottom');
-        var topCached  = (_windowOrphansCache[topKey] || []).map(function(e) {
+        var topKey    = 'top:' + (firstBatch ? firstBatch.batch_id : 'bottom');
+        var topCached = (_windowOrphansCache[topKey] || []).map(function(e) {
           return Object.assign({}, e, { _orphan: true });
         });
         groups.unshift({
-          type:        'sysgroup',
-          items:       topCached,
-          _posKey:     topKey,
-          _dateBefore: null,
-          _dateAfter:  firstBatch ? firstBatch.created_at : null,
+          type:         'sysgroup',
+          items:        topCached,
+          _posKey:      topKey,
+          _dateBefore:  null,
+          _dateAfter:   firstBatch ? firstBatch.created_at  : null,
+          _orphanCount: hasSystemTop.orphan_count  || 0,
+          _orphanMinAt: hasSystemTop.orphan_min_at || null,
         });
       }
     }
@@ -569,7 +574,7 @@
       newKeys.push(key);
       newHtmlMap[key] = g.type === 'batch'
         ? renderBatch(g.data)
-        : renderSysGroup(g.items, g._posKey, g._dateBefore, g._dateAfter);
+        : renderSysGroup(g.items, g._posKey, g._dateBefore, g._dateAfter, g._orphanCount, g._orphanMinAt);
     });
 
     var oldEls = {};

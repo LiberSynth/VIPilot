@@ -110,57 +110,64 @@ def db_get_monitor(batch_limit=50):
 
             cur.execute(
                 """
-                WITH ordered AS (
+                SELECT
+                    b.id AS batch_id,
+                    (COUNT(le.id) > 0) AS has_system_before,
+                    COUNT(le.id) AS orphan_count,
+                    MIN(le.created_at) AS orphan_min_at
+                FROM (
                     SELECT id,
                            created_at AS date_begin,
                            LEAD(created_at) OVER (ORDER BY created_at DESC, id DESC) AS date_end
                     FROM batches
-                ),
-                all_windows AS (
-                    SELECT id, date_begin, date_end FROM ordered
                     UNION ALL
-                    SELECT NULL::uuid, 'infinity'::timestamptz, MAX(date_begin) FROM ordered
-                ),
-                sys_events AS (
-                    SELECT created_at FROM log        WHERE batch_id IS NULL
-                    UNION ALL
-                    SELECT created_at FROM log_entries WHERE log_id  IS NULL AND level != 'silent'
-                )
-                SELECT
-                    b.id::text AS batch_id,
-                    (COUNT(s.created_at) > 0) AS has_system_before
-                FROM all_windows b
-                LEFT JOIN sys_events s
-                    ON  s.created_at <  b.date_begin
-                    AND s.created_at >= COALESCE(b.date_end, '-infinity'::timestamptz)
+                    SELECT NULL::uuid, 'infinity'::timestamptz, MAX(created_at)
+                    FROM batches
+                ) b
+                LEFT JOIN log_entries le
+                    ON  le.log_id IS NULL
+                    AND le.created_at <  b.date_begin
+                    AND le.created_at >= COALESCE(b.date_end, '-infinity'::timestamptz)
                 GROUP BY b.id, b.date_begin, b.date_end
+                ORDER BY b.date_begin DESC, b.id DESC
                 """
             )
             sys_flag_rows = cur.fetchall()
 
     has_system_map = {}
-    has_system_top = False
+    has_system_top = None
     for r in sys_flag_rows:
-        if r[0] is None:
-            has_system_top = bool(r[1])
+        bid, has_before, count, min_at = r[0], bool(r[1]), int(r[2] or 0), r[3]
+        entry = {
+            "has_system_before": has_before,
+            "orphan_count":      count,
+            "orphan_min_at":     min_at.isoformat() if min_at else None,
+        }
+        if bid is None:
+            if has_before:
+                has_system_top = entry
         else:
-            has_system_map[r[0]] = bool(r[1])
+            has_system_map[str(bid)] = entry
 
     batches = [
         {
-            "batch_id": str(r[0]),
-            "scheduled_at": r[1].isoformat() if r[1] else None,
-            "type": r[2],
-            "batch_status": r[3],
-            "created_at": r[4].isoformat() if r[4] else None,
-            "last_event_at": r[5].isoformat() if r[5] else None,
-            "story_id": str(r[6]) if r[6] else None,
+            "batch_id":       str(r[0]),
+            "scheduled_at":   r[1].isoformat() if r[1] else None,
+            "type":           r[2],
+            "batch_status":   r[3],
+            "created_at":     r[4].isoformat() if r[4] else None,
+            "last_event_at":  r[5].isoformat() if r[5] else None,
+            "story_id":       str(r[6]) if r[6] else None,
             "has_video_data": bool(r[7]),
-            "logs": r[8],
-            "text_model_name": r[9],
+            "logs":           r[8],
+            "text_model_name":  r[9],
             "video_model_name": r[10],
-            "title": r[11],
-            "has_system_before": has_system_map.get(str(r[0]), False),
+            "title":            r[11],
+            **has_system_map.get(str(r[0]), {
+                "has_system_before": False,
+                "orphan_count":      0,
+                "orphan_min_at":     None,
+            }),
         }
         for r in batch_rows
     ]
