@@ -292,9 +292,19 @@ def api_run_now():
 def api_monitor():
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
+    t0 = time.perf_counter()
     data = db_get_monitor()
+    t1 = time.perf_counter()
     data["active_batch_ids"] = list(environment.get_active_batch_ids())
-    return jsonify(data)
+    resp = jsonify(data)
+    t2 = time.perf_counter()
+    write_log_entry(
+        None,
+        f"[timing] /api/monitor db={int((t1-t0)*1000)}ms "
+        f"jsonify={int((t2-t1)*1000)}ms total={int((t2-t0)*1000)}ms",
+        level="silent",
+    )
+    return resp
 
 
 @bp.route("/schedule", methods=["GET"])
