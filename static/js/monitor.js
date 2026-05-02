@@ -120,8 +120,7 @@
       : (log.pipeline === 'transcode' || log.pipeline === 'transcoding') ? 'H.264'
       : null;
     const modelTag   = modelName ? '<span class="monitor-log-model">' + esc(modelName) + '</span>' : '';
-    const hasEntries = log.has_entries || (log.entries && log.entries.length > 0);
-    const chevron    = hasEntries ? '<span class="monitor-log-chevron">▼</span>' : '';
+    const chevron = '<span class="monitor-log-chevron">▼</span>';
     const comment    = log.message ? '<div class="monitor-log-comment">' + esc(log.message) + '</div>' : '';
 
     const canRestart = batchId

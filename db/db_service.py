@@ -69,11 +69,7 @@ def db_get_monitor(batch_limit=50):
                                 'pipeline',   l.pipeline,
                                 'message',    l.message,
                                 'status',     l.status,
-                                'created_at', l.created_at,
-                                'has_entries', EXISTS(
-                                    SELECT 1 FROM log_entries le
-                                    WHERE le.log_id = l.id AND le.level != 'silent'
-                                )
+                                'created_at', l.created_at
                             ) ORDER BY l.created_at, l.id
                         ) FILTER (WHERE l.id IS NOT NULL),
                         '[]'::json
