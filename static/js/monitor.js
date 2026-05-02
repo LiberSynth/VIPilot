@@ -654,9 +654,10 @@
         var html = logInfo.entries.map(_buildEntryRow).join('');
         li.insertAdjacentHTML('beforeend', '<div class="monitor-entries">' + html + '</div>');
       } else {
-        var newEntries = logInfo.entries.slice(existingCount);
-        if (newEntries.length) {
-          existingDiv.insertAdjacentHTML('beforeend', newEntries.map(_buildEntryRow).join(''));
+        var totalNew = logInfo.entries.length - existingCount;
+        if (totalNew > 0) {
+          var newEntries = logInfo.entries.slice(0, totalNew);
+          existingDiv.insertAdjacentHTML('afterbegin', newEntries.map(_buildEntryRow).join(''));
         }
       }
       if (lidsToOpen[logInfo.id]) li.classList.add('open');
