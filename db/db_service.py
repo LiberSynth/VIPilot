@@ -123,6 +123,7 @@ def db_get_monitor():
                 ) b
                 LEFT JOIN log_entries le
                     ON  le.log_id IS NULL
+                    AND le.level != 'silent'
                     AND le.created_at <  b.date_begin
                     AND le.created_at >= COALESCE(b.date_end, '-infinity'::timestamptz)
                 GROUP BY b.id, b.date_begin, b.date_end
@@ -223,7 +224,7 @@ def db_get_system_window_orphans(
                 cur.execute(
                     """
                     SELECT message, level, created_at FROM log_entries
-                    WHERE log_id IS NULL
+                    WHERE log_id IS NULL AND level != 'silent'
                       AND created_at <  %s::timestamptz
                       AND created_at >= %s::timestamptz
                     ORDER BY created_at DESC, id DESC
@@ -234,7 +235,7 @@ def db_get_system_window_orphans(
                 cur.execute(
                     """
                     SELECT message, level, created_at FROM log_entries
-                    WHERE log_id IS NULL
+                    WHERE log_id IS NULL AND level != 'silent'
                       AND created_at < %s::timestamptz
                     ORDER BY created_at DESC, id DESC
                     """,
@@ -244,7 +245,7 @@ def db_get_system_window_orphans(
                 cur.execute(
                     """
                     SELECT message, level, created_at FROM log_entries
-                    WHERE log_id IS NULL
+                    WHERE log_id IS NULL AND level != 'silent'
                       AND created_at >= %s::timestamptz
                     ORDER BY created_at DESC, id DESC
                     """,
