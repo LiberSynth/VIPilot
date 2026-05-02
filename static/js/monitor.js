@@ -454,7 +454,9 @@
     document.querySelectorAll('.monitor-sysgroup').forEach(function(el) {
       if (state.sgkeys[el.dataset.sgKey] && !_collapsedSgKeys[el.dataset.sgKey]) {
         el.classList.add('open');
-        _refreshSgOrphans(el);
+        if (!el.querySelector('.monitor-sysgroup-orphan-item')) {
+          _refreshSgOrphans(el);
+        }
         _startSgPolling(el);
       }
     });
@@ -603,6 +605,15 @@
           var newNode = tmp.firstChild;
           if (isOpen) {
             newNode.classList.add('open');
+            var oldItems = existing.querySelector('.monitor-sysgroup-items');
+            var newItems = newNode.querySelector('.monitor-sysgroup-items');
+            if (oldItems && newItems) {
+              Array.prototype.slice.call(oldItems.children).forEach(function(child) {
+                if (child.classList.contains('monitor-sysgroup-orphan-item')) {
+                  newItems.appendChild(child);
+                }
+              });
+            }
             newNode.querySelectorAll('.monitor-log-item').forEach(function(li) {
               if (prev.lids && prev.lids[li.dataset.lid]) li.classList.add('open');
             });
