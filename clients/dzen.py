@@ -325,6 +325,77 @@ def _dismiss_unknown(page, log_id=None) -> None:
             pass
 
 
+def _set_comments_all_users(page, log_id, batch_id=None) -> None:
+    """
+    Находит дропдаун «Кто может комментировать» и выставляет «Все пользователи».
+    Если дропдаун не найден или уже выставлен нужное значение — логирует и продолжает.
+    Все ошибки ловит внутри и не пробрасывает.
+    """
+    try:
+        # Ищем интерактивный триггер дропдауна рядом с меткой «Кто может комментировать».
+        # Приоритет: button/combobox-роль рядом с меткой, затем fallback по текущему значению.
+        trigger_sel = (
+            "[role='combobox']:near(:text('Кто может комментировать')), "
+            "button:near(:text('Кто может комментировать')), "
+            "label:has-text('Кто может комментировать') ~ [role='combobox'], "
+            "label:has-text('Кто может комментировать') ~ button"
+        )
+        trigger = page.locator(trigger_sel).first
+
+        found = False
+        try:
+            trigger.wait_for(state="visible", timeout=5_000)
+            found = True
+        except Exception:
+            pass
+
+        if not found:
+            # Fallback: дропдаун скрыт за меткой — ищем по любому текущему значению в контейнере
+            fallback_sel = (
+                "[role='combobox']:has-text('комментир'), "
+                "button:has-text('комментир'), "
+                "[role='combobox']:has-text('пользовател'), "
+                "button:has-text('пользовател')"
+            )
+            trigger = page.locator(fallback_sel).first
+            try:
+                trigger.wait_for(state="visible", timeout=3_000)
+                found = True
+            except Exception:
+                pass
+
+        if not found:
+            write_log_entry(log_id, "Дзен: Дропдаун комментариев не найден — продолжаю.", level='silent')
+            return
+
+        current_text = trigger.text_content() or ""
+        if "Все пользователи" in current_text:
+            write_log_entry(log_id, "Дзен: Комментарии уже выставлены «Все пользователи».", level='silent')
+            _snap(page, batch_id)
+            return
+
+        trigger.click()
+        page.wait_for_timeout(500)
+
+        option_sel = (
+            "[role='option']:has-text('Все пользователи'), "
+            "li:has-text('Все пользователи'), "
+            "div[role='option']:has-text('Все пользователи')"
+        )
+        option = page.locator(option_sel).first
+        try:
+            option.wait_for(state="visible", timeout=5_000)
+            option.click()
+            write_log_entry(log_id, "Дзен: Выставлены комментарии «Все пользователи».")
+            _snap(page, batch_id)
+        except Exception as _e:
+            write_log_entry(log_id, "Дзен: Не удалось выбрать «Все пользователи» — продолжаю.", level='silent')
+            write_log_entry(log_id, f"[dzen] Ошибка выбора варианта: {_e}", level='silent')
+    except Exception as _e:
+        write_log_entry(log_id, "Дзен: Ошибка при настройке комментариев — продолжаю.", level='silent')
+        write_log_entry(log_id, f"[dzen] Ошибка _set_comments_all_users: {_e}", level='silent')
+
+
 def _handle_popups(page, log_id=None, batch_id=None) -> None:
     """
     Проверяет страницу на попапы, хинты, тултипы и диалоги.
@@ -500,6 +571,9 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
     except Exception as _e:
         write_log_entry(log_id, "Дзен: Не удалось заполнить теги — продолжаю.")
         write_log_entry(log_id, f"[dzen] Ошибка тегов: {_e}", level='silent')
+
+    # ── Шаг 5.5: Выставляем «Все пользователи» в комментариях ───────────
+    _set_comments_all_users(page, log_id, batch_id)
 
     # ── Шаг 6: Публикуем ─────────────────────────────────────────────────
     write_log_entry(log_id, "Дзен: Нажимаю «Опубликовать».")
