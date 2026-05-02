@@ -445,7 +445,7 @@
       // Мгновенно восстанавливаем кадр из кэша (без мигания после перерисовки DOM)
       if (_pubFrameCache[bid] && !img.src) {
         img.src = _pubFrameCache[bid];
-        img.parentNode.classList.add('has-frame');
+        img.parentNode.style.display = 'block';
       }
 
       // Новый кадр получаем только для активной публикации
