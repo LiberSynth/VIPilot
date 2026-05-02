@@ -401,7 +401,6 @@
       var batchEl = document.querySelector('.monitor-batch[data-bid="' + _openBid + '"]');
       if (batchEl) {
         batchEl.classList.add('open');
-        _fetchAndInjectEntries(_openBid, state.lids);
       } else {
         _openBid = null;
       }
@@ -951,7 +950,12 @@
     }
   };
 
+  function refreshOpenBatchEntries() {
+    if (_openBid) _fetchAndInjectEntries(_openBid);
+  }
+
   refreshMonitor();
   setInterval(refreshMonitor, 5000);
   setInterval(refreshPublishFrames, 3000);
+  setInterval(refreshOpenBatchEntries, 5000);
 })();
