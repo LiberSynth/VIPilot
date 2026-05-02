@@ -42,7 +42,7 @@ def db_get_log_entries(log_id):
     ]
 
 
-def db_get_monitor(batch_limit=50):
+def db_get_monitor():
     """
     Возвращает структурированные данные для монитора.
     Первичная таблица — log. Батч появляется только если есть хотя бы одна запись в log.
@@ -91,9 +91,7 @@ def db_get_monitor(batch_limit=50):
                          b.story_id, m.has_video_data,
                          tm.name, vm.name, b.title
                 ORDER BY COALESCE(MAX(l.created_at), b.created_at) DESC, b.id DESC
-                LIMIT %s
-                """,
-                (batch_limit,),
+                """
             )
             batch_rows = cur.fetchall()
 
