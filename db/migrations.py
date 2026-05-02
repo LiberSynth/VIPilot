@@ -41,12 +41,21 @@ def _m093_log_entries_created_at_idx(cur):
     )
 
 
+def _m094_datetime_indexes(cur):
+    """Индексы по created_at для таблиц ai_models, movies, schedule, stories."""
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_ai_models_created_at ON ai_models (created_at)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_movies_created_at    ON movies    (created_at)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_schedule_created_at  ON schedule  (created_at)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_stories_created_at   ON stories   (created_at)")
+
+
 # ---------------------------------------------------------------------------
 # Реестр миграций — добавляйте только в конец, никогда не переиспользуйте номера
 # ---------------------------------------------------------------------------
 
 MIGRATIONS = [
     (93, _m093_log_entries_created_at_idx),
+    (94, _m094_datetime_indexes),
 ]
 
 
