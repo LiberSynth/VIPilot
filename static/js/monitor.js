@@ -660,22 +660,9 @@
   function refreshMonitor() {
     var panel = document.getElementById('panel-log');
     if (!panel || !panel.classList.contains('active')) return;
-    var t0 = performance.now();
     fetch('/api/monitor')
-      .then(function(r) {
-        var t1 = performance.now();
-        return r.json().then(function(data) {
-          var t2 = performance.now();
-          renderTimeline(data);
-          var t3 = performance.now();
-          console.log(
-            '[timing] /api/monitor fetch=' + (t1 - t0).toFixed(0) + 'ms ' +
-            'json=' + (t2 - t1).toFixed(0) + 'ms ' +
-            'render=' + (t3 - t2).toFixed(0) + 'ms ' +
-            'total=' + (t3 - t0).toFixed(0) + 'ms'
-          );
-        });
-      })
+      .then(function(r) { return r.json(); })
+      .then(renderTimeline)
       .catch(function() {});
   }
 
