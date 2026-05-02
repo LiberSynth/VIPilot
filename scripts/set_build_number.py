@@ -45,6 +45,22 @@ def main() -> None:
         )
     print(f'[set_build_number] BUILD = {count} → {build_file}')
 
+    try:
+        pw_result = subprocess.run(
+            ['playwright', 'install', 'chromium'],
+            timeout=300,
+        )
+        if pw_result.returncode != 0:
+            print(f'[set_build_number] playwright install завершился с кодом {pw_result.returncode}', file=sys.stderr)
+            sys.exit(1)
+        print('[set_build_number] Playwright Chromium установлен')
+    except FileNotFoundError:
+        print('[set_build_number] playwright не найден — деплой без браузера недопустим', file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print(f'[set_build_number] Ошибка при установке Playwright: {e}', file=sys.stderr)
+        sys.exit(1)
+
 
 if __name__ == '__main__':
     main()
