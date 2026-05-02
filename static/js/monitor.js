@@ -281,11 +281,12 @@
     '</div>';
   }
 
-  function renderSysGroup(items, posKey) {
+  function renderSysGroup(items, posKey, dateBefore, dateAfter) {
     const key      = posKey || '';
-    const headTime = items.length ? items[items.length - 1].created_at : null;
     const n        = items.length;
-    const sub      = n + ' ' + (n === 1 ? 'событие' : n < 5 ? 'события' : 'событий');
+    const headTime = n > 0 ? items[n - 1].created_at : null;
+    const sub      = n === 0 ? '…'
+                   : n + ' ' + (n === 1 ? 'событие' : n < 5 ? 'события' : 'событий');
 
     const rows = items.map(function(e) {
       if (e._orphan) {
@@ -312,7 +313,10 @@
         '<button class="cycle-float-btn" title="Скопировать" onclick="monitorSysCopy(this)">' + MON_SVG_COPY + '</button>' +
       '</div>';
 
-    return '<div class="monitor-sysgroup" data-sg-key="' + esc(key) + '" onclick="monitorToggleSys(event,this)">' +
+    return '<div class="monitor-sysgroup" data-sg-key="' + esc(key) + '"' +
+      (dateBefore ? ' data-sg-before="' + esc(dateBefore) + '"' : '') +
+      (dateAfter  ? ' data-sg-after="'  + esc(dateAfter)  + '"' : '') +
+      ' onclick="monitorToggleSys(event,this)">' +
       '<div class="monitor-sysgroup-header">' +
         '<span class="monitor-sysgroup-dot"></span>' +
         '<div class="monitor-sysgroup-meta">' +
@@ -326,11 +330,10 @@
     '</div>';
   }
 
-  function buildTimeline(batches, system, orphan) {
+  function buildTimeline(batches, system, hasSystemMap, hasSystemTop) {
     var items = [];
     (batches || []).forEach(function(b) { items.push({ type: 'batch', time: b.created_at, data: b }); });
     (system  || []).forEach(function(s) { items.push({ type: 'sys',   time: s.created_at, data: s }); });
-    (orphan  || []).forEach(function(e) { items.push({ type: 'sys',   time: e.created_at, data: Object.assign({}, e, { _orphan: true }) }); });
     items.sort(function(a, b) { return new Date(b.time) - new Date(a.time); });
 
     var groups = [], sysAccum = null;
@@ -344,16 +347,73 @@
       }
     });
 
+    // Вычисляем posKey, dateBefore, dateAfter для sysgroup из system-логов; добавляем кэшированные orphan-записи
     for (var i = 0; i < groups.length; i++) {
       if (groups[i].type !== 'sysgroup') continue;
-      var prev = null, next = null;
+      var prevBatch = null, nextBatch = null;
       for (var j = i - 1; j >= 0; j--) {
-        if (groups[j].type === 'batch') { prev = groups[j].data.batch_id; break; }
+        if (groups[j].type === 'batch') { prevBatch = groups[j].data; break; }
       }
       for (var k = i + 1; k < groups.length; k++) {
-        if (groups[k].type === 'batch') { next = groups[k].data.batch_id; break; }
+        if (groups[k].type === 'batch') { nextBatch = groups[k].data; break; }
       }
-      groups[i]._posKey = (prev || 'top') + ':' + (next || 'bottom');
+      var posKey = (prevBatch ? prevBatch.batch_id : 'top') + ':' + (nextBatch ? nextBatch.batch_id : 'bottom');
+      groups[i]._posKey     = posKey;
+      groups[i]._dateBefore = prevBatch ? prevBatch.created_at : null;
+      groups[i]._dateAfter  = nextBatch ? nextBatch.created_at : null;
+      var cached = (_windowOrphansCache[posKey] || []).map(function(e) {
+        return Object.assign({}, e, { _orphan: true });
+      });
+      if (cached.length) groups[i].items = groups[i].items.concat(cached);
+    }
+
+    // Вставляем placeholder-sysgroup там, где has_system_before=true, но sysgroup из system-логов нет
+    var insertions = [];
+    for (var i = 0; i < groups.length; i++) {
+      if (groups[i].type !== 'batch') continue;
+      var bid = groups[i].data.batch_id;
+      if (!(hasSystemMap && hasSystemMap[bid])) continue;
+      if (i + 1 < groups.length && groups[i + 1].type === 'sysgroup') continue;
+      var nextBatch2 = null;
+      for (var k = i + 1; k < groups.length; k++) {
+        if (groups[k].type === 'batch') { nextBatch2 = groups[k].data; break; }
+      }
+      var posKey2 = bid + ':' + (nextBatch2 ? nextBatch2.batch_id : 'bottom');
+      var cached2 = (_windowOrphansCache[posKey2] || []).map(function(e) {
+        return Object.assign({}, e, { _orphan: true });
+      });
+      insertions.push({
+        index: i + 1,
+        group: {
+          type:         'sysgroup',
+          items:        cached2,
+          _posKey:      posKey2,
+          _dateBefore:  groups[i].data.created_at,
+          _dateAfter:   nextBatch2 ? nextBatch2.created_at : null,
+        },
+      });
+    }
+    insertions.reverse().forEach(function(ins) { groups.splice(ins.index, 0, ins.group); });
+
+    // Верхний sysgroup (записи новее самого нового батча)
+    if (hasSystemTop) {
+      var firstBatch = null;
+      for (var i = 0; i < groups.length; i++) {
+        if (groups[i].type === 'batch') { firstBatch = groups[i].data; break; }
+      }
+      if (!(groups.length > 0 && groups[0].type === 'sysgroup')) {
+        var topKey     = 'top:' + (firstBatch ? firstBatch.batch_id : 'bottom');
+        var topCached  = (_windowOrphansCache[topKey] || []).map(function(e) {
+          return Object.assign({}, e, { _orphan: true });
+        });
+        groups.unshift({
+          type:        'sysgroup',
+          items:       topCached,
+          _posKey:     topKey,
+          _dateBefore: null,
+          _dateAfter:  firstBatch ? firstBatch.created_at : null,
+        });
+      }
     }
 
     return groups;
@@ -366,14 +426,14 @@
   var _seenLids      = {};
   var _seenBids      = {};
   var _firstRender   = true;
-  var _pubFrameCache      = {};   // batchId → blob URL
-  var _pubFrameFetching   = {};   // batchId → true (in-flight guard)
-  var _lastRenderedHtml   = {};   // key → last rendered HTML string
-  var _lastMonitorData    = null; // last full response from /api/monitor
-  var _orphanEntriesCache = null; // null = not yet fetched, [] or [...] = fetched
-  var _orphanFetching     = false;
-  var _sysLogEntriesCache = {};   // log_id → entries array (lazy)
-  var _sysLogFetching     = {};   // log_id → true (in-flight guard)
+  var _pubFrameCache        = {};   // batchId → blob URL
+  var _pubFrameFetching     = {};   // batchId → true (in-flight guard)
+  var _lastRenderedHtml     = {};   // key → last rendered HTML string
+  var _lastMonitorData      = null; // last full response from /api/monitor
+  var _windowOrphansCache   = {};   // posKey → entries array (fetched)
+  var _windowOrphansFetching= {};   // posKey → true (in-flight guard)
+  var _sysLogEntriesCache   = {};   // log_id → entries array (lazy)
+  var _sysLogFetching       = {};   // log_id → true (in-flight guard)
 
   function getOpenState() {
     var sgkeys = {}, lids = {}, syslids = {};
@@ -490,9 +550,12 @@
     if (!el) return;
     _lastMonitorData = data;
     _activeBatchIds = Array.isArray(data.active_batch_ids) ? data.active_batch_ids : [];
-    var prev   = getOpenState();
-    var orphan = _orphanEntriesCache !== null ? _orphanEntriesCache : (data.orphan_entries || []);
-    var groups = buildTimeline(data.batches, data.system, orphan);
+    var prev = getOpenState();
+    var hasSystemMap = {};
+    (data.batches || []).forEach(function(b) {
+      if (b.has_system_before) hasSystemMap[b.batch_id] = true;
+    });
+    var groups = buildTimeline(data.batches, data.system, hasSystemMap, data.has_system_top);
     if (groups.length === 0) {
       el.innerHTML = '<div style="font-size:12px;color:#444;padding:4px 0">Нет данных</div>';
       _firstRender = false;
@@ -504,7 +567,9 @@
     groups.forEach(function(g) {
       var key = _groupKey(g);
       newKeys.push(key);
-      newHtmlMap[key] = g.type === 'batch' ? renderBatch(g.data) : renderSysGroup(g.items, g._posKey);
+      newHtmlMap[key] = g.type === 'batch'
+        ? renderBatch(g.data)
+        : renderSysGroup(g.items, g._posKey, g._dateBefore, g._dateAfter);
     });
 
     var oldEls = {};
@@ -581,10 +646,6 @@
     restoreOpenState(prev);
     _firstRender = false;
     refreshPublishFrames();
-    if (_orphanEntriesCache === null && !_orphanFetching &&
-        data.has_orphan_entries && (!data.system || !data.system.length)) {
-      _fetchOrphanEntries();
-    }
   }
 
   function refreshMonitor() {
@@ -672,17 +733,21 @@
       });
   }
 
-  function _fetchOrphanEntries() {
-    if (_orphanEntriesCache !== null || _orphanFetching) return;
-    _orphanFetching = true;
-    fetch('/api/monitor/orphan-entries')
+  function _fetchWindowOrphans(posKey, dateBefore, dateAfter) {
+    if (_windowOrphansFetching[posKey]) return;
+    _windowOrphansFetching[posKey] = true;
+    var params = [];
+    if (dateBefore) params.push('before=' + encodeURIComponent(dateBefore));
+    if (dateAfter)  params.push('after='  + encodeURIComponent(dateAfter));
+    var url = '/api/monitor/system-window-orphans' + (params.length ? '?' + params.join('&') : '');
+    fetch(url)
       .then(function(r) { return r.json(); })
       .then(function(data) {
-        _orphanFetching     = false;
-        _orphanEntriesCache = data.entries || [];
+        delete _windowOrphansFetching[posKey];
+        _windowOrphansCache[posKey] = data.entries || [];
         if (_lastMonitorData) renderTimeline(_lastMonitorData);
       })
-      .catch(function() { _orphanFetching = false; });
+      .catch(function() { delete _windowOrphansFetching[posKey]; });
   }
 
   function _applySysLogEntries(itemEl, lid, entries) {
@@ -745,8 +810,8 @@
       if (el.classList.contains('open')) delete _collapsedSgKeys[key];
       else _collapsedSgKeys[key] = true;
     }
-    if (el.classList.contains('open')) {
-      _fetchOrphanEntries();
+    if (el.classList.contains('open') && key && !_windowOrphansCache.hasOwnProperty(key)) {
+      _fetchWindowOrphans(key, el.dataset.sgBefore || null, el.dataset.sgAfter || null);
     }
   };
 

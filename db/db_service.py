@@ -110,14 +110,41 @@ def db_get_monitor(batch_limit=50):
 
             cur.execute(
                 """
-                SELECT EXISTS(
-                    SELECT 1 FROM log_entries
-                    WHERE log_id IS NULL AND level != 'silent'
-                    LIMIT 1
+                WITH ordered AS (
+                    SELECT id,
+                           created_at AS date_begin,
+                           LEAD(created_at) OVER (ORDER BY created_at DESC, id DESC) AS date_end
+                    FROM batches
+                ),
+                all_windows AS (
+                    SELECT id, date_begin, date_end FROM ordered
+                    UNION ALL
+                    SELECT NULL::uuid, 'infinity'::timestamptz, MAX(date_begin) FROM ordered
+                ),
+                sys_events AS (
+                    SELECT created_at FROM log        WHERE batch_id IS NULL
+                    UNION ALL
+                    SELECT created_at FROM log_entries WHERE log_id  IS NULL AND level != 'silent'
                 )
+                SELECT
+                    b.id::text AS batch_id,
+                    (COUNT(s.created_at) > 0) AS has_system_before
+                FROM all_windows b
+                LEFT JOIN sys_events s
+                    ON  s.created_at <  b.date_begin
+                    AND s.created_at >= COALESCE(b.date_end, '-infinity'::timestamptz)
+                GROUP BY b.id, b.date_begin, b.date_end
                 """
             )
-            has_orphan_entries = bool(cur.fetchone()[0])
+            sys_flag_rows = cur.fetchall()
+
+    has_system_map = {}
+    has_system_top = False
+    for r in sys_flag_rows:
+        if r[0] is None:
+            has_system_top = bool(r[1])
+        else:
+            has_system_map[r[0]] = bool(r[1])
 
     batches = [
         {
@@ -133,6 +160,7 @@ def db_get_monitor(batch_limit=50):
             "text_model_name": r[9],
             "video_model_name": r[10],
             "title": r[11],
+            "has_system_before": has_system_map.get(str(r[0]), False),
         }
         for r in batch_rows
     ]
@@ -146,7 +174,7 @@ def db_get_monitor(batch_limit=50):
         }
         for r in sys_rows
     ]
-    return {"batches": batches, "system": system, "has_orphan_entries": has_orphan_entries}
+    return {"batches": batches, "system": system, "has_system_top": has_system_top}
 
 
 def db_get_system_log_entries(log_id: str) -> list:
@@ -174,20 +202,51 @@ def db_get_system_log_entries(log_id: str) -> list:
     ]
 
 
-def db_get_orphan_entries(limit: int = 500) -> list:
-    """Возвращает log_entries с log_id IS NULL (осиротевшие записи)."""
+def db_get_system_window_orphans(
+    before_iso: str | None = None,
+    after_iso:  str | None = None,
+    limit: int = 200,
+) -> list:
+    """Orphan log_entries (log_id IS NULL, level != 'silent') в заданном временном окне.
+
+    before_iso — верхняя граница (исключительная), after_iso — нижняя (включительная).
+    Если граница не указана — окно открыто с этой стороны.
+    """
+    if not before_iso and not after_iso:
+        return []
     with get_db() as conn:
         with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT message, level, created_at
-                FROM log_entries
-                WHERE log_id IS NULL AND level != 'silent'
-                ORDER BY created_at DESC, id DESC
-                LIMIT %s
-                """,
-                (limit,),
-            )
+            if before_iso and after_iso:
+                cur.execute(
+                    """
+                    SELECT message, level, created_at FROM log_entries
+                    WHERE log_id IS NULL AND level != 'silent'
+                      AND created_at <  %s::timestamptz
+                      AND created_at >= %s::timestamptz
+                    ORDER BY created_at DESC, id DESC LIMIT %s
+                    """,
+                    (before_iso, after_iso, limit),
+                )
+            elif before_iso:
+                cur.execute(
+                    """
+                    SELECT message, level, created_at FROM log_entries
+                    WHERE log_id IS NULL AND level != 'silent'
+                      AND created_at < %s::timestamptz
+                    ORDER BY created_at DESC, id DESC LIMIT %s
+                    """,
+                    (before_iso, limit),
+                )
+            else:
+                cur.execute(
+                    """
+                    SELECT message, level, created_at FROM log_entries
+                    WHERE log_id IS NULL AND level != 'silent'
+                      AND created_at >= %s::timestamptz
+                    ORDER BY created_at DESC, id DESC LIMIT %s
+                    """,
+                    (after_iso, limit),
+                )
             rows = cur.fetchall()
     return [
         {

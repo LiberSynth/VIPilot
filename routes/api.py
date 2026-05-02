@@ -59,7 +59,7 @@ from log import (
     db_get_monitor,
     db_get_batch_log_entries,
     db_get_system_log_entries,
-    db_get_orphan_entries,
+    db_get_system_window_orphans,
     log_batch_planned,
     write_log_entry,
 )
@@ -689,11 +689,13 @@ def api_monitor_log_entries(log_id):
     return jsonify({"entries": entries})
 
 
-@bp.route("/monitor/orphan-entries")
-def api_monitor_orphan_entries():
+@bp.route("/monitor/system-window-orphans")
+def api_monitor_system_window_orphans():
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
-    entries = db_get_orphan_entries()
+    before = request.args.get("before") or None
+    after  = request.args.get("after")  or None
+    entries = db_get_system_window_orphans(before_iso=before, after_iso=after)
     return jsonify({"entries": entries})
 
 
