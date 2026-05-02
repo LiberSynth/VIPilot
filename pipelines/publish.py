@@ -18,7 +18,7 @@ from db import (
     db_get_batch_vkvideo_clip_url,
 )
 from log import db_log_update, db_get_log_entries, write_log_entry
-from pipelines.base import check_cancelled
+from pipelines.base import check_cancelled, ensure_playwright_chromium
 from common.exceptions import AppException
 from utils.utils import fmt_id_msg
 from routes.api import client_is_configured, build_publication_title
@@ -138,6 +138,8 @@ _CLIENTS = {
     'vkvideo': _call_vkvideo,
 }
 
+_BROWSER_SLUGS = {'dzen', 'rutube', 'vkvideo'}
+
 
 def _call_client(slug, method, batch_id, log_id, target, pub_title):
     """Диспетчеризует вызов клиента по реестру _CLIENTS. Возвращает True при успехе."""
@@ -250,6 +252,9 @@ def run(batch_id, log_id):
                 write_log_entry(log_id, fmt_id_msg("[publish] Батч {}: {}", batch_id, _msg), level='silent')
                 db_log_update(log_id, _msg, 'error')
                 raise AppException(batch_id, 'publish', _msg, log_id)
+
+    if any(slug in _BROWSER_SLUGS for slug, _, _ in steps):
+        ensure_playwright_chromium(log_id)
 
     target_names = ', '.join(t['name'] for t in active_targets)
 

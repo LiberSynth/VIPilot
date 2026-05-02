@@ -9,6 +9,9 @@
 подставляется в пространство имён каждого модуля пакета через pipelines/__init__.py.
 """
 
+import os
+import subprocess
+
 from db import (
     db_set_batch_status,
     db_is_batch_scheduled,
@@ -25,6 +28,39 @@ def _forbidden_print(*args, **kwargs):
         "Прямой вызов print в pipelines/ запрещён. "
         "Используйте write_log_entry(log_id, msg, level) из log."
     )
+
+
+def ensure_playwright_chromium(log_id) -> None:
+    """Проверяет наличие Chromium для Playwright и устанавливает его, если бинарник отсутствует.
+
+    Вызывать перед публикацией через браузерные платформы (dzen, rutube, vkvideo).
+    Бросает RuntimeError если установка не удалась.
+    """
+    from playwright.sync_api import sync_playwright
+
+    try:
+        with sync_playwright() as p:
+            exec_path = p.chromium.executable_path
+    except Exception as e:
+        exec_path = None
+        write_log_entry(log_id, f'[playwright] Не удалось определить путь к Chromium: {e}', level='silent')
+
+    if exec_path and os.path.exists(exec_path):
+        write_log_entry(log_id, f'[playwright] Chromium найден: {exec_path}', level='silent')
+        return
+
+    write_log_entry(log_id, 'Playwright Chromium не установлен — выполняю установку…')
+    result = subprocess.run(
+        ['playwright', 'install', 'chromium'],
+        capture_output=True,
+        text=True,
+        timeout=300,
+    )
+    if result.returncode != 0:
+        msg = f'playwright install chromium завершился с ошибкой: {result.stderr.strip()}'
+        write_log_entry(log_id, msg, level='error')
+        raise RuntimeError(msg)
+    write_log_entry(log_id, 'Playwright Chromium успешно установлен')
 
 
 def check_cancelled(pipeline_name: str, batch_id: str, batch: dict, log_id=None) -> bool:
