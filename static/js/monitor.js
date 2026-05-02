@@ -442,15 +442,25 @@
       var bid = img.dataset.bid;
       if (!bid) return;
 
-      // Мгновенно восстанавливаем кадр из кэша (без мигания после перерисовки DOM)
-      if (_pubFrameCache[bid] && !img.src) {
-        img.src = _pubFrameCache[bid];
-        img.parentNode.style.display = 'block';
-      }
-
       // Новый кадр получаем только для активной публикации
       var logItem = img.closest('.monitor-log-item');
-      if (!logItem || logItem.dataset.status !== 'running') return;
+      var isRunning = logItem && logItem.dataset.status === 'running';
+
+      // Мгновенно восстанавливаем кадр из кэша (без мигания после перерисовки DOM),
+      // но только пока публикация активна — после завершения скрываем кадр.
+      if (_pubFrameCache[bid] && !img.src) {
+        if (isRunning) {
+          img.src = _pubFrameCache[bid];
+          img.parentNode.style.display = 'block';
+        } else {
+          img.parentNode.style.display = 'none';
+        }
+      } else if (!isRunning && img.parentNode.style.display !== 'none') {
+        img.src = '';
+        img.parentNode.style.display = 'none';
+      }
+
+      if (!isRunning) return;
 
       // Защита от дублирующих запросов при медленной сети
       if (_pubFrameFetching[bid]) return;

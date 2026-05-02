@@ -296,10 +296,40 @@ def _handle_confirm_element(page, log_id, batch_id) -> None:
             pass
 
 
+def _detect_already_publishable(page) -> bool:
+    """Определяет попап/хинт «Уже можно публиковать» от Дзена."""
+    try:
+        return page.locator(":text('Уже можно публиковать')").first.is_visible(timeout=300)
+    except Exception:
+        return False
+
+
+def _handle_already_publishable(page, log_id, batch_id) -> None:
+    """Закрывает попап «Уже можно публиковать» кнопкой × рядом с заголовком."""
+    try:
+        for sel in [
+            "button[aria-label*='lose'], button[aria-label*='закр']",
+            "button:has-text('×'), button:has-text('✕'), button:has-text('✗')",
+        ]:
+            btn = page.locator(sel).first
+            if btn.is_visible(timeout=400):
+                btn.click()
+                write_log_entry(log_id, "Дзен: Закрыл подсказку «Уже можно публиковать».")
+                _snap(page, batch_id)
+                return
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(300)
+        write_log_entry(log_id, "Дзен: Закрыл подсказку «Уже можно публиковать» (Escape).")
+        _snap(page, batch_id)
+    except Exception as _e:
+        write_log_entry(log_id, f"[dzen] _handle_already_publishable: {_e}", level='silent')
+
+
 _EXPECTED_ELEMENTS = [
-    ("captcha",       _detect_captcha,       _handle_captcha_element),
-    ("confirm",       _detect_confirm_dialog, _handle_confirm_element),
-    ("file_input",    _detect_file_input,     None),
+    ("captcha",             _detect_captcha,              _handle_captcha_element),
+    ("confirm",             _detect_confirm_dialog,       _handle_confirm_element),
+    ("already_publishable", _detect_already_publishable,  _handle_already_publishable),
+    ("file_input",          _detect_file_input,           None),
 ]
 
 
@@ -331,69 +361,78 @@ def _dismiss_unknown(page, log_id=None) -> None:
 
 def _set_comments_all_users(page, log_id, batch_id=None) -> None:
     """
-    Находит дропдаун «Кто может комментировать» и выставляет «Все пользователи».
-    Поддерживает нативный <select> и кастомные combobox/button дропдауны.
-    Все ошибки ловит внутри и не пробрасывает.
+    Выставляет «Все пользователи» в дропдауне «Кто может комментировать».
+
+    Стратегия 1 — JS evaluate: ищет любой <select> с опцией «Все пользователи»
+    и выставляет его через DOM (работает даже если элемент скрыт/перекрыт).
+    Стратегия 2 — Playwright select_option на видимом <select> рядом с меткой.
+    Стратегия 3 — кастомный combobox/button + клик по опции.
+    Все ошибки ловит внутри, не пробрасывает.
     """
     _TARGET = "Все пользователи"
     try:
-        # ── Стратегия 1: нативный <select> рядом с меткой ────────────────
-        # Дзен использует <select> для этого дропдауна.
+        # ── Стратегия 1: evaluate() — самый надёжный путь ────────────────
+        # Находит <select> с нужной опцией через JS и выставляет значение напрямую.
+        done = page.evaluate("""(target) => {
+            const selects = Array.from(document.querySelectorAll('select'));
+            for (const sel of selects) {
+                const opts = Array.from(sel.options);
+                const idx  = opts.findIndex(o => o.text.includes(target));
+                if (idx < 0) continue;
+                if (sel.options[sel.selectedIndex].text.includes(target)) return 'already';
+                sel.selectedIndex = idx;
+                sel.dispatchEvent(new Event('change', {bubbles: true}));
+                sel.dispatchEvent(new Event('input',  {bubbles: true}));
+                return 'done';
+            }
+            return 'not_found';
+        }""", _TARGET)
+
+        if done == 'already':
+            write_log_entry(log_id, "Дзен: Комментарии уже «Все пользователи».", level='silent')
+            _snap(page, batch_id)
+            return
+        if done == 'done':
+            write_log_entry(log_id, "Дзен: Комментарии выставлены «Все пользователи» (JS).")
+            _snap(page, batch_id)
+            return
+
+        write_log_entry(log_id, "[dzen] JS-evaluate не нашёл select с нужной опцией.", level='silent')
+
+        # ── Стратегия 2: Playwright select_option ─────────────────────────
         native_sel = (
             "label:has-text('Кто может комментировать') ~ select, "
-            "label:has-text('Кто может комментировать') + select, "
-            ":text('Кто может комментировать') ~ select"
+            "label:has-text('Кто может комментировать') + select"
         )
         native = page.locator(native_sel).first
         native_found = False
         try:
-            native.wait_for(state="attached", timeout=5_000)
+            native.wait_for(state="attached", timeout=4_000)
             native_found = True
         except Exception:
             pass
 
         if native_found:
-            current = native.evaluate("el => el.options[el.selectedIndex]?.text || ''")
-            if _TARGET in current:
-                write_log_entry(log_id, "Дзен: Комментарии уже «Все пользователи».", level='silent')
-                _snap(page, batch_id)
-                return
             try:
                 native.select_option(label=_TARGET)
-                write_log_entry(log_id, "Дзен: Комментарии выставлены «Все пользователи» (select).")
+                write_log_entry(log_id, "Дзен: Комментарии выставлены «Все пользователи» (select_option).")
                 _snap(page, batch_id)
                 return
             except Exception as _e:
                 write_log_entry(log_id, f"[dzen] select_option не сработал: {_e}", level='silent')
 
-        # ── Стратегия 2: кастомный combobox / button рядом с меткой ─────
+        # ── Стратегия 3: кастомный combobox / button ──────────────────────
         trigger_sel = (
             "[role='combobox']:near(:text('Кто может комментировать')), "
-            "button:near(:text('Кто может комментировать')), "
-            "label:has-text('Кто может комментировать') ~ [role='combobox'], "
-            "label:has-text('Кто может комментировать') ~ button"
+            "button:near(:text('Кто может комментировать'))"
         )
         trigger = page.locator(trigger_sel).first
         found = False
         try:
-            trigger.wait_for(state="visible", timeout=4_000)
+            trigger.wait_for(state="visible", timeout=3_000)
             found = True
         except Exception:
             pass
-
-        if not found:
-            # Fallback по тексту текущего значения
-            fallback_sel = (
-                "select:has-text('Подписчик'), "
-                "[role='combobox']:has-text('Подписчик'), "
-                "button:has-text('Подписчик')"
-            )
-            trigger = page.locator(fallback_sel).first
-            try:
-                trigger.wait_for(state="visible", timeout=3_000)
-                found = True
-            except Exception:
-                pass
 
         if not found:
             write_log_entry(log_id, "Дзен: Дропдаун комментариев не найден — продолжаю.", level='silent')
@@ -407,14 +446,11 @@ def _set_comments_all_users(page, log_id, batch_id=None) -> None:
 
         trigger.click()
         page.wait_for_timeout(500)
-
-        option_sel = (
+        option = page.locator(
             "[role='option']:has-text('Все пользователи'), "
             "li:has-text('Все пользователи'), "
-            "div[role='option']:has-text('Все пользователи'), "
-            "option:has-text('Все пользователи')"
-        )
-        option = page.locator(option_sel).first
+            "div[role='option']:has-text('Все пользователи')"
+        ).first
         try:
             option.wait_for(state="visible", timeout=5_000)
             option.click()
