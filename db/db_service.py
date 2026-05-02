@@ -123,6 +123,7 @@ def db_get_monitor():
                 ) b
                 LEFT JOIN log_entries le
                     ON  le.log_id IS NULL
+                    AND le.level != 'silent'
                     AND le.created_at <  b.date_begin
                     AND le.created_at >= COALESCE(b.date_end, '-infinity'::timestamptz)
                 GROUP BY b.id, b.date_begin, b.date_end
