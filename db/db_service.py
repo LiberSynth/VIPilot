@@ -131,6 +131,41 @@ def db_get_monitor():
             )
             sys_flag_rows = cur.fetchall()
 
+            cur.execute(
+                """
+                SELECT b.id AS batch_id, le.message, le.level, le.created_at
+                FROM (
+                    SELECT id,
+                           created_at AS date_begin,
+                           LEAD(created_at) OVER (ORDER BY created_at DESC, id DESC) AS date_end
+                    FROM batches
+                    UNION ALL
+                    SELECT NULL::uuid, 'infinity'::timestamptz, MAX(created_at)
+                    FROM batches
+                ) b
+                JOIN log_entries le
+                    ON  le.log_id IS NULL
+                    AND le.created_at <  b.date_begin
+                    AND le.created_at >= COALESCE(b.date_end, '-infinity'::timestamptz)
+                ORDER BY le.created_at DESC, le.id DESC
+                """
+            )
+            orphan_rows = cur.fetchall()
+
+    orphans_by_batch: dict = {}
+    orphans_top: list = []
+    for r in orphan_rows:
+        bid_o, msg_o, lvl_o, at_o = r[0], r[1], r[2], r[3]
+        entry_o = {
+            "message":    msg_o,
+            "level":      lvl_o,
+            "created_at": at_o.isoformat() if at_o else None,
+        }
+        if bid_o is None:
+            orphans_top.append(entry_o)
+        else:
+            orphans_by_batch.setdefault(str(bid_o), []).append(entry_o)
+
     has_system_map = {}
     has_system_top = None
     for r in sys_flag_rows:
@@ -139,9 +174,11 @@ def db_get_monitor():
             "has_system_before": has_before,
             "orphan_count":      count,
             "orphan_min_at":     min_at.isoformat() if min_at else None,
+            "orphan_entries":    orphans_by_batch.get(str(bid) if bid else "", []),
         }
         if bid is None:
             if has_before:
+                entry["orphan_entries"] = orphans_top
                 has_system_top = entry
         else:
             has_system_map[str(bid)] = entry
@@ -164,6 +201,7 @@ def db_get_monitor():
                 "has_system_before": False,
                 "orphan_count":      0,
                 "orphan_min_at":     None,
+                "orphan_entries":    [],
             }),
         }
         for r in batch_rows

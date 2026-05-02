@@ -281,9 +281,10 @@
     '</div>';
   }
 
-  function renderSysGroup(items, posKey, dateBefore, dateAfter, orphanCount, orphanMinAt) {
+  function renderSysGroup(items, posKey, dateBefore, dateAfter, orphanCount, orphanMinAt, orphans) {
     const key      = posKey || '';
-    const n        = (orphanCount != null) ? orphanCount : items.length;
+    const orphList = orphans || [];
+    const n        = (orphanCount != null) ? orphanCount : (items.length + orphList.length);
     const headTime = orphanMinAt || (items.length > 0 ? items[items.length - 1].created_at : null);
     const sub      = n > 0 ? ('Событий ' + n) : '…';
 
@@ -297,7 +298,7 @@
           '<span class="monitor-syslog-chevron">▼</span>' +
         '</div>' +
       '</div>';
-    }).join('');
+    }).join('') + _renderOrphanRows(orphList);
 
     const sysActions =
       '<div class="monitor-hdr-actions-always" onclick="event.stopPropagation()">' +
@@ -354,6 +355,7 @@
       groups[i]._dateAfter    = nextBatch ? nextBatch.created_at  : null;
       groups[i]._orphanCount  = prevBatch ? (prevBatch.orphan_count  || 0)    : 0;
       groups[i]._orphanMinAt  = prevBatch ? (prevBatch.orphan_min_at || null) : null;
+      groups[i]._orphans      = prevBatch ? (prevBatch.orphan_entries || []) : [];
     }
 
     // Вставляем placeholder-sysgroup там, где has_system_before=true, но sysgroup из system-логов нет
@@ -378,6 +380,7 @@
           _dateAfter:    nextBatch2 ? nextBatch2.created_at  : null,
           _orphanCount:  groups[i].data.orphan_count  || 0,
           _orphanMinAt:  groups[i].data.orphan_min_at || null,
+          _orphans:      groups[i].data.orphan_entries || [],
         },
       });
     }
@@ -399,6 +402,7 @@
           _dateAfter:   firstBatch ? firstBatch.created_at  : null,
           _orphanCount: hasSystemTop.orphan_count  || 0,
           _orphanMinAt: hasSystemTop.orphan_min_at || null,
+          _orphans:     hasSystemTop.orphan_entries || [],
         });
       }
     }
@@ -417,10 +421,8 @@
   var _pubFrameFetching     = {};   // batchId → true (in-flight guard)
   var _lastRenderedHtml     = {};   // key → last rendered HTML string
   var _lastMonitorData      = null; // last full response from /api/monitor
-  var _sgPollers            = {};   // posKey → intervalId (active polling for open sysgroup)
   var _sysLogEntriesCache   = {};   // log_id → entries array (lazy)
   var _sysLogFetching       = {};   // log_id → true (in-flight guard)
-  var SG_POLL_INTERVAL_MS   = 5000;
 
   function getOpenState() {
     var sgkeys = {}, lids = {}, syslids = {};
@@ -454,19 +456,7 @@
     document.querySelectorAll('.monitor-sysgroup').forEach(function(el) {
       if (state.sgkeys[el.dataset.sgKey] && !_collapsedSgKeys[el.dataset.sgKey]) {
         el.classList.add('open');
-        if (!el.querySelector('.monitor-sysgroup-orphan-item')) {
-          _refreshSgOrphans(el);
-        }
-        _startSgPolling(el);
       }
-    });
-    // Стопаем поллеры для sysgroup, которых уже нет в DOM
-    var liveKeys = {};
-    document.querySelectorAll('.monitor-sysgroup').forEach(function(el) {
-      if (el.dataset.sgKey) liveKeys[el.dataset.sgKey] = true;
-    });
-    Object.keys(_sgPollers).forEach(function(k) {
-      if (!liveKeys[k]) _stopSgPolling(k);
     });
     document.querySelectorAll('.monitor-log-item').forEach(function(el) {
       if (state.lids && state.lids[el.dataset.lid] && !_collapsedLids[el.dataset.lid]) el.classList.add('open');
@@ -572,7 +562,7 @@
       newGroupMap[key] = g;
       newHtmlMap[key] = g.type === 'batch'
         ? renderBatch(g.data)
-        : renderSysGroup(g.items, g._posKey, g._dateBefore, g._dateAfter, g._orphanCount, g._orphanMinAt);
+        : renderSysGroup(g.items, g._posKey, g._dateBefore, g._dateAfter, g._orphanCount, g._orphanMinAt, g._orphans);
     });
 
     var oldEls = {};
@@ -603,6 +593,7 @@
       if (existing) {
         if (g.type === 'sysgroup') {
           _updateSgInPlace(existing, g);
+          _injectOrphansIntoSg(existing, g._orphans || []);
           _lastRenderedHtml[key] = newHtml;
           return existing;
         }
@@ -742,14 +733,6 @@
       });
   }
 
-  function _fetchOrphansFor(dateBefore, dateAfter) {
-    var params = [];
-    if (dateBefore) params.push('before=' + encodeURIComponent(dateBefore));
-    if (dateAfter)  params.push('after='  + encodeURIComponent(dateAfter));
-    var url = '/api/monitor/system-window-orphans' + (params.length ? '?' + params.join('&') : '');
-    return fetch(url).then(function(r) { return r.json(); }).then(function(d) { return d.entries || []; });
-  }
-
   function _renderOrphanRows(entries) {
     return entries.map(function(e) {
       var lvl = e.level || 'info';
@@ -783,36 +766,6 @@
     if (subEl   && subEl.textContent   !== newSub)   subEl.textContent   = newSub;
     if (g._dateBefore) sgEl.dataset.sgBefore = g._dateBefore; else delete sgEl.dataset.sgBefore;
     if (g._dateAfter)  sgEl.dataset.sgAfter  = g._dateAfter;  else delete sgEl.dataset.sgAfter;
-  }
-
-  function _refreshSgOrphans(sgEl) {
-    var before = sgEl.dataset.sgBefore || null;
-    var after  = sgEl.dataset.sgAfter || null;
-    return _fetchOrphansFor(before, after).then(function(entries) {
-      var liveEl = document.querySelector('.monitor-sysgroup[data-sg-key="' + sgEl.dataset.sgKey + '"]');
-      if (liveEl) _injectOrphansIntoSg(liveEl, entries);
-      return entries;
-    }).catch(function() { return []; });
-  }
-
-  function _startSgPolling(sgEl) {
-    var key = sgEl.dataset.sgKey;
-    if (!key || _sgPollers[key]) return;
-    _sgPollers[key] = setInterval(function() {
-      var el = document.querySelector('.monitor-sysgroup[data-sg-key="' + key + '"]');
-      if (!el || !el.classList.contains('open')) {
-        _stopSgPolling(key);
-        return;
-      }
-      _refreshSgOrphans(el);
-    }, SG_POLL_INTERVAL_MS);
-  }
-
-  function _stopSgPolling(key) {
-    if (_sgPollers[key]) {
-      clearInterval(_sgPollers[key]);
-      delete _sgPollers[key];
-    }
   }
 
   function _applySysLogEntries(itemEl, lid, entries) {
@@ -871,15 +824,9 @@
     if (e.target.closest('.monitor-sysgroup-body')) return;
     el.classList.toggle('open');
     var key = el.dataset.sgKey;
-    if (el.classList.contains('open')) {
-      if (key) delete _collapsedSgKeys[key];
-      _refreshSgOrphans(el);
-      _startSgPolling(el);
-    } else {
-      if (key) {
-        _collapsedSgKeys[key] = true;
-        _stopSgPolling(key);
-      }
+    if (key) {
+      if (el.classList.contains('open')) delete _collapsedSgKeys[key];
+      else _collapsedSgKeys[key] = true;
     }
   };
 
@@ -921,22 +868,13 @@
   window.monitorSysCopy = function(btn) {
     const sg = btn.closest('.monitor-sysgroup');
     if (!sg) return;
-    if (sg.classList.contains('open')) {
-      var lines = [];
-      sg.querySelectorAll('.monitor-sysgroup-orphan-item').forEach(function(row) {
-        const ts  = row.querySelector('.monitor-sysgroup-ts')  ? row.querySelector('.monitor-sysgroup-ts').textContent.trim()  : '';
-        const msg = row.querySelector('.monitor-sysgroup-msg') ? row.querySelector('.monitor-sysgroup-msg').textContent.trim() : '';
-        lines.push('[' + ts + '] ' + msg);
-      });
-      _monitorCopyText(lines.join('\n'), btn);
-      return;
-    }
-    _fetchOrphansFor(sg.dataset.sgBefore || null, sg.dataset.sgAfter || null).then(function(entries) {
-      var lines = entries.map(function(e) {
-        return '[' + fmtMsk(e.created_at) + '] ' + (e.message || '');
-      });
-      _monitorCopyText(lines.join('\n'), btn);
+    var lines = [];
+    sg.querySelectorAll('.monitor-sysgroup-orphan-item').forEach(function(row) {
+      const ts  = row.querySelector('.monitor-sysgroup-ts')  ? row.querySelector('.monitor-sysgroup-ts').textContent.trim()  : '';
+      const msg = row.querySelector('.monitor-sysgroup-msg') ? row.querySelector('.monitor-sysgroup-msg').textContent.trim() : '';
+      lines.push('[' + ts + '] ' + msg);
     });
+    _monitorCopyText(lines.join('\n'), btn);
   };
 
   window.monitorCopy = function(btn) {
