@@ -332,12 +332,41 @@ def _dismiss_unknown(page, log_id=None) -> None:
 def _set_comments_all_users(page, log_id, batch_id=None) -> None:
     """
     Находит дропдаун «Кто может комментировать» и выставляет «Все пользователи».
-    Если дропдаун не найден или уже выставлен нужное значение — логирует и продолжает.
+    Поддерживает нативный <select> и кастомные combobox/button дропдауны.
     Все ошибки ловит внутри и не пробрасывает.
     """
+    _TARGET = "Все пользователи"
     try:
-        # Ищем интерактивный триггер дропдауна рядом с меткой «Кто может комментировать».
-        # Приоритет: button/combobox-роль рядом с меткой, затем fallback по текущему значению.
+        # ── Стратегия 1: нативный <select> рядом с меткой ────────────────
+        # Дзен использует <select> для этого дропдауна.
+        native_sel = (
+            "label:has-text('Кто может комментировать') ~ select, "
+            "label:has-text('Кто может комментировать') + select, "
+            ":text('Кто может комментировать') ~ select"
+        )
+        native = page.locator(native_sel).first
+        native_found = False
+        try:
+            native.wait_for(state="attached", timeout=5_000)
+            native_found = True
+        except Exception:
+            pass
+
+        if native_found:
+            current = native.evaluate("el => el.options[el.selectedIndex]?.text || ''")
+            if _TARGET in current:
+                write_log_entry(log_id, "Дзен: Комментарии уже «Все пользователи».", level='silent')
+                _snap(page, batch_id)
+                return
+            try:
+                native.select_option(label=_TARGET)
+                write_log_entry(log_id, "Дзен: Комментарии выставлены «Все пользователи» (select).")
+                _snap(page, batch_id)
+                return
+            except Exception as _e:
+                write_log_entry(log_id, f"[dzen] select_option не сработал: {_e}", level='silent')
+
+        # ── Стратегия 2: кастомный combobox / button рядом с меткой ─────
         trigger_sel = (
             "[role='combobox']:near(:text('Кто может комментировать')), "
             "button:near(:text('Кто может комментировать')), "
@@ -345,21 +374,19 @@ def _set_comments_all_users(page, log_id, batch_id=None) -> None:
             "label:has-text('Кто может комментировать') ~ button"
         )
         trigger = page.locator(trigger_sel).first
-
         found = False
         try:
-            trigger.wait_for(state="visible", timeout=5_000)
+            trigger.wait_for(state="visible", timeout=4_000)
             found = True
         except Exception:
             pass
 
         if not found:
-            # Fallback: дропдаун скрыт за меткой — ищем по любому текущему значению в контейнере
+            # Fallback по тексту текущего значения
             fallback_sel = (
-                "[role='combobox']:has-text('комментир'), "
-                "button:has-text('комментир'), "
-                "[role='combobox']:has-text('пользовател'), "
-                "button:has-text('пользовател')"
+                "select:has-text('Подписчик'), "
+                "[role='combobox']:has-text('Подписчик'), "
+                "button:has-text('Подписчик')"
             )
             trigger = page.locator(fallback_sel).first
             try:
@@ -373,8 +400,8 @@ def _set_comments_all_users(page, log_id, batch_id=None) -> None:
             return
 
         current_text = trigger.text_content() or ""
-        if "Все пользователи" in current_text:
-            write_log_entry(log_id, "Дзен: Комментарии уже выставлены «Все пользователи».", level='silent')
+        if _TARGET in current_text:
+            write_log_entry(log_id, "Дзен: Комментарии уже «Все пользователи».", level='silent')
             _snap(page, batch_id)
             return
 
@@ -384,13 +411,14 @@ def _set_comments_all_users(page, log_id, batch_id=None) -> None:
         option_sel = (
             "[role='option']:has-text('Все пользователи'), "
             "li:has-text('Все пользователи'), "
-            "div[role='option']:has-text('Все пользователи')"
+            "div[role='option']:has-text('Все пользователи'), "
+            "option:has-text('Все пользователи')"
         )
         option = page.locator(option_sel).first
         try:
             option.wait_for(state="visible", timeout=5_000)
             option.click()
-            write_log_entry(log_id, "Дзен: Выставлены комментарии «Все пользователи».")
+            write_log_entry(log_id, "Дзен: Комментарии выставлены «Все пользователи» (custom).")
             _snap(page, batch_id)
         except Exception as _e:
             write_log_entry(log_id, "Дзен: Не удалось выбрать «Все пользователи» — продолжаю.", level='silent')
