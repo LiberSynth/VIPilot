@@ -183,7 +183,7 @@
     });
     order.forEach(function(pip) {
       map[pip].entries.sort(function(a, b) {
-        return (a.created_at || '').localeCompare(b.created_at || '');
+        return (b.created_at || '').localeCompare(a.created_at || '');
       });
     });
     return order.map(function(pip) { return map[pip]; });
