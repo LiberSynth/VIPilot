@@ -445,7 +445,7 @@
       // Мгновенно восстанавливаем кадр из кэша (без мигания после перерисовки DOM)
       if (_pubFrameCache[bid] && !img.src) {
         img.src = _pubFrameCache[bid];
-        img.parentNode.style.display = 'block';
+        img.parentNode.classList.add('has-frame');
       }
 
       // Новый кадр получаем только для активной публикации
@@ -471,7 +471,7 @@
           document.querySelectorAll('.monitor-pub-frame img[data-bid="' + bid + '"]')
             .forEach(function(el) {
               el.src = url;
-              el.parentNode.style.display = 'block';
+              el.parentNode.classList.add('has-frame');
             });
         })
         .catch(function() { _pubFrameFetching[bid] = false; });
