@@ -138,9 +138,6 @@ _CLIENTS = {
     'vkvideo': _call_vkvideo,
 }
 
-_BROWSER_SLUGS = {'dzen', 'rutube', 'vkvideo'}
-
-
 def _call_client(slug, method, batch_id, log_id, target, pub_title):
     """Диспетчеризует вызов клиента по реестру _CLIENTS. Возвращает True при успехе."""
     handler = _CLIENTS.get(slug)
@@ -175,6 +172,7 @@ def _build_steps(active_targets):
 
 def run(batch_id, log_id):
     snap = environment.snapshot()
+    ensure_playwright_chromium(log_id)
     batch = db_get_batch_by_id(batch_id)
     if not batch:
         db_log_update(log_id, "Батч не найден", "error")
@@ -252,9 +250,6 @@ def run(batch_id, log_id):
                 write_log_entry(log_id, fmt_id_msg("[publish] Батч {}: {}", batch_id, _msg), level='silent')
                 db_log_update(log_id, _msg, 'error')
                 raise AppException(batch_id, 'publish', _msg, log_id)
-
-    if any(slug in _BROWSER_SLUGS for slug, _, _ in steps):
-        ensure_playwright_chromium(log_id)
 
     target_names = ', '.join(t['name'] for t in active_targets)
 
