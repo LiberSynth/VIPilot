@@ -74,7 +74,7 @@ def db_get_monitor(batch_limit=50):
                                     SELECT 1 FROM log_entries le
                                     WHERE le.log_id = l.id AND le.level != 'silent'
                                 )
-                            ) ORDER BY l.created_at, l.id
+                            ) ORDER BY l.created_at DESC, l.id DESC
                         ) FILTER (WHERE l.id IS NOT NULL),
                         '[]'::json
                     ) AS logs,
