@@ -96,6 +96,10 @@ def publish(
 
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
+        try:
+            _get_browser("rutube").stop()
+        except Exception:
+            pass
 
     write_log_entry(log_id, "Рутьюб: видео опубликовано успешно")
     return True

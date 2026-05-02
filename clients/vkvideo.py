@@ -106,6 +106,10 @@ def publish(
 
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
+        try:
+            _get_browser("vkvideo").stop()
+        except Exception:
+            pass
 
     write_log_entry(log_id, "VK Видео: клип опубликован успешно")
     return {"ok": True, "clip_url": _state["clip_url"]}

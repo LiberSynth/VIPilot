@@ -95,6 +95,10 @@ def publish(
 
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
+        try:
+            _get_browser("dzen").stop()
+        except Exception:
+            pass
 
     write_log_entry(log_id, "Дзен: видео опубликовано успешно")
     return True
