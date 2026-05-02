@@ -123,7 +123,6 @@ def db_get_monitor():
                 ) b
                 LEFT JOIN log_entries le
                     ON  le.log_id IS NULL
-                    AND le.level != 'silent'
                     AND le.created_at <  b.date_begin
                     AND le.created_at >= COALESCE(b.date_end, '-infinity'::timestamptz)
                 GROUP BY b.id, b.date_begin, b.date_end
@@ -191,7 +190,7 @@ def db_get_system_log_entries(log_id: str) -> list:
                 SELECT le.message, le.level, le.created_at
                 FROM log_entries le
                 JOIN log l ON l.id = le.log_id
-                WHERE le.log_id = %s AND le.level != 'silent' AND l.batch_id IS NULL
+                WHERE le.log_id = %s AND l.batch_id IS NULL
                 ORDER BY le.created_at DESC, le.id DESC
                 """,
                 (log_id,),
@@ -224,7 +223,7 @@ def db_get_system_window_orphans(
                 cur.execute(
                     """
                     SELECT message, level, created_at FROM log_entries
-                    WHERE log_id IS NULL AND level != 'silent'
+                    WHERE log_id IS NULL
                       AND created_at <  %s::timestamptz
                       AND created_at >= %s::timestamptz
                     ORDER BY created_at DESC, id DESC
@@ -235,7 +234,7 @@ def db_get_system_window_orphans(
                 cur.execute(
                     """
                     SELECT message, level, created_at FROM log_entries
-                    WHERE log_id IS NULL AND level != 'silent'
+                    WHERE log_id IS NULL
                       AND created_at < %s::timestamptz
                     ORDER BY created_at DESC, id DESC
                     """,
@@ -245,7 +244,7 @@ def db_get_system_window_orphans(
                 cur.execute(
                     """
                     SELECT message, level, created_at FROM log_entries
-                    WHERE log_id IS NULL AND level != 'silent'
+                    WHERE log_id IS NULL
                       AND created_at >= %s::timestamptz
                     ORDER BY created_at DESC, id DESC
                     """,
