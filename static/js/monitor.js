@@ -564,10 +564,12 @@
     }
 
     var newHtmlMap = {};
+    var newGroupMap = {};
     var newKeys    = [];
     groups.forEach(function(g) {
       var key = _groupKey(g);
       newKeys.push(key);
+      newGroupMap[key] = g;
       newHtmlMap[key] = g.type === 'batch'
         ? renderBatch(g.data)
         : renderSysGroup(g.items, g._posKey, g._dateBefore, g._dateAfter, g._orphanCount, g._orphanMinAt);
@@ -597,7 +599,13 @@
     var resolvedNodes = newKeys.map(function(key) {
       var existing = oldEls[key];
       var newHtml  = newHtmlMap[key];
+      var g        = newGroupMap[key];
       if (existing) {
+        if (g.type === 'sysgroup') {
+          _updateSgInPlace(existing, g);
+          _lastRenderedHtml[key] = newHtml;
+          return existing;
+        }
         if (_lastRenderedHtml[key] !== newHtml) {
           var isOpen = existing.classList.contains('open');
           var tmp = document.createElement('div');
@@ -605,15 +613,6 @@
           var newNode = tmp.firstChild;
           if (isOpen) {
             newNode.classList.add('open');
-            var oldItems = existing.querySelector('.monitor-sysgroup-items');
-            var newItems = newNode.querySelector('.monitor-sysgroup-items');
-            if (oldItems && newItems) {
-              Array.prototype.slice.call(oldItems.children).forEach(function(child) {
-                if (child.classList.contains('monitor-sysgroup-orphan-item')) {
-                  newItems.appendChild(child);
-                }
-              });
-            }
             newNode.querySelectorAll('.monitor-log-item').forEach(function(li) {
               if (prev.lids && prev.lids[li.dataset.lid]) li.classList.add('open');
             });
@@ -784,6 +783,19 @@
       }
     });
     if (entries.length) itemsEl.insertAdjacentHTML('beforeend', _renderOrphanRows(entries));
+  }
+
+  function _updateSgInPlace(sgEl, g) {
+    var n = (g._orphanCount != null) ? g._orphanCount : (g.items ? g.items.length : 0);
+    var headTime = g._orphanMinAt || (g.items && g.items.length > 0 ? g.items[g.items.length - 1].created_at : null);
+    var titleEl = sgEl.querySelector('.monitor-sysgroup-title');
+    var subEl   = sgEl.querySelector('.monitor-sysgroup-sub');
+    var newTitle = headTime ? fmtMsk(headTime) : '';
+    var newSub   = n > 0 ? ('Событий ' + n) : '…';
+    if (titleEl && titleEl.textContent !== newTitle) titleEl.textContent = newTitle;
+    if (subEl   && subEl.textContent   !== newSub)   subEl.textContent   = newSub;
+    if (g._dateBefore) sgEl.dataset.sgBefore = g._dateBefore; else delete sgEl.dataset.sgBefore;
+    if (g._dateAfter)  sgEl.dataset.sgAfter  = g._dateAfter;  else delete sgEl.dataset.sgAfter;
   }
 
   function _refreshSgOrphans(sgEl) {
