@@ -383,12 +383,11 @@ class PlatformBrowser:
                     fn_result = fn(page, ctx)
                     result = {"ok": True, "result": fn_result}
                 except Exception as e:
-                    import traceback
-                    traceback.print_exc()
                     result = {"ok": False, "error": str(e)}
                 finally:
                     try:
                         browser.close()
+                        write_log_entry(None, f"{tag} Браузер пайплайна закрыт.", level='silent')
                     except Exception:
                         pass
 

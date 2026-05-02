@@ -305,12 +305,42 @@ _EXPECTED_ELEMENTS = [
 
 
 def _dismiss_unknown(page, log_id=None) -> None:
-    """Закрывает неизвестный попап/диалог/хинт: Escape + стандартные кнопки закрытия."""
+    """Закрывает неизвестный попап/диалог/хинт: Escape + стандартные кнопки закрытия.
+
+    Порядок попыток:
+    1. JS evaluate — ищет visible кнопку × (или ×-эквивалент) внутри любого
+       floating/notice/hint/widget контейнера.  Работает для inline-уведомлений
+       Дзена, у которых нет стандартных aria-label.
+    2. Стандартные CSS-селекторы для модальных окон и диалогов.
+    3. Escape — резерв на случай модального оверлея.
+    """
+    # ── 1. JS evaluate: ищем кнопку-крестик в notification/hint контейнерах ─
     try:
-        page.keyboard.press("Escape")
+        page.evaluate("""() => {
+            const CLOSE_CHARS = new Set(['\u00d7', '\u2715', '\u2716', '\u2717', '\u00d7', 'x', 'X', '\u2613']);
+            const containers = document.querySelectorAll(
+                '[class*="notice"], [class*="Notice"], [class*="notification"], [class*="Notification"], '
+                + '[class*="hint"], [class*="Hint"], [class*="widget"], [class*="Widget"], '
+                + '[class*="popup"], [class*="Popup"], [class*="toast"], [class*="Toast"], '
+                + '[class*="overlay"], [class*="Overlay"]'
+            );
+            for (const c of containers) {
+                if (!c.offsetParent) continue;
+                const btns = c.querySelectorAll('button');
+                for (const btn of btns) {
+                    const t = (btn.textContent || '').trim();
+                    if (t.length <= 2 && (CLOSE_CHARS.has(t) || CLOSE_CHARS.has(t[0]))) {
+                        btn.click();
+                        return;
+                    }
+                }
+            }
+        }""")
         page.wait_for_timeout(200)
     except Exception:
         pass
+
+    # ── 2. CSS-селекторы для стандартных модальных окон ───────────────────
     for sel in [
         "[data-testid='modal-overlay']",
         "[class*='modal-close']",
@@ -329,6 +359,13 @@ def _dismiss_unknown(page, log_id=None) -> None:
         except Exception:
             pass
 
+    # ── 3. Escape — резерв ───────────────────────────────────────────────
+    try:
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(200)
+    except Exception:
+        pass
+
 
 def _set_comments_all_users(page, log_id, batch_id=None) -> None:
     """
@@ -342,6 +379,18 @@ def _set_comments_all_users(page, log_id, batch_id=None) -> None:
     """
     _TARGET = "Все пользователи"
     try:
+        # Прокручиваем форму вниз — «Кто может комментировать» может быть ниже
+        # области тегов и не попадать в DOM-поиск до скролла.
+        try:
+            page.evaluate("""() => {
+                const form = document.querySelector('form, [class*="editor"], [class*="Editor"]');
+                if (form) form.scrollTop = form.scrollHeight;
+                else window.scrollBy(0, 400);
+            }""")
+            page.wait_for_timeout(400)
+        except Exception:
+            pass
+
         # ── Стратегия 1: evaluate() — самый надёжный путь ────────────────
         # Находит <select> с нужной опцией через JS и выставляет значение напрямую.
         done = page.evaluate("""(target) => {
@@ -615,7 +664,10 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
 
     # ── Шаг 5.5: Выставляем «Все пользователи» в комментариях ───────────
     # _handle_popups НЕ вызываем — он нажмёт «Опубликовать после обработки»
-    # раньше времени (confirm в _EXPECTED_ELEMENTS). Только выставляем комментарии.
+    # раньше времени (confirm в _EXPECTED_ELEMENTS). Вместо него — только
+    # _dismiss_unknown: закрывает любые попапы (в т.ч. «Уже можно публиковать»)
+    # без обработки ожидаемых элементов.
+    _dismiss_unknown(page, log_id)
     _set_comments_all_users(page, log_id, batch_id)
 
     # ── Шаг 6: Публикуем ─────────────────────────────────────────────────
