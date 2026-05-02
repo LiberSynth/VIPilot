@@ -622,7 +622,9 @@
     overflow: hidden;
     background: #0d0d14;
     line-height: 0;
+    min-height: 200px;
   }
+  .monitor-log-item.open .monitor-pub-frame { display: block; }
   .monitor-pub-frame img {
     width: 100%;
     height: auto;
@@ -636,7 +638,6 @@
     padding: 4px 14px 4px 52px;
   }
   .monitor-log-item.open .monitor-entries { display: block; }
-  .monitor-log-item:not(.open) .monitor-pub-frame { display: none !important; }
   .monitor-entry-row {
     display: flex; gap: 8px; padding: 2px 0;
     border-bottom: 1px solid #0e0e18; font-size: 11px;
