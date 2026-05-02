@@ -49,6 +49,23 @@ def _m094_datetime_indexes(cur):
     cur.execute("CREATE INDEX IF NOT EXISTS idx_stories_created_at   ON stories   (created_at)")
 
 
+def _m095_misc_field_indexes(cur):
+    """Индексы по часто фильтруемым полям: grade, level, manual_changed, module,
+    order, pinned, pipeline, status, title."""
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_ai_models_grade       ON ai_models    (grade)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_movies_grade          ON movies       (grade)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_log_entries_level     ON log_entries  (level)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_stories_manual_changed ON stories     (manual_changed)")
+    cur.execute('CREATE INDEX IF NOT EXISTS idx_user_roles_module     ON user_roles   (module)')
+    cur.execute('CREATE INDEX IF NOT EXISTS idx_ai_models_order       ON ai_models    ("order")')
+    cur.execute('CREATE INDEX IF NOT EXISTS idx_targets_order         ON targets      ("order")')
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_stories_pinned        ON stories      (pinned)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_log_pipeline          ON log          (pipeline)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_log_status            ON log          (status)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_batches_title         ON batches      (title)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_stories_title         ON stories      (title)")
+
+
 # ---------------------------------------------------------------------------
 # Реестр миграций — добавляйте только в конец, никогда не переиспользуйте номера
 # ---------------------------------------------------------------------------
@@ -56,6 +73,7 @@ def _m094_datetime_indexes(cur):
 MIGRATIONS = [
     (93, _m093_log_entries_created_at_idx),
     (94, _m094_datetime_indexes),
+    (95, _m095_misc_field_indexes),
 ]
 
 
