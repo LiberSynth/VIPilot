@@ -103,7 +103,6 @@ def db_get_monitor(batch_limit=50):
                 FROM log l
                 WHERE l.batch_id IS NULL
                 ORDER BY l.created_at DESC, l.id DESC
-                LIMIT 100
                 """
             )
             sys_rows = cur.fetchall()
