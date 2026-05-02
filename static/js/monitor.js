@@ -442,25 +442,15 @@
       var bid = img.dataset.bid;
       if (!bid) return;
 
-      // Новый кадр получаем только для активной публикации
-      var logItem = img.closest('.monitor-log-item');
-      var isRunning = logItem && logItem.dataset.status === 'running';
-
-      // Мгновенно восстанавливаем кадр из кэша (без мигания после перерисовки DOM),
-      // но только пока публикация активна — после завершения скрываем кадр.
+      // Мгновенно восстанавливаем кадр из кэша (без мигания после перерисовки DOM)
       if (_pubFrameCache[bid] && !img.src) {
-        if (isRunning) {
-          img.src = _pubFrameCache[bid];
-          img.parentNode.style.display = 'block';
-        } else {
-          img.parentNode.style.display = 'none';
-        }
-      } else if (!isRunning && img.parentNode.style.display !== 'none') {
-        img.src = '';
-        img.parentNode.style.display = 'none';
+        img.src = _pubFrameCache[bid];
+        img.parentNode.style.display = 'block';
       }
 
-      if (!isRunning) return;
+      // Новый кадр получаем только для активной публикации
+      var logItem = img.closest('.monitor-log-item');
+      if (!logItem || logItem.dataset.status !== 'running') return;
 
       // Защита от дублирующих запросов при медленной сети
       if (_pubFrameFetching[bid]) return;

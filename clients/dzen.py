@@ -297,9 +297,10 @@ def _handle_confirm_element(page, log_id, batch_id) -> None:
 
 
 _EXPECTED_ELEMENTS = [
-    ("captcha",    _detect_captcha,        _handle_captcha_element),
-    ("confirm",    _detect_confirm_dialog, _handle_confirm_element),
-    ("file_input", _detect_file_input,     None),
+    ("captcha", _detect_captcha,        _handle_captcha_element),
+    ("confirm", _detect_confirm_dialog, _handle_confirm_element),
+    # file_input НЕ ДОБАВЛЯТЬ сюда — после set_files() input[type=file] остаётся в DOM
+    # на всё время публикации и блокирует вызов _dismiss_unknown для любых других попапов.
 ]
 
 
@@ -391,11 +392,9 @@ def _set_comments_all_users(page, log_id, batch_id=None) -> None:
             except Exception as _e:
                 write_log_entry(log_id, f"[dzen] select_option не сработал: {_e}", level='silent')
 
-        # ── Стратегия 3: кастомный combobox / button ──────────────────────
-        trigger_sel = (
-            "[role='combobox']:near(:text('Кто может комментировать')), "
-            "button:near(:text('Кто может комментировать'))"
-        )
+        # ── Стратегия 3: кастомный combobox ──────────────────────────────
+        # Не используем button:near() — он может попасть на × тегов рядом.
+        trigger_sel = "[role='combobox']:near(:text('Кто может комментировать'))"
         trigger = page.locator(trigger_sel).first
         found = False
         try:
@@ -615,16 +614,33 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
         write_log_entry(log_id, f"[dzen] Ошибка тегов: {_e}", level='silent')
 
     # ── Шаг 5.5: Выставляем «Все пользователи» в комментариях ───────────
-    # Попап может появиться в любой момент пока видео обрабатывается —
-    # закрываем перед взаимодействием с дропдауном.
-    _handle_popups(page, log_id, batch_id)
+    # _handle_popups НЕ вызываем — он нажмёт «Опубликовать после обработки»
+    # раньше времени (confirm в _EXPECTED_ELEMENTS). Только выставляем комментарии.
     _set_comments_all_users(page, log_id, batch_id)
 
     # ── Шаг 6: Публикуем ─────────────────────────────────────────────────
     write_log_entry(log_id, "Дзен: Нажимаю «Опубликовать».")
     pub_btn = page.locator("button:has-text('Опубликовать')").first
     pub_btn.wait_for(state="visible", timeout=180_000)
-    pub_btn.click(timeout=180_000)
+
+    # Перед кликом — проверяем на капчу и закрываем всё лишнее.
+    # Капча от VK блокирует pointer events на всей странице, поэтому
+    # она должна быть обработана ДО попытки клика.
+    _handle_popups(page, log_id, batch_id)
+
+    try:
+        pub_btn.click(timeout=30_000)
+    except Exception as _click_err:
+        write_log_entry(log_id, "[dzen] Обычный клик не прошёл — пробую JS-клик.", level='silent')
+        write_log_entry(log_id, f"[dzen] Причина: {_click_err}", level='silent')
+        try:
+            page.evaluate(
+                "() => { const b = document.querySelector('[data-testid=\"publish-btn\"]') "
+                "|| document.querySelector('button[type=\"submit\"]'); if(b) b.click(); }"
+            )
+        except Exception as _js_err:
+            write_log_entry(log_id, f"[dzen] JS-клик тоже не прошёл: {_js_err}", level='silent')
+
     # Ждём появления диалога подтверждения или капчи до 12 секунд.
     # Если за 12 сек ничего не появилось — продолжаем в шаг 7.
     _CONFIRM_OR_CAPTCHA_SEL = (
