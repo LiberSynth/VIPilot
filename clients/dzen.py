@@ -615,6 +615,9 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
         write_log_entry(log_id, f"[dzen] Ошибка тегов: {_e}", level='silent')
 
     # ── Шаг 5.5: Выставляем «Все пользователи» в комментариях ───────────
+    # Попап может появиться в любой момент пока видео обрабатывается —
+    # закрываем перед взаимодействием с дропдауном.
+    _handle_popups(page, log_id, batch_id)
     _set_comments_all_users(page, log_id, batch_id)
 
     # ── Шаг 6: Публикуем ─────────────────────────────────────────────────
