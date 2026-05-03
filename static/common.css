@@ -1011,3 +1011,4 @@
     border-radius: 4px;
   }
   .search-clear-btn:hover { color: #fff; background: rgba(255,255,255,0.08); }
+  .search-clear-btn[hidden] { display: none; }
