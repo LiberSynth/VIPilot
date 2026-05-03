@@ -487,6 +487,8 @@
   function refreshPublishFrames() {
     _evictPubFrameCache();
 
+    if (!document.querySelector('.monitor-log-item[data-status="running"] .monitor-pub-frame img[data-bid]')) return;
+
     document.querySelectorAll('.monitor-pub-frame img[data-bid]').forEach(function(img) {
       var bid = img.dataset.bid;
       if (!bid) return;
@@ -645,7 +647,6 @@
 
     restoreOpenState(prev);
     _firstRender = false;
-    refreshPublishFrames();
   }
 
   function refreshMonitor() {
@@ -1032,8 +1033,37 @@
     if (_openBid) _fetchAndInjectEntries(_openBid);
   }
 
-  refreshMonitor();
-  setInterval(refreshMonitor, 5000);
-  setInterval(refreshPublishFrames, 3000);
-  setInterval(refreshOpenBatchEntries, 5000);
+  var _timerMonitor           = null;
+  var _timerPublishFrames     = null;
+  var _timerOpenBatchEntries  = null;
+
+  if (!document.hidden) {
+    refreshMonitor();
+    _timerMonitor          = setInterval(refreshMonitor, 5000);
+    _timerPublishFrames    = setInterval(refreshPublishFrames, 10000);
+    _timerOpenBatchEntries = setInterval(refreshOpenBatchEntries, 5000);
+  }
+
+  function _pauseMonitorPolling() {
+    clearInterval(_timerMonitor);
+    clearInterval(_timerPublishFrames);
+    clearInterval(_timerOpenBatchEntries);
+    _timerMonitor = _timerPublishFrames = _timerOpenBatchEntries = null;
+  }
+
+  function _resumeMonitorPolling() {
+    if (_timerMonitor) return;
+    refreshMonitor();
+    _timerMonitor          = setInterval(refreshMonitor, 5000);
+    _timerPublishFrames    = setInterval(refreshPublishFrames, 10000);
+    _timerOpenBatchEntries = setInterval(refreshOpenBatchEntries, 5000);
+  }
+
+  document.addEventListener('visibilitychange', function() {
+    if (document.hidden) {
+      _pauseMonitorPolling();
+    } else {
+      _resumeMonitorPolling();
+    }
+  });
 })();
