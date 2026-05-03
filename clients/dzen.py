@@ -316,11 +316,45 @@ def _dismiss_unknown(page, log_id=None) -> None:
     """
     write_log_entry(log_id, "Дзен: Закрываю неизвестный попап/хинт.")
 
-    # ── 1. JS evaluate: ищем кнопку-крестик в notification/hint контейнерах ─
+    # ── 1. JS evaluate: ищем кнопку-крестик внутри контейнера хинта ────────
+    # Стратегия A: контент-based — ищем хинт по известному тексту и кликаем ×
+    #              строго внутри него (теговые кнопки × не попадают).
+    # Стратегия B: class-based  — запасная, для контейнеров с классами
+    #              notice/hint/popup и т.п.
     clicked_by_js = False
     try:
         clicked_by_js = page.evaluate("""() => {
-            const CLOSE_CHARS = new Set(['\u00d7', '\u2715', '\u2716', '\u2717', '\u00d7', 'x', 'X', '\u2613']);
+            const CLOSE_CHARS = new Set(['\u00d7', '\u2715', '\u2716', '\u2717', 'x', 'X', '\u2613']);
+            const HINT_TEXTS  = [
+                '\u0423\u0436\u0435 \u043c\u043e\u0436\u043d\u043e \u043f\u0443\u0431\u043b\u0438\u043a\u043e\u0432\u0430\u0442\u044c',
+                '\u0412\u0438\u0434\u0435\u043e \u043f\u043e\u044f\u0432\u0438\u0442\u0441\u044f',
+                '\u0414\u043e\u0431\u0440\u043e \u043f\u043e\u0436\u0430\u043b\u043e\u0432\u0430\u0442\u044c',
+            ];
+
+            function closeBtn(container) {
+                const btns = container.querySelectorAll('button');
+                for (const btn of btns) {
+                    const t = (btn.textContent || '').trim();
+                    if (t.length <= 2 && (CLOSE_CHARS.has(t) || CLOSE_CHARS.has(t[0]))) {
+                        btn.click();
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            // Стратегия A: ищем хинт-контейнер по тексту
+            const candidates = document.querySelectorAll('div, section, aside, article');
+            for (const el of candidates) {
+                if (!el.offsetParent) continue;
+                // Берём только «листовые» контейнеры — не body, не html, не весь page
+                if (el.children.length > 12) continue;
+                const text = el.textContent || '';
+                if (!HINT_TEXTS.some(t => text.includes(t))) continue;
+                if (closeBtn(el)) return true;
+            }
+
+            // Стратегия B: class-based — запасная
             const containers = document.querySelectorAll(
                 '[class*="notice"], [class*="Notice"], [class*="notification"], [class*="Notification"], '
                 + '[class*="hint"], [class*="Hint"], [class*="widget"], [class*="Widget"], '
@@ -329,15 +363,9 @@ def _dismiss_unknown(page, log_id=None) -> None:
             );
             for (const c of containers) {
                 if (!c.offsetParent) continue;
-                const btns = c.querySelectorAll('button');
-                for (const btn of btns) {
-                    const t = (btn.textContent || '').trim();
-                    if (t.length <= 2 && (CLOSE_CHARS.has(t) || CLOSE_CHARS.has(t[0]))) {
-                        btn.click();
-                        return true;
-                    }
-                }
+                if (closeBtn(c)) return true;
             }
+
             return false;
         }""")
         if clicked_by_js:
