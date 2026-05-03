@@ -304,58 +304,164 @@ _EXPECTED_ELEMENTS = [
 ]
 
 
-def _detect_unknown_popup(page) -> bool:
-    """Проверяет DOM на наличие неизвестного попапа/хинта.
+# JS-сниппет для поиска видимых попап-подобных контейнеров — структурно,
+# без хардкода текстов или классов конкретных хинтов Дзена.
+#
+# Контейнер считается «попапом», если выполнены ОБА условия:
+#   1. Он визуально «всплывающий»:
+#      role ∈ {dialog, alertdialog, tooltip, menu, listbox} ИЛИ
+#      computed position ∈ {fixed, absolute} с z-index ≥ 10 ИЛИ
+#      DOM-тег <dialog>.
+#   2. Внутри есть кликабельный «×» (button/символ ×, aria-label со словом
+#      close/закр, или класс с close/dismiss).
+# Возвращает массив таких контейнеров (в режиме collect=true) или результат
+# первого клика по × (collect=false).
+_POPUP_FIND_JS = r"""(opts) => {
+    const collect = !!(opts && opts.collect);
 
-    Ищет видимые контейнеры по двум признакам:
-    A. Текст известных хинтов («Уже можно публиковать», «Видео появится»,
-       «Добро пожаловать»).
-    B. Класс контейнера notice/hint/popup/toast/overlay/helper-tooltip и т.п.,
-       внутри которого есть кнопка-крестик ×.
-    Возвращает True, если такой контейнер найден.
+    const CLOSE_CHARS = new Set(['\u00d7', '\u2715', '\u2716', '\u2717', 'x', 'X', '\u2613']);
+    const POPUP_ROLES = new Set(['dialog', 'alertdialog', 'tooltip', 'menu', 'listbox']);
+
+    function isVisible(el) {
+        if (!el || !el.isConnected) return false;
+        const cs = getComputedStyle(el);
+        if (cs.display === 'none' || cs.visibility === 'hidden' || parseFloat(cs.opacity) === 0) return false;
+        const r = el.getBoundingClientRect();
+        if (r.width < 8 || r.height < 8) return false;
+        // Не используем offsetParent — для position:fixed он всегда null,
+        // что ломало детект фиксированных оверлеев.
+        if (r.bottom < 0 || r.right < 0) return false;
+        if (r.top > (window.innerHeight || 0) || r.left > (window.innerWidth || 0)) return false;
+        return true;
+    }
+
+    function isPopupLike(el) {
+        if (el.tagName === 'DIALOG' && el.open !== false) return true;
+        const role = (el.getAttribute('role') || '').toLowerCase();
+        if (POPUP_ROLES.has(role)) return true;
+        const cs = getComputedStyle(el);
+        if (cs.position === 'fixed' || cs.position === 'absolute') {
+            const z = parseInt(cs.zIndex, 10);
+            if (!isNaN(z) && z >= 10) return true;
+        }
+        return false;
+    }
+
+    // Защита от ложного закрытия рабочих UI: дропдаун выбора комментариев
+    // (`select-editor`) и его опции (`select-editor__option`) не закрываем —
+    // их обрабатывает _set_comments_all_users.
+    const PROTECTED_CLASS_TOKENS = ['select-editor'];
+    function isProtected(el) {
+        let cur = el;
+        while (cur && cur !== document.body) {
+            const cls = (cur.getAttribute && cur.getAttribute('class')) || '';
+            for (const tok of PROTECTED_CLASS_TOKENS) {
+                if (cls.indexOf(tok) !== -1) return true;
+            }
+            cur = cur.parentElement;
+        }
+        return false;
+    }
+
+    // Проверяет, что строка содержит слово close/dismiss как токен
+    // (а не подстроку — иначе ловит «disclosure», «enclosed» и т.п.).
+    function hasCloseToken(s) {
+        if (!s) return false;
+        const lower = s.toLowerCase();
+        const tokens = lower.split(/[\s_\-/]+/);
+        for (const t of tokens) {
+            if (t === 'close' || t === 'dismiss' || t === 'closebutton'
+                || t.startsWith('close') && t.length <= 12
+                || t.startsWith('dismiss') && t.length <= 14) {
+                // Доп. отсечь явные ложные срабатывания
+                if (t === 'closed' || t === 'closes' || t === 'closing') continue;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function findCloseBtn(container) {
+        // 1. aria-label со словом close/закр
+        const byAria = container.querySelectorAll(
+            'button[aria-label*="lose" i], [role="button"][aria-label*="lose" i], '
+            + 'button[aria-label*="закр" i], [role="button"][aria-label*="закр" i]'
+        );
+        for (const b of byAria) {
+            if (!isVisible(b)) continue;
+            const lbl = (b.getAttribute('aria-label') || '');
+            if (hasCloseToken(lbl) || lbl.toLowerCase().indexOf('закр') !== -1) return b;
+        }
+
+        // 2. кликабельный элемент с символом ×
+        const allBtns = container.querySelectorAll('button, [role="button"]');
+        for (const b of allBtns) {
+            if (!isVisible(b)) continue;
+            const t = (b.textContent || '').trim();
+            if (t.length <= 2 && (CLOSE_CHARS.has(t) || CLOSE_CHARS.has(t[0]))) return b;
+        }
+
+        // 3. кликабельный элемент с классом close/dismiss (по токену, не подстроке)
+        const clickable = container.querySelectorAll(
+            'button, [role="button"], [tabindex]'
+        );
+        for (const b of clickable) {
+            if (!isVisible(b)) continue;
+            if (b === container) continue;
+            const cls = b.getAttribute('class') || '';
+            if (!hasCloseToken(cls)) continue;
+            const r = b.getBoundingClientRect();
+            if (r.width > 80 || r.height > 80) continue;
+            return b;
+        }
+        return null;
+    }
+
+    // Кандидаты — все элементы с ролью или position fixed/absolute. Перебираем
+    // самые «глубокие» — клик по дочернему контейнеру предпочтителен, чтобы
+    // не закрыть главную модалку, в которой попап рендерится.
+    const all = Array.from(document.querySelectorAll('*'));
+    const popups = [];
+    for (const el of all) {
+        try {
+            if (!isVisible(el)) continue;
+            if (!isPopupLike(el)) continue;
+            if (isProtected(el)) continue;
+            const close = findCloseBtn(el);
+            if (!close) continue;
+            popups.push({el, close});
+        } catch (_) {}
+    }
+    if (popups.length === 0) return collect ? 0 : 'none';
+
+    // Сортируем: сначала меньшие по площади (наиболее «листовые» попапы),
+    // чтобы случайно не закрыть огромную форму-модалку.
+    popups.sort((a, b) => {
+        const ra = a.el.getBoundingClientRect();
+        const rb = b.el.getBoundingClientRect();
+        return (ra.width * ra.height) - (rb.width * rb.height);
+    });
+
+    if (collect) return popups.length;
+
+    // Кликаем × у первого (самого маленького) попапа.
+    try {
+        popups[0].close.click();
+        return 'clicked';
+    } catch (_e) {
+        return 'click_failed';
+    }
+}"""
+
+
+def _detect_unknown_popup(page) -> bool:
+    """Возвращает True, если в DOM есть видимый попап-подобный контейнер с ×.
+
+    Структурный детект — без хардкода текстов или классов конкретных хинтов:
+    role=dialog/tooltip/menu/alertdialog ИЛИ position fixed/absolute с z-index ≥ 10.
     """
     try:
-        return bool(page.evaluate("""() => {
-            const CLOSE_CHARS = new Set(['\u00d7', '\u2715', '\u2716', '\u2717', 'x', 'X', '\u2613']);
-            const HINT_TEXTS  = [
-                '\u0423\u0436\u0435 \u043c\u043e\u0436\u043d\u043e \u043f\u0443\u0431\u043b\u0438\u043a\u043e\u0432\u0430\u0442\u044c',
-                '\u0412\u0438\u0434\u0435\u043e \u043f\u043e\u044f\u0432\u0438\u0442\u0441\u044f',
-                '\u0414\u043e\u0431\u0440\u043e \u043f\u043e\u0436\u0430\u043b\u043e\u0432\u0430\u0442\u044c',
-            ];
-
-            function hasCloseBtn(container) {
-                const btns = container.querySelectorAll('button');
-                for (const btn of btns) {
-                    const t = (btn.textContent || '').trim();
-                    if (t.length <= 2 && (CLOSE_CHARS.has(t) || CLOSE_CHARS.has(t[0]))) return true;
-                }
-                return false;
-            }
-
-            // A. По тексту хинта
-            const candidates = document.querySelectorAll('div, section, aside, article');
-            for (const el of candidates) {
-                if (!el.offsetParent) continue;
-                if (el.children.length > 12) continue;
-                const text = el.textContent || '';
-                if (HINT_TEXTS.some(t => text.includes(t))) return true;
-            }
-
-            // B. По классу контейнера + наличие × внутри
-            const containers = document.querySelectorAll(
-                '[class*="helper-tooltip"], '
-                + '[class*="notice"], [class*="Notice"], [class*="notification"], [class*="Notification"], '
-                + '[class*="hint"], [class*="Hint"], [class*="widget"], [class*="Widget"], '
-                + '[class*="popup"], [class*="Popup"], [class*="toast"], [class*="Toast"], '
-                + '[class*="overlay"], [class*="Overlay"]'
-            );
-            for (const c of containers) {
-                if (!c.offsetParent) continue;
-                if (hasCloseBtn(c)) return true;
-            }
-
-            return false;
-        }"""))
+        return bool(page.evaluate(_POPUP_FIND_JS, {"collect": True}))
     except Exception:
         return False
 
@@ -364,13 +470,11 @@ def _dismiss_unknown(page, log_id=None) -> None:
     """Закрывает неизвестный попап/диалог/хинт — но только если он реально есть.
 
     Алгоритм:
-    0. Детектирует наличие неизвестного попапа в DOM. Если ничего не найдено —
-       выходит без действий (никакого Escape вслепую — иначе можно закрыть
-       полезное окно).
-    1. JS-клик по × строго внутри контейнера хинта/попапа.
-    2. CSS-селекторы кнопок закрытия — резерв.
-    3. Escape — последний резерв, только если предыдущие шаги не сработали
-       и попап всё ещё в DOM.
+    0. Детектирует попап структурно (без знания конкретных текстов/классов).
+       Если не найден — выходит молча, ничего не нажимает.
+    1. JS-клик по × строго внутри найденного попап-контейнера.
+    2. Повторяет до 3 раз — попапов может быть несколько подряд.
+    3. Если после 3 попыток попап всё ещё в DOM — пишет warn-лог.
     """
     if not _detect_unknown_popup(page):
         write_log_entry(log_id, "[dzen] _dismiss_unknown: попап не обнаружен — пропускаю.", level='silent')
@@ -378,107 +482,21 @@ def _dismiss_unknown(page, log_id=None) -> None:
 
     write_log_entry(log_id, "Дзен: Обнаружен неизвестный попап/хинт, закрываю.")
 
-    # ── 1. JS-клик по × внутри контейнера хинта ───────────────────────────
-    clicked_by_js = False
-    try:
-        clicked_by_js = page.evaluate("""() => {
-            const CLOSE_CHARS = new Set(['\u00d7', '\u2715', '\u2716', '\u2717', 'x', 'X', '\u2613']);
-            const HINT_TEXTS  = [
-                '\u0423\u0436\u0435 \u043c\u043e\u0436\u043d\u043e \u043f\u0443\u0431\u043b\u0438\u043a\u043e\u0432\u0430\u0442\u044c',
-                '\u0412\u0438\u0434\u0435\u043e \u043f\u043e\u044f\u0432\u0438\u0442\u0441\u044f',
-                '\u0414\u043e\u0431\u0440\u043e \u043f\u043e\u0436\u0430\u043b\u043e\u0432\u0430\u0442\u044c',
-            ];
-
-            function closeBtn(container) {
-                const btns = container.querySelectorAll('button');
-                for (const btn of btns) {
-                    const t = (btn.textContent || '').trim();
-                    if (t.length <= 2 && (CLOSE_CHARS.has(t) || CLOSE_CHARS.has(t[0]))) {
-                        btn.click();
-                        return true;
-                    }
-                }
-                return false;
-            }
-
-            // A. Контейнер хинта по известному тексту
-            const candidates = document.querySelectorAll('div, section, aside, article');
-            for (const el of candidates) {
-                if (!el.offsetParent) continue;
-                if (el.children.length > 12) continue;
-                const text = el.textContent || '';
-                if (!HINT_TEXTS.some(t => text.includes(t))) continue;
-                if (closeBtn(el)) return true;
-            }
-
-            // B. Контейнер по классу
-            const containers = document.querySelectorAll(
-                '[class*="helper-tooltip"], '
-                + '[class*="notice"], [class*="Notice"], [class*="notification"], [class*="Notification"], '
-                + '[class*="hint"], [class*="Hint"], [class*="widget"], [class*="Widget"], '
-                + '[class*="popup"], [class*="Popup"], [class*="toast"], [class*="Toast"], '
-                + '[class*="overlay"], [class*="Overlay"]'
-            );
-            for (const c of containers) {
-                if (!c.offsetParent) continue;
-                if (closeBtn(c)) return true;
-            }
-
-            return false;
-        }""")
-        page.wait_for_timeout(200)
-        write_log_entry(log_id, f"[dzen] _dismiss_unknown: JS-клик → {clicked_by_js}", level='silent')
-    except Exception as _e:
-        write_log_entry(log_id, f"[dzen] _dismiss_unknown: JS-evaluate упал: {_e}", level='silent')
-
-    # Если JS закрыл и попапа больше нет — выходим, не дёргаем CSS/Escape.
-    if clicked_by_js and not _detect_unknown_popup(page):
-        write_log_entry(log_id, "Дзен: Неизвестный попап/хинт закрыт (JS).")
-        return
-
-    # ── 2. CSS-селекторы кнопок закрытия ──────────────────────────────────
-    _css_clicked = False
-    for sel in [
-        "[class*='helper-tooltip__closeButton']",
-        "[data-testid='modal-overlay']",
-        "[class*='modal-close']",
-        "[class*='modalClose']",
-        "button[aria-label*='lose']",
-        "button[aria-label*='закр']",
-        "dialog button",
-        "[class*='close'][class*='button']",
-    ]:
+    for _attempt in range(3):
         try:
-            btn = page.locator(sel).first
-            if btn.is_visible(timeout=300):
-                btn.click()
-                write_log_entry(log_id, f"[dzen] _dismiss_unknown: CSS-клик по {sel!r}.", level='silent')
-                page.wait_for_timeout(200)
-                _css_clicked = True
-                break
-        except Exception:
-            pass
+            result = page.evaluate(_POPUP_FIND_JS, {"collect": False})
+            write_log_entry(log_id, f"[dzen] _dismiss_unknown: попытка {_attempt + 1} → {result!r}", level='silent')
+        except Exception as _e:
+            write_log_entry(log_id, f"[dzen] _dismiss_unknown: JS-evaluate упал: {_e}", level='silent')
+            break
 
-    if _css_clicked and not _detect_unknown_popup(page):
-        write_log_entry(log_id, "Дзен: Неизвестный попап/хинт закрыт (CSS).")
-        return
+        page.wait_for_timeout(250)
 
-    # ── 3. Escape — последний резерв, только если попап всё ещё в DOM ─────
-    if not _detect_unknown_popup(page):
-        write_log_entry(log_id, "Дзен: Неизвестный попап/хинт закрыт.")
-        return
+        if not _detect_unknown_popup(page):
+            write_log_entry(log_id, "Дзен: Неизвестный попап/хинт закрыт.")
+            return
 
-    try:
-        page.keyboard.press("Escape")
-        write_log_entry(log_id, "[dzen] _dismiss_unknown: Escape нажат (попап всё ещё в DOM).", level='silent')
-        page.wait_for_timeout(200)
-    except Exception as _e:
-        write_log_entry(log_id, f"[dzen] _dismiss_unknown: Escape упал: {_e}", level='silent')
-
-    if _detect_unknown_popup(page):
-        write_log_entry(log_id, "Дзен: Не удалось закрыть неизвестный попап/хинт.", level='warn')
-    else:
-        write_log_entry(log_id, "Дзен: Неизвестный попап/хинт закрыт (Escape).")
+    write_log_entry(log_id, "Дзен: Не удалось закрыть неизвестный попап/хинт.", level='warn')
 
 
 def _set_comments_all_users(page, log_id, batch_id=None) -> None:
