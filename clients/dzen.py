@@ -319,7 +319,6 @@ _EXPECTED_ELEMENTS = [
 _POPUP_FIND_JS = r"""(opts) => {
     const collect = !!(opts && opts.collect);
 
-    const CLOSE_CHARS = new Set(['\u00d7', '\u2715', '\u2716', '\u2717', 'x', 'X', '\u2613']);
     const POPUP_ROLES = new Set(['dialog', 'alertdialog', 'tooltip', 'menu', 'listbox']);
 
     function isVisible(el) {
@@ -393,15 +392,7 @@ _POPUP_FIND_JS = r"""(opts) => {
             if (hasCloseToken(lbl) || lbl.toLowerCase().indexOf('закр') !== -1) return b;
         }
 
-        // 2. кликабельный элемент с символом ×
-        const allBtns = container.querySelectorAll('button, [role="button"]');
-        for (const b of allBtns) {
-            if (!isVisible(b)) continue;
-            const t = (b.textContent || '').trim();
-            if (t.length <= 2 && (CLOSE_CHARS.has(t) || CLOSE_CHARS.has(t[0]))) return b;
-        }
-
-        // 3. кликабельный элемент с классом close/dismiss (по токену, не подстроке)
+        // 2. кликабельный элемент с классом close/dismiss (по токену, не подстроке)
         const clickable = container.querySelectorAll(
             'button, [role="button"], [tabindex]'
         );
