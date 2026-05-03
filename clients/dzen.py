@@ -427,20 +427,35 @@ def _set_comments_all_users(page, log_id, batch_id=None) -> None:
             return
 
         # ── Стратегия 2: клик по триггеру select-editor, затем опция ────
-        # Класс триггера в бандле: video-editor--select-editor__trigger-*
-        trigger = page.locator("[class*='select-editor__trigger']").first
-        trigger_found = False
+        # На странице может быть несколько select-editor__trigger (разные настройки),
+        # поэтому фильтруем по тексту-метке «комментировать» в обёртке wrapperWithTitle.
+        # Если такой обёртки нет — берём триггер, чей текущий текст «Подписчики/Никто».
+        wrapper = page.locator(
+            "[class*='select-editor__wrapperWithTitle']:has-text('омментировать')"
+        ).first
+        trigger = None
         try:
-            trigger.wait_for(state="visible", timeout=4_000)
-            trigger_found = True
+            wrapper.wait_for(state="visible", timeout=4_000)
+            trigger = wrapper.locator("[class*='select-editor__trigger']").first
         except Exception:
-            pass
+            # Резерв: ищем любой триггер с текстом «Подписчики» / «Никто из пользователей»
+            candidates = page.locator("[class*='select-editor__trigger']")
+            n = candidates.count()
+            for i in range(n):
+                try:
+                    t = candidates.nth(i)
+                    txt = (t.inner_text() or "").strip()
+                    if any(s in txt for s in ("Подписчики", "Никто", _TARGET)):
+                        trigger = t
+                        break
+                except Exception:
+                    continue
 
-        if not trigger_found:
-            write_log_entry(log_id, "Дзен: select-editor__trigger не найден — продолжаю.", level='silent')
+        if trigger is None:
+            write_log_entry(log_id, "Дзен: select-editor__trigger «комментировать» не найден — пропускаю.", level='silent')
             return
 
-        current_text = trigger.inner_text() or ""
+        current_text = (trigger.inner_text() or "").strip()
         write_log_entry(log_id, f"[dzen] _set_comments: триггер найден, текущий: {current_text!r}", level='silent')
 
         if _TARGET in current_text:
@@ -448,23 +463,40 @@ def _set_comments_all_users(page, log_id, batch_id=None) -> None:
             _snap(page, batch_id)
             return
 
+        trigger.scroll_into_view_if_needed(timeout=2_000)
         trigger.click()
-        page.wait_for_timeout(400)
+        page.wait_for_timeout(500)
 
+        # Опции дропдауна — это `context-menu__item` (реальный класс из бандла).
         option = page.locator(
-            "[role='option']:has-text('Все пользователи'), "
-            "li:has-text('Все пользователи'), "
-            "div[role='option']:has-text('Все пользователи'), "
-            "*:has-text('Все пользователи'):visible"
+            f"[class*='context-menu__item']:has-text('{_TARGET}')"
         ).first
         try:
             option.wait_for(state="visible", timeout=5_000)
             option.click()
-            write_log_entry(log_id, "Дзен: Комментарии выставлены «Все пользователи» (trigger+option).")
-            _snap(page, batch_id)
         except Exception as _e:
-            write_log_entry(log_id, "Дзен: Не удалось выбрать «Все пользователи» — продолжаю.", level='silent')
+            write_log_entry(log_id, "Дзен: Опция «Все пользователи» не найдена/не кликнулась.", level='silent')
             write_log_entry(log_id, f"[dzen] Ошибка выбора опции: {_e}", level='silent')
+            return
+
+        # ── Верификация: триггер ДОЛЖЕН теперь содержать «Все пользователи» ──
+        page.wait_for_timeout(400)
+        try:
+            new_text = (trigger.inner_text() or "").strip()
+        except Exception:
+            new_text = ""
+        write_log_entry(log_id, f"[dzen] _set_comments: триггер ПОСЛЕ клика: {new_text!r}", level='silent')
+
+        if _TARGET in new_text:
+            write_log_entry(log_id, "Дзен: Комментарии выставлены «Все пользователи» (подтверждено).")
+            _snap(page, batch_id)
+        else:
+            write_log_entry(
+                log_id,
+                f"Дзен: НЕ УДАЛОСЬ выставить «Все пользователи» — триггер показывает {new_text!r}.",
+                level='warn',
+            )
+            _snap(page, batch_id)
     except Exception as _e:
         write_log_entry(log_id, "Дзен: Ошибка при настройке комментариев — продолжаю.", level='silent')
         write_log_entry(log_id, f"[dzen] Ошибка _set_comments_all_users: {_e}", level='silent')
