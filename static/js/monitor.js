@@ -1068,7 +1068,7 @@
   if (!document.hidden) {
     refreshMonitor();
     _timerMonitor          = setInterval(refreshMonitor, 5000);
-    _timerPublishFrames    = setInterval(refreshPublishFrames, 10000);
+    _timerPublishFrames    = setInterval(refreshPublishFrames, 2000);
     _timerOpenBatchEntries = setInterval(refreshOpenBatchEntries, 5000);
   }
 
@@ -1083,7 +1083,7 @@
     if (_timerMonitor) return;
     refreshMonitor();
     _timerMonitor          = setInterval(refreshMonitor, 5000);
-    _timerPublishFrames    = setInterval(refreshPublishFrames, 10000);
+    _timerPublishFrames    = setInterval(refreshPublishFrames, 2000);
     _timerOpenBatchEntries = setInterval(refreshOpenBatchEntries, 5000);
   }
 
