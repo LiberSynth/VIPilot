@@ -417,7 +417,34 @@ def _set_comments_all_users(page, log_id, batch_id=None) -> None:
             return
 
         # ── Кликаем триггер и ищем реальную опцию в выпавшем поповере ──
-        trigger.scroll_into_view_if_needed(timeout=2_000)
+        # Скроллим триггер К ВЕРХУ окна — иначе дропдаун открывается ниже
+        # и вылезает за viewport, Playwright не видит опции.
+        try:
+            page.evaluate(
+                """() => {
+                    const t = document.querySelector('[data-testid="select-trigger-button-comment"]');
+                    if (!t) return;
+                    t.scrollIntoView({block: 'start', behavior: 'instant'});
+                    // Доп. отступ сверху, чтобы дропдаун точно поместился ниже.
+                    const scroller = document.scrollingElement || document.documentElement;
+                    scroller.scrollTop = Math.max(0, scroller.scrollTop - 80);
+                    // Также прокручиваем ближайший внутренний скроллер модалки.
+                    let p = t.parentElement;
+                    while (p) {
+                        const cs = getComputedStyle(p);
+                        if (/(auto|scroll)/.test(cs.overflowY) && p.scrollHeight > p.clientHeight) {
+                            const r = t.getBoundingClientRect();
+                            const pr = p.getBoundingClientRect();
+                            p.scrollTop += (r.top - pr.top) - 80;
+                            break;
+                        }
+                        p = p.parentElement;
+                    }
+                }"""
+            )
+        except Exception:
+            pass
+        page.wait_for_timeout(300)
         trigger.click()
         page.wait_for_timeout(800)
 
