@@ -381,6 +381,9 @@ def _set_comments_all_users(page, log_id, batch_id=None) -> None:
     если не «Все пользователи», пишет WARN.
     """
     _TARGET = "Все пользователи"
+    # Из бандла video-editor: enum значений для <select> комментариев,
+    # `e.VISIBLE = "visible"` — это и есть «Все пользователи».
+    _TARGET_VALUE = "visible"
     write_log_entry(log_id, "Дзен: Выставляю «Все пользователи» в «Кто может комментировать».")
     try:
         # Скроллим вниз — контрол может быть ниже видимой области.
@@ -413,34 +416,61 @@ def _set_comments_all_users(page, log_id, batch_id=None) -> None:
             _snap(page, batch_id)
             return
 
-        trigger.scroll_into_view_if_needed(timeout=2_000)
-        trigger.click()
-        page.wait_for_timeout(500)
+        # ── Под кнопкой-триггером лежит настоящий <select> с <option value="visible">.
+        # Выставляем значение напрямую через нативный setter, чтобы React
+        # подхватил change-event (controlled component).
+        result = page.evaluate(
+            """({targetValue, targetText}) => {
+                const trigger = document.querySelector('[data-testid="select-trigger-button-comment"]');
+                if (!trigger) return {ok: false, reason: 'no_trigger'};
 
-        # Опция дропдауна — <li data-testid="menu-v2-item"> с нужным текстом.
-        option = page.locator(
-            f'li[data-testid="menu-v2-item"]:has-text("{_TARGET}")'
-        ).first
-        try:
-            option.wait_for(state="visible", timeout=5_000)
-            option.click()
-        except Exception as _e:
-            write_log_entry(log_id, "Дзен: Опция «Все пользователи» не найдена/не кликнулась.", level='warn')
-            write_log_entry(log_id, f"[dzen] Ошибка выбора опции: {_e}", level='silent')
-            # Закрываем дропдаун Esc, чтобы не мешал дальнейшим шагам.
-            try:
-                page.keyboard.press("Escape")
-            except Exception:
-                pass
+                // Поднимаемся вверх по DOM, ищем <select> рядом с триггером.
+                let node = trigger;
+                let sel = null;
+                for (let i = 0; i < 8 && node; i++) {
+                    sel = node.querySelector ? node.querySelector('select') : null;
+                    if (sel) break;
+                    node = node.parentElement;
+                }
+                if (!sel) return {ok: false, reason: 'no_select'};
+
+                const opts = Array.from(sel.options || []);
+                let idx = opts.findIndex(o => o.value === targetValue);
+                if (idx < 0) idx = opts.findIndex(o => (o.text || o.textContent || '').includes(targetText));
+                if (idx < 0) return {ok: false, reason: 'no_option', values: opts.map(o => o.value)};
+
+                if (sel.selectedIndex === idx) return {ok: true, reason: 'already', value: opts[idx].value};
+
+                // React 18 controlled <select>: используем нативный value setter,
+                // чтобы React увидел изменение через onChange.
+                const proto = window.HTMLSelectElement.prototype;
+                const setter = Object.getOwnPropertyDescriptor(proto, 'value').set;
+                setter.call(sel, opts[idx].value);
+                sel.dispatchEvent(new Event('change', {bubbles: true}));
+                sel.dispatchEvent(new Event('input',  {bubbles: true}));
+                return {ok: true, reason: 'done', value: opts[idx].value};
+            }""",
+            {"targetValue": _TARGET_VALUE, "targetText": _TARGET},
+        )
+
+        write_log_entry(log_id, f"[dzen] _set_comments: native-select → {result!r}", level='silent')
+
+        if not result.get("ok"):
+            write_log_entry(
+                log_id,
+                f"Дзен: Не удалось выставить «Все пользователи» — {result.get('reason')}.",
+                level='warn',
+            )
+            _snap(page, batch_id)
             return
 
-        # ── Верификация: триггер ДОЛЖЕН теперь содержать «Все пользователи» ──
+        # ── Верификация: триггер ДОЛЖЕН теперь показывать «Все пользователи» ──
         page.wait_for_timeout(400)
         try:
             new_text = (trigger.inner_text() or "").strip()
         except Exception:
             new_text = ""
-        write_log_entry(log_id, f"[dzen] _set_comments: триггер ПОСЛЕ клика: {new_text!r}", level='silent')
+        write_log_entry(log_id, f"[dzen] _set_comments: триггер ПОСЛЕ установки: {new_text!r}", level='silent')
 
         if _TARGET in new_text:
             write_log_entry(log_id, "Дзен: Комментарии выставлены «Все пользователи» (подтверждено).")
