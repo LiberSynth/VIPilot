@@ -24,7 +24,7 @@ from utils.utils import fmt_id_msg
 from routes.api import publication_file_name, hashtags
 
 
-_NAV_TIMEOUT  = 30_000   # ms — таймаут навигации
+_NAV_TIMEOUT  = 180_000  # ms — таймаут навигации (3 минуты)
 _UPLOAD_WAIT  = 180_000  # ms — ожидание завершения загрузки (до 3 минут)
 
 
