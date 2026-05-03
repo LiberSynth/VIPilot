@@ -379,6 +379,7 @@ def _dismiss_unknown(page, log_id=None) -> None:
     # ── 2. CSS-селекторы для стандартных модальных окон ───────────────────
     _css_clicked = False
     for sel in [
+        "[class*='helper-tooltip__closeButton']",  # хинт «Уже можно публиковать»
         "[data-testid='modal-overlay']",
         "[class*='modal-close']",
         "[class*='modalClose']",
