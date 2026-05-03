@@ -419,6 +419,7 @@
   var _firstRender   = true;
   var _pubFrameCache        = {};   // batchId → blob URL
   var _pubFrameFetching     = {};   // batchId → true (in-flight guard)
+  var _pubFrameVer          = {};   // batchId → version counter (для отбрасывания устаревших ответов)
   var _lastRenderedHtml     = {};   // key → last rendered HTML string
   var _lastMonitorData      = null; // last full response from /api/monitor
   var _sysLogEntriesCache   = {};   // log_id → entries array (lazy)
@@ -471,15 +472,28 @@
   }
 
   function _evictPubFrameCache() {
-    var inDom = {};
-    document.querySelectorAll('.monitor-pub-frame img[data-bid]').forEach(function(img) {
-      if (img.dataset.bid) inDom[img.dataset.bid] = true;
+    // Кадр считается «живым», только когда раздел Публикация и сам батч развёрнуты.
+    // Свёрнутый блок -> освобождаем blob и зачищаем src, чтобы не висел поллинг и память.
+    var alive = {};
+    document.querySelectorAll(
+      '.monitor-batch.open .monitor-log-item.open .monitor-pub-frame img[data-bid]'
+    ).forEach(function(img) {
+      if (img.dataset.bid) alive[img.dataset.bid] = true;
     });
-    Object.keys(_pubFrameCache).forEach(function(bid) {
-      if (!inDom[bid]) {
-        URL.revokeObjectURL(_pubFrameCache[bid]);
+    // Бампим версии для ВСЕХ известных bid'ов, не входящих в alive: даже если кэша нет,
+    // но висит in-flight запрос — его ответ будет отброшен по ver-mismatch.
+    var seen = {};
+    Object.keys(_pubFrameCache).forEach(function(b) { seen[b] = true; });
+    Object.keys(_pubFrameFetching).forEach(function(b) { seen[b] = true; });
+    Object.keys(_pubFrameVer).forEach(function(b) { seen[b] = true; });
+    Object.keys(seen).forEach(function(bid) {
+      if (!alive[bid]) {
+        _pubFrameVer[bid] = (_pubFrameVer[bid] || 0) + 1;
+        if (_pubFrameCache[bid]) URL.revokeObjectURL(_pubFrameCache[bid]);
         delete _pubFrameCache[bid];
         delete _pubFrameFetching[bid];
+        document.querySelectorAll('.monitor-pub-frame img[data-bid="' + bid + '"]')
+          .forEach(function(el) { el.removeAttribute('src'); });
       }
     });
   }
@@ -487,9 +501,13 @@
   function refreshPublishFrames() {
     _evictPubFrameCache();
 
-    if (!document.querySelector('.monitor-log-item[data-status="running"] .monitor-pub-frame img[data-bid]')) return;
+    if (!document.querySelector(
+      '.monitor-batch.open .monitor-log-item.open[data-status="running"] .monitor-pub-frame img[data-bid]'
+    )) return;
 
-    document.querySelectorAll('.monitor-pub-frame img[data-bid]').forEach(function(img) {
+    document.querySelectorAll(
+      '.monitor-batch.open .monitor-log-item.open .monitor-pub-frame img[data-bid]'
+    ).forEach(function(img) {
       var bid = img.dataset.bid;
       if (!bid) return;
 
@@ -505,6 +523,8 @@
       // Защита от дублирующих запросов при медленной сети
       if (_pubFrameFetching[bid]) return;
       _pubFrameFetching[bid] = true;
+      // Версия запроса: если к моменту ответа батч/лог свернули — ответ выкидываем
+      var ver = (_pubFrameVer[bid] = (_pubFrameVer[bid] || 0) + 1);
 
       // Preload-swap: старый кадр виден до тех пор, пока новый не загружен полностью
       fetch('/api/batch/' + bid + '/publish-frame?t=' + Date.now())
@@ -515,6 +535,11 @@
         .then(function(blob) {
           _pubFrameFetching[bid] = false;
           if (!blob) return;
+          // Stale-check: устарел или контейнер уже невидим — отбрасываем
+          if (_pubFrameVer[bid] !== ver) return;
+          if (!document.querySelector(
+            '.monitor-batch.open .monitor-log-item.open .monitor-pub-frame img[data-bid="' + bid + '"]'
+          )) return;
           if (_pubFrameCache[bid]) URL.revokeObjectURL(_pubFrameCache[bid]);
           var url = URL.createObjectURL(blob);
           _pubFrameCache[bid] = url;
@@ -799,6 +824,7 @@
       _openBid = bid || null;
       if (_openBid) _fetchAndInjectEntries(_openBid);
     }
+    _evictPubFrameCache();
   };
 
   window.monitorExpandAll = function(btn) {
@@ -819,6 +845,7 @@
       item.classList.remove('open');
       if (item.dataset.lid) _collapsedLids[item.dataset.lid] = true;
     });
+    _evictPubFrameCache();
   };
 
   window.monitorToggleSys = function(e, el) {
@@ -985,6 +1012,7 @@
         if (el.classList.contains('open')) delete _collapsedLids[lid];
         else _collapsedLids[lid] = true;
       }
+      _evictPubFrameCache();
     }
   };
 
