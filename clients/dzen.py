@@ -417,18 +417,19 @@ def _dismiss_unknown(page, log_id=None) -> None:
 
 def _set_comments_all_users(page, log_id, batch_id=None) -> None:
     """
-    Выставляет «Все пользователи» в дропдауне «Кто может комментировать».
+    Выставляет «Все» в дропдауне «Кто может комментировать».
 
-    Стратегия 1 — JS evaluate: ищет любой <select> с опцией «Все пользователи»
-    и выставляет его через DOM (работает даже если элемент скрыт/перекрыт).
-    Стратегия 2 — Playwright select_option на видимом <select> рядом с меткой.
-    Стратегия 3 — кастомный combobox/button + клик по опции.
+    Стратегия 1 — JS evaluate: находит <select class*='select-editor__select'>
+    (реальный класс из бандла видеоредактора Дзена) и выставляет первую опцию
+    с текстом «Все» через DOM (работает даже если элемент визуально скрыт).
+    Стратегия 2 — Playwright: кликает триггер-кнопку [class*='select-editor__trigger']
+    и выбирает опцию «Все» из открывшегося списка.
     Все ошибки ловит внутри, не пробрасывает.
     """
-    _TARGET = "Все пользователи"
+    _TARGET = "Все"
+    write_log_entry(log_id, "Дзен: Выставляю «Все» в «Кто может комментировать».")
     try:
-        # Прокручиваем форму вниз — «Кто может комментировать» может быть ниже
-        # области тегов и не попадать в DOM-поиск до скролла.
+        # Скроллим вниз — контрол может быть ниже видимой области.
         try:
             page.evaluate("""() => {
                 const form = document.querySelector('form, [class*="editor"], [class*="Editor"]');
@@ -439,92 +440,70 @@ def _set_comments_all_users(page, log_id, batch_id=None) -> None:
         except Exception:
             pass
 
-        # ── Стратегия 1: evaluate() — самый надёжный путь ────────────────
-        # Находит <select> с нужной опцией через JS и выставляет значение напрямую.
+        # ── Стратегия 1: JS evaluate через реальный класс select-editor ──
+        # Класс нативного <select> в бандле: video-editor--select-editor__select-*
         done = page.evaluate("""(target) => {
-            const selects = Array.from(document.querySelectorAll('select'));
-            for (const sel of selects) {
-                const opts = Array.from(sel.options);
-                const idx  = opts.findIndex(o => o.text.includes(target));
-                if (idx < 0) continue;
-                if (sel.options[sel.selectedIndex].text.includes(target)) return 'already';
-                sel.selectedIndex = idx;
-                sel.dispatchEvent(new Event('change', {bubbles: true}));
-                sel.dispatchEvent(new Event('input',  {bubbles: true}));
-                return 'done';
-            }
-            return 'not_found';
+            const sel = document.querySelector('[class*="select-editor__select"]');
+            if (!sel) return 'not_found';
+            const opts = Array.from(sel.options);
+            const idx  = opts.findIndex(o => o.text.includes(target));
+            if (idx < 0) return 'no_option';
+            if (sel.options[sel.selectedIndex].text.includes(target)) return 'already';
+            sel.selectedIndex = idx;
+            sel.dispatchEvent(new Event('change', {bubbles: true}));
+            sel.dispatchEvent(new Event('input',  {bubbles: true}));
+            return 'done';
         }""", _TARGET)
 
+        write_log_entry(log_id, f"[dzen] _set_comments: JS-evaluate → {done!r}", level='silent')
+
         if done == 'already':
-            write_log_entry(log_id, "Дзен: Комментарии уже «Все пользователи».", level='silent')
+            write_log_entry(log_id, "Дзен: Комментарии уже «Все».", level='silent')
             _snap(page, batch_id)
             return
         if done == 'done':
-            write_log_entry(log_id, "Дзен: Комментарии выставлены «Все пользователи» (JS).")
+            write_log_entry(log_id, "Дзен: Комментарии выставлены «Все» (JS select).")
             _snap(page, batch_id)
             return
 
-        write_log_entry(log_id, "[dzen] JS-evaluate не нашёл select с нужной опцией.", level='silent')
-
-        # ── Стратегия 2: Playwright select_option ─────────────────────────
-        native_sel = (
-            "label:has-text('Кто может комментировать') ~ select, "
-            "label:has-text('Кто может комментировать') + select"
-        )
-        native = page.locator(native_sel).first
-        native_found = False
+        # ── Стратегия 2: клик по триггеру select-editor, затем опция ────
+        # Класс триггера в бандле: video-editor--select-editor__trigger-*
+        trigger = page.locator("[class*='select-editor__trigger']").first
+        trigger_found = False
         try:
-            native.wait_for(state="attached", timeout=4_000)
-            native_found = True
+            trigger.wait_for(state="visible", timeout=4_000)
+            trigger_found = True
         except Exception:
             pass
 
-        if native_found:
-            try:
-                native.select_option(label=_TARGET)
-                write_log_entry(log_id, "Дзен: Комментарии выставлены «Все пользователи» (select_option).")
-                _snap(page, batch_id)
-                return
-            except Exception as _e:
-                write_log_entry(log_id, f"[dzen] select_option не сработал: {_e}", level='silent')
-
-        # ── Стратегия 3: кастомный combobox ──────────────────────────────
-        # Не используем button:near() — он может попасть на × тегов рядом.
-        trigger_sel = "[role='combobox']:near(:text('Кто может комментировать'))"
-        trigger = page.locator(trigger_sel).first
-        found = False
-        try:
-            trigger.wait_for(state="visible", timeout=3_000)
-            found = True
-        except Exception:
-            pass
-
-        if not found:
-            write_log_entry(log_id, "Дзен: Дропдаун комментариев не найден — продолжаю.", level='silent')
+        if not trigger_found:
+            write_log_entry(log_id, "Дзен: select-editor__trigger не найден — продолжаю.", level='silent')
             return
 
-        current_text = trigger.text_content() or ""
-        if _TARGET in current_text:
-            write_log_entry(log_id, "Дзен: Комментарии уже «Все пользователи».", level='silent')
+        current_text = trigger.inner_text() or ""
+        write_log_entry(log_id, f"[dzen] _set_comments: триггер найден, текущий: {current_text!r}", level='silent')
+
+        if _TARGET in current_text and "Подписч" not in current_text:
+            write_log_entry(log_id, "Дзен: Комментарии уже «Все».", level='silent')
             _snap(page, batch_id)
             return
 
         trigger.click()
-        page.wait_for_timeout(500)
+        page.wait_for_timeout(400)
+
         option = page.locator(
-            "[role='option']:has-text('Все пользователи'), "
-            "li:has-text('Все пользователи'), "
-            "div[role='option']:has-text('Все пользователи')"
+            "[role='option']:has-text('Все'), "
+            "li:has-text('Все'), "
+            "div[role='option']:has-text('Все')"
         ).first
         try:
             option.wait_for(state="visible", timeout=5_000)
             option.click()
-            write_log_entry(log_id, "Дзен: Комментарии выставлены «Все пользователи» (custom).")
+            write_log_entry(log_id, "Дзен: Комментарии выставлены «Все» (trigger+option).")
             _snap(page, batch_id)
         except Exception as _e:
-            write_log_entry(log_id, "Дзен: Не удалось выбрать «Все пользователи» — продолжаю.", level='silent')
-            write_log_entry(log_id, f"[dzen] Ошибка выбора варианта: {_e}", level='silent')
+            write_log_entry(log_id, "Дзен: Не удалось выбрать «Все» — продолжаю.", level='silent')
+            write_log_entry(log_id, f"[dzen] Ошибка выбора опции: {_e}", level='silent')
     except Exception as _e:
         write_log_entry(log_id, "Дзен: Ошибка при настройке комментариев — продолжаю.", level='silent')
         write_log_entry(log_id, f"[dzen] Ошибка _set_comments_all_users: {_e}", level='silent')
