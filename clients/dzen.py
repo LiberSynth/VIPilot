@@ -411,12 +411,16 @@ def _set_comments_all_users(page, log_id, batch_id=None) -> None:
         page.wait_for_timeout(200)
 
         trigger.click()
+        # Пауза, чтобы поповер успел отрендериться и навесить обработчики
+        # (по образцу проверенного rutube.py — без неё клик может «промахнуться»).
+        page.wait_for_timeout(500)
 
         # Опция: data-testid в точности равен тексту опции (см. _j в бандле).
         option = page.locator(f'[data-testid="{_TARGET}"]').first
         try:
             option.wait_for(state="visible", timeout=5_000)
             option.click()
+            page.wait_for_timeout(500)
         except Exception as _e:
             write_log_entry(
                 log_id,
