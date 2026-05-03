@@ -622,7 +622,7 @@
     overflow: hidden;
     background: #0d0d14;
     line-height: 0;
-    min-height: 200px;
+    aspect-ratio: 1280 / 720;
   }
   .monitor-log-item.open .monitor-pub-frame { display: block; }
   .monitor-pub-frame img {
