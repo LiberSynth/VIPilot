@@ -252,9 +252,7 @@ def db_get_movies_list(show_published=True, show_bad=True, for_approval=False, p
                 LEFT JOIN LATERAL (
                     SELECT bp.movie_id
                     FROM batches bp
-                    WHERE bp.movie_id = m.id
-                      AND (bp.status IN ('published', 'published_partially')
-                           OR bp.status LIKE '%%.published')
+                    WHERE bp.movie_id = m.id AND bp.status LIKE '%%published%%'
                     LIMIT 1
                 ) p ON TRUE
                 LEFT JOIN LATERAL (
