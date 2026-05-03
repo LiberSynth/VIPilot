@@ -259,7 +259,15 @@ def db_get_movies_list(show_published=True, show_bad=True, for_approval=False, p
                           )
                         ORDER BY b2.created_at DESC, b2.id DESC
                         LIMIT 1
-                    ) AS active_batch_id
+                    ) AS active_batch_id,
+                    (
+                        SELECT b4.story_id::text
+                        FROM batches b4
+                        JOIN stories s2 ON s2.id = b4.story_id
+                        WHERE b4.movie_id = m.id AND b4.story_id IS NOT NULL
+                        ORDER BY b4.created_at DESC, b4.id DESC
+                        LIMIT 1
+                    ) AS story_id
                 FROM movies m
                 LEFT JOIN ai_models vm ON vm.id = m.model_id
                 {where_clause}
@@ -275,6 +283,7 @@ def db_get_movies_list(show_published=True, show_bad=True, for_approval=False, p
             "model_name": row[4] or "",
             "published": bool(row[5]),
             "active_batch_id": row[6],
+            "story_id": row[7],
         }
         for row in rows
     ]

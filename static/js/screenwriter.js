@@ -194,6 +194,30 @@ var setDraftStoryFromRecord;
     _accordionList.setActiveId(id);
   };
 
+  window.openStoryInScreenwriter = function(storyId) {
+    if (!storyId) return;
+    if (typeof switchPanel === 'function') switchPanel('screenwriter');
+    var searchInput = document.getElementById('story-search-input');
+    if (searchInput && searchInput.value) {
+      searchInput.value = '';
+      var clearBtn = document.getElementById('story-search-clear');
+      if (clearBtn) clearBtn.hidden = true;
+    }
+    _activeStoryId = String(storyId);
+    var container = document.getElementById('stories-list');
+    if (!container) return;
+    container.innerHTML = '<div class="stories-loading">Загрузка...</div>';
+    fetch('/production/stories?' + getFilterParams())
+      .then(function(r) { return r.ok ? r.json() : []; })
+      .then(function(stories) {
+        renderStories(stories);
+        _accordionList.selectRow(String(storyId));
+      })
+      .catch(function() {
+        container.innerHTML = '<div class="stories-empty">Ошибка загрузки</div>';
+      });
+  };
+
   function _bindListButtons(container) {
     container.querySelectorAll('.story-pin-btn').forEach(function(btn) {
       btn.addEventListener('click', function(e) {

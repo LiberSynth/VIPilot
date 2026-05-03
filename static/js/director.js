@@ -117,6 +117,17 @@
       + '<polyline points="2,8 6,12 14,4"/></svg></span>';
   }
 
+  function _renderGoToStoryBtn(m) {
+    var disabled = !m.story_id;
+    var attrs = 'class="story-icon movie-goto-story-btn"'
+      + ' title="К сюжету"'
+      + (disabled ? ' disabled' : ' data-story-id="' + AccordionList.escapeHtml(m.story_id) + '"');
+    return '<button type="button" ' + attrs + '>'
+      + '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">'
+      + '<polyline points="10,3 4,8 10,13"/>'
+      + '</svg></button>';
+  }
+
   function _renderInfoBtn(m) {
     return '<button class="story-icon story-info-btn" data-copy="movie_id: ' + m.id + '" title="Инфо">'
       + '<svg viewBox="0 0 16 16" fill="none" stroke="#8888b0" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">'
@@ -150,7 +161,7 @@
       return titleHtml + modelLabel;
     },
     renderButtons: function(item) {
-      return _renderPublishedIcon(item) + _renderInfoBtn(item) + _renderMovieDeleteBtn(item);
+      return _renderPublishedIcon(item) + _renderGoToStoryBtn(item) + _renderInfoBtn(item) + _renderMovieDeleteBtn(item);
     },
     onExpand: function(item) {
       _stopActiveBatchPoll();
@@ -182,6 +193,17 @@
           btn.classList.add('copied');
           setTimeout(function() { btn.classList.remove('copied'); }, 2000);
         }).catch(function() {});
+      });
+    });
+    container.querySelectorAll('.movie-goto-story-btn').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        if (btn.disabled) return;
+        var storyId = btn.getAttribute('data-story-id');
+        if (!storyId) return;
+        if (typeof window.openStoryInScreenwriter === 'function') {
+          window.openStoryInScreenwriter(storyId);
+        }
       });
     });
     container.querySelectorAll('.movie-delete-btn').forEach(function(btn) {
