@@ -655,8 +655,24 @@ var setDraftStoryFromRecord;
   function initStoryClientFilter() {
     var input = document.getElementById('story-search-input');
     if (!input) return;
+    var clearBtn = document.getElementById('story-search-clear');
 
     var _debounce = null;
+
+    function _updateClearVisibility() {
+      if (clearBtn) clearBtn.hidden = !input.value;
+    }
+    _updateClearVisibility();
+
+    if (clearBtn) {
+      clearBtn.addEventListener('click', function() {
+        input.value = '';
+        _updateClearVisibility();
+        clearTimeout(_debounce);
+        input.focus();
+        if (typeof window.loadStoryList === 'function') window.loadStoryList();
+      });
+    }
 
     function _doSearch() {
       var q = input.value.trim().toLowerCase();
@@ -687,6 +703,7 @@ var setDraftStoryFromRecord;
     }
 
     input.addEventListener('input', function() {
+      _updateClearVisibility();
       clearTimeout(_debounce);
       _debounce = setTimeout(_doSearch, 400);
     });

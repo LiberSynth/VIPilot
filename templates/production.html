@@ -98,7 +98,10 @@
       </div>
       <div style="display:flex; gap:10px; align-items:flex-start; margin-top:7px; margin-bottom:10px">
         <div id="story-search-row" style="flex:1; min-width:0; align-self:flex-end">
-          <input type="text" id="story-search-input" placeholder="Фильтр по вхождению слов из введенного текста..." autocomplete="off" style="width:100%; box-sizing:border-box">
+          <div class="search-input-wrap">
+            <input type="text" id="story-search-input" placeholder="Фильтр по вхождению слов из введенного текста..." autocomplete="off">
+            <button type="button" id="story-search-clear" class="search-clear-btn" aria-label="Очистить" hidden>×</button>
+          </div>
         </div>
         <div style="flex-shrink:0; margin-left:auto; display:flex; flex-direction:column; gap:6px">
           <label class="sw-filter-row" for="filter-for-approval">
@@ -210,7 +213,10 @@
       </label>
       <div style="display:flex; gap:10px; align-items:flex-start; margin-bottom:10px">
         <div id="movie-search-row" style="flex:1; min-width:0; align-self:flex-end">
-          <input type="text" id="movie-search-input" placeholder="Фильтр по вхождению слов из введенного текста..." autocomplete="off" style="width:100%; box-sizing:border-box">
+          <div class="search-input-wrap">
+            <input type="text" id="movie-search-input" placeholder="Фильтр по вхождению слов из введенного текста..." autocomplete="off">
+            <button type="button" id="movie-search-clear" class="search-clear-btn" aria-label="Очистить" hidden>×</button>
+          </div>
         </div>
         <div style="flex-shrink:0; margin-left:auto; display:flex; flex-direction:column; gap:6px">
           <label class="sw-filter-row" for="movie-filter-for-approval">

@@ -980,3 +980,34 @@
   }
   #touch-tooltip.hidden { opacity: 0; }
 
+
+  /* ── Поле поиска с кнопкой "Очистить" ── */
+  .search-input-wrap {
+    position: relative;
+    width: 100%;
+  }
+  .search-input-wrap > input[type="text"] {
+    width: 100%;
+    box-sizing: border-box;
+    padding-right: 28px;
+  }
+  .search-clear-btn {
+    position: absolute;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    color: #888;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+  }
+  .search-clear-btn:hover { color: #fff; background: rgba(255,255,255,0.08); }
