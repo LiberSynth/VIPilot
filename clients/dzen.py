@@ -304,58 +304,85 @@ _EXPECTED_ELEMENTS = [
 ]
 
 
-# JS-сниппет для поиска видимых попап-подобных контейнеров — структурно,
-# без хардкода текстов или классов конкретных хинтов Дзена.
+# JS-сниппет: ищет кнопки закрытия хинтов/тултипов/нотификаций по комбинации
+# семантических классов. Кнопка считается close-кнопкой ХИНТА, если:
+#   1. Её собственный class содержит токен close/dismiss/closeButton.
+#   2. Она сама ИЛИ любой её предок имеет class с одним из popup-токенов:
+#      tooltip, hint, notice, notification, popup, toast, overlay, helper, hover.
+# Это совпадает с `helper-tooltip__closeButton` (и любым новым хинтом с
+# похожей семантикой), но НЕ совпадает с × главной модалки (`modal__close`,
+# `Publication-...`), которую закрывать нельзя.
 #
-# Контейнер считается «попапом», если выполнены ОБА условия:
-#   1. Он визуально «всплывающий»:
-#      role ∈ {dialog, alertdialog, tooltip, menu, listbox} ИЛИ
-#      computed position ∈ {fixed, absolute} с z-index ≥ 10 ИЛИ
-#      DOM-тег <dialog>.
-#   2. Внутри есть кликабельный «×» (button/символ ×, aria-label со словом
-#      close/закр, или класс с close/dismiss).
-# Возвращает массив таких контейнеров (в режиме collect=true) или результат
-# первого клика по × (collect=false).
+# Дополнительно: aria-label со словом close/закр/Скрыть тоже подходит, если
+# элемент находится внутри popup-маркера ИЛИ его размер ≤ 60×60 (типичный ×).
+#
+# Возвращает количество найденных кнопок (collect=true) или результат клика
+# по самой мелкой кнопке (collect=false): 'clicked' / 'click_failed' / 'none'.
 _POPUP_FIND_JS = r"""(opts) => {
     const collect = !!(opts && opts.collect);
 
-    const POPUP_ROLES = new Set(['dialog', 'alertdialog', 'tooltip', 'menu', 'listbox']);
+    const POPUP_TOKENS = new Set([
+        'tooltip', 'hint', 'notice', 'notification', 'popup',
+        'toast', 'overlay', 'helper', 'hover', 'callout', 'banner'
+    ]);
+    const PROTECTED_TOKENS = ['select-editor'];
 
     function isVisible(el) {
         if (!el || !el.isConnected) return false;
         const cs = getComputedStyle(el);
         if (cs.display === 'none' || cs.visibility === 'hidden' || parseFloat(cs.opacity) === 0) return false;
         const r = el.getBoundingClientRect();
-        if (r.width < 8 || r.height < 8) return false;
-        // Не используем offsetParent — для position:fixed он всегда null,
-        // что ломало детект фиксированных оверлеев.
+        if (r.width < 4 || r.height < 4) return false;
         if (r.bottom < 0 || r.right < 0) return false;
         if (r.top > (window.innerHeight || 0) || r.left > (window.innerWidth || 0)) return false;
         return true;
     }
 
-    function isPopupLike(el) {
-        if (el.tagName === 'DIALOG' && el.open !== false) return true;
-        const role = (el.getAttribute('role') || '').toLowerCase();
-        if (POPUP_ROLES.has(role)) return true;
-        const cs = getComputedStyle(el);
-        // Достаточно position: fixed/absolute. Раньше дополнительно требовали
-        // z-index ≥ 10, но Дзен-хинты типа helper-tooltip используют
-        // z-index: auto, и проверка их отсекала. Лишний мусор отсеивают
-        // фильтры по размеру (isVisible) и по наличию × (findCloseBtn).
-        if (cs.position === 'fixed' || cs.position === 'absolute') return true;
+    function classTokens(el) {
+        const cls = (el && el.getAttribute && el.getAttribute('class')) || '';
+        return cls.toLowerCase().split(/[\s_\-/]+/).filter(Boolean);
+    }
+
+    function tokenIsClose(t) {
+        if (t === 'closed' || t === 'closes' || t === 'closing' || t === 'enclosed') return false;
+        if (t === 'close' || t === 'dismiss' || t === 'closebutton' || t === 'dismissbutton') return true;
+        if (t.startsWith('close') && t.length <= 14) return true;
+        if (t.startsWith('dismiss') && t.length <= 16) return true;
         return false;
     }
 
-    // Защита от ложного закрытия рабочих UI: дропдаун выбора комментариев
-    // (`select-editor`) и его опции (`select-editor__option`) не закрываем —
-    // их обрабатывает _set_comments_all_users.
-    const PROTECTED_CLASS_TOKENS = ['select-editor'];
+    function hasCloseInClass(el) {
+        return classTokens(el).some(tokenIsClose);
+    }
+
+    function ariaLooksClose(el) {
+        const lbl = (el.getAttribute('aria-label') || '').toLowerCase();
+        if (!lbl) return false;
+        if (lbl.indexOf('закр') !== -1) return true;
+        if (lbl.indexOf('скрыт') !== -1) return true;
+        if (lbl.indexOf('понятно') !== -1) return true;
+        if (lbl.indexOf('close') !== -1) return true;
+        if (lbl.indexOf('dismiss') !== -1) return true;
+        return false;
+    }
+
+    function isInsidePopupMarker(el) {
+        let cur = el;
+        let depth = 0;
+        while (cur && cur !== document.body && depth < 12) {
+            const tokens = classTokens(cur);
+            for (const t of tokens) if (POPUP_TOKENS.has(t)) return true;
+            cur = cur.parentElement;
+            depth++;
+        }
+        return false;
+    }
+
     function isProtected(el) {
         let cur = el;
         while (cur && cur !== document.body) {
             const cls = (cur.getAttribute && cur.getAttribute('class')) || '';
-            for (const tok of PROTECTED_CLASS_TOKENS) {
+            for (const tok of PROTECTED_TOKENS) {
                 if (cls.indexOf(tok) !== -1) return true;
             }
             cur = cur.parentElement;
@@ -363,82 +390,36 @@ _POPUP_FIND_JS = r"""(opts) => {
         return false;
     }
 
-    // Проверяет, что строка содержит слово close/dismiss как токен
-    // (а не подстроку — иначе ловит «disclosure», «enclosed» и т.п.).
-    function hasCloseToken(s) {
-        if (!s) return false;
-        const lower = s.toLowerCase();
-        const tokens = lower.split(/[\s_\-/]+/);
-        for (const t of tokens) {
-            if (t === 'close' || t === 'dismiss' || t === 'closebutton'
-                || t.startsWith('close') && t.length <= 12
-                || t.startsWith('dismiss') && t.length <= 14) {
-                // Доп. отсечь явные ложные срабатывания
-                if (t === 'closed' || t === 'closes' || t === 'closing') continue;
-                return true;
-            }
-        }
-        return false;
-    }
-
-    function findCloseBtn(container) {
-        // 1. aria-label со словом close/закр
-        const byAria = container.querySelectorAll(
-            'button[aria-label*="lose" i], [role="button"][aria-label*="lose" i], '
-            + 'button[aria-label*="закр" i], [role="button"][aria-label*="закр" i]'
-        );
-        for (const b of byAria) {
-            if (!isVisible(b)) continue;
-            const lbl = (b.getAttribute('aria-label') || '');
-            if (hasCloseToken(lbl) || lbl.toLowerCase().indexOf('закр') !== -1) return b;
-        }
-
-        // 2. кликабельный элемент с классом close/dismiss (по токену, не подстроке)
-        const clickable = container.querySelectorAll(
-            'button, [role="button"], [tabindex]'
-        );
-        for (const b of clickable) {
-            if (!isVisible(b)) continue;
-            if (b === container) continue;
-            const cls = b.getAttribute('class') || '';
-            if (!hasCloseToken(cls)) continue;
-            const r = b.getBoundingClientRect();
-            if (r.width > 80 || r.height > 80) continue;
-            return b;
-        }
-        return null;
-    }
-
-    // Кандидаты — все элементы с ролью или position fixed/absolute. Перебираем
-    // самые «глубокие» — клик по дочернему контейнеру предпочтителен, чтобы
-    // не закрыть главную модалку, в которой попап рендерится.
-    const all = Array.from(document.querySelectorAll('*'));
-    const popups = [];
-    for (const el of all) {
+    const clickable = document.querySelectorAll('button, [role="button"], [tabindex], a, span, div');
+    const found = [];
+    for (const b of clickable) {
         try {
-            if (!isVisible(el)) continue;
-            if (!isPopupLike(el)) continue;
-            if (isProtected(el)) continue;
-            const close = findCloseBtn(el);
-            if (!close) continue;
-            popups.push({el, close});
+            if (!isVisible(b)) continue;
+            if (isProtected(b)) continue;
+            const r = b.getBoundingClientRect();
+            // Кнопка × всегда мелкая. Защита от случайного клика по большим блокам.
+            if (r.width > 80 || r.height > 80) continue;
+
+            const closeByClass = hasCloseInClass(b);
+            const closeByAria  = ariaLooksClose(b);
+            if (!closeByClass && !closeByAria) continue;
+
+            // Кнопка должна быть внутри popup-маркера (tooltip/hint/popup/...),
+            // ИЛИ совсем мелкая (≤ 40×40 — это однозначный × хинта).
+            const tinyXButton = (r.width <= 40 && r.height <= 40);
+            if (!tinyXButton && !isInsidePopupMarker(b)) continue;
+
+            found.push({el: b, area: r.width * r.height});
         } catch (_) {}
     }
-    if (popups.length === 0) return collect ? 0 : 'none';
 
-    // Сортируем: сначала меньшие по площади (наиболее «листовые» попапы),
-    // чтобы случайно не закрыть огромную форму-модалку.
-    popups.sort((a, b) => {
-        const ra = a.el.getBoundingClientRect();
-        const rb = b.el.getBoundingClientRect();
-        return (ra.width * ra.height) - (rb.width * rb.height);
-    });
+    if (found.length === 0) return collect ? 0 : 'none';
+    if (collect) return found.length;
 
-    if (collect) return popups.length;
-
-    // Кликаем × у первого (самого маленького) попапа.
+    // Сортируем по площади (мелкие — впереди), кликаем самую мелкую.
+    found.sort((a, b) => a.area - b.area);
     try {
-        popups[0].close.click();
+        found[0].el.click();
         return 'clicked';
     } catch (_e) {
         return 'click_failed';
