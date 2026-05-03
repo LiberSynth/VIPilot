@@ -381,9 +381,6 @@ def _set_comments_all_users(page, log_id, batch_id=None) -> None:
     если не «Все пользователи», пишет WARN.
     """
     _TARGET = "Все пользователи"
-    # Из бандла video-editor: enum значений для <select> комментариев,
-    # `e.VISIBLE = "visible"` — это и есть «Все пользователи».
-    _TARGET_VALUE = "visible"
     write_log_entry(log_id, "Дзен: Выставляю «Все пользователи» в «Кто может комментировать».")
     try:
         # Скроллим вниз — контрол может быть ниже видимой области.
@@ -416,19 +413,24 @@ def _set_comments_all_users(page, log_id, batch_id=None) -> None:
             _snap(page, batch_id)
             return
 
-        # ── Кликаем триггер и ищем реальную опцию в выпавшем поповере ──
-        # Скроллим триггер К ВЕРХУ окна — иначе дропдаун открывается ниже
-        # и вылезает за viewport, Playwright не видит опции.
+        # ── Точный путь по бандлу video-editor: ──
+        #   1. Триггер — <button data-testid="select-trigger-button-comment">
+        #   2. По клику открывается поповер в портале (Lego ComponentRegistry).
+        #   3. Поповер содержит <div role="listbox"> (рендерится только когда
+        #      открыт), внутри — <li data-testid="menu-v2-item"> для опций.
+        #   4. В один момент времени открыт только ОДИН listbox, поэтому
+        #      `[role="listbox"]` без дополнительной фильтрации однозначен.
+        #
+        # Скроллим триггер к верху, чтобы поповер открывался вниз и помещался
+        # во viewport (иначе Playwright не считает опции `visible`).
         try:
             page.evaluate(
                 """() => {
                     const t = document.querySelector('[data-testid="select-trigger-button-comment"]');
                     if (!t) return;
                     t.scrollIntoView({block: 'start', behavior: 'instant'});
-                    // Доп. отступ сверху, чтобы дропдаун точно поместился ниже.
                     const scroller = document.scrollingElement || document.documentElement;
                     scroller.scrollTop = Math.max(0, scroller.scrollTop - 80);
-                    // Также прокручиваем ближайший внутренний скроллер модалки.
                     let p = t.parentElement;
                     while (p) {
                         const cs = getComputedStyle(p);
@@ -445,113 +447,49 @@ def _set_comments_all_users(page, log_id, batch_id=None) -> None:
         except Exception:
             pass
         page.wait_for_timeout(300)
+
         trigger.click()
-        page.wait_for_timeout(800)
 
-        # Инструментация: дампим в лог ВСЕ видимые кандидаты с текстом «Все пользователи»
-        # — реальные tag/class/testid, чтобы видеть, какой селектор использовать.
-        candidates = page.evaluate(
-            """(target) => {
-                const all = document.querySelectorAll('*');
-                const out = [];
-                const TAG_SKIP = new Set(['HTML','BODY','MAIN','ARTICLE','SECTION','HEADER','FOOTER','NAV','FORM','DIV']);
-                for (const el of all) {
-                    if (out.length >= 30) break;
-                    let txt = '';
-                    try { txt = (el.textContent || '').trim(); } catch (_) { continue; }
-                    if (!txt.includes(target)) continue;
-                    // Только листовые: текст узла без вложенных совпадений
-                    let leaf = true;
-                    for (const ch of el.children) {
-                        if ((ch.textContent || '').includes(target)) { leaf = false; break; }
-                    }
-                    if (!leaf) continue;
-                    const r = el.getBoundingClientRect();
-                    if (r.width < 4 || r.height < 4) continue;
-                    const cs = getComputedStyle(el);
-                    if (cs.visibility === 'hidden' || cs.display === 'none') continue;
-                    out.push({
-                        tag: el.tagName,
-                        cls: (el.getAttribute('class') || '').slice(0, 200),
-                        testid: el.getAttribute('data-testid') || '',
-                        role: el.getAttribute('role') || '',
-                        parentTag: el.parentElement ? el.parentElement.tagName : '',
-                        parentTestid: el.parentElement ? (el.parentElement.getAttribute('data-testid') || '') : '',
-                        parentRole: el.parentElement ? (el.parentElement.getAttribute('role') || '') : '',
-                        rect: {w: Math.round(r.width), h: Math.round(r.height), x: Math.round(r.x), y: Math.round(r.y)},
-                    });
-                }
-                return out;
-            }""",
-            _TARGET,
-        )
-        write_log_entry(log_id, f"[dzen] _set_comments: кандидаты «{_TARGET}» (visible, leaf): {candidates!r}", level='silent')
-
-        # Пытаемся кликнуть по самому глубокому листовому элементу (опция меню).
-        # Сначала пробуем явные «правильные» паттерны, потом — любой видимый листовой.
-        clicked = page.evaluate(
-            """(target) => {
-                function visible(el) {
-                    if (!el || !el.isConnected) return false;
-                    const cs = getComputedStyle(el);
-                    if (cs.display === 'none' || cs.visibility === 'hidden') return false;
-                    const r = el.getBoundingClientRect();
-                    return r.width >= 4 && r.height >= 4;
-                }
-                function leafContains(el) {
-                    if (!(el.textContent || '').includes(target)) return false;
-                    for (const ch of el.children) {
-                        if ((ch.textContent || '').includes(target)) return false;
-                    }
-                    return true;
-                }
-                // Кандидаты по убыванию приоритета:
-                const selectors = [
-                    'li[role="option"]', 'div[role="option"]', '[role="option"]',
-                    'li[data-testid="menu-v2-item"]',
-                    '[class*="menu__menuItem"]', '[class*="menuItem"]',
-                    '[class*="context-menu__item"]',
-                    'li', 'a', 'button', 'span', 'div',
-                ];
-                for (const sel of selectors) {
-                    const list = document.querySelectorAll(sel);
-                    for (const el of list) {
-                        if (!visible(el)) continue;
-                        if (!leafContains(el)) continue;
-                        // Не кликаем по триггеру (его текст «Подписчики» не содержит target).
-                        // Не кликаем по элементам с aria-expanded (это сами триггеры).
-                        if (el.hasAttribute('aria-expanded')) continue;
-                        // Кликаем — возвращаем какой селектор сработал.
-                        try {
-                            el.click();
-                            return {ok: true, selector: sel, tag: el.tagName, cls: (el.getAttribute('class') || '').slice(0, 120)};
-                        } catch (_e) {
-                            return {ok: false, reason: 'click_failed', selector: sel};
-                        }
-                    }
-                }
-                return {ok: false, reason: 'no_leaf'};
-            }""",
-            _TARGET,
-        )
-        write_log_entry(log_id, f"[dzen] _set_comments: попытка клика → {clicked!r}", level='silent')
-
-        if not clicked.get("ok"):
-            # Закрываем дропдаун, чтобы не мешал.
+        # Ждём появления именно poperа-listbox.
+        listbox = page.locator('[role="listbox"]').first
+        try:
+            listbox.wait_for(state="visible", timeout=5_000)
+        except Exception:
+            write_log_entry(
+                log_id,
+                "Дзен: Поповер [role='listbox'] не открылся после клика по триггеру.",
+                level='warn',
+            )
             try:
                 page.keyboard.press("Escape")
             except Exception:
                 pass
+            _snap(page, batch_id)
+            return
+
+        # Опция «Все пользователи» внутри listbox.
+        option = listbox.locator(
+            f'li[data-testid="menu-v2-item"]:has-text("{_TARGET}")'
+        ).first
+        try:
+            option.wait_for(state="visible", timeout=3_000)
+            option.click()
+        except Exception as _e:
             write_log_entry(
                 log_id,
-                f"Дзен: Не удалось кликнуть «Все пользователи» — {clicked.get('reason')}.",
+                f"Дзен: Опция «{_TARGET}» внутри listbox не найдена.",
                 level='warn',
             )
+            write_log_entry(log_id, f"[dzen] Ошибка выбора опции: {_e}", level='silent')
+            try:
+                page.keyboard.press("Escape")
+            except Exception:
+                pass
             _snap(page, batch_id)
             return
 
         # ── Верификация: триггер ДОЛЖЕН теперь показывать «Все пользователи» ──
-        page.wait_for_timeout(500)
+        page.wait_for_timeout(400)
         try:
             new_text = (trigger.inner_text() or "").strip()
         except Exception:
