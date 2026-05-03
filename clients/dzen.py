@@ -666,7 +666,10 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
     _handle_popups(page, log_id, batch_id)
 
     try:
-        pub_btn.click(timeout=30_000)
+        # Таймаут 3 сек: если confirm-диалог уже был обработан в _handle_popups
+        # выше, главная кнопка дизейблится и ждать её enable бессмысленно —
+        # публикация уже отправлена. JS-клик ниже останется как страховка.
+        pub_btn.click(timeout=3_000)
     except Exception as _click_err:
         write_log_entry(log_id, "[dzen] Обычный клик не прошёл — пробую JS-клик.", level='silent')
         write_log_entry(log_id, f"[dzen] Причина: {_click_err}", level='silent')
