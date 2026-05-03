@@ -314,7 +314,10 @@ def _dismiss_unknown(page, log_id=None) -> None:
     2. Стандартные CSS-селекторы для модальных окон и диалогов.
     3. Escape — резерв на случай модального оверлея.
     """
+    write_log_entry(log_id, "Дзен: Закрываю неизвестный попап/хинт.")
+
     # ── 1. JS evaluate: ищем кнопку-крестик в notification/hint контейнерах ─
+    clicked_by_js = False
     try:
         clicked_by_js = page.evaluate("""() => {
             const CLOSE_CHARS = new Set(['\u00d7', '\u2715', '\u2716', '\u2717', '\u00d7', 'x', 'X', '\u2613']);
@@ -376,6 +379,11 @@ def _dismiss_unknown(page, log_id=None) -> None:
         page.wait_for_timeout(200)
     except Exception as _e:
         write_log_entry(log_id, f"[dzen] _dismiss_unknown: Escape упал: {_e}", level='silent')
+
+    if clicked_by_js or _css_clicked:
+        write_log_entry(log_id, "Дзен: Неизвестный попап/хинт закрыт.")
+    else:
+        write_log_entry(log_id, "Дзен: Неизвестный попап/хинт не обнаружен.")
 
 
 def _set_comments_all_users(page, log_id, batch_id=None) -> None:
