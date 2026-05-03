@@ -427,12 +427,22 @@ _POPUP_FIND_JS = r"""(opts) => {
 }"""
 
 
-def _detect_unknown_popup(page) -> bool:
-    """Возвращает True, если в DOM есть видимый попап-подобный контейнер с ×.
+_HINT_CLOSE_SELECTOR = "[class*='helper-tooltip__closeButton']"
 
-    Структурный детект — без хардкода текстов или классов конкретных хинтов:
-    role=dialog/tooltip/menu/alertdialog ИЛИ position fixed/absolute с z-index ≥ 10.
+
+def _detect_unknown_popup(page) -> bool:
+    """True, если в DOM есть видимая кнопка закрытия хинта Дзена.
+
+    Опирается на реальный класс из бандла видеоредактора:
+    `video-editor--helper-tooltip__closeButton-*` (substring-match).
+    Расширенная структурная эвристика — резерв через `_POPUP_FIND_JS`,
+    но в 99% случаев хинт ловится именно по `helper-tooltip__closeButton`.
     """
+    try:
+        if page.locator(_HINT_CLOSE_SELECTOR).first.is_visible(timeout=300):
+            return True
+    except Exception:
+        pass
     try:
         return bool(page.evaluate(_POPUP_FIND_JS, {"collect": True}))
     except Exception:
@@ -440,36 +450,99 @@ def _detect_unknown_popup(page) -> bool:
 
 
 def _dismiss_unknown(page, log_id=None) -> None:
-    """Закрывает неизвестный попап/диалог/хинт — но только если он реально есть.
+    """Закрывает хинт-попап Дзена — только если он реально есть.
 
-    Алгоритм:
-    0. Детектирует попап структурно (без знания конкретных текстов/классов).
-       Если не найден — выходит молча, ничего не нажимает.
-    1. JS-клик по × строго внутри найденного попап-контейнера.
-    2. Повторяет до 3 раз — попапов может быть несколько подряд.
-    3. Если после 3 попыток попап всё ещё в DOM — пишет warn-лог.
+    Стратегия 1 (главная): клик по `[class*='helper-tooltip__closeButton']`
+    через Playwright Locator (а не JS .click() — настоящий мышиный клик,
+    который React гарантированно ловит). После клика проверяет, что элемент
+    исчез из DOM. Логирует РЕАЛЬНЫЙ результат, а не предположение.
+    Стратегия 2 (резерв): структурный JS-сниппет `_POPUP_FIND_JS` для
+    неизвестных попапов без класса `helper-tooltip__closeButton`.
     """
-    if not _detect_unknown_popup(page):
-        write_log_entry(log_id, "[dzen] _dismiss_unknown: попап не обнаружен — пропускаю.", level='silent')
+    # При log_id=None все info/warn должны идти как silent (правило 4 конвенций).
+    _user_lvl = 'info' if log_id else 'silent'
+    _warn_lvl = 'warn' if log_id else 'silent'
+
+    # ── Стратегия 1: точный селектор helper-tooltip__closeButton ──────────
+    hint_was_seen = False
+    for _attempt in range(3):
+        try:
+            btn = page.locator(_HINT_CLOSE_SELECTOR).first
+            if not btn.is_visible(timeout=300):
+                break
+        except Exception:
+            break
+
+        hint_was_seen = True
+
+        # Снимок для верификации (короткий таймаут, чтобы не висеть)
+        try:
+            cls_before = btn.get_attribute("class", timeout=300) or ""
+        except Exception:
+            cls_before = ""
+
+        write_log_entry(log_id, f"Дзен: Закрываю хинт (попытка {_attempt + 1}).", level=_user_lvl)
+        write_log_entry(log_id, f"[dzen] hint close target class={cls_before!r}", level='silent')
+
+        try:
+            btn.click(timeout=2_000)
+        except Exception as _e:
+            write_log_entry(log_id, f"[dzen] hint click failed: {_e}", level='silent')
+            break
+
+        page.wait_for_timeout(300)
+
+        # Реальная верификация: элемент исчез?
+        try:
+            still_visible = page.locator(_HINT_CLOSE_SELECTOR).first.is_visible(timeout=200)
+        except Exception:
+            still_visible = False
+
+        if not still_visible:
+            write_log_entry(log_id, "Дзен: Хинт закрыт.", level=_user_lvl)
+            return
+
+        write_log_entry(log_id, "[dzen] хинт всё ещё виден после клика — повтор.", level='silent')
+
+    # Если хинт был виден, но за 3 попытки не закрылся — это явный фейл стратегии 1.
+    if hint_was_seen:
+        try:
+            still_hint = page.locator(_HINT_CLOSE_SELECTOR).first.is_visible(timeout=200)
+        except Exception:
+            still_hint = False
+        if still_hint:
+            write_log_entry(log_id, "Дзен: Хинт helper-tooltip не закрылся за 3 попытки.", level=_warn_lvl)
+
+    # ── Стратегия 2: структурный fallback для неизвестных попапов ────────
+    try:
+        has_other = bool(page.evaluate(_POPUP_FIND_JS, {"collect": True}))
+    except Exception:
+        has_other = False
+
+    if not has_other:
         return
 
-    write_log_entry(log_id, "Дзен: Обнаружен неизвестный попап/хинт, закрываю.")
-
+    write_log_entry(log_id, "Дзен: Обнаружен неизвестный попап (не helper-tooltip), пытаюсь закрыть.", level=_user_lvl)
     for _attempt in range(3):
         try:
             result = page.evaluate(_POPUP_FIND_JS, {"collect": False})
-            write_log_entry(log_id, f"[dzen] _dismiss_unknown: попытка {_attempt + 1} → {result!r}", level='silent')
+            write_log_entry(log_id, f"[dzen] _dismiss_unknown fallback {_attempt + 1} → {result!r}", level='silent')
         except Exception as _e:
-            write_log_entry(log_id, f"[dzen] _dismiss_unknown: JS-evaluate упал: {_e}", level='silent')
+            write_log_entry(log_id, f"[dzen] fallback JS упал: {_e}", level='silent')
             break
 
         page.wait_for_timeout(250)
 
-        if not _detect_unknown_popup(page):
-            write_log_entry(log_id, "Дзен: Неизвестный попап/хинт закрыт.")
+        try:
+            still = bool(page.evaluate(_POPUP_FIND_JS, {"collect": True}))
+        except Exception:
+            still = False
+
+        if not still:
+            write_log_entry(log_id, "Дзен: Неизвестный попап закрыт (fallback).", level=_user_lvl)
             return
 
-    write_log_entry(log_id, "Дзен: Не удалось закрыть неизвестный попап/хинт.", level='warn')
+    write_log_entry(log_id, "Дзен: Не удалось закрыть попап/хинт.", level=_warn_lvl)
 
 
 def _set_comments_all_users(page, log_id, batch_id=None) -> None:
