@@ -659,6 +659,9 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
     write_log_entry(log_id, "Дзен: Кнопка «+» нажата, жду меню.")
     _snap(page, batch_id)
 
+    # Перед шагом 3: закрываем любой неожиданный попап/хинт.
+    _dismiss_unknown(page, log_id)
+
     # ── Шаг 3: «Загрузить видео» из выпадающего меню ─────────────────────
     write_log_entry(log_id, "Дзен: Выбираю «Загрузить видео».")
     upload_item = page.get_by_text("Загрузить видео", exact=True).first
@@ -671,6 +674,9 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
     upload_item.click()
     write_log_entry(log_id, "Дзен: «Загрузить видео» нажато")
     _snap(page, batch_id)
+
+    # Перед шагом 4: закрываем любой неожиданный попап/хинт.
+    _dismiss_unknown(page, log_id)
 
     # ── Шаг 4: Загружаем файл ────────────────────────────────────────────
     write_log_entry(log_id, "Дзен: Ищу поле загрузки файла.")
@@ -756,14 +762,15 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
         write_log_entry(log_id, "Дзен: Не удалось заполнить теги — продолжаю.")
         write_log_entry(log_id, f"[dzen] Ошибка тегов: {_e}", level='silent')
 
+    # Перед шагом 5.1: закрываем хинт «Уже можно публиковать» (он часто
+    # всплывает после ввода тегов и перекрывает дропдаун комментариев).
+    _dismiss_unknown(page, log_id)
+
     # ── Шаг 5.1: Выставляем «Все пользователи» в «Кто может комментировать»
     # Сразу после тегов — контрол виден в той же модалке «Публикация ролика».
     _set_comments_all_users(page, log_id, batch_id)
 
-    # ── Шаг 5.5: Закрываем хинт «Уже можно публиковать», если появился ──
-    # _handle_popups НЕ вызываем — он нажмёт «Опубликовать после обработки»
-    # раньше времени (confirm в _EXPECTED_ELEMENTS). Только _dismiss_unknown,
-    # и только если попап реально есть в DOM.
+    # Перед шагом 6: ещё раз закрываем любые всплывшие хинты/попапы.
     _dismiss_unknown(page, log_id)
 
     # ── Шаг 6: Публикуем ─────────────────────────────────────────────────
@@ -862,6 +869,9 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
         page.wait_for_timeout(_DIALOG_POLL)
 
     write_log_entry(log_id, "Дзен: Шаг 7 завершён, жду подтверждения публикации.")
+
+    # Перед шагом 8: закрываем любой неожиданный попап/хинт.
+    _dismiss_unknown(page, log_id)
 
     # ── Шаг 8: Ожидаем подтверждения публикации ──────────────────────────
     _PUBLISH_CONFIRM_TIMEOUT = 60_000  # ms — полный таймаут ожидания
