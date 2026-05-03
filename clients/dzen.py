@@ -339,10 +339,11 @@ _POPUP_FIND_JS = r"""(opts) => {
         const role = (el.getAttribute('role') || '').toLowerCase();
         if (POPUP_ROLES.has(role)) return true;
         const cs = getComputedStyle(el);
-        if (cs.position === 'fixed' || cs.position === 'absolute') {
-            const z = parseInt(cs.zIndex, 10);
-            if (!isNaN(z) && z >= 10) return true;
-        }
+        // Достаточно position: fixed/absolute. Раньше дополнительно требовали
+        // z-index ≥ 10, но Дзен-хинты типа helper-tooltip используют
+        // z-index: auto, и проверка их отсекала. Лишний мусор отсеивают
+        // фильтры по размеру (isVisible) и по наличию × (findCloseBtn).
+        if (cs.position === 'fixed' || cs.position === 'absolute') return true;
         return false;
     }
 
