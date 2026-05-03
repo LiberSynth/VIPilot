@@ -29,52 +29,14 @@ from log.log import write_log_entry
 # Функции миграций
 # ---------------------------------------------------------------------------
 
-# Миграции 1–92 удалены: задеплоены на prod 2026-04-30, db_version = 92.
-# Следующая миграция: _m094_...
-
-
-def _m093_log_entries_created_at_idx(cur):
-    """Индекс по log_entries.created_at для быстрого поиска системных логов по диапазону дат."""
-    cur.execute(
-        "CREATE INDEX IF NOT EXISTS idx_log_entries_created_at"
-        " ON log_entries (created_at)"
-    )
-
-
-def _m094_datetime_indexes(cur):
-    """Индексы по created_at для таблиц ai_models, movies, schedule, stories."""
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_ai_models_created_at ON ai_models (created_at)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_movies_created_at    ON movies    (created_at)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_schedule_created_at  ON schedule  (created_at)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_stories_created_at   ON stories   (created_at)")
-
-
-def _m095_misc_field_indexes(cur):
-    """Индексы по часто фильтруемым полям: grade, level, manual_changed, module,
-    order, pinned, pipeline, status, title."""
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_ai_models_grade       ON ai_models    (grade)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_movies_grade          ON movies       (grade)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_log_entries_level     ON log_entries  (level)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_stories_manual_changed ON stories     (manual_changed)")
-    cur.execute('CREATE INDEX IF NOT EXISTS idx_user_roles_module     ON user_roles   (module)')
-    cur.execute('CREATE INDEX IF NOT EXISTS idx_ai_models_order       ON ai_models    ("order")')
-    cur.execute('CREATE INDEX IF NOT EXISTS idx_targets_order         ON targets      ("order")')
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_stories_pinned        ON stories      (pinned)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_log_pipeline          ON log          (pipeline)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_log_status            ON log          (status)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_batches_title         ON batches      (title)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_stories_title         ON stories      (title)")
+# Миграции 1–95 удалены. Следующая миграция: _m096_...
 
 
 # ---------------------------------------------------------------------------
 # Реестр миграций — добавляйте только в конец, никогда не переиспользуйте номера
 # ---------------------------------------------------------------------------
 
-MIGRATIONS = [
-    (93, _m093_log_entries_created_at_idx),
-    (94, _m094_datetime_indexes),
-    (95, _m095_misc_field_indexes),
-]
+MIGRATIONS = []
 
 
 # ---------------------------------------------------------------------------
