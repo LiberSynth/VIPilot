@@ -316,7 +316,7 @@ def _dismiss_unknown(page, log_id=None) -> None:
     """
     # ── 1. JS evaluate: ищем кнопку-крестик в notification/hint контейнерах ─
     try:
-        page.evaluate("""() => {
+        clicked_by_js = page.evaluate("""() => {
             const CLOSE_CHARS = new Set(['\u00d7', '\u2715', '\u2716', '\u2717', '\u00d7', 'x', 'X', '\u2613']);
             const containers = document.querySelectorAll(
                 '[class*="notice"], [class*="Notice"], [class*="notification"], [class*="Notification"], '
@@ -331,16 +331,22 @@ def _dismiss_unknown(page, log_id=None) -> None:
                     const t = (btn.textContent || '').trim();
                     if (t.length <= 2 && (CLOSE_CHARS.has(t) || CLOSE_CHARS.has(t[0]))) {
                         btn.click();
-                        return;
+                        return true;
                     }
                 }
             }
+            return false;
         }""")
+        if clicked_by_js:
+            write_log_entry(log_id, "[dzen] _dismiss_unknown: JS-клик по кнопке × в контейнере.", level='silent')
+        else:
+            write_log_entry(log_id, "[dzen] _dismiss_unknown: JS-evaluate — кнопка × не найдена.", level='silent')
         page.wait_for_timeout(200)
-    except Exception:
-        pass
+    except Exception as _e:
+        write_log_entry(log_id, f"[dzen] _dismiss_unknown: JS-evaluate упал: {_e}", level='silent')
 
     # ── 2. CSS-селекторы для стандартных модальных окон ───────────────────
+    _css_clicked = False
     for sel in [
         "[data-testid='modal-overlay']",
         "[class*='modal-close']",
@@ -354,17 +360,22 @@ def _dismiss_unknown(page, log_id=None) -> None:
             btn = page.locator(sel).first
             if btn.is_visible(timeout=300):
                 btn.click()
+                write_log_entry(log_id, f"[dzen] _dismiss_unknown: CSS-клик по {sel!r}.", level='silent')
                 page.wait_for_timeout(200)
+                _css_clicked = True
                 break
         except Exception:
             pass
+    if not _css_clicked:
+        write_log_entry(log_id, "[dzen] _dismiss_unknown: CSS-селекторы — ничего не найдено.", level='silent')
 
     # ── 3. Escape — резерв ───────────────────────────────────────────────
     try:
         page.keyboard.press("Escape")
+        write_log_entry(log_id, "[dzen] _dismiss_unknown: Escape нажат (резерв).", level='silent')
         page.wait_for_timeout(200)
-    except Exception:
-        pass
+    except Exception as _e:
+        write_log_entry(log_id, f"[dzen] _dismiss_unknown: Escape упал: {_e}", level='silent')
 
 
 def _set_comments_all_users(page, log_id, batch_id=None) -> None:
