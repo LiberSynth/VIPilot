@@ -373,27 +373,17 @@ def _set_comments_all_users(page, log_id, batch_id=None) -> None:
     """
     Выставляет «Все пользователи» в дропдауне «Кто может комментировать».
 
-    Использует стабильные `data-testid` от самих разработчиков Дзена
-    (найдено в бандле video-editor):
-      • Триггер: <button data-testid="select-trigger-button-comment">
-      • Опции:   <li   data-testid="menu-v2-item">
-    После клика по опции ОБЯЗАТЕЛЬНО проверяет текст триггера —
-    если не «Все пользователи», пишет WARN.
+    Точная разметка из бандла video-editor 1.8.3 (компоненты nL/zU/_j):
+      • Триггер: <button data-testid="select-trigger-button-comment"
+                          aria-expanded="true|false">
+      • Опция:   элемент с data-testid="<текст опции>"
+                 (в _j: `dataTestId: l.content` — т.е. testid = тексту).
+                 Например, <... data-testid="Все пользователи" aria-selected=...>
+    После клика по опции ОБЯЗАТЕЛЬНО проверяет текст триггера.
     """
     _TARGET = "Все пользователи"
     write_log_entry(log_id, "Дзен: Выставляю «Все пользователи» в «Кто может комментировать».")
     try:
-        # Скроллим вниз — контрол может быть ниже видимой области.
-        try:
-            page.evaluate("""() => {
-                const form = document.querySelector('form, [class*="editor"], [class*="Editor"]');
-                if (form) form.scrollTop = form.scrollHeight;
-                else window.scrollBy(0, 400);
-            }""")
-            page.wait_for_timeout(400)
-        except Exception:
-            pass
-
         trigger = page.locator('[data-testid="select-trigger-button-comment"]').first
         try:
             trigger.wait_for(state="visible", timeout=6_000)
@@ -413,71 +403,24 @@ def _set_comments_all_users(page, log_id, batch_id=None) -> None:
             _snap(page, batch_id)
             return
 
-        # ── Точный путь по бандлу video-editor: ──
-        #   1. Триггер — <button data-testid="select-trigger-button-comment">
-        #   2. По клику открывается поповер в портале (Lego ComponentRegistry).
-        #   3. Поповер содержит <div role="listbox"> (рендерится только когда
-        #      открыт), внутри — <li data-testid="menu-v2-item"> для опций.
-        #   4. В один момент времени открыт только ОДИН listbox, поэтому
-        #      `[role="listbox"]` без дополнительной фильтрации однозначен.
-        #
-        # Скроллим триггер к верху, чтобы поповер открывался вниз и помещался
-        # во viewport (иначе Playwright не считает опции `visible`).
+        # Скроллим триггер ближе к верху, чтобы поповер вместился во viewport.
         try:
-            page.evaluate(
-                """() => {
-                    const t = document.querySelector('[data-testid="select-trigger-button-comment"]');
-                    if (!t) return;
-                    t.scrollIntoView({block: 'start', behavior: 'instant'});
-                    const scroller = document.scrollingElement || document.documentElement;
-                    scroller.scrollTop = Math.max(0, scroller.scrollTop - 80);
-                    let p = t.parentElement;
-                    while (p) {
-                        const cs = getComputedStyle(p);
-                        if (/(auto|scroll)/.test(cs.overflowY) && p.scrollHeight > p.clientHeight) {
-                            const r = t.getBoundingClientRect();
-                            const pr = p.getBoundingClientRect();
-                            p.scrollTop += (r.top - pr.top) - 80;
-                            break;
-                        }
-                        p = p.parentElement;
-                    }
-                }"""
-            )
+            trigger.scroll_into_view_if_needed(timeout=1500)
         except Exception:
             pass
-        page.wait_for_timeout(300)
+        page.wait_for_timeout(200)
 
         trigger.click()
 
-        # Ждём появления именно poperа-listbox.
-        listbox = page.locator('[role="listbox"]').first
+        # Опция: data-testid в точности равен тексту опции (см. _j в бандле).
+        option = page.locator(f'[data-testid="{_TARGET}"]').first
         try:
-            listbox.wait_for(state="visible", timeout=5_000)
-        except Exception:
-            write_log_entry(
-                log_id,
-                "Дзен: Поповер [role='listbox'] не открылся после клика по триггеру.",
-                level='warn',
-            )
-            try:
-                page.keyboard.press("Escape")
-            except Exception:
-                pass
-            _snap(page, batch_id)
-            return
-
-        # Опция «Все пользователи» внутри listbox.
-        option = listbox.locator(
-            f'li[data-testid="menu-v2-item"]:has-text("{_TARGET}")'
-        ).first
-        try:
-            option.wait_for(state="visible", timeout=3_000)
+            option.wait_for(state="visible", timeout=5_000)
             option.click()
         except Exception as _e:
             write_log_entry(
                 log_id,
-                f"Дзен: Опция «{_TARGET}» внутри listbox не найдена.",
+                f"Дзен: Опция [data-testid=\"{_TARGET}\"] не появилась после клика по триггеру.",
                 level='warn',
             )
             write_log_entry(log_id, f"[dzen] Ошибка выбора опции: {_e}", level='silent')
