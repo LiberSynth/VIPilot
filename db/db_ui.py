@@ -234,44 +234,41 @@ def db_get_movies_list(show_published=True, show_bad=True, for_approval=False, p
                     m.id::text,
                     m.grade,
                     m.created_at,
-                    (
-                        SELECT s.title
-                        FROM batches b
-                        JOIN stories s ON s.id = b.story_id
-                        WHERE b.movie_id = m.id AND b.story_id IS NOT NULL
-                        ORDER BY b.created_at DESC, b.id DESC
-                        LIMIT 1
-                    ) AS story_title,
+                    s.title AS story_title,
                     vm.name AS model_name,
-                    {_MOVIES_PUBLISHED_CHECK} AS published,
-                    (
-                        SELECT b2.id::text
-                        FROM batches b2
-                        WHERE b2.story_id = (
-                            SELECT b3.story_id FROM batches b3
-                            WHERE b3.movie_id = m.id
-                              AND b3.story_id IS NOT NULL
-                            ORDER BY b3.created_at DESC, b3.id DESC
-                            LIMIT 1
-                        )
-                          AND b2.type != 'story_probe'
-                          AND b2.status IN (
-                              'pending', 'story_generating', 'story_ready',
-                              'video_generating', 'video_pending'
-                          )
-                        ORDER BY b2.created_at DESC, b2.id DESC
-                        LIMIT 1
-                    ) AS active_batch_id,
-                    (
-                        SELECT b4.story_id::text
-                        FROM batches b4
-                        JOIN stories s2 ON s2.id = b4.story_id
-                        WHERE b4.movie_id = m.id AND b4.story_id IS NOT NULL
-                        ORDER BY b4.created_at DESC, b4.id DESC
-                        LIMIT 1
-                    ) AS story_id
+                    (p.movie_id IS NOT NULL) AS published,
+                    ab.id::text AS active_batch_id,
+                    s.id::text AS story_id
                 FROM movies m
                 LEFT JOIN ai_models vm ON vm.id = m.model_id
+                LEFT JOIN LATERAL (
+                    SELECT b.story_id
+                    FROM batches b
+                    WHERE b.movie_id = m.id AND b.story_id IS NOT NULL
+                    ORDER BY b.created_at DESC, b.id DESC
+                    LIMIT 1
+                ) lb ON TRUE
+                LEFT JOIN stories s ON s.id = lb.story_id
+                LEFT JOIN LATERAL (
+                    SELECT bp.movie_id
+                    FROM batches bp
+                    WHERE bp.movie_id = m.id
+                      AND (bp.status IN ('published', 'published_partially')
+                           OR bp.status LIKE '%%.published')
+                    LIMIT 1
+                ) p ON TRUE
+                LEFT JOIN LATERAL (
+                    SELECT b2.id
+                    FROM batches b2
+                    WHERE b2.story_id = lb.story_id
+                      AND b2.type != 'story_probe'
+                      AND b2.status IN (
+                          'pending', 'story_generating', 'story_ready',
+                          'video_generating', 'video_pending'
+                      )
+                    ORDER BY b2.created_at DESC, b2.id DESC
+                    LIMIT 1
+                ) ab ON TRUE
                 {where_clause}
                 ORDER BY m.created_at DESC, m.id DESC
             """, params or None)
