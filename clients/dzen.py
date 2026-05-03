@@ -304,166 +304,27 @@ _EXPECTED_ELEMENTS = [
 ]
 
 
-# JS-сниппет: ищет кнопки закрытия хинтов/тултипов/нотификаций по комбинации
-# семантических классов. Кнопка считается close-кнопкой ХИНТА, если:
-#   1. Её собственный class содержит токен close/dismiss/closeButton.
-#   2. Она сама ИЛИ любой её предок имеет class с одним из popup-токенов:
-#      tooltip, hint, notice, notification, popup, toast, overlay, helper, hover.
-# Это совпадает с `helper-tooltip__closeButton` (и любым новым хинтом с
-# похожей семантикой), но НЕ совпадает с × главной модалки (`modal__close`,
-# `Publication-...`), которую закрывать нельзя.
-#
-# Дополнительно: aria-label со словом close/закр/Скрыть тоже подходит, если
-# элемент находится внутри popup-маркера ИЛИ его размер ≤ 60×60 (типичный ×).
-#
-# Возвращает количество найденных кнопок (collect=true) или результат клика
-# по самой мелкой кнопке (collect=false): 'clicked' / 'click_failed' / 'none'.
-_POPUP_FIND_JS = r"""(opts) => {
-    const collect = !!(opts && opts.collect);
-
-    const POPUP_TOKENS = new Set([
-        'tooltip', 'hint', 'notice', 'notification', 'popup',
-        'toast', 'overlay', 'helper', 'hover', 'callout', 'banner'
-    ]);
-    const PROTECTED_TOKENS = ['select-editor'];
-
-    function isVisible(el) {
-        if (!el || !el.isConnected) return false;
-        const cs = getComputedStyle(el);
-        if (cs.display === 'none' || cs.visibility === 'hidden' || parseFloat(cs.opacity) === 0) return false;
-        const r = el.getBoundingClientRect();
-        if (r.width < 4 || r.height < 4) return false;
-        if (r.bottom < 0 || r.right < 0) return false;
-        if (r.top > (window.innerHeight || 0) || r.left > (window.innerWidth || 0)) return false;
-        return true;
-    }
-
-    function classTokens(el) {
-        const cls = (el && el.getAttribute && el.getAttribute('class')) || '';
-        return cls.toLowerCase().split(/[\s_\-/]+/).filter(Boolean);
-    }
-
-    function tokenIsClose(t) {
-        if (t === 'closed' || t === 'closes' || t === 'closing' || t === 'enclosed') return false;
-        if (t === 'close' || t === 'dismiss' || t === 'closebutton' || t === 'dismissbutton') return true;
-        if (t.startsWith('close') && t.length <= 14) return true;
-        if (t.startsWith('dismiss') && t.length <= 16) return true;
-        return false;
-    }
-
-    function hasCloseInClass(el) {
-        return classTokens(el).some(tokenIsClose);
-    }
-
-    function ariaLooksClose(el) {
-        const lbl = (el.getAttribute('aria-label') || '').toLowerCase();
-        if (!lbl) return false;
-        if (lbl.indexOf('закр') !== -1) return true;
-        if (lbl.indexOf('скрыт') !== -1) return true;
-        if (lbl.indexOf('понятно') !== -1) return true;
-        if (lbl.indexOf('close') !== -1) return true;
-        if (lbl.indexOf('dismiss') !== -1) return true;
-        return false;
-    }
-
-    function isInsidePopupMarker(el) {
-        let cur = el;
-        let depth = 0;
-        while (cur && cur !== document.body && depth < 12) {
-            const tokens = classTokens(cur);
-            for (const t of tokens) if (POPUP_TOKENS.has(t)) return true;
-            cur = cur.parentElement;
-            depth++;
-        }
-        return false;
-    }
-
-    function isProtected(el) {
-        let cur = el;
-        while (cur && cur !== document.body) {
-            const cls = (cur.getAttribute && cur.getAttribute('class')) || '';
-            for (const tok of PROTECTED_TOKENS) {
-                if (cls.indexOf(tok) !== -1) return true;
-            }
-            cur = cur.parentElement;
-        }
-        return false;
-    }
-
-    const clickable = document.querySelectorAll('button, [role="button"], [tabindex], a, span, div');
-    const found = [];
-    for (const b of clickable) {
-        try {
-            if (!isVisible(b)) continue;
-            if (isProtected(b)) continue;
-            const r = b.getBoundingClientRect();
-            // Кнопка × всегда мелкая. Защита от случайного клика по большим блокам.
-            if (r.width > 80 || r.height > 80) continue;
-
-            const closeByClass = hasCloseInClass(b);
-            const closeByAria  = ariaLooksClose(b);
-            if (!closeByClass && !closeByAria) continue;
-
-            // Кнопка должна быть внутри popup-маркера (tooltip/hint/popup/...),
-            // ИЛИ совсем мелкая (≤ 40×40 — это однозначный × хинта).
-            const tinyXButton = (r.width <= 40 && r.height <= 40);
-            if (!tinyXButton && !isInsidePopupMarker(b)) continue;
-
-            found.push({el: b, area: r.width * r.height});
-        } catch (_) {}
-    }
-
-    if (found.length === 0) return collect ? 0 : 'none';
-    if (collect) return found.length;
-
-    // Сортируем по площади (мелкие — впереди), кликаем самую мелкую.
-    found.sort((a, b) => a.area - b.area);
-    try {
-        found[0].el.click();
-        return 'clicked';
-    } catch (_e) {
-        return 'click_failed';
-    }
-}"""
-
-
 _HINT_CLOSE_SELECTOR = "[class*='helper-tooltip__closeButton']"
-
-
-def _detect_unknown_popup(page) -> bool:
-    """True, если в DOM есть видимая кнопка закрытия хинта Дзена.
-
-    Опирается на реальный класс из бандла видеоредактора:
-    `video-editor--helper-tooltip__closeButton-*` (substring-match).
-    Расширенная структурная эвристика — резерв через `_POPUP_FIND_JS`,
-    но в 99% случаев хинт ловится именно по `helper-tooltip__closeButton`.
-    """
-    try:
-        if page.locator(_HINT_CLOSE_SELECTOR).first.is_visible(timeout=300):
-            return True
-    except Exception:
-        pass
-    try:
-        return bool(page.evaluate(_POPUP_FIND_JS, {"collect": True}))
-    except Exception:
-        return False
 
 
 def _dismiss_unknown(page, log_id=None) -> None:
     """Закрывает хинт-попап Дзена — только если он реально есть.
 
-    Стратегия 1 (главная): клик по `[class*='helper-tooltip__closeButton']`
-    через Playwright Locator (а не JS .click() — настоящий мышиный клик,
-    который React гарантированно ловит). После клика проверяет, что элемент
-    исчез из DOM. Логирует РЕАЛЬНЫЙ результат, а не предположение.
-    Стратегия 2 (резерв): структурный JS-сниппет `_POPUP_FIND_JS` для
-    неизвестных попапов без класса `helper-tooltip__closeButton`.
+    Единственный путь: клик по `[class*='helper-tooltip__closeButton']` через
+    Playwright Locator (настоящий мышиный клик, который React гарантированно
+    ловит). После клика — реальная верификация `is_visible()`. Если хинта нет
+    — выходит молча.
+
+    Структурный fallback `_POPUP_FIND_JS` отключён: на практике он цеплялся
+    за постоянные мелкие кнопки редактора (не попапы), генерил ложные
+    'clicked' и спамил warn. В бандле video-editor класс закрытия хинта
+    ровно один — `helper-tooltip__closeButton`. Если Дзен введёт новый тип
+    хинта — добавим его конкретный селектор сюда же.
     """
     # При log_id=None все info/warn должны идти как silent (правило 4 конвенций).
     _user_lvl = 'info' if log_id else 'silent'
     _warn_lvl = 'warn' if log_id else 'silent'
 
-    # ── Стратегия 1: точный селектор helper-tooltip__closeButton ──────────
     hint_was_seen = False
     for _attempt in range(3):
         try:
@@ -504,45 +365,8 @@ def _dismiss_unknown(page, log_id=None) -> None:
 
         write_log_entry(log_id, "[dzen] хинт всё ещё виден после клика — повтор.", level='silent')
 
-    # Если хинт был виден, но за 3 попытки не закрылся — это явный фейл стратегии 1.
     if hint_was_seen:
-        try:
-            still_hint = page.locator(_HINT_CLOSE_SELECTOR).first.is_visible(timeout=200)
-        except Exception:
-            still_hint = False
-        if still_hint:
-            write_log_entry(log_id, "Дзен: Хинт helper-tooltip не закрылся за 3 попытки.", level=_warn_lvl)
-
-    # ── Стратегия 2: структурный fallback для неизвестных попапов ────────
-    try:
-        has_other = bool(page.evaluate(_POPUP_FIND_JS, {"collect": True}))
-    except Exception:
-        has_other = False
-
-    if not has_other:
-        return
-
-    write_log_entry(log_id, "Дзен: Обнаружен неизвестный попап (не helper-tooltip), пытаюсь закрыть.", level=_user_lvl)
-    for _attempt in range(3):
-        try:
-            result = page.evaluate(_POPUP_FIND_JS, {"collect": False})
-            write_log_entry(log_id, f"[dzen] _dismiss_unknown fallback {_attempt + 1} → {result!r}", level='silent')
-        except Exception as _e:
-            write_log_entry(log_id, f"[dzen] fallback JS упал: {_e}", level='silent')
-            break
-
-        page.wait_for_timeout(250)
-
-        try:
-            still = bool(page.evaluate(_POPUP_FIND_JS, {"collect": True}))
-        except Exception:
-            still = False
-
-        if not still:
-            write_log_entry(log_id, "Дзен: Неизвестный попап закрыт (fallback).", level=_user_lvl)
-            return
-
-    write_log_entry(log_id, "Дзен: Не удалось закрыть попап/хинт.", level=_warn_lvl)
+        write_log_entry(log_id, "Дзен: Хинт helper-tooltip не закрылся за 3 попытки.", level=_warn_lvl)
 
 
 def _set_comments_all_users(page, log_id, batch_id=None) -> None:
@@ -570,15 +394,21 @@ def _set_comments_all_users(page, log_id, batch_id=None) -> None:
         except Exception:
             pass
 
-        # ── Стратегия 1: JS evaluate через реальный класс select-editor ──
-        # Класс нативного <select> в бандле: video-editor--select-editor__select-*
+        # ── Стратегия 1: JS evaluate через нативный <select> ──────────────
+        # ВАЖНО: select-editor — это React-компонент, и `[class*='select-editor__select']`
+        # найдёт ДIV-обёртку, у которой нет .options. Поэтому строго фильтруем
+        # tagName === 'SELECT'. Если нативный <select> не найден — переходим
+        # к стратегии 2 (клик по триггеру).
         done = page.evaluate("""(target) => {
-            const sel = document.querySelector('[class*="select-editor__select"]');
-            if (!sel) return 'not_found';
+            // Сначала пытаемся найти настоящий <select> с нужным классом
+            let sel = document.querySelector('select[class*="select-editor"]');
+            // Резерв: любой <select> в форме (если класс не совпал)
+            if (!sel) sel = document.querySelector('select');
+            if (!sel || sel.tagName !== 'SELECT' || !sel.options) return 'not_found';
             const opts = Array.from(sel.options);
             const idx  = opts.findIndex(o => o.text.includes(target));
             if (idx < 0) return 'no_option';
-            if (sel.options[sel.selectedIndex].text.includes(target)) return 'already';
+            if (sel.options[sel.selectedIndex] && sel.options[sel.selectedIndex].text.includes(target)) return 'already';
             sel.selectedIndex = idx;
             sel.dispatchEvent(new Event('change', {bubbles: true}));
             sel.dispatchEvent(new Event('input',  {bubbles: true}));
