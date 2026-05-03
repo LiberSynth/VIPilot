@@ -239,6 +239,7 @@ def db_get_movies_list(show_published=True, show_bad=True, for_approval=False, p
                         FROM batches b
                         JOIN stories s ON s.id = b.story_id
                         WHERE b.movie_id = m.id AND b.story_id IS NOT NULL
+                        ORDER BY b.created_at DESC, b.id DESC
                         LIMIT 1
                     ) AS story_title,
                     vm.name AS model_name,
@@ -250,6 +251,7 @@ def db_get_movies_list(show_published=True, show_bad=True, for_approval=False, p
                             SELECT b3.story_id FROM batches b3
                             WHERE b3.movie_id = m.id
                               AND b3.story_id IS NOT NULL
+                            ORDER BY b3.created_at DESC, b3.id DESC
                             LIMIT 1
                         )
                           AND b2.type != 'story_probe'
