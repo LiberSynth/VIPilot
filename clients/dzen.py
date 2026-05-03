@@ -483,17 +483,17 @@ def _dismiss_unknown(page, log_id=None) -> None:
 
 def _set_comments_all_users(page, log_id, batch_id=None) -> None:
     """
-    Выставляет «Все» в дропдауне «Кто может комментировать».
+    Выставляет «Все пользователи» в дропдауне «Кто может комментировать».
 
     Стратегия 1 — JS evaluate: находит <select class*='select-editor__select'>
-    (реальный класс из бандла видеоредактора Дзена) и выставляет первую опцию
-    с текстом «Все» через DOM (работает даже если элемент визуально скрыт).
+    (реальный класс из бандла видеоредактора Дзена) и выставляет опцию
+    «Все пользователи» через DOM (работает даже если элемент визуально скрыт).
     Стратегия 2 — Playwright: кликает триггер-кнопку [class*='select-editor__trigger']
-    и выбирает опцию «Все» из открывшегося списка.
+    и выбирает «Все пользователи» из открывшегося списка.
     Все ошибки ловит внутри, не пробрасывает.
     """
-    _TARGET = "Все"
-    write_log_entry(log_id, "Дзен: Выставляю «Все» в «Кто может комментировать».")
+    _TARGET = "Все пользователи"
+    write_log_entry(log_id, "Дзен: Выставляю «Все пользователи» в «Кто может комментировать».")
     try:
         # Скроллим вниз — контрол может быть ниже видимой области.
         try:
@@ -524,11 +524,11 @@ def _set_comments_all_users(page, log_id, batch_id=None) -> None:
         write_log_entry(log_id, f"[dzen] _set_comments: JS-evaluate → {done!r}", level='silent')
 
         if done == 'already':
-            write_log_entry(log_id, "Дзен: Комментарии уже «Все».", level='silent')
+            write_log_entry(log_id, "Дзен: Комментарии уже «Все пользователи».", level='silent')
             _snap(page, batch_id)
             return
         if done == 'done':
-            write_log_entry(log_id, "Дзен: Комментарии выставлены «Все» (JS select).")
+            write_log_entry(log_id, "Дзен: Комментарии выставлены «Все пользователи» (JS select).")
             _snap(page, batch_id)
             return
 
@@ -549,8 +549,8 @@ def _set_comments_all_users(page, log_id, batch_id=None) -> None:
         current_text = trigger.inner_text() or ""
         write_log_entry(log_id, f"[dzen] _set_comments: триггер найден, текущий: {current_text!r}", level='silent')
 
-        if _TARGET in current_text and "Подписч" not in current_text:
-            write_log_entry(log_id, "Дзен: Комментарии уже «Все».", level='silent')
+        if _TARGET in current_text:
+            write_log_entry(log_id, "Дзен: Комментарии уже «Все пользователи».", level='silent')
             _snap(page, batch_id)
             return
 
@@ -558,17 +558,18 @@ def _set_comments_all_users(page, log_id, batch_id=None) -> None:
         page.wait_for_timeout(400)
 
         option = page.locator(
-            "[role='option']:has-text('Все'), "
-            "li:has-text('Все'), "
-            "div[role='option']:has-text('Все')"
+            "[role='option']:has-text('Все пользователи'), "
+            "li:has-text('Все пользователи'), "
+            "div[role='option']:has-text('Все пользователи'), "
+            "*:has-text('Все пользователи'):visible"
         ).first
         try:
             option.wait_for(state="visible", timeout=5_000)
             option.click()
-            write_log_entry(log_id, "Дзен: Комментарии выставлены «Все» (trigger+option).")
+            write_log_entry(log_id, "Дзен: Комментарии выставлены «Все пользователи» (trigger+option).")
             _snap(page, batch_id)
         except Exception as _e:
-            write_log_entry(log_id, "Дзен: Не удалось выбрать «Все» — продолжаю.", level='silent')
+            write_log_entry(log_id, "Дзен: Не удалось выбрать «Все пользователи» — продолжаю.", level='silent')
             write_log_entry(log_id, f"[dzen] Ошибка выбора опции: {_e}", level='silent')
     except Exception as _e:
         write_log_entry(log_id, "Дзен: Ошибка при настройке комментариев — продолжаю.", level='silent')
@@ -755,13 +756,15 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
         write_log_entry(log_id, "Дзен: Не удалось заполнить теги — продолжаю.")
         write_log_entry(log_id, f"[dzen] Ошибка тегов: {_e}", level='silent')
 
-    # ── Шаг 5.5: Выставляем «Все пользователи» в комментариях ───────────
-    # _handle_popups НЕ вызываем — он нажмёт «Опубликовать после обработки»
-    # раньше времени (confirm в _EXPECTED_ELEMENTS). Вместо него — только
-    # _dismiss_unknown: закрывает любые попапы (в т.ч. «Уже можно публиковать»)
-    # без обработки ожидаемых элементов.
-    _dismiss_unknown(page, log_id)
+    # ── Шаг 5.1: Выставляем «Все пользователи» в «Кто может комментировать»
+    # Сразу после тегов — контрол виден в той же модалке «Публикация ролика».
     _set_comments_all_users(page, log_id, batch_id)
+
+    # ── Шаг 5.5: Закрываем хинт «Уже можно публиковать», если появился ──
+    # _handle_popups НЕ вызываем — он нажмёт «Опубликовать после обработки»
+    # раньше времени (confirm в _EXPECTED_ELEMENTS). Только _dismiss_unknown,
+    # и только если попап реально есть в DOM.
+    _dismiss_unknown(page, log_id)
 
     # ── Шаг 6: Публикуем ─────────────────────────────────────────────────
     write_log_entry(log_id, "Дзен: Нажимаю «Опубликовать».")
