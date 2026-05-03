@@ -341,12 +341,12 @@ def _dismiss_unknown(page, log_id=None) -> None:
             return false;
         }""")
         if clicked_by_js:
-            write_log_entry(log_id, "[dzen] _dismiss_unknown: JS-клик по кнопке × в контейнере.", level='silent')
+            write_log_entry(log_id, "[dzen] _dismiss_unknown: JS-клик по кнопке × в контейнере.")
         else:
-            write_log_entry(log_id, "[dzen] _dismiss_unknown: JS-evaluate — кнопка × не найдена.", level='silent')
+            write_log_entry(log_id, "[dzen] _dismiss_unknown: JS-evaluate — кнопка × не найдена.")
         page.wait_for_timeout(200)
     except Exception as _e:
-        write_log_entry(log_id, f"[dzen] _dismiss_unknown: JS-evaluate упал: {_e}", level='silent')
+        write_log_entry(log_id, f"[dzen] _dismiss_unknown: JS-evaluate упал: {_e}")
 
     # ── 2. CSS-селекторы для стандартных модальных окон ───────────────────
     _css_clicked = False
