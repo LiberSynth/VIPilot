@@ -15,6 +15,7 @@ from db import (
     db_reorder_models,
     init_db,
     db_clear_all_history,
+    db_vacuum_full,
     env_get,
     env_set,
     db_create_adhoc_batch,
@@ -553,6 +554,24 @@ def api_clear_history():
         return jsonify({"ok": True, "deleted": result})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@bp.route("/vacuum_db", methods=["POST"])
+def api_vacuum_db():
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    try:
+        result = db_vacuum_full()
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+    if result.get("tables_failed", 0) > 0:
+        failed = [r["table"] for r in result.get("results", []) if not r.get("ok")]
+        return jsonify({
+            "ok": False,
+            "error": f"Сбой по таблицам: {', '.join(failed)}",
+            "result": result,
+        })
+    return jsonify({"ok": True, "result": result})
 
 
 @bp.route("/workflow/state", methods=["GET"])

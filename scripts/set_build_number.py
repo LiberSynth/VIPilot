@@ -9,6 +9,8 @@ import subprocess
 import sys
 import os
 
+import psycopg2
+
 _BUILD_FILE = os.path.join(os.path.dirname(__file__), '..', 'utils', '_build.py')
 
 
@@ -60,6 +62,35 @@ def main() -> None:
     except Exception as e:
         print(f'[set_build_number] Ошибка при установке Playwright: {e}', file=sys.stderr)
         sys.exit(1)
+
+    _install_pg_repack_extension()
+
+
+def _install_pg_repack_extension() -> None:
+    """Подключается к БД и создаёт extension pg_repack (идемпотентно).
+
+    Падает с exit(1), если DATABASE_URL не задан, БД недоступна или
+    CREATE EXTENSION завершился ошибкой — деплой без сжатия БД недопустим.
+    """
+    dsn = os.environ.get('DATABASE_URL')
+    if not dsn:
+        print('[set_build_number] DATABASE_URL не задан — невозможно создать extension pg_repack', file=sys.stderr)
+        sys.exit(1)
+    try:
+        conn = psycopg2.connect(dsn, connect_timeout=10)
+    except Exception as e:
+        print(f'[set_build_number] Не удалось подключиться к БД: {e}', file=sys.stderr)
+        sys.exit(1)
+    try:
+        conn.autocommit = True
+        with conn.cursor() as cur:
+            cur.execute('CREATE EXTENSION IF NOT EXISTS pg_repack')
+        print('[set_build_number] Extension pg_repack установлено (или уже было)')
+    except Exception as e:
+        print(f'[set_build_number] CREATE EXTENSION pg_repack упал: {e}', file=sys.stderr)
+        sys.exit(1)
+    finally:
+        conn.close()
 
 
 if __name__ == '__main__':

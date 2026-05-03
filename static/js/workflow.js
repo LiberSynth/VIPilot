@@ -241,3 +241,31 @@ function openClearHistoryDialog() {
     confirmBtn.disabled = inp.value !== PHRASE;
   });
 }
+
+function openVacuumDbDialog() {
+  new ConfirmDialog({
+    title: 'Сжать базу данных?',
+    text:
+      'Запустит pg_repack по всем таблицам схемы public. Операция онлайн — приложение не блокируется, но может занять несколько минут и временно требует свободного места на диске. Не запускайте во время деплоя.',
+    confirmLabel: 'Сжать',
+    onConfirm: function(btn, dlg) {
+      btn.disabled    = true;
+      btn.textContent = 'Сжимаем…';
+      fetch('/api/vacuum_db', { method: 'POST' })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          dlg.close();
+          var res  = data.result || {};
+          var mb   = ((res.freed_bytes || 0) / (1024 * 1024)).toFixed(1);
+          var base = 'таблиц: ' + (res.tables_ok || 0) + '/' + (res.tables_total || 0)
+                   + ', освобождено: ' + mb + ' МБ';
+          if (data.ok) {
+            showToast('БД сжата (' + base + ')', 'success');
+          } else {
+            showToast('Сжатие с ошибками: ' + (data.error || 'неизвестная ошибка') + ' (' + base + ')', 'error');
+          }
+        })
+        .catch(function() { dlg.close(); showToast('Ошибка соединения', 'error'); });
+    },
+  }).open();
+}

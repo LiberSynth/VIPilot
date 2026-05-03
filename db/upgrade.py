@@ -108,6 +108,49 @@ def _check_chromium() -> tuple[bool, str]:
         return False, f'chromium: {e}'
 
 
+def _check_pg_repack() -> tuple[bool, str]:
+    """Проверяет CLI pg_repack и серверное extension pg_repack.
+
+    Если extension не установлен — пытается создать его сам (по образцу
+    `_check_chromium`, который сам устанавливает Chromium). Возвращает False
+    только если: нет CLI; CREATE EXTENSION упал; версии CLI и extension
+    не совпадают.
+    """
+    cli_path = shutil.which('pg_repack')
+    if not cli_path:
+        return False, 'pg_repack: CLI не найден (добавь pg_repack в replit.nix)'
+    try:
+        r = subprocess.run(['pg_repack', '--version'], capture_output=True, timeout=5)
+        out = (r.stdout.decode() + r.stderr.decode()).strip()
+        cli_ver = out.split()[-1] if out else ''
+    except Exception as e:
+        return False, f'pg_repack: ошибка вызова CLI — {e}'
+    if not cli_ver:
+        return False, f'pg_repack: не удалось распарсить версию CLI ({out!r})'
+
+    try:
+        from db.connection import get_db
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT extversion FROM pg_extension WHERE extname='pg_repack'")
+                row = cur.fetchone()
+                if not row:
+                    write_log_entry(None, '[upgrade] pg_repack extension отсутствует — устанавливаю.', level='silent')
+                    cur.execute('CREATE EXTENSION IF NOT EXISTS pg_repack')
+                    conn.commit()
+                    cur.execute("SELECT extversion FROM pg_extension WHERE extname='pg_repack'")
+                    row = cur.fetchone()
+                    if not row:
+                        return False, 'pg_repack: установка extension не дала результата'
+                ext_ver = row[0]
+    except Exception as e:
+        return False, f'pg_repack: ошибка установки/чтения extension — {e}'
+
+    if cli_ver != ext_ver:
+        return False, f'pg_repack: версии не совпадают (CLI={cli_ver}, extension={ext_ver})'
+    return True, f'pg_repack {cli_ver} (CLI и extension)'
+
+
 def _check_model_durations() -> tuple[bool, str]:
     try:
         from db.connection import get_db
@@ -140,6 +183,7 @@ _CHECKS = [
     ('psycopg2',   _check_psycopg2),
     ('playwright', _check_playwright),
     ('chromium',   _check_chromium),
+    ('pg_repack',  _check_pg_repack),
 ]
 
 _POST_MIGRATION_CHECKS = [
