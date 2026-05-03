@@ -33,13 +33,18 @@ from log.log import write_log_entry
 
 
 def _m098(cur):
-    """Привязка ролика 798fefe4 к сюжету «В Шортс зайдет».
+    """Перепривязка батчей к корректным роликам/сюжетам.
 
     Deployed: 2026-05-03
     """
     cur.execute(
         "UPDATE batches SET story_id = %s WHERE id = %s",
         ('12846310-e053-4dd5-bc02-776e98a556c4',
+         '9040e1f1-dbb8-4a81-8355-1188dcc2878a'),
+    )
+    cur.execute(
+        "UPDATE batches SET movie_id = %s WHERE id = %s",
+        ('561567c5-16f3-4a58-8bc8-4ce9ed9ddba9',
          '9040e1f1-dbb8-4a81-8355-1188dcc2878a'),
     )
 
