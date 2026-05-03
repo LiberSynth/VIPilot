@@ -304,23 +304,81 @@ _EXPECTED_ELEMENTS = [
 ]
 
 
-def _dismiss_unknown(page, log_id=None) -> None:
-    """Закрывает неизвестный попап/диалог/хинт: Escape + стандартные кнопки закрытия.
+def _detect_unknown_popup(page) -> bool:
+    """Проверяет DOM на наличие неизвестного попапа/хинта.
 
-    Порядок попыток:
-    1. JS evaluate — ищет visible кнопку × (или ×-эквивалент) внутри любого
-       floating/notice/hint/widget контейнера.  Работает для inline-уведомлений
-       Дзена, у которых нет стандартных aria-label.
-    2. Стандартные CSS-селекторы для модальных окон и диалогов.
-    3. Escape — резерв на случай модального оверлея.
+    Ищет видимые контейнеры по двум признакам:
+    A. Текст известных хинтов («Уже можно публиковать», «Видео появится»,
+       «Добро пожаловать»).
+    B. Класс контейнера notice/hint/popup/toast/overlay/helper-tooltip и т.п.,
+       внутри которого есть кнопка-крестик ×.
+    Возвращает True, если такой контейнер найден.
     """
-    write_log_entry(log_id, "Дзен: Закрываю неизвестный попап/хинт.")
+    try:
+        return bool(page.evaluate("""() => {
+            const CLOSE_CHARS = new Set(['\u00d7', '\u2715', '\u2716', '\u2717', 'x', 'X', '\u2613']);
+            const HINT_TEXTS  = [
+                '\u0423\u0436\u0435 \u043c\u043e\u0436\u043d\u043e \u043f\u0443\u0431\u043b\u0438\u043a\u043e\u0432\u0430\u0442\u044c',
+                '\u0412\u0438\u0434\u0435\u043e \u043f\u043e\u044f\u0432\u0438\u0442\u0441\u044f',
+                '\u0414\u043e\u0431\u0440\u043e \u043f\u043e\u0436\u0430\u043b\u043e\u0432\u0430\u0442\u044c',
+            ];
 
-    # ── 1. JS evaluate: ищем кнопку-крестик внутри контейнера хинта ────────
-    # Стратегия A: контент-based — ищем хинт по известному тексту и кликаем ×
-    #              строго внутри него (теговые кнопки × не попадают).
-    # Стратегия B: class-based  — запасная, для контейнеров с классами
-    #              notice/hint/popup и т.п.
+            function hasCloseBtn(container) {
+                const btns = container.querySelectorAll('button');
+                for (const btn of btns) {
+                    const t = (btn.textContent || '').trim();
+                    if (t.length <= 2 && (CLOSE_CHARS.has(t) || CLOSE_CHARS.has(t[0]))) return true;
+                }
+                return false;
+            }
+
+            // A. По тексту хинта
+            const candidates = document.querySelectorAll('div, section, aside, article');
+            for (const el of candidates) {
+                if (!el.offsetParent) continue;
+                if (el.children.length > 12) continue;
+                const text = el.textContent || '';
+                if (HINT_TEXTS.some(t => text.includes(t))) return true;
+            }
+
+            // B. По классу контейнера + наличие × внутри
+            const containers = document.querySelectorAll(
+                '[class*="helper-tooltip"], '
+                + '[class*="notice"], [class*="Notice"], [class*="notification"], [class*="Notification"], '
+                + '[class*="hint"], [class*="Hint"], [class*="widget"], [class*="Widget"], '
+                + '[class*="popup"], [class*="Popup"], [class*="toast"], [class*="Toast"], '
+                + '[class*="overlay"], [class*="Overlay"]'
+            );
+            for (const c of containers) {
+                if (!c.offsetParent) continue;
+                if (hasCloseBtn(c)) return true;
+            }
+
+            return false;
+        }"""))
+    except Exception:
+        return False
+
+
+def _dismiss_unknown(page, log_id=None) -> None:
+    """Закрывает неизвестный попап/диалог/хинт — но только если он реально есть.
+
+    Алгоритм:
+    0. Детектирует наличие неизвестного попапа в DOM. Если ничего не найдено —
+       выходит без действий (никакого Escape вслепую — иначе можно закрыть
+       полезное окно).
+    1. JS-клик по × строго внутри контейнера хинта/попапа.
+    2. CSS-селекторы кнопок закрытия — резерв.
+    3. Escape — последний резерв, только если предыдущие шаги не сработали
+       и попап всё ещё в DOM.
+    """
+    if not _detect_unknown_popup(page):
+        write_log_entry(log_id, "[dzen] _dismiss_unknown: попап не обнаружен — пропускаю.", level='silent')
+        return
+
+    write_log_entry(log_id, "Дзен: Обнаружен неизвестный попап/хинт, закрываю.")
+
+    # ── 1. JS-клик по × внутри контейнера хинта ───────────────────────────
     clicked_by_js = False
     try:
         clicked_by_js = page.evaluate("""() => {
@@ -343,20 +401,20 @@ def _dismiss_unknown(page, log_id=None) -> None:
                 return false;
             }
 
-            // Стратегия A: ищем хинт-контейнер по тексту
+            // A. Контейнер хинта по известному тексту
             const candidates = document.querySelectorAll('div, section, aside, article');
             for (const el of candidates) {
                 if (!el.offsetParent) continue;
-                // Берём только «листовые» контейнеры — не body, не html, не весь page
                 if (el.children.length > 12) continue;
                 const text = el.textContent || '';
                 if (!HINT_TEXTS.some(t => text.includes(t))) continue;
                 if (closeBtn(el)) return true;
             }
 
-            // Стратегия B: class-based — запасная
+            // B. Контейнер по классу
             const containers = document.querySelectorAll(
-                '[class*="notice"], [class*="Notice"], [class*="notification"], [class*="Notification"], '
+                '[class*="helper-tooltip"], '
+                + '[class*="notice"], [class*="Notice"], [class*="notification"], [class*="Notification"], '
                 + '[class*="hint"], [class*="Hint"], [class*="widget"], [class*="Widget"], '
                 + '[class*="popup"], [class*="Popup"], [class*="toast"], [class*="Toast"], '
                 + '[class*="overlay"], [class*="Overlay"]'
@@ -368,18 +426,20 @@ def _dismiss_unknown(page, log_id=None) -> None:
 
             return false;
         }""")
-        if clicked_by_js:
-            write_log_entry(log_id, "[dzen] _dismiss_unknown: JS-клик по кнопке × в контейнере.", level='silent')
-        else:
-            write_log_entry(log_id, "[dzen] _dismiss_unknown: JS-evaluate — кнопка × не найдена.", level='silent')
         page.wait_for_timeout(200)
+        write_log_entry(log_id, f"[dzen] _dismiss_unknown: JS-клик → {clicked_by_js}", level='silent')
     except Exception as _e:
         write_log_entry(log_id, f"[dzen] _dismiss_unknown: JS-evaluate упал: {_e}", level='silent')
 
-    # ── 2. CSS-селекторы для стандартных модальных окон ───────────────────
+    # Если JS закрыл и попапа больше нет — выходим, не дёргаем CSS/Escape.
+    if clicked_by_js and not _detect_unknown_popup(page):
+        write_log_entry(log_id, "Дзен: Неизвестный попап/хинт закрыт (JS).")
+        return
+
+    # ── 2. CSS-селекторы кнопок закрытия ──────────────────────────────────
     _css_clicked = False
     for sel in [
-        "[class*='helper-tooltip__closeButton']",  # хинт «Уже можно публиковать»
+        "[class*='helper-tooltip__closeButton']",
         "[data-testid='modal-overlay']",
         "[class*='modal-close']",
         "[class*='modalClose']",
@@ -398,21 +458,27 @@ def _dismiss_unknown(page, log_id=None) -> None:
                 break
         except Exception:
             pass
-    if not _css_clicked:
-        write_log_entry(log_id, "[dzen] _dismiss_unknown: CSS-селекторы — ничего не найдено.", level='silent')
 
-    # ── 3. Escape — резерв ───────────────────────────────────────────────
+    if _css_clicked and not _detect_unknown_popup(page):
+        write_log_entry(log_id, "Дзен: Неизвестный попап/хинт закрыт (CSS).")
+        return
+
+    # ── 3. Escape — последний резерв, только если попап всё ещё в DOM ─────
+    if not _detect_unknown_popup(page):
+        write_log_entry(log_id, "Дзен: Неизвестный попап/хинт закрыт.")
+        return
+
     try:
         page.keyboard.press("Escape")
-        write_log_entry(log_id, "[dzen] _dismiss_unknown: Escape нажат (резерв).", level='silent')
+        write_log_entry(log_id, "[dzen] _dismiss_unknown: Escape нажат (попап всё ещё в DOM).", level='silent')
         page.wait_for_timeout(200)
     except Exception as _e:
         write_log_entry(log_id, f"[dzen] _dismiss_unknown: Escape упал: {_e}", level='silent')
 
-    if clicked_by_js or _css_clicked:
-        write_log_entry(log_id, "Дзен: Неизвестный попап/хинт закрыт.")
+    if _detect_unknown_popup(page):
+        write_log_entry(log_id, "Дзен: Не удалось закрыть неизвестный попап/хинт.", level='warn')
     else:
-        write_log_entry(log_id, "Дзен: Неизвестный попап/хинт не обнаружен.")
+        write_log_entry(log_id, "Дзен: Неизвестный попап/хинт закрыт (Escape).")
 
 
 def _set_comments_all_users(page, log_id, batch_id=None) -> None:
