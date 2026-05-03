@@ -416,56 +416,115 @@ def _set_comments_all_users(page, log_id, batch_id=None) -> None:
             _snap(page, batch_id)
             return
 
-        # ── Под кнопкой-триггером лежит настоящий <select> с <option value="visible">.
-        # Выставляем значение напрямую через нативный setter, чтобы React
-        # подхватил change-event (controlled component).
-        result = page.evaluate(
-            """({targetValue, targetText}) => {
-                const trigger = document.querySelector('[data-testid="select-trigger-button-comment"]');
-                if (!trigger) return {ok: false, reason: 'no_trigger'};
+        # ── Кликаем триггер и ищем реальную опцию в выпавшем поповере ──
+        trigger.scroll_into_view_if_needed(timeout=2_000)
+        trigger.click()
+        page.wait_for_timeout(800)
 
-                // Поднимаемся вверх по DOM, ищем <select> рядом с триггером.
-                let node = trigger;
-                let sel = null;
-                for (let i = 0; i < 8 && node; i++) {
-                    sel = node.querySelector ? node.querySelector('select') : null;
-                    if (sel) break;
-                    node = node.parentElement;
+        # Инструментация: дампим в лог ВСЕ видимые кандидаты с текстом «Все пользователи»
+        # — реальные tag/class/testid, чтобы видеть, какой селектор использовать.
+        candidates = page.evaluate(
+            """(target) => {
+                const all = document.querySelectorAll('*');
+                const out = [];
+                const TAG_SKIP = new Set(['HTML','BODY','MAIN','ARTICLE','SECTION','HEADER','FOOTER','NAV','FORM','DIV']);
+                for (const el of all) {
+                    if (out.length >= 30) break;
+                    let txt = '';
+                    try { txt = (el.textContent || '').trim(); } catch (_) { continue; }
+                    if (!txt.includes(target)) continue;
+                    // Только листовые: текст узла без вложенных совпадений
+                    let leaf = true;
+                    for (const ch of el.children) {
+                        if ((ch.textContent || '').includes(target)) { leaf = false; break; }
+                    }
+                    if (!leaf) continue;
+                    const r = el.getBoundingClientRect();
+                    if (r.width < 4 || r.height < 4) continue;
+                    const cs = getComputedStyle(el);
+                    if (cs.visibility === 'hidden' || cs.display === 'none') continue;
+                    out.push({
+                        tag: el.tagName,
+                        cls: (el.getAttribute('class') || '').slice(0, 200),
+                        testid: el.getAttribute('data-testid') || '',
+                        role: el.getAttribute('role') || '',
+                        parentTag: el.parentElement ? el.parentElement.tagName : '',
+                        parentTestid: el.parentElement ? (el.parentElement.getAttribute('data-testid') || '') : '',
+                        parentRole: el.parentElement ? (el.parentElement.getAttribute('role') || '') : '',
+                        rect: {w: Math.round(r.width), h: Math.round(r.height), x: Math.round(r.x), y: Math.round(r.y)},
+                    });
                 }
-                if (!sel) return {ok: false, reason: 'no_select'};
-
-                const opts = Array.from(sel.options || []);
-                let idx = opts.findIndex(o => o.value === targetValue);
-                if (idx < 0) idx = opts.findIndex(o => (o.text || o.textContent || '').includes(targetText));
-                if (idx < 0) return {ok: false, reason: 'no_option', values: opts.map(o => o.value)};
-
-                if (sel.selectedIndex === idx) return {ok: true, reason: 'already', value: opts[idx].value};
-
-                // React 18 controlled <select>: используем нативный value setter,
-                // чтобы React увидел изменение через onChange.
-                const proto = window.HTMLSelectElement.prototype;
-                const setter = Object.getOwnPropertyDescriptor(proto, 'value').set;
-                setter.call(sel, opts[idx].value);
-                sel.dispatchEvent(new Event('change', {bubbles: true}));
-                sel.dispatchEvent(new Event('input',  {bubbles: true}));
-                return {ok: true, reason: 'done', value: opts[idx].value};
+                return out;
             }""",
-            {"targetValue": _TARGET_VALUE, "targetText": _TARGET},
+            _TARGET,
         )
+        write_log_entry(log_id, f"[dzen] _set_comments: кандидаты «{_TARGET}» (visible, leaf): {candidates!r}", level='silent')
 
-        write_log_entry(log_id, f"[dzen] _set_comments: native-select → {result!r}", level='silent')
+        # Пытаемся кликнуть по самому глубокому листовому элементу (опция меню).
+        # Сначала пробуем явные «правильные» паттерны, потом — любой видимый листовой.
+        clicked = page.evaluate(
+            """(target) => {
+                function visible(el) {
+                    if (!el || !el.isConnected) return false;
+                    const cs = getComputedStyle(el);
+                    if (cs.display === 'none' || cs.visibility === 'hidden') return false;
+                    const r = el.getBoundingClientRect();
+                    return r.width >= 4 && r.height >= 4;
+                }
+                function leafContains(el) {
+                    if (!(el.textContent || '').includes(target)) return false;
+                    for (const ch of el.children) {
+                        if ((ch.textContent || '').includes(target)) return false;
+                    }
+                    return true;
+                }
+                // Кандидаты по убыванию приоритета:
+                const selectors = [
+                    'li[role="option"]', 'div[role="option"]', '[role="option"]',
+                    'li[data-testid="menu-v2-item"]',
+                    '[class*="menu__menuItem"]', '[class*="menuItem"]',
+                    '[class*="context-menu__item"]',
+                    'li', 'a', 'button', 'span', 'div',
+                ];
+                for (const sel of selectors) {
+                    const list = document.querySelectorAll(sel);
+                    for (const el of list) {
+                        if (!visible(el)) continue;
+                        if (!leafContains(el)) continue;
+                        // Не кликаем по триггеру (его текст «Подписчики» не содержит target).
+                        // Не кликаем по элементам с aria-expanded (это сами триггеры).
+                        if (el.hasAttribute('aria-expanded')) continue;
+                        // Кликаем — возвращаем какой селектор сработал.
+                        try {
+                            el.click();
+                            return {ok: true, selector: sel, tag: el.tagName, cls: (el.getAttribute('class') || '').slice(0, 120)};
+                        } catch (_e) {
+                            return {ok: false, reason: 'click_failed', selector: sel};
+                        }
+                    }
+                }
+                return {ok: false, reason: 'no_leaf'};
+            }""",
+            _TARGET,
+        )
+        write_log_entry(log_id, f"[dzen] _set_comments: попытка клика → {clicked!r}", level='silent')
 
-        if not result.get("ok"):
+        if not clicked.get("ok"):
+            # Закрываем дропдаун, чтобы не мешал.
+            try:
+                page.keyboard.press("Escape")
+            except Exception:
+                pass
             write_log_entry(
                 log_id,
-                f"Дзен: Не удалось выставить «Все пользователи» — {result.get('reason')}.",
+                f"Дзен: Не удалось кликнуть «Все пользователи» — {clicked.get('reason')}.",
                 level='warn',
             )
             _snap(page, batch_id)
             return
 
         # ── Верификация: триггер ДОЛЖЕН теперь показывать «Все пользователи» ──
-        page.wait_for_timeout(400)
+        page.wait_for_timeout(500)
         try:
             new_text = (trigger.inner_text() or "").strip()
         except Exception:
