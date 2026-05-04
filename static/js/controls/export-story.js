@@ -22,12 +22,22 @@
     setTimeout(function() { btn.classList.remove('copied'); }, 2000);
   };
 
-  function _writeManualBlock(title, content, btn) {
-    var block = '/* Ручной сюжет НАЧАЛО */\n' + (title || '') + '\n\n' + (content || '') + '\n/* Ручной сюжет КОНЕЦ */';
-    _clipBuffer = block;
+  function _appendBlock(blockFactory, btn) {
+    var isFirst = (_clipBuffer === null);
+    var block = blockFactory(isFirst);
+    var toWrite = isFirst ? block : (_clipBuffer + '\n\n' + block);
+    _clipBuffer = toWrite;
     clearTimeout(_clipTimer);
     _clipTimer = setTimeout(_resetBuffer, ACCUMULATE_MS);
-    navigator.clipboard.writeText(block).then(function() { window.flashCopied(btn); }).catch(function() {});
+    navigator.clipboard.writeText(toWrite).then(function() { window.flashCopied(btn); }).catch(function() {});
+  }
+
+  function _manualBlock(title, content) {
+    return '/* Ручной сюжет НАЧАЛО */\n' + (title || '') + '\n\n' + (content || '') + '\n/* Ручной сюжет КОНЕЦ */';
+  }
+
+  function _writeManualBlock(title, content, btn) {
+    _appendBlock(function() { return _manualBlock(title, content); }, btn);
   }
 
   window.exportStory = function(storyId, btn) {
@@ -53,25 +63,20 @@
         var configLines = Object.keys(body).filter(function(k) { return !SKIP_KEYS[k]; }).map(function(k) { return k + ': ' + body[k]; });
         var answer = d.title ? d.title + '\n\n' + d.text : d.text;
 
-        var modelBlock = '/* Текстовая модель: ' + modelLabel + ' */';
-        if (configLines.length) {
-          modelBlock += '\n' + window.wrapBlock('Конфиг модели', configLines.join('\n'));
-        }
-        var answerBlock = window.wrapBlock('Ответ текстовой модели', answer);
-
-        var toWrite;
-        if (_clipBuffer === null) {
-          var promptBlock = window.wrapBlock('Системный промпт', d.format_prompt || '');
-          promptBlock += '\n\n' + window.wrapBlock('Промпт', d.user_prompt || '');
-          toWrite = promptBlock + '\n\n' + modelBlock + '\n' + answerBlock;
-        } else {
-          toWrite = _clipBuffer + '\n\n' + modelBlock + '\n' + answerBlock;
-        }
-
-        _clipBuffer = toWrite;
-        clearTimeout(_clipTimer);
-        _clipTimer = setTimeout(_resetBuffer, ACCUMULATE_MS);
-        navigator.clipboard.writeText(toWrite).then(function() { window.flashCopied(btn); }).catch(function() {});
+        _appendBlock(function(isFirst) {
+          var modelBlock = '/* Текстовая модель: ' + modelLabel + ' */';
+          if (configLines.length) {
+            modelBlock += '\n' + window.wrapBlock('Конфиг модели', configLines.join('\n'));
+          }
+          var answerBlock = window.wrapBlock('Ответ текстовой модели', answer);
+          var tail = modelBlock + '\n' + answerBlock;
+          if (isFirst) {
+            var promptBlock = window.wrapBlock('Системный промпт', d.format_prompt || '');
+            promptBlock += '\n\n' + window.wrapBlock('Промпт', d.user_prompt || '');
+            return promptBlock + '\n\n' + tail;
+          }
+          return tail;
+        }, btn);
       })
       .catch(function() {});
   };
