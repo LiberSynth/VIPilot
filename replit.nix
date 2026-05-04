@@ -1,5 +1,6 @@
 {pkgs}: {
   deps = [
+    pkgs.zip
     pkgs.postgresql16Packages.pg_repack
     pkgs.libgbm
     pkgs.dbus
