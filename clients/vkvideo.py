@@ -24,7 +24,7 @@ from utils.utils import fmt_id_msg
 from routes.api import publication_file_name, hashtags
 
 
-_NAV_TIMEOUT  = 180_000  # ms — таймаут навигации (3 минуты)
+_NAV_TIMEOUT  = 60_000   # ms — таймаут одной попытки навигации (1 минута; до 5 попыток с интервалом 30 с)
 _UPLOAD_WAIT  = 180_000  # ms — ожидание завершения загрузки (до 3 минут)
 
 
@@ -180,7 +180,20 @@ def _publish_ui(page, club_id: str, video_path: str, pub_title: str, log_id, bat
     # ── Шаг 1: Переходим в кабинет с параметром uploader ─────────────────
     write_log_entry(log_id, "VK Видео: Переход в кабинет автора.")
     _snap(page, batch_id)
-    page.goto(cabinet_url, wait_until="domcontentloaded", timeout=_NAV_TIMEOUT)
+    _last_err = None
+    for _attempt in range(1, 6):
+        try:
+            page.goto(cabinet_url, wait_until="domcontentloaded", timeout=_NAV_TIMEOUT)
+            _last_err = None
+            break
+        except Exception as _e:
+            _last_err = _e
+            write_log_entry(log_id, f"VK Видео: попытка {_attempt}/5 перейти в кабинет не удалась: {_e}", level='warn')
+            if _attempt < 5:
+                _snap(page, batch_id)
+                _time.sleep(30)
+    if _last_err is not None:
+        raise VkVideoApiError(f"Не удалось перейти в кабинет VK Видео после 5 попыток: {_last_err}") from _last_err
     _snap(page, batch_id)
 
     cur = page.url
