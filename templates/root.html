@@ -273,15 +273,6 @@
           <div class="hint" style="margin-top:6px">Онлайн-дефрагментация таблиц через pg_repack: приложение не блокируется. Может занять несколько минут, временно требует свободного места на диске (примерно равного размеру самой большой таблицы). Не запускайте во время деплоя.</div>
         </div>
 
-        <div style="margin-top:8px;padding-top:8px;border-top:1px solid #1e1e28">
-          <button type="button" id="btn-db-backup" class="btn-secondary" onclick="openCreateBackupDialog(this)">Создать бэкап</button>
-          <div class="hint" style="margin-top:6px">Снимает полный сжатый дамп базы и скачивает его одним файлом. Файл может содержать чувствительные данные приложения — храните его в надёжном месте.</div>
-        </div>
-
-        <div style="margin-top:8px;padding-top:8px;border-top:1px solid #1e1e28">
-          <button type="button" id="btn-db-restore" class="btn-secondary" onclick="openRestoreBackupDialog(this)">Восстановить из бэкапа</button>
-          <div class="hint" style="margin-top:6px">Полностью заменяет текущую базу содержимым выбранного файла бэкапа. Операция атомарна: при ошибке текущая база остаётся нетронутой. На время восстановления движок автоматически останавливается.</div>
-        </div>
       </div>
 
     </form>
@@ -319,7 +310,6 @@
 <script src="/static/js/controls/export-story.js"></script>
 <script src="/static/js/controls/dialog.js"></script>
 <script src="/static/js/controls/confirm-dialog.js"></script>
-<script src="/static/js/controls/progress-dialog.js"></script>
 <script src="/static/js/controls/accordion-list.js"></script>
 <script src="/static/js/workflow.js"></script>
 <script src="/static/js/settings.js"></script>

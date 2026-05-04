@@ -4,7 +4,7 @@ import threading
 import time
 import io
 from datetime import datetime, timezone, timedelta
-from flask import Blueprint, jsonify, request, Response, send_file, stream_with_context
+from flask import Blueprint, jsonify, request, Response, send_file
 
 from db import (
     db_get_schedule,
@@ -16,16 +16,6 @@ from db import (
     init_db,
     db_clear_all_history,
     db_vacuum_full,
-    db_backup_check_available,
-    db_restore_check_available,
-    start_db_backup,
-    cancel_db_backup,
-    get_db_backup_state,
-    stream_db_backup_for_download,
-    get_backup_download_filename,
-    start_db_restore_from_path,
-    cancel_db_restore,
-    get_db_restore_state,
 )
 from db import (
     env_get,
@@ -583,115 +573,6 @@ def api_vacuum_db():
         })
     return jsonify({"ok": True, "result": result})
 
-
-@bp.route("/db_op/status", methods=["GET"])
-def api_db_op_status():
-    if not is_authenticated():
-        return jsonify({"error": "unauthorized"}), 401
-    return jsonify({
-        "backup": get_db_backup_state(),
-        "restore": get_db_restore_state(),
-    })
-
-
-@bp.route("/db_backup/start", methods=["POST"])
-def api_db_backup_start():
-    if not is_authenticated():
-        return jsonify({"error": "unauthorized"}), 401
-    try:
-        state = start_db_backup()
-        return jsonify({"ok": True, "state": state})
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 409
-
-
-@bp.route("/db_backup/cancel", methods=["POST"])
-def api_db_backup_cancel():
-    if not is_authenticated():
-        return jsonify({"error": "unauthorized"}), 401
-    state = cancel_db_backup()
-    return jsonify({"ok": True, "state": state})
-
-
-@bp.route("/db_backup/download", methods=["GET"])
-def api_db_backup_download():
-    if not is_authenticated():
-        return jsonify({"error": "unauthorized"}), 401
-    state = get_db_backup_state()
-    if state.get('state') != 'ready':
-        return jsonify({
-            "ok": False,
-            "error": f"Файл бэкапа не готов (state={state.get('state')})",
-        }), 409
-    fname = get_backup_download_filename()
-    try:
-        gen = stream_db_backup_for_download()
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
-    return Response(
-        stream_with_context(gen),
-        mimetype='application/octet-stream',
-        headers={
-            'Content-Disposition': f'attachment; filename="{fname}"',
-            'Cache-Control': 'no-store',
-            'X-Content-Type-Options': 'nosniff',
-        },
-    )
-
-
-@bp.route("/db_restore/start", methods=["POST"])
-def api_db_restore_start():
-    if not is_authenticated():
-        return jsonify({"error": "unauthorized"}), 401
-
-    cur = get_db_restore_state()
-    if cur.get('state') == 'running':
-        return jsonify({"ok": False, "error": "Восстановление уже выполняется", "state": cur}), 409
-    cur_b = get_db_backup_state()
-    if cur_b.get('state') in ('running', 'ready'):
-        return jsonify({"ok": False, "error": "Идёт операция бэкапа", "state": cur_b}), 409
-
-    import tempfile
-    tmp = tempfile.NamedTemporaryFile(
-        prefix='vipilot-restore-', suffix='.dump', delete=False, dir='/tmp',
-    )
-    tmp_path = tmp.name
-    try:
-        chunk_size = 1 << 20
-        try:
-            stream = request.stream
-            while True:
-                chunk = stream.read(chunk_size)
-                if not chunk:
-                    break
-                tmp.write(chunk)
-        finally:
-            tmp.close()
-
-        if os.path.getsize(tmp_path) == 0:
-            os.unlink(tmp_path)
-            return jsonify({"ok": False, "error": "Пустой файл бэкапа"}), 400
-
-        write_log_entry(
-            None,
-            f'[api] Восстановление БД: принят файл ({os.path.getsize(tmp_path)} байт), tmp={tmp_path}',
-            level='silent',
-        )
-        state = start_db_restore_from_path(tmp_path)
-        return jsonify({"ok": True, "state": state}), 202
-    except Exception as e:
-        try: os.unlink(tmp_path)
-        except Exception: pass
-        write_log_entry(None, f'[api] Восстановление БД: ошибка приёма файла: {e}', level='silent')
-        return jsonify({"ok": False, "error": str(e)}), 500
-
-
-@bp.route("/db_restore/cancel", methods=["POST"])
-def api_db_restore_cancel():
-    if not is_authenticated():
-        return jsonify({"error": "unauthorized"}), 401
-    state = cancel_db_restore()
-    return jsonify({"ok": True, "state": state})
 
 
 @bp.route("/workflow/state", methods=["GET"])
