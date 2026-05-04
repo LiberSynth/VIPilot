@@ -304,6 +304,19 @@ def db_get_story_title(story_id):
     return row[0] if row else None
 
 
+def db_get_story_flags(story_id):
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT model_id IS NOT NULL, manual_changed FROM stories WHERE id = %s",
+                (story_id,),
+            )
+            row = cur.fetchone()
+    if not row:
+        return None
+    return {"ai_generated": bool(row[0]), "manual_changed": bool(row[1])}
+
+
 def db_get_story_model_info(story_id):
     with get_db() as conn:
         with conn.cursor() as cur:

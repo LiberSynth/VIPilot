@@ -264,6 +264,7 @@ def bootstrap():
                 RETURNS void LANGUAGE plpgsql AS $$
                 DECLARE
                     v_donor_id uuid;
+                    v_donated_status text := 'donated';
                 BEGIN
                     PERFORM pg_advisory_xact_lock(hashtext('donor_claim'));
                     SELECT b.id INTO v_donor_id
@@ -275,7 +276,7 @@ def bootstrap():
                     ORDER BY b.created_at ASC
                     LIMIT 1 FOR UPDATE OF b;
                     IF v_donor_id IS NULL THEN RETURN; END IF;
-                    UPDATE batches SET status = 'donated' WHERE id = v_donor_id;
+                    UPDATE batches SET status = v_donated_status WHERE id = v_donor_id;
                     UPDATE batches
                     SET data = COALESCE(data, '{}'::jsonb)
                             || jsonb_build_object('donor_batch_id', v_donor_id::text)

@@ -34,6 +34,7 @@ from db import (
     db_reset_batch_pipeline,
     db_get_story_text,
     db_get_story_title,
+    db_get_story_flags,
     db_get_story_model_info,
     db_get_batch_video_data,
     db_get_movie_video_data,
@@ -923,6 +924,7 @@ def api_get_story(story_id):
     platform_name = model_info["platform_name"] if model_info else ""
     model_name = model_info["model_name"] if model_info else ""
     model_body = model_info["body"] if model_info else None
+    flags = db_get_story_flags(story_id) or {}
     return jsonify(
         {
             "text": text,
@@ -932,6 +934,8 @@ def api_get_story(story_id):
             "platform_name": platform_name,
             "model_name": model_name,
             "model_body": model_body,
+            "ai_generated": flags.get("ai_generated", False),
+            "manual_changed": flags.get("manual_changed", False),
         }
     )
 
