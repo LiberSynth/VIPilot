@@ -4,7 +4,7 @@ import threading
 import time
 import io
 from datetime import datetime, timezone, timedelta
-from flask import Blueprint, jsonify, request, Response, send_file
+from flask import Blueprint, jsonify, request, Response, send_file, stream_with_context
 
 from db import (
     db_get_schedule,
@@ -16,6 +16,14 @@ from db import (
     init_db,
     db_clear_all_history,
     db_vacuum_full,
+    db_backup_check_available,
+    db_backup_stream,
+    db_restore_check_available,
+    db_restore_from_file,
+    is_db_restore_in_progress,
+)
+from db.db_service import RestoreBusyError
+from db import (
     env_get,
     env_set,
     db_create_adhoc_batch,
@@ -572,6 +580,89 @@ def api_vacuum_db():
             "result": result,
         })
     return jsonify({"ok": True, "result": result})
+
+
+@bp.route("/db_backup", methods=["GET"])
+def api_db_backup():
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    ok, err = db_backup_check_available()
+    if not ok:
+        return jsonify({"ok": False, "error": err}), 500
+    fname = 'vipilot-' + datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S') + '.dump'
+    return Response(
+        stream_with_context(db_backup_stream()),
+        mimetype='application/octet-stream',
+        headers={
+            'Content-Disposition': f'attachment; filename="{fname}"',
+            'Cache-Control': 'no-store',
+            'X-Content-Type-Options': 'nosniff',
+        },
+    )
+
+
+@bp.route("/db_restore/status", methods=["GET"])
+def api_db_restore_status():
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    return jsonify({"in_progress": is_db_restore_in_progress()})
+
+
+@bp.route("/db_restore", methods=["POST"])
+def api_db_restore():
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    if is_db_restore_in_progress():
+        return jsonify({"ok": False, "error": "Восстановление уже выполняется"}), 409
+    ok, err = db_restore_check_available()
+    if not ok:
+        return jsonify({"ok": False, "error": err}), 500
+
+    import tempfile
+    tmp = tempfile.NamedTemporaryFile(
+        prefix='vipilot-restore-', suffix='.dump', delete=False,
+    )
+    tmp_path = tmp.name
+    was_running = False
+    paused_here = False
+    try:
+        chunk_size = 1 << 20
+        try:
+            stream = request.stream
+            while True:
+                chunk = stream.read(chunk_size)
+                if not chunk:
+                    break
+                tmp.write(chunk)
+        finally:
+            tmp.close()
+
+        if os.path.getsize(tmp_path) == 0:
+            return jsonify({"ok": False, "error": "Пустой файл бэкапа"}), 400
+
+        was_running = env_get("workflow_state", "running") != "pause"
+        if was_running:
+            env_set("workflow_state", "pause")
+            environment.set_paused()
+            paused_here = True
+            write_log_entry(None, "[api] Движок приостановлен на время восстановления БД", level='silent')
+
+        db_restore_from_file(tmp_path)
+        return jsonify({"ok": True})
+    except RestoreBusyError as e:
+        return jsonify({"ok": False, "error": str(e)}), 409
+    except Exception as e:
+        write_log_entry(None, f"[api] Ошибка восстановления БД: {e}", level='silent')
+        return jsonify({"ok": False, "error": str(e)}), 500
+    finally:
+        if paused_here:
+            env_set("workflow_state", "running")
+            environment.set_running()
+            write_log_entry(None, "[api] Движок возобновлён после восстановления БД", level='silent')
+        try:
+            os.unlink(tmp_path)
+        except Exception:
+            pass
 
 
 @bp.route("/workflow/state", methods=["GET"])

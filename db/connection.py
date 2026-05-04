@@ -30,3 +30,19 @@ def get_db():
         raise
     finally:
         p.putconn(conn)
+
+
+def close_pool() -> None:
+    """Закрывает все соединения пула. Следующий get_db() создаст новый пул.
+
+    Нужно перед операциями, которые ломают/пересоздают объекты схемы
+    (например, восстановление БД из бэкапа): idle-коннекты в пуле могут
+    блокировать DROP SCHEMA.
+    """
+    global _pool
+    if _pool is not None and not _pool.closed:
+        try:
+            _pool.closeall()
+        except Exception:
+            pass
+    _pool = None

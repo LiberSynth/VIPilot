@@ -1,12 +1,53 @@
 import os
 import shutil
 import subprocess
+import threading
 from urllib.parse import urlparse, unquote, parse_qsl
 
 from .connection import get_db
 from common.statuses import FINAL_BATCH_STATUSES
 from log.log import write_log_entry
 from utils.utils import fmt_id_msg
+
+
+_restore_lock = threading.Lock()
+_restore_state_lock = threading.Lock()
+_restore_in_progress = False
+
+
+class RestoreBusyError(RuntimeError):
+    """Бросается, если восстановление уже выполняется в другом потоке."""
+
+
+def _drain_to_buffer(stream, buf: list) -> threading.Thread:
+    """Запускает фоновый поток, который читает stream до EOF в buf.
+
+    Нужно для дренирования stderr дочерних процессов: иначе при заполнении
+    буфера трубы процесс может зависнуть в write().
+    """
+    def _run():
+        try:
+            while True:
+                chunk = stream.read(65536)
+                if not chunk:
+                    break
+                buf.append(chunk)
+        except Exception:
+            pass
+    t = threading.Thread(target=_run, daemon=True)
+    t.start()
+    return t
+
+
+def is_db_restore_in_progress() -> bool:
+    with _restore_state_lock:
+        return _restore_in_progress
+
+
+def _set_restore_in_progress(val: bool) -> None:
+    global _restore_in_progress
+    with _restore_state_lock:
+        _restore_in_progress = val
 
 
 def db_interrupt_stale_logs():
@@ -794,3 +835,205 @@ def db_cleanup_batches(batch_lifetime_days: int) -> int:
 
         conn.commit()
     return len(batch_ids)
+
+
+def db_backup_check_available() -> tuple[bool, str]:
+    """Проверяет доступность pg_dump CLI и его базовую работоспособность."""
+    cli = shutil.which('pg_dump')
+    if not cli:
+        return False, 'pg_dump CLI не найден в окружении (нужен PostgreSQL 16; добавь pkgs.postgresql_16 в replit.nix)'
+    try:
+        r = subprocess.run([cli, '--version'], capture_output=True, timeout=5)
+        if r.returncode != 0:
+            return False, f'pg_dump --version вернул код {r.returncode}'
+    except Exception as e:
+        return False, f'pg_dump: ошибка вызова CLI — {e}'
+    return True, ''
+
+
+def db_restore_check_available() -> tuple[bool, str]:
+    """Проверяет доступность psql и pg_restore CLI."""
+    for name in ('pg_restore', 'psql'):
+        if not shutil.which(name):
+            return False, f'{name} CLI не найден в окружении (нужен PostgreSQL 16; добавь pkgs.postgresql_16 в replit.nix)'
+    return True, ''
+
+
+def db_backup_stream(chunk_size: int = 65536):
+    """Генератор: выдаёт байты сжатого custom-дампа БД (`pg_dump -Fc -Z 6`).
+
+    Поток подходит для прямой выдачи в HTTP-ответ. Если pg_dump падает —
+    сообщение пишется в silent-лог; HTTP-ответ при этом оборвётся.
+    """
+    cli = shutil.which('pg_dump')
+    if not cli:
+        raise RuntimeError('pg_dump CLI не найден')
+    conn_params = _parse_db_url()
+
+    env = os.environ.copy()
+    if conn_params['password']:
+        env['PGPASSWORD'] = conn_params['password']
+    for k, v in conn_params['extra_env'].items():
+        env[k] = v
+    args = [
+        cli,
+        '-h', conn_params['host'],
+        '-p', conn_params['port'],
+        '-d', conn_params['dbname'],
+        '-Fc', '-Z', '6',
+        '--no-owner', '--no-privileges',
+    ]
+    if conn_params['user']:
+        args += ['-U', conn_params['user']]
+
+    proc = subprocess.Popen(
+        args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
+    )
+    err_buf: list = []
+    err_t = _drain_to_buffer(proc.stderr, err_buf)
+    try:
+        while True:
+            chunk = proc.stdout.read(chunk_size)
+            if not chunk:
+                break
+            yield chunk
+        rc = proc.wait()
+        err_t.join(timeout=5)
+        if rc != 0:
+            err = b''.join(err_buf).decode(errors='replace').strip()
+            write_log_entry(
+                None,
+                f'[DB] Бэкап завершился с ошибкой rc={rc}: {err[:500]}',
+                level='silent',
+            )
+        else:
+            write_log_entry(None, '[DB] Бэкап БД создан и отдан клиенту', level='silent')
+    finally:
+        try: proc.stdout.close()
+        except Exception: pass
+        try: proc.stderr.close()
+        except Exception: pass
+        if proc.poll() is None:
+            try: proc.kill()
+            except Exception: pass
+
+
+def db_restore_from_file(tmp_path: str) -> dict:
+    """Полное атомарное восстановление БД из custom-дампа.
+
+    Поток pg_restore -> psql --single-transaction. Перед накатом терминирует
+    все остальные сессии и сносит схему public. Всё внутри одной транзакции:
+    при любой ошибке БД остаётся в исходном состоянии. Пул соединений
+    приложения сбрасывается до и после, чтобы idle-коннекты не блокировали
+    DROP SCHEMA и чтобы новые запросы шли через свежие коннекты.
+    """
+    if not _restore_lock.acquire(blocking=False):
+        raise RestoreBusyError('Восстановление уже выполняется')
+    _set_restore_in_progress(True)
+    try:
+        psql_bin = shutil.which('psql')
+        prest_bin = shutil.which('pg_restore')
+        if not psql_bin or not prest_bin:
+            raise RuntimeError('psql/pg_restore CLI не найдены в окружении')
+
+        conn_params = _parse_db_url()
+        env = os.environ.copy()
+        if conn_params['password']:
+            env['PGPASSWORD'] = conn_params['password']
+        for k, v in conn_params['extra_env'].items():
+            env[k] = v
+
+        from db.connection import close_pool
+        close_pool()
+
+        psql_args = [
+            psql_bin,
+            '-h', conn_params['host'],
+            '-p', conn_params['port'],
+            '-d', conn_params['dbname'],
+            '-v', 'ON_ERROR_STOP=1',
+            '--single-transaction',
+            '-q', '-X',
+        ]
+        if conn_params['user']:
+            psql_args += ['-U', conn_params['user']]
+
+        rest_args = [
+            prest_bin, '--no-owner', '--no-privileges',
+            '-f', '-', tmp_path,
+        ]
+
+        psql_proc = subprocess.Popen(
+            psql_args,
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            env=env,
+        )
+        rest_proc = None
+        rest_rc = 0
+        psql_err_buf: list = []
+        psql_out_buf: list = []
+        rest_err_buf: list = []
+        psql_err_t = _drain_to_buffer(psql_proc.stderr, psql_err_buf)
+        psql_out_t = _drain_to_buffer(psql_proc.stdout, psql_out_buf)
+        rest_err_t: threading.Thread | None = None
+        try:
+            preamble = (
+                "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+                "WHERE pid <> pg_backend_pid() AND datname = current_database();\n"
+                "DROP SCHEMA IF EXISTS public CASCADE;\n"
+                "CREATE SCHEMA public;\n"
+            )
+            psql_proc.stdin.write(preamble.encode())
+            psql_proc.stdin.flush()
+
+            rest_proc = subprocess.Popen(
+                rest_args,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
+            )
+            rest_err_t = _drain_to_buffer(rest_proc.stderr, rest_err_buf)
+            try:
+                shutil.copyfileobj(rest_proc.stdout, psql_proc.stdin)
+            except BrokenPipeError:
+                pass
+            finally:
+                try: rest_proc.stdout.close()
+                except Exception: pass
+                rest_rc = rest_proc.wait()
+                rest_err_t.join(timeout=5)
+
+            try: psql_proc.stdin.close()
+            except Exception: pass
+            psql_rc = psql_proc.wait()
+            psql_err_t.join(timeout=5)
+            psql_out_t.join(timeout=5)
+        finally:
+            try:
+                if psql_proc.stdin and not psql_proc.stdin.closed:
+                    psql_proc.stdin.close()
+            except Exception:
+                pass
+            if psql_proc.poll() is None:
+                try: psql_proc.kill()
+                except Exception: pass
+            if rest_proc is not None and rest_proc.poll() is None:
+                try: rest_proc.kill()
+                except Exception: pass
+
+        rest_err = b''.join(rest_err_buf).decode(errors='replace').strip()
+        psql_err = b''.join(psql_err_buf).decode(errors='replace').strip()
+
+        if rest_rc != 0:
+            raise RuntimeError(f'pg_restore: rc={rest_rc}; {rest_err[:500]}')
+        if psql_rc != 0:
+            raise RuntimeError(f'psql: rc={psql_rc}; {psql_err[:500]}')
+
+        write_log_entry(None, '[DB] Восстановление БД из бэкапа завершено успешно', level='silent')
+        return {'ok': True}
+    finally:
+        try:
+            from db.connection import close_pool
+            close_pool()
+        except Exception:
+            pass
+        _set_restore_in_progress(False)
+        _restore_lock.release()

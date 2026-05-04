@@ -53,6 +53,7 @@ function switchPanel(name) {
   }
   if (name === 'service') {
     if (typeof refreshWorkflowState === 'function') refreshWorkflowState();
+    if (typeof refreshDbRestoreStatus === 'function') refreshDbRestoreStatus();
   }
   if (name === 'director' || name === 'workflow') {
     if (typeof refreshDonorCount === 'function') refreshDonorCount();
