@@ -333,6 +333,9 @@ def production_page():
     screenwriter_only_pinned = env_get("screenwriter_only_pinned", "0") == "1"
     screenwriter_only_bad = env_get("screenwriter_only_bad", "0") == "1"
     autoplay_movie = env_get("producer_autoplay_movie", "0") == "1"
+    director_filter_for_approval = env_get("director_filter_for_approval", "0") == "1"
+    director_filter_only_good = env_get("director_filter_only_good", "0") == "1"
+    director_filter_show_published = env_get("director_filter_show_published", "1") == "1"
     _save_last_page()
     resp = make_response(render_template(
         "production.html",
@@ -355,6 +358,9 @@ def production_page():
         screenwriter_only_pinned=screenwriter_only_pinned,
         screenwriter_only_bad=screenwriter_only_bad,
         autoplay_movie=autoplay_movie,
+        director_filter_for_approval=director_filter_for_approval,
+        director_filter_only_good=director_filter_only_good,
+        director_filter_show_published=director_filter_show_published,
     ))
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     resp.headers["Pragma"] = "no-cache"

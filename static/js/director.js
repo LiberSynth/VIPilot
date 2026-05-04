@@ -281,13 +281,25 @@
     var onlyGood      = document.getElementById('movie-filter-only-good');
     var showPublished = document.getElementById('movie-filter-show-published');
 
+    function saveFilter(key, checkbox) {
+      fetch('/production/env', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: key, value: checkbox.checked ? '1' : '0' }),
+      });
+    }
+
     function onFilterChange(changed) {
       if (changed === forApproval && forApproval && forApproval.checked) {
-        if (onlyGood)      onlyGood.checked      = false;
-        if (showPublished) showPublished.checked  = false;
+        if (onlyGood)      { onlyGood.checked      = false; saveFilter('director_filter_only_good', onlyGood); }
+        if (showPublished) { showPublished.checked  = false; saveFilter('director_filter_show_published', showPublished); }
       } else if (changed !== forApproval && forApproval) {
         forApproval.checked = false;
+        saveFilter('director_filter_for_approval', forApproval);
       }
+      if (changed === forApproval)   saveFilter('director_filter_for_approval', forApproval);
+      if (changed === onlyGood)      saveFilter('director_filter_only_good', onlyGood);
+      if (changed === showPublished)  saveFilter('director_filter_show_published', showPublished);
       window.loadMovieList();
     }
 

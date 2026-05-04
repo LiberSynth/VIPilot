@@ -979,6 +979,9 @@ def api_production_env_set():
         "screenwriter_only_bad",
         "screenwriter_for_approval",
         "screenwriter_only_pinned",
+        "director_filter_for_approval",
+        "director_filter_only_good",
+        "director_filter_show_published",
     }
     if key not in allowed_keys:
         return jsonify({"error": "invalid key"}), 400

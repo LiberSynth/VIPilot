@@ -221,15 +221,15 @@
         <div style="flex-shrink:0; margin-left:auto; display:flex; flex-direction:column; gap:6px">
           <label class="sw-filter-row" for="movie-filter-for-approval">
             <span class="sw-filter-label">На утверждение</span>
-            <input class="sw-filter-check" type="checkbox" id="movie-filter-for-approval">
+            <input class="sw-filter-check" type="checkbox" id="movie-filter-for-approval"{% if director_filter_for_approval %} checked{% endif %}>
           </label>
           <label class="sw-filter-row" for="movie-filter-only-good">
             <span class="sw-filter-label">Только хорошие</span>
-            <input class="sw-filter-check" type="checkbox" id="movie-filter-only-good">
+            <input class="sw-filter-check" type="checkbox" id="movie-filter-only-good"{% if director_filter_only_good %} checked{% endif %}>
           </label>
           <label class="sw-filter-row" for="movie-filter-show-published">
             <span class="sw-filter-label">Опубликованные</span>
-            <input class="sw-filter-check" type="checkbox" id="movie-filter-show-published" checked>
+            <input class="sw-filter-check" type="checkbox" id="movie-filter-show-published"{% if director_filter_show_published %} checked{% endif %}>
           </label>
         </div>
       </div>
