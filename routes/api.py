@@ -588,8 +588,12 @@ def api_db_backup():
         return jsonify({"error": "unauthorized"}), 401
     ok, err = db_backup_check_available()
     if not ok:
+        write_log_entry(None, f'[api] Бэкап БД: pg_dump недоступен: {err}', level='silent')
+        write_log_entry(None, 'Бэкап БД: ошибка создания', level='error')
         return jsonify({"ok": False, "error": err}), 500
     fname = 'vipilot-' + datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S') + '.dump'
+    write_log_entry(None, f'[api] Бэкап БД: запущено создание (файл {fname})', level='silent')
+    write_log_entry(None, 'Бэкап БД: запущено создание', level='info')
     return Response(
         stream_with_context(db_backup_stream()),
         mimetype='application/octet-stream',
@@ -637,8 +641,17 @@ def api_db_restore():
         finally:
             tmp.close()
 
-        if os.path.getsize(tmp_path) == 0:
+        dump_size = os.path.getsize(tmp_path)
+        if dump_size == 0:
             return jsonify({"ok": False, "error": "Пустой файл бэкапа"}), 400
+
+        write_log_entry(
+            None,
+            f'[api] Восстановление БД: принят файл бэкапа ({dump_size} байт), '
+            f'tmp={tmp_path}',
+            level='silent',
+        )
+        write_log_entry(None, 'Восстановление БД: запущено', level='info')
 
         was_running = env_get("workflow_state", "running") != "pause"
         if was_running:
@@ -648,11 +661,13 @@ def api_db_restore():
             write_log_entry(None, "[api] Движок приостановлен на время восстановления БД", level='silent')
 
         db_restore_from_file(tmp_path)
+        write_log_entry(None, 'Восстановление БД: завершено успешно', level='info')
         return jsonify({"ok": True})
     except RestoreBusyError as e:
         return jsonify({"ok": False, "error": str(e)}), 409
     except Exception as e:
         write_log_entry(None, f"[api] Ошибка восстановления БД: {e}", level='silent')
+        write_log_entry(None, 'Восстановление БД: не удалось', level='error')
         return jsonify({"ok": False, "error": str(e)}), 500
     finally:
         if paused_here:

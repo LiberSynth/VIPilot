@@ -2,6 +2,7 @@ import os
 import shutil
 import subprocess
 import threading
+import time
 from urllib.parse import urlparse, unquote, parse_qsl
 
 from .connection import get_db
@@ -891,23 +892,35 @@ def db_backup_stream(chunk_size: int = 65536):
     )
     err_buf: list = []
     err_t = _drain_to_buffer(proc.stderr, err_buf)
+    started_at = time.monotonic()
+    total_bytes = 0
     try:
         while True:
             chunk = proc.stdout.read(chunk_size)
             if not chunk:
                 break
+            total_bytes += len(chunk)
             yield chunk
         rc = proc.wait()
         err_t.join(timeout=5)
+        elapsed = time.monotonic() - started_at
         if rc != 0:
             err = b''.join(err_buf).decode(errors='replace').strip()
             write_log_entry(
                 None,
-                f'[DB] Бэкап завершился с ошибкой rc={rc}: {err[:500]}',
+                f'[DB] Бэкап завершился с ошибкой rc={rc} '
+                f'(передано {total_bytes} байт за {elapsed:.1f}c): {err[:500]}',
                 level='silent',
             )
+            write_log_entry(None, 'Бэкап БД: ошибка создания', level='error')
         else:
-            write_log_entry(None, '[DB] Бэкап БД создан и отдан клиенту', level='silent')
+            write_log_entry(
+                None,
+                f'[DB] Бэкап БД создан и отдан клиенту: '
+                f'{total_bytes} байт за {elapsed:.1f}c',
+                level='silent',
+            )
+            write_log_entry(None, 'Бэкап БД: создан и скачан', level='info')
     finally:
         try: proc.stdout.close()
         except Exception: pass
@@ -1027,7 +1040,16 @@ def db_restore_from_file(tmp_path: str) -> dict:
         if psql_rc != 0:
             raise RuntimeError(f'psql: rc={psql_rc}; {psql_err[:500]}')
 
-        write_log_entry(None, '[DB] Восстановление БД из бэкапа завершено успешно', level='silent')
+        try:
+            dump_size = os.path.getsize(tmp_path)
+        except Exception:
+            dump_size = -1
+        write_log_entry(
+            None,
+            f'[DB] Восстановление БД из бэкапа завершено успешно '
+            f'(дамп {dump_size} байт)',
+            level='silent',
+        )
         return {'ok': True}
     finally:
         try:
