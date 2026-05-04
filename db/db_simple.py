@@ -336,6 +336,40 @@ def db_get_story_model_info(story_id):
     return {"platform_name": row[0], "model_name": row[1], "body": row[2]}
 
 
+def db_get_story_export_data(story_id):
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                    s.content,
+                    s.title,
+                    s.model_id IS NOT NULL AS ai_generated,
+                    s.manual_changed,
+                    p.name AS platform_name,
+                    m.name AS model_name,
+                    m.body
+                FROM stories s
+                LEFT JOIN ai_models m ON m.id = s.model_id
+                LEFT JOIN ai_platforms p ON p.id = m.platform_id
+                WHERE s.id = %s
+                """,
+                (story_id,),
+            )
+            row = cur.fetchone()
+    if not row:
+        return None
+    return {
+        "text": row[0],
+        "title": row[1] or "",
+        "ai_generated": bool(row[2]),
+        "manual_changed": bool(row[3]),
+        "platform_name": row[4] or "",
+        "model_name": row[5] or "",
+        "model_body": row[6],
+    }
+
+
 def db_set_story_model(story_id, model_id):
     with get_db() as conn:
         with conn.cursor() as cur:

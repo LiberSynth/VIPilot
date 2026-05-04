@@ -32,10 +32,7 @@ from db import (
     env_set,
     db_create_adhoc_batch,
     db_reset_batch_pipeline,
-    db_get_story_text,
-    db_get_story_title,
-    db_get_story_flags,
-    db_get_story_model_info,
+    db_get_story_export_data,
     db_get_batch_video_data,
     db_get_movie_video_data,
     db_get_text_model_by_id,
@@ -912,30 +909,24 @@ def api_get_batch_video(batch_id):
 def api_get_story(story_id):
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
-    text = db_get_story_text(story_id)
-    if text is None:
+    story = db_get_story_export_data(story_id)
+    if story is None:
         return jsonify({"error": "not found"}), 404
-    title = db_get_story_title(story_id) or ""
     format_prompt = cycle_config_get("format_prompt") or ""
     user_prompt = cycle_config_get("text_prompt") or ""
     user_prompt = apply_prompt_params(user_prompt)
     format_prompt = apply_prompt_params(format_prompt)
-    model_info = db_get_story_model_info(story_id)
-    platform_name = model_info["platform_name"] if model_info else ""
-    model_name = model_info["model_name"] if model_info else ""
-    model_body = model_info["body"] if model_info else None
-    flags = db_get_story_flags(story_id) or {}
     return jsonify(
         {
-            "text": text,
-            "title": title,
+            "text": story["text"],
+            "title": story["title"],
             "format_prompt": format_prompt,
             "user_prompt": user_prompt,
-            "platform_name": platform_name,
-            "model_name": model_name,
-            "model_body": model_body,
-            "ai_generated": flags.get("ai_generated", False),
-            "manual_changed": flags.get("manual_changed", False),
+            "platform_name": story["platform_name"],
+            "model_name": story["model_name"],
+            "model_body": story["model_body"],
+            "ai_generated": story["ai_generated"],
+            "manual_changed": story["manual_changed"],
         }
     )
 
