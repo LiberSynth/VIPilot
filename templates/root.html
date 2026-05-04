@@ -86,10 +86,21 @@
     <form id="publish-form" style="margin-top:0">
       <input type="hidden" id="target_id" name="target_id" value="{{ target_id or '' }}">
 
+      <div class="card">
+        <div class="card-title">Общие</div>
+        <div style="margin-top:14px">
+          <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block">Текущий счётчик публикаций</label>
+          <div class="lead-row">
+            <input type="number" id="publication_counter" value="{{ publication_counter }}" min="0" step="1" autocomplete="off">
+          </div>
+          <div class="hint" style="margin-top:5px">Порядковый номер последней публикации. Следующая публикация получит номер на 1 больше.</div>
+        </div>
+      </div>
+
       {% for slug in publish_order %}
 
       {% if slug == 'vk' %}
-      <div class="card{% if not vk_active %} target-disabled{% endif %}"{% if not loop.first %} style="margin-top:12px"{% endif %}>
+      <div class="card{% if not vk_active %} target-disabled{% endif %}" style="margin-top:12px">
         <input type="hidden" id="vk_target_id" value="{{ vk_target_id or '' }}">
         <div class="card-header">
           <div class="card-title">Публикация в ВКонтакте</div>
@@ -109,7 +120,7 @@
       {% endif %}
 
       {% if slug in browser_targets %}
-      {{ browser_card(browser_targets[slug], loop.first) }}
+      {{ browser_card(browser_targets[slug], false) }}
       {% endif %}
 
       {% endfor %}
@@ -283,13 +294,6 @@
         <input type="file" id="upload-package-input" accept=".yaml,.yml" style="display:none">
         <button type="button" class="btn-secondary" onclick="uploadUpdatePackage(this)">Загрузить статический пакет</button>
         <div class="hint" style="margin-top:6px">Загружает update_package.yaml и синхронизирует справочные таблицы: новые записи добавляются, существующие обновляются, лишние удаляются.</div>
-      </div>
-      <div style="margin-top:8px;padding-top:8px;border-top:1px solid #1e1e28">
-        <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block">Текущий счётчик публикаций</label>
-        <div class="lead-row">
-          <input type="number" id="publication_counter" value="{{ publication_counter }}" min="0" step="1" autocomplete="off">
-        </div>
-        <div class="hint" style="margin-top:5px">Порядковый номер последней публикации. Следующая публикация получит номер на 1 больше.</div>
       </div>
     </div>
 
