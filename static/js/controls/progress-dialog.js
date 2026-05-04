@@ -57,11 +57,13 @@ class DbOpProgressDialog extends Dialog {
   setUploadingMode(fileName) {
     this._uploading = true;
     this._uploadFileName = fileName || '';
+    if (this._timer) { clearInterval(this._timer); this._timer = null; }
     if (this._el) this._renderUploading();
   }
 
   endUploadingMode() {
     this._uploading = false;
+    this._lastRestoreState = 'running';
     if (this._timer) clearInterval(this._timer);
     this._poll();
     this._timer = setInterval(this._poll.bind(this), 1500);
@@ -79,11 +81,11 @@ class DbOpProgressDialog extends Dialog {
   }
 
   _poll() {
-    if (this._closed) return;
+    if (this._closed || this._uploading) return;
     var self = this;
     fetch('/api/db_op/status')
       .then(function(r) { return r.json(); })
-      .then(function(d) { if (!self._closed) self._render(d); })
+      .then(function(d) { if (!self._closed && !self._uploading) self._render(d); })
       .catch(function() {});
   }
 
