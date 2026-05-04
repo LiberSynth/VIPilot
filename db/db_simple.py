@@ -304,38 +304,6 @@ def db_get_story_title(story_id):
     return row[0] if row else None
 
 
-def db_get_story_flags(story_id):
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT model_id IS NOT NULL, manual_changed FROM stories WHERE id = %s",
-                (story_id,),
-            )
-            row = cur.fetchone()
-    if not row:
-        return None
-    return {"ai_generated": bool(row[0]), "manual_changed": bool(row[1])}
-
-
-def db_get_story_model_info(story_id):
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT p.name AS platform_name, m.name AS model_name, m.body
-                FROM stories s
-                JOIN ai_models m ON m.id = s.model_id
-                JOIN ai_platforms p ON p.id = m.platform_id
-                WHERE s.id = %s
-                """,
-                (story_id,),
-            )
-            row = cur.fetchone()
-    if not row:
-        return None
-    return {"platform_name": row[0], "model_name": row[1], "body": row[2]}
-
-
 def db_get_story_export_data(story_id):
     with get_db() as conn:
         with conn.cursor() as cur:
