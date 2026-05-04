@@ -5,6 +5,7 @@ from db import (
     db_get_actionable_batches,
     db_set_batch_status,
     db_interrupt_stale_logs,
+    cleanup_db_op_state_on_startup,
 )
 from common.exceptions import AppException
 from common.startup import init_app, create_app
@@ -74,6 +75,7 @@ def start_main_loop():
         init_app(flask_app)
         environment.init_from_db()
         db_interrupt_stale_logs()
+        cleanup_db_op_state_on_startup()
         write_log_entry(None, "[main] Приложение запущено", level='info')
         atexit.register(_on_exit)
         t = threading.Thread(target=main_loop, daemon=True)

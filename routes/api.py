@@ -17,12 +17,16 @@ from db import (
     db_clear_all_history,
     db_vacuum_full,
     db_backup_check_available,
-    db_backup_stream,
     db_restore_check_available,
-    db_restore_from_file,
-    is_db_restore_in_progress,
+    start_db_backup,
+    cancel_db_backup,
+    get_db_backup_state,
+    stream_db_backup_for_download,
+    get_backup_download_filename,
+    start_db_restore_from_path,
+    cancel_db_restore,
+    get_db_restore_state,
 )
-from db.db_service import RestoreBusyError
 from db import (
     env_get,
     env_set,
@@ -582,20 +586,52 @@ def api_vacuum_db():
     return jsonify({"ok": True, "result": result})
 
 
-@bp.route("/db_backup", methods=["GET"])
-def api_db_backup():
+@bp.route("/db_op/status", methods=["GET"])
+def api_db_op_status():
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
-    ok, err = db_backup_check_available()
-    if not ok:
-        write_log_entry(None, f'[api] Бэкап БД: pg_dump недоступен: {err}', level='silent')
-        write_log_entry(None, 'Бэкап БД: ошибка создания', level='error')
-        return jsonify({"ok": False, "error": err}), 500
-    fname = 'vipilot-' + datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S') + '.dump'
-    write_log_entry(None, f'[api] Бэкап БД: запущено создание (файл {fname})', level='silent')
-    write_log_entry(None, 'Бэкап БД: запущено создание', level='info')
+    return jsonify({
+        "backup": get_db_backup_state(),
+        "restore": get_db_restore_state(),
+    })
+
+
+@bp.route("/db_backup/start", methods=["POST"])
+def api_db_backup_start():
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    try:
+        state = start_db_backup()
+        return jsonify({"ok": True, "state": state})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 409
+
+
+@bp.route("/db_backup/cancel", methods=["POST"])
+def api_db_backup_cancel():
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    state = cancel_db_backup()
+    return jsonify({"ok": True, "state": state})
+
+
+@bp.route("/db_backup/download", methods=["GET"])
+def api_db_backup_download():
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    state = get_db_backup_state()
+    if state.get('state') != 'ready':
+        return jsonify({
+            "ok": False,
+            "error": f"Файл бэкапа не готов (state={state.get('state')})",
+        }), 409
+    fname = get_backup_download_filename()
+    try:
+        gen = stream_db_backup_for_download()
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
     return Response(
-        stream_with_context(db_backup_stream()),
+        stream_with_context(gen),
         mimetype='application/octet-stream',
         headers={
             'Content-Disposition': f'attachment; filename="{fname}"',
@@ -605,30 +641,23 @@ def api_db_backup():
     )
 
 
-@bp.route("/db_restore/status", methods=["GET"])
-def api_db_restore_status():
+@bp.route("/db_restore/start", methods=["POST"])
+def api_db_restore_start():
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
-    return jsonify({"in_progress": is_db_restore_in_progress()})
 
-
-@bp.route("/db_restore", methods=["POST"])
-def api_db_restore():
-    if not is_authenticated():
-        return jsonify({"error": "unauthorized"}), 401
-    if is_db_restore_in_progress():
-        return jsonify({"ok": False, "error": "Восстановление уже выполняется"}), 409
-    ok, err = db_restore_check_available()
-    if not ok:
-        return jsonify({"ok": False, "error": err}), 500
+    cur = get_db_restore_state()
+    if cur.get('state') == 'running':
+        return jsonify({"ok": False, "error": "Восстановление уже выполняется", "state": cur}), 409
+    cur_b = get_db_backup_state()
+    if cur_b.get('state') in ('running', 'ready'):
+        return jsonify({"ok": False, "error": "Идёт операция бэкапа", "state": cur_b}), 409
 
     import tempfile
     tmp = tempfile.NamedTemporaryFile(
-        prefix='vipilot-restore-', suffix='.dump', delete=False,
+        prefix='vipilot-restore-', suffix='.dump', delete=False, dir='/tmp',
     )
     tmp_path = tmp.name
-    was_running = False
-    paused_here = False
     try:
         chunk_size = 1 << 20
         try:
@@ -641,43 +670,30 @@ def api_db_restore():
         finally:
             tmp.close()
 
-        dump_size = os.path.getsize(tmp_path)
-        if dump_size == 0:
+        if os.path.getsize(tmp_path) == 0:
+            os.unlink(tmp_path)
             return jsonify({"ok": False, "error": "Пустой файл бэкапа"}), 400
 
         write_log_entry(
             None,
-            f'[api] Восстановление БД: принят файл бэкапа ({dump_size} байт), '
-            f'tmp={tmp_path}',
+            f'[api] Восстановление БД: принят файл ({os.path.getsize(tmp_path)} байт), tmp={tmp_path}',
             level='silent',
         )
-        write_log_entry(None, 'Восстановление БД: запущено', level='info')
-
-        was_running = env_get("workflow_state", "running") != "pause"
-        if was_running:
-            env_set("workflow_state", "pause")
-            environment.set_paused()
-            paused_here = True
-            write_log_entry(None, "[api] Движок приостановлен на время восстановления БД", level='silent')
-
-        db_restore_from_file(tmp_path)
-        write_log_entry(None, 'Восстановление БД: завершено успешно', level='info')
-        return jsonify({"ok": True})
-    except RestoreBusyError as e:
-        return jsonify({"ok": False, "error": str(e)}), 409
+        state = start_db_restore_from_path(tmp_path)
+        return jsonify({"ok": True, "state": state}), 202
     except Exception as e:
-        write_log_entry(None, f"[api] Ошибка восстановления БД: {e}", level='silent')
-        write_log_entry(None, 'Восстановление БД: не удалось', level='error')
+        try: os.unlink(tmp_path)
+        except Exception: pass
+        write_log_entry(None, f'[api] Восстановление БД: ошибка приёма файла: {e}', level='silent')
         return jsonify({"ok": False, "error": str(e)}), 500
-    finally:
-        if paused_here:
-            env_set("workflow_state", "running")
-            environment.set_running()
-            write_log_entry(None, "[api] Движок возобновлён после восстановления БД", level='silent')
-        try:
-            os.unlink(tmp_path)
-        except Exception:
-            pass
+
+
+@bp.route("/db_restore/cancel", methods=["POST"])
+def api_db_restore_cancel():
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    state = cancel_db_restore()
+    return jsonify({"ok": True, "state": state})
 
 
 @bp.route("/workflow/state", methods=["GET"])

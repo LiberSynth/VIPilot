@@ -1,8 +1,11 @@
+import glob
+import json
 import os
 import shutil
 import subprocess
 import threading
 import time
+from datetime import datetime, timezone
 from urllib.parse import urlparse, unquote, parse_qsl
 
 from .connection import get_db
@@ -11,13 +14,17 @@ from log.log import write_log_entry
 from utils.utils import fmt_id_msg
 
 
-_restore_lock = threading.Lock()
-_restore_state_lock = threading.Lock()
-_restore_in_progress = False
+_db_op_lock = threading.Lock()
+_backup_proc_holder: dict = {'proc': None}
+_restore_proc_holder: dict = {'psql': None, 'rest': None}
+_backup_cancel_event = threading.Event()
+_restore_cancel_event = threading.Event()
 
+_BACKUP_TMP_GLOB = '/tmp/vipilot-backup-*.dump'
+_RESTORE_TMP_GLOB = '/tmp/vipilot-restore-*.dump'
 
-class RestoreBusyError(RuntimeError):
-    """Бросается, если восстановление уже выполняется в другом потоке."""
+ENV_BACKUP_STATE = 'db_backup_state'
+ENV_RESTORE_STATE = 'db_restore_state'
 
 
 def _drain_to_buffer(stream, buf: list) -> threading.Thread:
@@ -40,15 +47,37 @@ def _drain_to_buffer(stream, buf: list) -> threading.Thread:
     return t
 
 
-def is_db_restore_in_progress() -> bool:
-    with _restore_state_lock:
-        return _restore_in_progress
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
 
-def _set_restore_in_progress(val: bool) -> None:
-    global _restore_in_progress
-    with _restore_state_lock:
-        _restore_in_progress = val
+def _get_state(env_key: str) -> dict:
+    from db.db_simple import env_get
+    raw = env_get(env_key, '')
+    if not raw:
+        return {'state': 'idle'}
+    try:
+        d = json.loads(raw)
+        if not isinstance(d, dict) or 'state' not in d:
+            return {'state': 'idle'}
+        return d
+    except Exception:
+        return {'state': 'idle'}
+
+
+def _set_state(env_key: str, state: dict) -> None:
+    from db.db_simple import env_set
+    env_set(env_key, json.dumps(state, ensure_ascii=False))
+
+
+def _is_pid_alive(pid) -> bool:
+    if not pid:
+        return False
+    try:
+        os.kill(int(pid), 0)
+        return True
+    except (OSError, ValueError, TypeError):
+        return False
 
 
 def db_interrupt_stale_logs():
@@ -860,17 +889,109 @@ def db_restore_check_available() -> tuple[bool, str]:
     return True, ''
 
 
-def db_backup_stream(chunk_size: int = 65536):
-    """Генератор: выдаёт байты сжатого custom-дампа БД (`pg_dump -Fc -Z 6`).
+def get_db_backup_state() -> dict:
+    """Возвращает текущее состояние бэкапа из env с актуальным bytes_written и проверкой PID.
 
-    Поток подходит для прямой выдачи в HTTP-ответ. Если pg_dump падает —
-    сообщение пишется в silent-лог; HTTP-ответ при этом оборвётся.
+    PID-liveness проверяется ТОЛЬКО если PID уже установлен; до этого state считается
+    валидным running ('starting' окно — воркер ещё не успел заспавнить процесс).
     """
-    cli = shutil.which('pg_dump')
-    if not cli:
-        raise RuntimeError('pg_dump CLI не найден')
-    conn_params = _parse_db_url()
+    s = _get_state(ENV_BACKUP_STATE)
+    if s.get('state') == 'running':
+        pid = s.get('pid')
+        if pid and not _is_pid_alive(pid):
+            s = {
+                'state': 'failed',
+                'error': 'Процесс прерван (рестарт сервера или внешнее завершение).',
+                'finished_at': _now_iso(),
+            }
+            _set_state(ENV_BACKUP_STATE, s)
+    if s.get('state') in ('running', 'ready'):
+        fn = s.get('filename')
+        if fn:
+            try:
+                s['bytes_written'] = os.path.getsize(fn)
+            except Exception:
+                s['bytes_written'] = 0
+    return s
 
+
+def get_db_restore_state() -> dict:
+    s = _get_state(ENV_RESTORE_STATE)
+    if s.get('state') == 'running':
+        pid = s.get('pid')
+        if pid and not _is_pid_alive(pid):
+            s = {
+                'state': 'failed',
+                'error': 'Процесс прерван (рестарт сервера или внешнее завершение).',
+                'finished_at': _now_iso(),
+            }
+            _set_state(ENV_RESTORE_STATE, s)
+    return s
+
+
+def _estimate_db_size_bytes() -> int:
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT pg_database_size(current_database())")
+                row = cur.fetchone()
+                return int(row[0]) if row else 0
+    except Exception:
+        return 0
+
+
+def start_db_backup() -> dict:
+    """Запускает фоновое создание бэкапа в файл /tmp/vipilot-backup-*.dump.
+
+    Возвращает текущее состояние. Если бэкап уже идёт или готов — возвращает его.
+    Если идёт восстановление — бросает RuntimeError.
+    """
+    with _db_op_lock:
+        b = get_db_backup_state()
+        r = get_db_restore_state()
+        if b.get('state') in ('running', 'ready'):
+            return b
+        if r.get('state') == 'running':
+            raise RuntimeError('Идёт восстановление БД')
+
+        ok, err = db_backup_check_available()
+        if not ok:
+            state = {'state': 'failed', 'error': err, 'finished_at': _now_iso()}
+            _set_state(ENV_BACKUP_STATE, state)
+            write_log_entry(None, f'[DB] Бэкап БД: pg_dump недоступен: {err}', level='silent')
+            write_log_entry(None, 'Бэкап БД: ошибка создания', level='error')
+            return state
+
+        for old in glob.glob(_BACKUP_TMP_GLOB):
+            try: os.unlink(old)
+            except Exception: pass
+
+        _backup_cancel_event.clear()
+        ts = datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')
+        filename = f'/tmp/vipilot-backup-{ts}.dump'
+        bytes_total_est = _estimate_db_size_bytes()
+        state = {
+            'state': 'running',
+            'pid': None,
+            'filename': filename,
+            'started_at': _now_iso(),
+            'bytes_total_est': bytes_total_est,
+        }
+        _set_state(ENV_BACKUP_STATE, state)
+        write_log_entry(None, 'Бэкап БД: запущено создание', level='info')
+        write_log_entry(
+            None,
+            f'[DB] Бэкап БД: запущено (файл {filename}, оценка несжатого размера {bytes_total_est} байт)',
+            level='silent',
+        )
+        t = threading.Thread(target=_db_backup_worker, args=(filename,), daemon=True)
+        t.start()
+        return get_db_backup_state()
+
+
+def _db_backup_worker(filename: str):
+    cli = shutil.which('pg_dump')
+    conn_params = _parse_db_url()
     env = os.environ.copy()
     if conn_params['password']:
         env['PGPASSWORD'] = conn_params['password']
@@ -878,91 +999,283 @@ def db_backup_stream(chunk_size: int = 65536):
         env[k] = v
     args = [
         cli,
-        '-h', conn_params['host'],
-        '-p', conn_params['port'],
+        '-h', conn_params['host'], '-p', conn_params['port'],
         '-d', conn_params['dbname'],
         '-Fc', '-Z', '6',
         '--no-owner', '--no-privileges',
+        '-f', filename,
     ]
     if conn_params['user']:
         args += ['-U', conn_params['user']]
 
-    proc = subprocess.Popen(
-        args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
-    )
+    started = time.monotonic()
+    proc = None
     err_buf: list = []
-    err_t = _drain_to_buffer(proc.stderr, err_buf)
-    started_at = time.monotonic()
-    total_bytes = 0
     try:
-        while True:
-            chunk = proc.stdout.read(chunk_size)
-            if not chunk:
-                break
-            total_bytes += len(chunk)
-            yield chunk
+        if _backup_cancel_event.is_set():
+            try: os.unlink(filename)
+            except Exception: pass
+            _set_state(ENV_BACKUP_STATE, {'state': 'idle'})
+            write_log_entry(None, '[DB] Бэкап БД отменён до запуска pg_dump', level='silent')
+            write_log_entry(None, 'Бэкап БД: отменён', level='info')
+            return
+        proc = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, env=env)
+        _backup_proc_holder['proc'] = proc
+        if _backup_cancel_event.is_set():
+            try: proc.kill()
+            except Exception: pass
+
+        s = _get_state(ENV_BACKUP_STATE)
+        s['pid'] = proc.pid
+        _set_state(ENV_BACKUP_STATE, s)
+
+        err_t = _drain_to_buffer(proc.stderr, err_buf)
         rc = proc.wait()
         err_t.join(timeout=5)
-        elapsed = time.monotonic() - started_at
+        elapsed = time.monotonic() - started
+
+        if _backup_cancel_event.is_set() or _get_state(ENV_BACKUP_STATE).get('state') == 'cancelled':
+            try: os.unlink(filename)
+            except Exception: pass
+            _set_state(ENV_BACKUP_STATE, {'state': 'idle'})
+            write_log_entry(None, '[DB] Бэкап БД отменён пользователем', level='silent')
+            write_log_entry(None, 'Бэкап БД: отменён', level='info')
+            return
+
         if rc != 0:
-            err = b''.join(err_buf).decode(errors='replace').strip()
-            write_log_entry(
-                None,
-                f'[DB] Бэкап завершился с ошибкой rc={rc} '
-                f'(передано {total_bytes} байт за {elapsed:.1f}c): {err[:500]}',
-                level='silent',
-            )
+            err = b''.join(err_buf).decode(errors='replace').strip()[:500]
+            _set_state(ENV_BACKUP_STATE, {
+                'state': 'failed',
+                'error': f'pg_dump rc={rc}: {err}',
+                'finished_at': _now_iso(),
+            })
+            try: os.unlink(filename)
+            except Exception: pass
+            write_log_entry(None, f'[DB] Бэкап БД: ошибка pg_dump rc={rc}: {err}', level='silent')
             write_log_entry(None, 'Бэкап БД: ошибка создания', level='error')
-        else:
-            write_log_entry(
-                None,
-                f'[DB] Бэкап БД создан и отдан клиенту: '
-                f'{total_bytes} байт за {elapsed:.1f}c',
-                level='silent',
-            )
-            write_log_entry(None, 'Бэкап БД: создан и скачан', level='info')
+            return
+
+        try:
+            size = os.path.getsize(filename)
+        except Exception:
+            size = 0
+
+        prest = shutil.which('pg_restore')
+        if prest:
+            try:
+                v = subprocess.run([prest, '--list', filename], capture_output=True, timeout=30)
+                if v.returncode != 0:
+                    raise RuntimeError(
+                        f'pg_restore --list rc={v.returncode}: '
+                        f'{v.stderr.decode(errors="replace")[:300]}'
+                    )
+            except Exception as e:
+                _set_state(ENV_BACKUP_STATE, {
+                    'state': 'failed',
+                    'error': f'Файл бэкапа не прошёл валидацию: {e}',
+                    'finished_at': _now_iso(),
+                })
+                try: os.unlink(filename)
+                except Exception: pass
+                write_log_entry(None, f'[DB] Бэкап БД: валидация провалилась: {e}', level='silent')
+                write_log_entry(None, 'Бэкап БД: ошибка создания', level='error')
+                return
+
+        _set_state(ENV_BACKUP_STATE, {
+            'state': 'ready',
+            'filename': filename,
+            'bytes_total': size,
+            'finished_at': _now_iso(),
+            'elapsed_sec': round(elapsed, 1),
+        })
+        write_log_entry(
+            None,
+            f'[DB] Бэкап БД создан: {size} байт за {elapsed:.1f}c, ожидает скачивания',
+            level='silent',
+        )
+        write_log_entry(None, 'Бэкап БД: создан, готов к скачиванию', level='info')
+    except Exception as e:
+        _set_state(ENV_BACKUP_STATE, {
+            'state': 'failed',
+            'error': str(e)[:500],
+            'finished_at': _now_iso(),
+        })
+        try: os.unlink(filename)
+        except Exception: pass
+        write_log_entry(None, f'[DB] Бэкап БД: исключение в воркере: {e}', level='silent')
+        write_log_entry(None, 'Бэкап БД: ошибка создания', level='error')
     finally:
-        try: proc.stdout.close()
-        except Exception: pass
-        try: proc.stderr.close()
-        except Exception: pass
-        if proc.poll() is None:
+        _backup_proc_holder['proc'] = None
+        if proc is not None and proc.poll() is None:
             try: proc.kill()
             except Exception: pass
 
 
-def db_restore_from_file(tmp_path: str) -> dict:
-    """Полное атомарное восстановление БД из custom-дампа.
+def cancel_db_backup() -> dict:
+    """Отменяет бэкап (running) или сбрасывает финальный state (ready/failed) в idle."""
+    with _db_op_lock:
+        s = _get_state(ENV_BACKUP_STATE)
+        st = s.get('state')
+    if st == 'running':
+        _backup_cancel_event.set()
+        s['state'] = 'cancelled'
+        _set_state(ENV_BACKUP_STATE, s)
+        proc = _backup_proc_holder.get('proc')
+        if proc is not None:
+            try: proc.kill()
+            except Exception: pass
+        write_log_entry(None, '[DB] Бэкап БД: запрошена отмена пользователем', level='silent')
+    elif st == 'ready':
+        fn = s.get('filename')
+        if fn:
+            try: os.unlink(fn)
+            except Exception: pass
+        _set_state(ENV_BACKUP_STATE, {'state': 'idle'})
+        write_log_entry(None, '[DB] Бэкап БД: готовый файл удалён по запросу пользователя', level='silent')
+    elif st in ('failed', 'cancelled'):
+        _set_state(ENV_BACKUP_STATE, {'state': 'idle'})
+    return _get_state(ENV_BACKUP_STATE)
 
-    Поток pg_restore -> psql --single-transaction. Перед накатом терминирует
-    все остальные сессии и сносит схему public. Всё внутри одной транзакции:
-    при любой ошибке БД остаётся в исходном состоянии. Пул соединений
-    приложения сбрасывается до и после, чтобы idle-коннекты не блокировали
-    DROP SCHEMA и чтобы новые запросы шли через свежие коннекты.
+
+def get_backup_download_filename() -> str:
+    s = _get_state(ENV_BACKUP_STATE)
+    fn = s.get('filename') or ''
+    return os.path.basename(fn) or 'vipilot-backup.dump'
+
+
+def stream_db_backup_for_download(chunk_size: int = 65536):
+    """Стримит готовый файл бэкапа клиенту. После завершения (нормального или при обрыве)
+    удаляет файл и сбрасывает state в idle.
     """
-    if not _restore_lock.acquire(blocking=False):
-        raise RestoreBusyError('Восстановление уже выполняется')
-    _set_restore_in_progress(True)
-    try:
-        psql_bin = shutil.which('psql')
-        prest_bin = shutil.which('pg_restore')
-        if not psql_bin or not prest_bin:
-            raise RuntimeError('psql/pg_restore CLI не найдены в окружении')
+    s = _get_state(ENV_BACKUP_STATE)
+    if s.get('state') != 'ready':
+        raise RuntimeError(f'Файл бэкапа не готов (state={s.get("state")})')
+    filename = s.get('filename')
+    if not filename or not os.path.exists(filename):
+        _set_state(ENV_BACKUP_STATE, {
+            'state': 'failed',
+            'error': 'Файл бэкапа отсутствует на диске',
+            'finished_at': _now_iso(),
+        })
+        raise RuntimeError('Файл бэкапа отсутствует на диске')
 
-        conn_params = _parse_db_url()
-        env = os.environ.copy()
-        if conn_params['password']:
-            env['PGPASSWORD'] = conn_params['password']
-        for k, v in conn_params['extra_env'].items():
-            env[k] = v
+    sent = 0
+    completed = False
+    try:
+        with open(filename, 'rb') as f:
+            while True:
+                chunk = f.read(chunk_size)
+                if not chunk:
+                    completed = True
+                    break
+                sent += len(chunk)
+                yield chunk
+    finally:
+        try: os.unlink(filename)
+        except Exception: pass
+        _set_state(ENV_BACKUP_STATE, {'state': 'idle'})
+        if completed:
+            write_log_entry(None, f'[DB] Бэкап БД скачан клиентом: {sent} байт', level='silent')
+            write_log_entry(None, 'Бэкап БД: скачан', level='info')
+        else:
+            write_log_entry(
+                None,
+                f'[DB] Бэкап БД: скачивание прервано на {sent} байт, файл удалён',
+                level='silent',
+            )
+
+
+# ====================== RESTORE ======================
+
+def start_db_restore_from_path(tmp_path: str) -> dict:
+    """Запускает фоновое восстановление из указанного файла.
+
+    Восстановление атомарно (psql --single-transaction): при ошибке БД остаётся
+    в исходном состоянии. Движок приостанавливается, в finally возобновляется
+    только если до старта он был running.
+    """
+    with _db_op_lock:
+        b = get_db_backup_state()
+        r = get_db_restore_state()
+        if r.get('state') == 'running':
+            try: os.unlink(tmp_path)
+            except Exception: pass
+            return r
+        if b.get('state') in ('running', 'ready'):
+            try: os.unlink(tmp_path)
+            except Exception: pass
+            raise RuntimeError('Идёт операция бэкапа')
+
+        ok, err = db_restore_check_available()
+        if not ok:
+            try: os.unlink(tmp_path)
+            except Exception: pass
+            state = {'state': 'failed', 'error': err, 'finished_at': _now_iso()}
+            _set_state(ENV_RESTORE_STATE, state)
+            write_log_entry(None, f'[DB] Восстановление БД: psql/pg_restore недоступны: {err}', level='silent')
+            write_log_entry(None, 'Восстановление БД: не удалось', level='error')
+            return state
+
+        from db.db_simple import env_get as _env_get, env_set as _env_set
+        import common.environment as environment
+        was_running = _env_get('workflow_state', 'running') != 'pause'
+        if was_running:
+            _env_set('workflow_state', 'pause')
+            environment.set_paused()
+            write_log_entry(None, '[DB] Восстановление БД: движок приостановлен', level='silent')
+
+        try:
+            dump_size = os.path.getsize(tmp_path)
+        except Exception:
+            dump_size = 0
+        _restore_cancel_event.clear()
+        state = {
+            'state': 'running',
+            'pid': None,
+            'phase': 'preparing',
+            'tmp_path': tmp_path,
+            'started_at': _now_iso(),
+            'was_running': was_running,
+            'bytes_total': dump_size,
+        }
+        _set_state(ENV_RESTORE_STATE, state)
+        write_log_entry(
+            None,
+            f'[DB] Восстановление БД: запущено (файл {tmp_path}, {dump_size} байт)',
+            level='silent',
+        )
+        write_log_entry(None, 'Восстановление БД: запущено', level='info')
+        t = threading.Thread(target=_db_restore_worker, args=(tmp_path, was_running), daemon=True)
+        t.start()
+        return get_db_restore_state()
+
+
+def _db_restore_worker(tmp_path: str, was_running: bool):
+    psql_bin = shutil.which('psql')
+    prest_bin = shutil.which('pg_restore')
+    conn_params = _parse_db_url()
+    env = os.environ.copy()
+    if conn_params['password']:
+        env['PGPASSWORD'] = conn_params['password']
+    for k, v in conn_params['extra_env'].items():
+        env[k] = v
+
+    psql_proc = None
+    rest_proc = None
+    started = time.monotonic()
+    try:
+        if _restore_cancel_event.is_set():
+            _set_state(ENV_RESTORE_STATE, {'state': 'idle'})
+            write_log_entry(None, '[DB] Восстановление БД отменено до запуска psql', level='silent')
+            write_log_entry(None, 'Восстановление БД: отменено', level='info')
+            return
 
         from db.connection import close_pool
         close_pool()
 
         psql_args = [
             psql_bin,
-            '-h', conn_params['host'],
-            '-p', conn_params['port'],
+            '-h', conn_params['host'], '-p', conn_params['port'],
             '-d', conn_params['dbname'],
             '-v', 'ON_ERROR_STOP=1',
             '--single-transaction',
@@ -970,92 +1283,175 @@ def db_restore_from_file(tmp_path: str) -> dict:
         ]
         if conn_params['user']:
             psql_args += ['-U', conn_params['user']]
-
-        rest_args = [
-            prest_bin, '--no-owner', '--no-privileges',
-            '-f', '-', tmp_path,
-        ]
+        rest_args = [prest_bin, '--no-owner', '--no-privileges', '-f', '-', tmp_path]
 
         psql_proc = subprocess.Popen(
-            psql_args,
-            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            env=env,
+            psql_args, stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
         )
-        rest_proc = None
-        rest_rc = 0
+        _restore_proc_holder['psql'] = psql_proc
+        if _restore_cancel_event.is_set():
+            try: psql_proc.kill()
+            except Exception: pass
+
+        s = _get_state(ENV_RESTORE_STATE)
+        s['pid'] = psql_proc.pid
+        s['phase'] = 'restoring'
+        _set_state(ENV_RESTORE_STATE, s)
+
         psql_err_buf: list = []
         psql_out_buf: list = []
         rest_err_buf: list = []
         psql_err_t = _drain_to_buffer(psql_proc.stderr, psql_err_buf)
         psql_out_t = _drain_to_buffer(psql_proc.stdout, psql_out_buf)
-        rest_err_t: threading.Thread | None = None
+
+        if _restore_cancel_event.is_set():
+            try: psql_proc.kill()
+            except Exception: pass
+            _set_state(ENV_RESTORE_STATE, {'state': 'idle'})
+            write_log_entry(None, '[DB] Восстановление БД отменено до destructive preamble', level='silent')
+            write_log_entry(None, 'Восстановление БД: отменено', level='info')
+            return
+
+        preamble = (
+            "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+            "WHERE pid <> pg_backend_pid() AND datname = current_database();\n"
+            "DROP SCHEMA IF EXISTS public CASCADE;\n"
+            "CREATE SCHEMA public;\n"
+        )
         try:
-            preamble = (
-                "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
-                "WHERE pid <> pg_backend_pid() AND datname = current_database();\n"
-                "DROP SCHEMA IF EXISTS public CASCADE;\n"
-                "CREATE SCHEMA public;\n"
-            )
             psql_proc.stdin.write(preamble.encode())
             psql_proc.stdin.flush()
+        except BrokenPipeError:
+            pass
 
-            rest_proc = subprocess.Popen(
-                rest_args,
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
-            )
-            rest_err_t = _drain_to_buffer(rest_proc.stderr, rest_err_buf)
-            try:
-                shutil.copyfileobj(rest_proc.stdout, psql_proc.stdin)
-            except BrokenPipeError:
-                pass
-            finally:
-                try: rest_proc.stdout.close()
-                except Exception: pass
-                rest_rc = rest_proc.wait()
-                rest_err_t.join(timeout=5)
+        rest_proc = subprocess.Popen(
+            rest_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
+        )
+        _restore_proc_holder['rest'] = rest_proc
+        rest_err_t = _drain_to_buffer(rest_proc.stderr, rest_err_buf)
 
-            try: psql_proc.stdin.close()
-            except Exception: pass
-            psql_rc = psql_proc.wait()
-            psql_err_t.join(timeout=5)
-            psql_out_t.join(timeout=5)
+        try:
+            shutil.copyfileobj(rest_proc.stdout, psql_proc.stdin)
+        except BrokenPipeError:
+            pass
         finally:
-            try:
-                if psql_proc.stdin and not psql_proc.stdin.closed:
-                    psql_proc.stdin.close()
-            except Exception:
-                pass
-            if psql_proc.poll() is None:
-                try: psql_proc.kill()
-                except Exception: pass
-            if rest_proc is not None and rest_proc.poll() is None:
-                try: rest_proc.kill()
-                except Exception: pass
+            try: rest_proc.stdout.close()
+            except Exception: pass
 
-        rest_err = b''.join(rest_err_buf).decode(errors='replace').strip()
-        psql_err = b''.join(psql_err_buf).decode(errors='replace').strip()
+        rest_rc = rest_proc.wait()
+        rest_err_t.join(timeout=5)
+
+        try: psql_proc.stdin.close()
+        except Exception: pass
+        psql_rc = psql_proc.wait()
+        psql_err_t.join(timeout=5)
+        psql_out_t.join(timeout=5)
+
+        rest_err = b''.join(rest_err_buf).decode(errors='replace').strip()[:500]
+        psql_err = b''.join(psql_err_buf).decode(errors='replace').strip()[:500]
+
+        cur_state = _get_state(ENV_RESTORE_STATE)
+        if cur_state.get('state') == 'cancelled':
+            _set_state(ENV_RESTORE_STATE, {'state': 'idle'})
+            write_log_entry(None, '[DB] Восстановление БД отменено пользователем', level='silent')
+            write_log_entry(None, 'Восстановление БД: отменено', level='info')
+            return
 
         if rest_rc != 0:
-            raise RuntimeError(f'pg_restore: rc={rest_rc}; {rest_err[:500]}')
+            raise RuntimeError(f'pg_restore: rc={rest_rc}; {rest_err}')
         if psql_rc != 0:
-            raise RuntimeError(f'psql: rc={psql_rc}; {psql_err[:500]}')
+            raise RuntimeError(f'psql: rc={psql_rc}; {psql_err}')
 
-        try:
-            dump_size = os.path.getsize(tmp_path)
-        except Exception:
-            dump_size = -1
+        elapsed = time.monotonic() - started
+        _set_state(ENV_RESTORE_STATE, {'state': 'idle'})
         write_log_entry(
             None,
-            f'[DB] Восстановление БД из бэкапа завершено успешно '
-            f'(дамп {dump_size} байт)',
+            f'[DB] Восстановление БД из бэкапа завершено успешно за {elapsed:.1f}c',
             level='silent',
         )
-        return {'ok': True}
+        write_log_entry(None, 'Восстановление БД: завершено успешно', level='info')
+    except Exception as e:
+        _set_state(ENV_RESTORE_STATE, {
+            'state': 'failed',
+            'error': str(e)[:500],
+            'finished_at': _now_iso(),
+        })
+        write_log_entry(None, f'[DB] Восстановление БД: ошибка: {e}', level='silent')
+        write_log_entry(None, 'Восстановление БД: не удалось', level='error')
     finally:
+        try: os.unlink(tmp_path)
+        except Exception: pass
+        _restore_proc_holder['psql'] = None
+        _restore_proc_holder['rest'] = None
+        if psql_proc and psql_proc.poll() is None:
+            try: psql_proc.kill()
+            except Exception: pass
+        if rest_proc and rest_proc.poll() is None:
+            try: rest_proc.kill()
+            except Exception: pass
         try:
-            from db.connection import close_pool
-            close_pool()
+            from db.db_simple import env_set as _env_set2
+            import common.environment as environment2
+            if was_running:
+                _env_set2('workflow_state', 'running')
+                environment2.set_running()
+                write_log_entry(None, '[DB] Восстановление БД: движок возобновлён', level='silent')
         except Exception:
             pass
-        _set_restore_in_progress(False)
-        _restore_lock.release()
+        try:
+            from db.connection import close_pool as _close_pool2
+            _close_pool2()
+        except Exception:
+            pass
+
+
+def cancel_db_restore() -> dict:
+    """Отменяет восстановление (running) или сбрасывает финальный state (failed) в idle.
+
+    При отмене running: выставляет cancel-event ДО любого kill (воркер проверяет event
+    в нескольких контрольных точках, в т.ч. перед destructive preamble), затем убивает
+    psql/pg_restore если они уже стартовали. Postgres откатит транзакцию по обрыву
+    соединения — БД останется в исходном состоянии.
+    """
+    with _db_op_lock:
+        s = _get_state(ENV_RESTORE_STATE)
+        st = s.get('state')
+    if st == 'running':
+        _restore_cancel_event.set()
+        s['state'] = 'cancelled'
+        _set_state(ENV_RESTORE_STATE, s)
+        for k in ('rest', 'psql'):
+            p = _restore_proc_holder.get(k)
+            if p is not None:
+                try: p.kill()
+                except Exception: pass
+        write_log_entry(None, '[DB] Восстановление БД: запрошена отмена пользователем', level='silent')
+    elif st in ('failed', 'cancelled'):
+        _set_state(ENV_RESTORE_STATE, {'state': 'idle'})
+    return _get_state(ENV_RESTORE_STATE)
+
+
+def cleanup_db_op_state_on_startup():
+    """Очищает зависшие state бэкапа/восстановления и tmp-файлы. Вызывать при старте Flask.
+
+    После SIGKILL рестарта Replit рабочие потоки не успевают записать финальный state.
+    Любой не-idle state на старте — заведомо мусор.
+    """
+    for env_key, label in ((ENV_BACKUP_STATE, 'бэкапа'), (ENV_RESTORE_STATE, 'восстановления')):
+        s = _get_state(env_key)
+        st = s.get('state')
+        if st and st != 'idle':
+            write_log_entry(
+                None,
+                f'[DB] Сброс зависшего state {label} (state={st}): процесс не пережил рестарт сервера',
+                level='silent',
+            )
+            _set_state(env_key, {'state': 'idle'})
+    for pat in (_BACKUP_TMP_GLOB, _RESTORE_TMP_GLOB):
+        for f in glob.glob(pat):
+            try:
+                os.unlink(f)
+                write_log_entry(None, f'[DB] Удалён остаточный tmp-файл операции БД: {f}', level='silent')
+            except Exception:
+                pass

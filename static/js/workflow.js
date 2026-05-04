@@ -243,82 +243,19 @@ function openClearHistoryDialog() {
 }
 
 function openCreateBackupDialog(btn) {
-  if (!btn || btn.disabled) return;
-  var origText = btn.textContent;
-  btn.disabled = true;
-  btn.textContent = 'Создаём бэкап…';
-  fetch('/api/db_backup', { method: 'GET' })
-    .then(function(r) {
-      if (!r.ok) {
-        return r.json().then(
-          function(d) { throw new Error(d.error || ('Ошибка ' + r.status)); },
-          function()  { throw new Error('Ошибка ' + r.status); }
-        );
-      }
-      var disp = r.headers.get('Content-Disposition') || '';
-      var m = disp.match(/filename="?([^";]+)"?/);
-      var fname = (m && m[1].trim()) || 'vipilot-backup.dump';
-      return r.blob().then(function(b) { return { blob: b, fname: fname }; });
-    })
-    .then(function(res) {
-      var url = URL.createObjectURL(res.blob);
-      var a = document.createElement('a');
-      a.href = url; a.download = res.fname;
-      document.body.appendChild(a); a.click();
-      setTimeout(function() { URL.revokeObjectURL(url); a.remove(); }, 200);
-      var mb = (res.blob.size / (1024 * 1024)).toFixed(2);
-      showToast('Бэкап создан: ' + res.fname + ' (' + mb + ' МБ)', 'success');
-    })
-    .catch(function(e) { showToast('Ошибка бэкапа: ' + (e.message || e), 'error'); })
-    .finally(function() { btn.disabled = false; btn.textContent = origText; });
-}
-
-function refreshDbRestoreStatus() {
-  var btn = document.getElementById('btn-db-restore');
-  if (!btn) return;
-  fetch('/api/db_restore/status')
-    .then(function(r) { return r.json(); })
-    .then(function(d) {
-      if (d && d.in_progress) {
-        btn.disabled = true;
-        btn.textContent = 'Восстанавливаем…';
-      } else if (!btn.dataset.busy) {
-        btn.disabled = false;
-        btn.textContent = 'Восстановить из бэкапа';
-      }
-    })
-    .catch(function() {});
-}
-
-function _doRestoreUpload(file, btn, origText) {
-  btn.disabled = true;
-  btn.dataset.busy = '1';
-  btn.textContent = 'Восстанавливаем…';
-  fetch('/api/db_restore', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/octet-stream' },
-    body:    file,
-  })
+  fetch('/api/db_backup/start', { method: 'POST' })
     .then(function(r) { return r.json().then(function(d) { return { r: r, d: d }; }); })
     .then(function(res) {
       if (res.r.ok && res.d.ok) {
-        showToast('База восстановлена из бэкапа', 'success');
+        openDbOpProgressDialog();
       } else {
-        showToast('Ошибка восстановления: ' + (res.d.error || ('код ' + res.r.status)), 'error');
+        showToast('Не удалось запустить бэкап: ' + (res.d.error || ('код ' + res.r.status)), 'error');
       }
     })
-    .catch(function(e) { showToast('Ошибка соединения: ' + (e.message || e), 'error'); })
-    .finally(function() {
-      delete btn.dataset.busy;
-      btn.disabled = false;
-      btn.textContent = origText;
-      refreshDbRestoreStatus();
-    });
+    .catch(function(e) { showToast('Ошибка соединения: ' + (e.message || e), 'error'); });
 }
 
 function openRestoreBackupDialog(btn) {
-  if (!btn || btn.disabled) return;
-  var origText = btn.textContent;
   var picker = document.createElement('input');
   picker.type = 'file';
   picker.accept = '.dump,application/octet-stream';
@@ -341,7 +278,7 @@ function openRestoreBackupDialog(btn) {
       confirmStyle: 'background:#b05820',
       onConfirm: function(cBtn, dlg) {
         dlg.close();
-        _doRestoreUpload(file, btn, origText);
+        _doRestoreUpload(file);
       },
       triggerBtn: btn,
     }).open();
@@ -353,6 +290,29 @@ function openRestoreBackupDialog(btn) {
     });
   });
   picker.click();
+}
+
+function _doRestoreUpload(file) {
+  var dlg = openDbOpProgressDialog();
+  dlg.setUploadingMode(file.name);
+  fetch('/api/db_restore/start', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/octet-stream' },
+    body:    file,
+  })
+    .then(function(r) { return r.json().then(function(d) { return { r: r, d: d }; }); })
+    .then(function(res) {
+      if (res.r.ok && res.d.ok) {
+        dlg.endUploadingMode();
+      } else {
+        dlg.close();
+        showToast('Не удалось запустить восстановление: ' + (res.d.error || ('код ' + res.r.status)), 'error');
+      }
+    })
+    .catch(function(e) {
+      dlg.close();
+      showToast('Ошибка соединения: ' + (e.message || e), 'error');
+    });
 }
 
 function openVacuumDbDialog() {
