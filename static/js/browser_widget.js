@@ -238,18 +238,21 @@ function createBrowserWidget(slug) {
       .then(function (data) {
         if (data.ok) {
           active = false;
+          showToast('Сессия сохранена', 'success');
           fetch(API + 'stop', { method: 'POST' }).catch(function () {});
           // SSE дожидается STOPPED → handleStopped() сбросит состояние.
         } else {
           overlay.style.display = 'none';
           overlay.textContent = '';
           applyState(STATE.OPEN);
+          showToast('Ошибка: ' + (data.error || 'Не удалось сохранить'), 'error');
         }
       })
       .catch(function () {
         overlay.style.display = 'none';
         overlay.textContent = '';
         applyState(STATE.OPEN);
+        showToast('Ошибка соединения', 'error');
       });
   }
 
