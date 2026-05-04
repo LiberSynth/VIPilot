@@ -253,7 +253,7 @@ class AccordionList {
     if (!container) return;
 
     var savedFocus   = this._saveFocus();
-    var prevActiveId = this._activeId;
+    var prevActiveId = this._activeId != null ? String(this._activeId) : null;
     var hadFakeRow   = this._canAddNew && !!container.querySelector('.story-row[data-id="__new__"]');
     this._detachCard();
 
@@ -263,6 +263,9 @@ class AccordionList {
       this.updateCount(0);
       this._activeId = null;
       container.innerHTML = this._emptyHtml;
+      if (hadFakeRow && prevActiveId === null) {
+        this.insertFakeRow(false);
+      }
       return;
     }
 

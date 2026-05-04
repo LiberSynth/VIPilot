@@ -41,7 +41,7 @@ var setDraftStoryFromRecord;
     })
     .then(function(r) { return r.ok ? r.json() : null; })
     .then(function(d) {
-      var newId = d && d.story_id ? d.story_id : null;
+      var newId = d && d.story_id ? String(d.story_id) : null;
       if (newId) {
         var wasNew = !_activeStoryId;
         _activeStoryId = newId;
@@ -341,8 +341,9 @@ var setDraftStoryFromRecord;
   }
 
   window.setExpandedStoryId = function(id) {
-    _activeStoryId = id;
-    _accordionList.setActiveId(id);
+    var sid = id != null ? String(id) : null;
+    _activeStoryId = sid;
+    _accordionList.setActiveId(sid);
   };
 
   window.openStoryInScreenwriter = function(storyId) {
@@ -445,7 +446,7 @@ var setDraftStoryFromRecord;
     if (!stories || stories.length === 0) {
       window._currentStoriesList = [];
       _setExportStoriesBtnEnabled(false);
-      _activeStoryId = null;
+      if (!_accordionList.getActiveId()) _activeStoryId = null;
       _accordionList.render([]);
       return;
     }
