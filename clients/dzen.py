@@ -16,7 +16,7 @@ from utils.utils import fmt_id_msg
 from routes.api import publication_file_name, tags
 
 
-_NAV_TIMEOUT = 60_000   # ms — таймаут одной попытки навигации (1 минута; до 5 попыток с интервалом 60 с)
+_NAV_TIMEOUT = 60_000   # ms — таймаут одной попытки навигации (1 минута; до 5 попыток подряд)
 _UPLOAD_WAIT  = 60_000  # ms — ожидание завершения загрузки видео
 
 
@@ -497,7 +497,6 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
             )
             if _attempt < 5:
                 _snap(page, batch_id)
-                _time.sleep(30)
     if _last_err is not None:
         raise DzenApiError(
             f"Не удалось перейти в студию Дзена после 5 попыток: {_last_err}"
@@ -619,7 +618,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
         page.wait_for_timeout(1_500)
 
     if _auto_published:
-        # Видео уже опубликовано — пропускаем шаги 5-7
+        # Видео уже опубликовано — пропускаем шаги 5-9
         _snap(page, batch_id)
         write_log_entry(log_id, "Дзен: Публикация завершена.")
         return
@@ -663,18 +662,18 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
         write_log_entry(log_id, "Дзен: Не удалось заполнить теги — продолжаю.")
         write_log_entry(log_id, f"[dzen] Ошибка тегов: {_e}", level='silent')
 
-    # Перед шагом 5.1: закрываем хинт «Уже можно публиковать» (он часто
+    # Перед шагом 6: закрываем хинт «Уже можно публиковать» (он часто
     # всплывает после ввода тегов и перекрывает дропдаун комментариев).
     _dismiss_unknown(page, log_id)
 
-    # ── Шаг 5.1: Выставляем «Все пользователи» в «Кто может комментировать»
+    # ── Шаг 6: Выставляем «Все пользователи» в «Кто может комментировать» ─
     # Сразу после тегов — контрол виден в той же модалке «Публикация ролика».
     _set_comments_all_users(page, log_id, batch_id)
 
-    # Перед шагом 6: ещё раз закрываем любые всплывшие хинты/попапы.
+    # Перед шагом 7: ещё раз закрываем любые всплывшие хинты/попапы.
     _dismiss_unknown(page, log_id)
 
-    # ── Шаг 6: Публикуем ─────────────────────────────────────────────────
+    # ── Шаг 7: Публикуем ─────────────────────────────────────────────────
     write_log_entry(log_id, "Дзен: Нажимаю «Опубликовать».")
     pub_btn = page.locator("button:has-text('Опубликовать')").first
     pub_btn.wait_for(state="visible", timeout=180_000)
@@ -701,7 +700,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
             write_log_entry(log_id, f"[dzen] JS-клик тоже не прошёл: {_js_err}", level='silent')
 
     # Ждём появления диалога подтверждения или капчи до 12 секунд.
-    # Если за 12 сек ничего не появилось — продолжаем в шаг 7.
+    # Если за 12 сек ничего не появилось — продолжаем в шаг 8.
     _CONFIRM_OR_CAPTCHA_SEL = (
         "button:has-text('Опубликовать после подтверждения'), "
         "button:has-text('Опубликовать после обработки'), "
@@ -714,7 +713,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
         pass
     _snap(page, batch_id)
 
-    # ── Шаг 7: Обрабатываем попапы, диалоги, хинты (25 секунд) ──────────
+    # ── Шаг 8: Обрабатываем попапы, диалоги, хинты (25 секунд) ──────────
     # Каждую итерацию вызываем _handle_popups — он сверяет со списком
     # _EXPECTED_ELEMENTS (капча, диалог подтверждения, файловый input)
     # и либо обрабатывает известный элемент, либо закрывает неизвестный.
@@ -747,7 +746,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
             pass
 
     _dialog_deadline = _time.monotonic() + _DIALOG_WINDOW / 1000
-    _step7_done = False
+    _step8_done = False
 
     while _time.monotonic() < _dialog_deadline:
         # Обрабатываем любые попапы/диалоги/хинты через единый список ожидаемых элементов.
@@ -764,20 +763,20 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
                 "[data-testid='publish-success']"
             ).first
             if success_now.is_visible():
-                write_log_entry(log_id, "Дзен: Публикация подтверждена в шаге 7.")
-                _step7_done = True
+                write_log_entry(log_id, "Дзен: Публикация подтверждена в шаге 8.")
+                _step8_done = True
                 break
         except Exception:
             pass
 
         page.wait_for_timeout(_DIALOG_POLL)
 
-    write_log_entry(log_id, "Дзен: Шаг 7 завершён, жду подтверждения публикации.")
+    write_log_entry(log_id, "Дзен: Шаг 8 завершён, жду подтверждения публикации.")
 
-    # Перед шагом 8: закрываем любой неожиданный попап/хинт.
+    # Перед шагом 9: закрываем любой неожиданный попап/хинт.
     _dismiss_unknown(page, log_id)
 
-    # ── Шаг 8: Ожидаем подтверждения публикации ──────────────────────────
+    # ── Шаг 9: Ожидаем подтверждения публикации ──────────────────────────
     _PUBLISH_CONFIRM_TIMEOUT = 60_000  # ms — полный таймаут ожидания
     _CONFIRM_POLL = 2_000              # ms — интервал опроса
 

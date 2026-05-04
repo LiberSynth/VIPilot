@@ -15,7 +15,7 @@ from utils.utils import fmt_id_msg
 from routes.api import publication_file_name
 
 
-_NAV_TIMEOUT  = 60_000   # ms — таймаут одной попытки навигации (1 минута; до 5 попыток с интервалом 60 с)
+_NAV_TIMEOUT  = 60_000   # ms — таймаут одной попытки навигации (1 минута; до 5 попыток подряд)
 _UPLOAD_WAIT  = 180_000  # ms — ожидание завершения загрузки (до 3 минут)
 _CATEGORY     = "Юмор"   # категория по умолчанию
 
@@ -142,7 +142,6 @@ def _publish_ui(page, video_path: str, log_id, batch_id=None):
             )
             if _attempt < 5:
                 _snap(page, batch_id)
-                _time.sleep(30)
     if _last_err is not None:
         raise RutubeApiError(
             f"Не удалось перейти в студию Рутьюба после 5 попыток: {_last_err}"
