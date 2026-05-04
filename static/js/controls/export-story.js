@@ -22,11 +22,30 @@
     setTimeout(function() { btn.classList.remove('copied'); }, 2000);
   };
 
+  function _writeManualBlock(title, content, btn) {
+    var block = '/* Ручной сюжет НАЧАЛО */\n' + (title || '') + '\n\n' + (content || '') + '\n/* Ручной сюжет КОНЕЦ */';
+    _clipBuffer = block;
+    clearTimeout(_clipTimer);
+    _clipTimer = setTimeout(_resetBuffer, ACCUMULATE_MS);
+    navigator.clipboard.writeText(block).then(function() { window.flashCopied(btn); }).catch(function() {});
+  }
+
   window.exportStory = function(storyId, btn) {
+    var mode = (btn && btn.dataset) ? btn.dataset.mode : null;
+    if (mode === 'manual-new') {
+      var titleEl = document.getElementById('draft-story-title');
+      var contentEl = document.getElementById('draft-story-content');
+      _writeManualBlock(titleEl ? titleEl.value : '', contentEl ? contentEl.value : '', btn);
+      return;
+    }
     if (!storyId) return;
     fetch('/api/story/' + encodeURIComponent(storyId))
       .then(function(r) { return r.json(); })
       .then(function(d) {
+        if (mode === 'manual') {
+          _writeManualBlock(d.title || '', d.text || '', btn);
+          return;
+        }
         if (!d.text) return;
         var modelLabel = (d.platform_name || '') + ': ' + (d.model_name || '');
         var body = d.model_body || {};

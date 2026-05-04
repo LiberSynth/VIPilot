@@ -10,6 +10,7 @@ class AccordionList {
     this._onExpand       = opts.onExpand       || null;
     this._onCollapse     = opts.onCollapse     || null;
     this._canAddNew      = opts.canAddNew      || false;
+    this._newRowItem     = opts.newRowItem     || null;
     this._onNewRowReady  = opts.onNewRowReady  || null;
     this._emptyHtml      = opts.emptyHtml      || '<div class="stories-empty">Нет записей</div>';
     this._rowClassFn        = opts.rowClassFn        || null;
@@ -173,6 +174,8 @@ class AccordionList {
       });
     });
     container.querySelectorAll('.story-grade-badge').forEach(function(btn) {
+      var brow = btn.closest('.story-row');
+      if (brow && brow.getAttribute('data-id') === '__new__') return;
       btn.addEventListener('click', function(e) {
         e.stopPropagation();
         self.cycleGrade(btn);
@@ -305,10 +308,16 @@ class AccordionList {
     var fakeRow = document.createElement('div');
     fakeRow.className = 'story-row story-row--expanded';
     fakeRow.setAttribute('data-id', '__new__');
+    var item = this._newRowItem || { id: '__new__' };
+    var gradeBadge  = this._renderGradeBadge(item);
+    var buttonsHtml = this._renderButtons ? this._renderButtons(item) : '';
     fakeRow.innerHTML =
       '<div class="story-row-header">'
-        + '<div class="story-title" style="color:#888;font-style:italic">Новый сюжет</div>'
-        + '<div class="story-row-right">'
+        + '<div class="story-title">'
+          + '<span style="color:#888;font-style:italic">Новый сюжет</span> '
+          + gradeBadge
+        + '</div>'
+        + '<div class="story-row-right">' + buttonsHtml
           + '<span class="story-chevron">' + AccordionList.CHEVRON_SVG + '</span>'
         + '</div>'
       + '</div>'
@@ -317,7 +326,7 @@ class AccordionList {
     var expandEl = fakeRow.querySelector('.story-expand');
     if (expandEl) this._attachCardToExpand(expandEl);
     fakeRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    if (this._onNewRowReady) this._onNewRowReady(expandEl);
+    if (this._onNewRowReady) this._onNewRowReady(expandEl, fakeRow);
     if (focusTitle) {
       var titleEl = document.getElementById('draft-story-title');
       if (titleEl) titleEl.focus();
