@@ -11,6 +11,7 @@ class ExportMoviesDialog extends Dialog {
     super(opts);
     opts = opts || {};
     this._total    = opts.total    || 0;
+    this._title    = opts.title    || 'Выгрузка роликов';
     this._cancelled = false;
     this._onCancel  = opts.onCancel || null;
   }
@@ -20,7 +21,7 @@ class ExportMoviesDialog extends Dialog {
 
   render() {
     return '<div class="confirm-box">' +
-      '<div class="confirm-box-title">Выгрузка роликов</div>' +
+      '<div class="confirm-box-title">' + _emdEscapeHtml(this._title) + '</div>' +
       '<div style="margin:12px 0 6px">' +
         '<div style="background:rgba(255,255,255,.08);border-radius:6px;height:6px;overflow:hidden">' +
           '<div id="_emd-bar" style="height:100%;width:0%;background:#6ee7a0;transition:width .2s"></div>' +

@@ -194,27 +194,49 @@ function _schedulePubCounterSave() {
 })();
 
 async function downloadBackup(btn) {
-  btn.disabled = true;
+  var tables;
   try {
-    const r = await fetch('/api/export-backup/tables');
+    var r = await fetch('/api/export-backup/tables');
     if (!r.ok) throw new Error('http ' + r.status);
-    const tables = await r.json();
-    for (const table of tables) {
-      const tr = await fetch('/api/export-backup/' + encodeURIComponent(table));
-      if (!tr.ok) continue;
-      const blob = await tr.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
+    tables = await r.json();
+  } catch (e) {
+    if (typeof window.showToast === 'function') window.showToast('Ошибка получения списка таблиц');
+    return;
+  }
+
+  btn.disabled = true;
+  var dlg = new ExportMoviesDialog({ total: tables.length, title: 'Выгрузка данных' });
+  dlg.open();
+
+  var done = 0;
+  var failedItems = [];
+  for (var i = 0; i < tables.length; i++) {
+    if (dlg.isCancelled()) break;
+    var table = tables[i];
+    var filename = table + '.yaml';
+    dlg.setCurrentFile(filename);
+    try {
+      var tr = await fetch('/api/export-backup/' + encodeURIComponent(table));
+      if (!tr.ok) throw new Error('http ' + tr.status);
+      var blob = await tr.blob();
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
       a.href = url;
-      a.download = table + '.yaml';
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+      done++;
+      dlg.setProgress(done, filename);
+    } catch (e) {
+      if (dlg.isCancelled()) break;
+      failedItems.push({ filename: filename, reason: 'ошибка скачивания' });
     }
-  } finally {
-    btn.disabled = false;
   }
+
+  btn.disabled = false;
+  dlg.finish(done, dlg.isCancelled(), failedItems);
 }
 
 function downloadUpdatePackage(btn) {
