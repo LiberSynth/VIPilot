@@ -194,22 +194,36 @@ function _schedulePubCounterSave() {
 })();
 
 async function downloadBackup(btn) {
-  var tables;
+  var tables, movieList;
   try {
-    var r = await fetch('/api/export-backup/tables');
-    if (!r.ok) throw new Error('http ' + r.status);
-    tables = await r.json();
+    var [rTables, rMovies] = await Promise.all([
+      fetch('/api/export-backup/tables'),
+      fetch('/api/export-backup/movie-list'),
+    ]);
+    if (!rTables.ok) throw new Error('tables: http ' + rTables.status);
+    if (!rMovies.ok) throw new Error('movies: http ' + rMovies.status);
+    tables    = await rTables.json();
+    movieList = await rMovies.json();
   } catch (e) {
-    if (typeof window.showToast === 'function') window.showToast('Ошибка получения списка таблиц');
+    if (typeof window.showToast === 'function') window.showToast('Ошибка получения списка файлов');
     return;
   }
 
+  var movieItems = [];
+  for (var m = 0; m < movieList.length; m++) {
+    for (var f = 0; f < movieList[m].fields.length; f++) {
+      movieItems.push({ id: movieList[m].id, field: movieList[m].fields[f] });
+    }
+  }
+
+  var total = tables.length + movieItems.length;
   btn.disabled = true;
-  var dlg = new ExportMoviesDialog({ total: tables.length, title: 'Выгрузка данных' });
+  var dlg = new ExportMoviesDialog({ total: total, title: 'Выгрузка данных' });
   dlg.open();
 
   var done = 0;
   var failedItems = [];
+
   for (var i = 0; i < tables.length; i++) {
     if (dlg.isCancelled()) break;
     var table = tables[i];
@@ -232,6 +246,33 @@ async function downloadBackup(btn) {
     } catch (e) {
       if (dlg.isCancelled()) break;
       failedItems.push({ filename: filename, reason: 'ошибка скачивания' });
+    }
+  }
+
+  for (var j = 0; j < movieItems.length; j++) {
+    if (dlg.isCancelled()) break;
+    var item = movieItems[j];
+    var mvFilename = item.id + ' - ' + item.field + '.mp4';
+    dlg.setCurrentFile(mvFilename);
+    try {
+      var mr = await fetch(
+        '/api/export-backup/movie/' + encodeURIComponent(item.id) + '/' + encodeURIComponent(item.field)
+      );
+      if (!mr.ok) throw new Error('http ' + mr.status);
+      var mvBlob = await mr.blob();
+      var mvUrl = URL.createObjectURL(mvBlob);
+      var ma = document.createElement('a');
+      ma.href = mvUrl;
+      ma.download = mvFilename;
+      document.body.appendChild(ma);
+      ma.click();
+      document.body.removeChild(ma);
+      URL.revokeObjectURL(mvUrl);
+      done++;
+      dlg.setProgress(done, mvFilename);
+    } catch (e) {
+      if (dlg.isCancelled()) break;
+      failedItems.push({ filename: mvFilename, reason: 'ошибка скачивания' });
     }
   }
 

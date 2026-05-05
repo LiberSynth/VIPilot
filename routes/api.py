@@ -889,6 +889,53 @@ def api_export_backup_table(table):
     )
 
 
+@bp.route("/export-backup/movie-list")
+def api_export_backup_movie_list():
+    if not is_authenticated():
+        return Response("Unauthorized", status=401)
+    from db.conn import get_db
+    VIDEO_FIELDS = ["raw_data", "transcoded_data"]
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id, raw_data, transcoded_data FROM movies ORDER BY created_at")
+            rows = cur.fetchall()
+    result = []
+    for row in rows:
+        movie_id = str(row[0])
+        fields = []
+        for i, field in enumerate(VIDEO_FIELDS):
+            if row[i + 1] is not None:
+                fields.append(field)
+        if fields:
+            result.append({"id": movie_id, "fields": fields})
+    return jsonify(result)
+
+
+@bp.route("/export-backup/movie/<movie_id>/<field>")
+def api_export_backup_movie_field(movie_id, field):
+    if not is_authenticated():
+        return Response("Unauthorized", status=401)
+    ALLOWED = {"raw_data", "transcoded_data"}
+    if field not in ALLOWED:
+        return jsonify({"error": "invalid field"}), 400
+    from db.conn import get_db
+    import re
+    if not re.match(r'^[0-9a-f-]{36}$', movie_id):
+        return jsonify({"error": "invalid id"}), 400
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(f"SELECT {field} FROM movies WHERE id = %s", (movie_id,))
+            row = cur.fetchone()
+    if not row or row[0] is None:
+        return jsonify({"error": "not_found"}), 404
+    return send_file(
+        io.BytesIO(bytes(row[0])),
+        mimetype="video/mp4",
+        as_attachment=True,
+        download_name=f"{movie_id} - {field}.mp4",
+    )
+
+
 production_bp = Blueprint("production_api", __name__)
 
 
