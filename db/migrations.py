@@ -32,11 +32,25 @@ from log.log import write_log_entry
 # Миграции 1–102 удалены.
 
 
+# Миграции 103 удалена.
+
+
+def _m104_ai_models_grade_nullable(cur):
+    """
+    Убирает NOT NULL и DEFAULT 'good' у колонки grade в ai_models.
+    Deployed: -
+    """
+    cur.execute("ALTER TABLE ai_models ALTER COLUMN grade DROP NOT NULL")
+    cur.execute("ALTER TABLE ai_models ALTER COLUMN grade DROP DEFAULT")
+
+
 # ---------------------------------------------------------------------------
 # Реестр миграций — добавляйте только в конец, никогда не переиспользуйте номера
 # ---------------------------------------------------------------------------
 
-MIGRATIONS = []
+MIGRATIONS = [
+    (104, _m104_ai_models_grade_nullable),
+]
 
 
 # ---------------------------------------------------------------------------

@@ -70,7 +70,7 @@ def bootstrap():
             """)
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS ai_models (
-                    id          UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+                    id          UUID         NOT NULL PRIMARY KEY DEFAULT gen_random_uuid(),
                     name        VARCHAR(200) NOT NULL,
                     url         VARCHAR(200) NOT NULL,
                     body        JSONB        NOT NULL DEFAULT '{}',
@@ -80,8 +80,13 @@ def bootstrap():
                     type        VARCHAR(50)  NOT NULL,
                     grade       VARCHAR(20),
                     note        TEXT,
-                    price       TEXT
+                    price       TEXT,
+                    created_at  TIMESTAMPTZ  NOT NULL DEFAULT now()
                 )
+            """)
+            cur.execute("""
+                ALTER TABLE ai_models
+                    ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now()
             """)
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS model_durations (
@@ -210,6 +215,30 @@ def bootstrap():
             # ------------------------------------------------------------------
             # Индексы (идемпотентны)
             # ------------------------------------------------------------------
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_ai_models_order
+                    ON ai_models ("order")
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_ai_models_active
+                    ON ai_models (active)
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_ai_models_platform_id
+                    ON ai_models (platform_id)
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_ai_models_type
+                    ON ai_models (type)
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_ai_models_grade
+                    ON ai_models (grade)
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_ai_models_created_at
+                    ON ai_models (created_at)
+            """)
             cur.execute("""
                 CREATE INDEX IF NOT EXISTS idx_batches_status
                     ON batches (status)
