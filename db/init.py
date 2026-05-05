@@ -85,10 +85,6 @@ def bootstrap():
                 )
             """)
             cur.execute("""
-                ALTER TABLE ai_models
-                    ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-            """)
-            cur.execute("""
                 CREATE TABLE IF NOT EXISTS model_durations (
                     model_id UUID    NOT NULL,
                     duration INTEGER NOT NULL,
