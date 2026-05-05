@@ -227,7 +227,7 @@ def _run_post_migration_checks() -> None:
     _run_checks(_POST_MIGRATION_CHECKS, 'Пост-миграционные проверки')
 
 
-def runcheck_upgrade():
+def check_upgrade():
     """
     Инициализирует БД при старте приложения.
 
