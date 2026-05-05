@@ -230,28 +230,26 @@ def check_upgrade() -> bool:
     """
     Инициализирует БД и возвращает True если приложение обновилось с последнего запуска.
 
-    bootstrap() вызывается безусловно первым — он idempotent (CREATE TABLE IF NOT EXISTS).
-    seed_db() вызывается после миграций и сама проверяет, нужен ли сид (таблица users пуста).
-    run_migrations() вызывается при каждом старте — и на деве, и на проде.
-    На проде дополнительно: проверка окружения, пост-миграционные проверки, запись build_number.
+    Признак первого запуска — отсутствие build_number в environment.
+    Порядок: bootstrap → [прод: ранний выход / env_checks] →
+             seed_db (первый запуск) → run_migrations → post_checks → env_set.
+    build_number фиксируется только после успешного завершения всех шагов.
     """
     bootstrap()
 
-    if os.environ.get('REPLIT_DEPLOYMENT') != '1':
+    is_prod = os.environ.get('REPLIT_DEPLOYMENT') == '1'
+    stored  = env_get(_BUILD_KEY, '')
+
+    if is_prod:
+        if stored == BUILD:
+            return False
+        write_log_entry(None, f'[upgrade] Обновление: {stored or "первый запуск"} → {BUILD}', level='silent')
+        _run_env_checks()
+
+    if not stored:
         seed_db()
-        run_migrations()
-        _run_post_migration_checks()
-        return False
-
-    stored = env_get(_BUILD_KEY, '')
-
-    if stored == BUILD:
-        return False
-
-    write_log_entry(None, f'[upgrade] Обновление: {stored or "первый запуск"} → {BUILD}', level='silent')
-    _run_env_checks()
-    env_set(_BUILD_KEY, BUILD)
-    seed_db()
     run_migrations()
     _run_post_migration_checks()
-    return True
+    env_set(_BUILD_KEY, BUILD)
+
+    return is_prod
