@@ -29,53 +29,14 @@ from log.log import write_log_entry
 # Функции миграций
 # ---------------------------------------------------------------------------
 
-# Миграции 1–102 удалены.
-
-
-# Миграции 103 удалена.
-
-
-def _m104_ai_models_grade_nullable(cur):
-    """
-    Убирает NOT NULL и DEFAULT 'good' у колонки grade в ai_models.
-    Deployed: -
-    """
-    cur.execute("ALTER TABLE ai_models ALTER COLUMN grade DROP NOT NULL")
-    cur.execute("ALTER TABLE ai_models ALTER COLUMN grade DROP DEFAULT")
+# Миграции 1–106 удалены.
 
 
 # ---------------------------------------------------------------------------
 # Реестр миграций — добавляйте только в конец, никогда не переиспользуйте номера
 # ---------------------------------------------------------------------------
 
-def _m105_batches_type_status_created_at(cur):
-    """
-    batches.type → TEXT, убирает NOT NULL и DEFAULT 'slot'.
-    batches.status → TEXT.
-    batches.created_at → DEFAULT now().
-    Deployed: -
-    """
-    cur.execute("ALTER TABLE batches ALTER COLUMN type TYPE TEXT")
-    cur.execute("ALTER TABLE batches ALTER COLUMN type DROP NOT NULL")
-    cur.execute("ALTER TABLE batches ALTER COLUMN type DROP DEFAULT")
-    cur.execute("ALTER TABLE batches ALTER COLUMN status TYPE TEXT")
-    cur.execute("ALTER TABLE batches ALTER COLUMN created_at SET DEFAULT now()")
-
-
-def _m106_batches_status_nullable(cur):
-    """
-    batches.status → убирает NOT NULL и DEFAULT 'pending'.
-    Deployed: -
-    """
-    cur.execute("ALTER TABLE batches ALTER COLUMN status DROP NOT NULL")
-    cur.execute("ALTER TABLE batches ALTER COLUMN status DROP DEFAULT")
-
-
-MIGRATIONS = [
-    (104, _m104_ai_models_grade_nullable),
-    (105, _m105_batches_type_status_created_at),
-    (106, _m106_batches_status_nullable),
-]
+MIGRATIONS = []
 
 
 # ---------------------------------------------------------------------------
