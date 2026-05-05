@@ -149,7 +149,7 @@ def bootstrap():
                     id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
                     scheduled_at TIMESTAMPTZ,
                     type         TEXT,
-                    status       TEXT        NOT NULL DEFAULT 'pending',
+                    status       TEXT,
                     story_id     UUID,
                     movie_id     UUID,
                     data         JSONB,
@@ -331,7 +331,7 @@ def bootstrap():
             """)
 
         conn.commit()
-    write_log_entry(None, '[DB] bootstrap: схема проверена/создана', level='silent')
+    write_log_entry(None, "[DB] bootstrap: схема проверена/создана", level="silent")
 
 
 def init_db():
@@ -340,5 +340,5 @@ def init_db():
         run_migrations()
         seed_db()
     except Exception as e:
-        write_log_entry(None, f"[DB] Ошибка инициализации: {e}", level='silent')
+        write_log_entry(None, f"[DB] Ошибка инициализации: {e}", level="silent")
         raise
