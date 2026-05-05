@@ -226,9 +226,9 @@ def _run_post_migration_checks() -> None:
     _run_checks(_POST_MIGRATION_CHECKS, 'Пост-миграционные проверки')
 
 
-def check_upgrade() -> bool:
+def check_upgrade():
     """
-    Инициализирует БД и возвращает True если приложение обновилось с последнего запуска.
+    Инициализирует БД при старте приложения.
 
     Признак первого запуска — отсутствие build_number в environment.
     Порядок: bootstrap → [прод: ранний выход / env_checks] →
@@ -251,5 +251,3 @@ def check_upgrade() -> bool:
     run_migrations()
     _run_post_migration_checks()
     env_set(_BUILD_KEY, BUILD)
-
-    return is_prod
