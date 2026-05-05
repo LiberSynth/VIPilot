@@ -235,7 +235,7 @@ def check_upgrade():
     Порядок: bootstrap → [прод: ранний выход / env_checks] →
              seed_db (первый запуск) → run_migrations → post_checks → env_set.
     build_number фиксируется только после успешного завершения всех шагов.
-    """  # noqa: E501 (alias below keeps both names valid)
+    """
     bootstrap()
 
     is_prod = os.environ.get('REPLIT_DEPLOYMENT') == '1'
