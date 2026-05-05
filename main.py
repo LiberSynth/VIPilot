@@ -1,5 +1,10 @@
 import atexit
+import pathlib
 import threading
+
+if pathlib.Path(".env").exists():
+    from dotenv import load_dotenv
+    load_dotenv()
 
 from db import (
     db_get_actionable_batches,
