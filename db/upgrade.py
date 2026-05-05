@@ -230,10 +230,10 @@ def check_upgrade() -> bool:
     """
     Инициализирует БД и возвращает True если приложение обновилось с последнего запуска.
 
-    bootstrap() вызывается безусловно первым — он idempotent (CREATE TABLE IF NOT EXISTS).
-    seed_db() вызывается после миграций и сама проверяет, нужен ли сид (таблица users пуста).
-    run_migrations() вызывается при каждом старте — и на деве, и на проде.
-    На проде дополнительно: проверка окружения, пост-миграционные проверки, запись build_number.
+    Порядок на деве и проде одинаковый: bootstrap → seed_db → run_migrations → post_checks.
+    seed_db() сама проверяет нужна ли она (users пуста) и выходит если нет.
+    На проде: выполняется только при смене build_number; build_number фиксируется
+    только после успешного завершения всех шагов.
     """
     bootstrap()
 
@@ -250,8 +250,8 @@ def check_upgrade() -> bool:
 
     write_log_entry(None, f'[upgrade] Обновление: {stored or "первый запуск"} → {BUILD}', level='silent')
     _run_env_checks()
-    env_set(_BUILD_KEY, BUILD)
     seed_db()
     run_migrations()
     _run_post_migration_checks()
+    env_set(_BUILD_KEY, BUILD)
     return True
