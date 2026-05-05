@@ -280,6 +280,80 @@ async function downloadBackup(btn) {
   dlg.finish(done, dlg.isCancelled(), failedItems);
 }
 
+function uploadBackup(btn) {
+  var input = document.getElementById('_backup-upload-input');
+  input.value = '';
+  input.onchange = function() { _doUploadBackup(btn, input.files); };
+  input.click();
+}
+
+async function _doUploadBackup(btn, files) {
+  var yamlFiles = [];
+  var mp4Files = [];
+  var MP4_RE = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}) - (raw_data|transcoded_data)\.mp4$/;
+  for (var i = 0; i < files.length; i++) {
+    var f = files[i];
+    if (f.name.endsWith('.yaml')) yamlFiles.push(f);
+    else if (f.name.endsWith('.mp4') && MP4_RE.test(f.name)) mp4Files.push(f);
+  }
+
+  var total = yamlFiles.length + mp4Files.length;
+  if (total === 0) {
+    if (typeof window.showToast === 'function') window.showToast('Нет подходящих файлов');
+    return;
+  }
+
+  btn.disabled = true;
+  var dlg = new ExportMoviesDialog({ total: total, title: 'Загрузка данных' });
+  dlg.open();
+
+  var done = 0;
+  var failedItems = [];
+
+  for (var i = 0; i < yamlFiles.length; i++) {
+    if (dlg.isCancelled()) break;
+    var f = yamlFiles[i];
+    var table = f.name.replace(/\.yaml$/, '');
+    dlg.setCurrentFile(f.name);
+    try {
+      var fd = new FormData();
+      fd.append('table', table);
+      fd.append('file', f);
+      var r = await fetch('/api/import-backup/table', { method: 'POST', body: fd });
+      if (!r.ok) throw new Error('http ' + r.status);
+      done++;
+      dlg.setProgress(done, f.name);
+    } catch (e) {
+      if (dlg.isCancelled()) break;
+      failedItems.push({ filename: f.name, reason: 'ошибка загрузки' });
+    }
+  }
+
+  for (var j = 0; j < mp4Files.length; j++) {
+    if (dlg.isCancelled()) break;
+    var f = mp4Files[j];
+    var m = f.name.match(MP4_RE);
+    var movieId = m[1];
+    var field = m[2];
+    dlg.setCurrentFile(f.name);
+    try {
+      var r = await fetch(
+        '/api/import-backup-video/' + encodeURIComponent(movieId) + '/' + encodeURIComponent(field),
+        { method: 'POST', body: f, headers: { 'Content-Type': 'video/mp4' } }
+      );
+      if (!r.ok) throw new Error('http ' + r.status);
+      done++;
+      dlg.setProgress(done, f.name);
+    } catch (e) {
+      if (dlg.isCancelled()) break;
+      failedItems.push({ filename: f.name, reason: 'ошибка загрузки' });
+    }
+  }
+
+  btn.disabled = false;
+  dlg.finish(done, dlg.isCancelled(), failedItems);
+}
+
 function downloadUpdatePackage(btn) {
   btn.disabled = true;
   const a = document.createElement('a');

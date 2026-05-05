@@ -943,6 +943,48 @@ def api_export_backup_movie_field(movie_id, field):
     )
 
 
+@bp.route("/import-backup/table", methods=["POST"])
+def api_import_backup_table():
+    if not is_authenticated():
+        return Response("Unauthorized", status=401)
+    import re as _re
+    table = request.form.get("table", "").strip()
+    if not table or not _re.match(r'^[a-z_]+$', table):
+        return jsonify({"error": "invalid table"}), 400
+    f = request.files.get("file")
+    if not f:
+        return jsonify({"error": "no file"}), 400
+    content = f.read().decode("utf-8")
+    from utils.import_backup import import_table
+    summary = import_table(table, content)
+    return jsonify(summary)
+
+
+@bp.route("/import-backup-video/<movie_id>/<field>", methods=["POST"])
+def api_import_backup_video_field(movie_id, field):
+    if not is_authenticated():
+        return Response("Unauthorized", status=401)
+    ALLOWED = {"raw_data", "transcoded_data"}
+    if field not in ALLOWED:
+        return jsonify({"error": "invalid field"}), 400
+    import re as _re
+    if not _re.match(r'^[0-9a-f-]{36}$', movie_id):
+        return jsonify({"error": "invalid id"}), 400
+    data = request.get_data()
+    if not data:
+        return jsonify({"error": "empty body"}), 400
+    from db.connection import get_db
+    from psycopg2 import Binary
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                f'INSERT INTO movies (id, "{field}") VALUES (%s, %s) '
+                f'ON CONFLICT (id) DO UPDATE SET "{field}" = EXCLUDED."{field}"',
+                (movie_id, Binary(data)),
+            )
+    return jsonify({"ok": True})
+
+
 production_bp = Blueprint("production_api", __name__)
 
 
