@@ -21,175 +21,138 @@ def bootstrap():
     with get_db() as conn:
         with conn.cursor() as cur:
             # ------------------------------------------------------------------
-            # Базовые служебные таблицы
+            # Таблицы
             # ------------------------------------------------------------------
             cur.execute("""
-                CREATE TABLE IF NOT EXISTS environment (
-                    key   VARCHAR(100) PRIMARY KEY,
-                    value TEXT NOT NULL
+                CREATE TABLE IF NOT EXISTS ai_models (
+                    id          UUID NOT NULL PRIMARY KEY DEFAULT gen_random_uuid(),
+                    name        TEXT NOT NULL,
+                    platform_id UUID,
+                    type        TEXT,
+                    active      BOOLEAN NOT NULL DEFAULT FALSE,
+                    url         TEXT,
+                    body        JSONB NOT NULL DEFAULT '{}',
+                    "order"     INTEGER NOT NULL DEFAULT 0,
+                    grade       TEXT,
+                    note        TEXT,
+                    price       TEXT,
+                    created_at  TIMESTAMPTZ  NOT NULL DEFAULT clock_timestamp()
                 )
             """)
             cur.execute("""
-                CREATE TABLE IF NOT EXISTS settings (
-                    key   VARCHAR(100) PRIMARY KEY,
-                    value TEXT NOT NULL
+                CREATE TABLE IF NOT EXISTS ai_platforms (
+                    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    name         TEXT NOT NULL,
+                    url          TEXT,
+                    env_key_name TEXT
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS batches (
+                    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    type         TEXT,
+                    story_id     UUID,
+                    movie_id     UUID,
+                    status       TEXT,
+                    scheduled_at TIMESTAMPTZ,
+                    data         JSONB,
+                    title        TEXT,
+                    created_at   TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
                 )
             """)
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS cycle_config (
-                    key   VARCHAR(100) PRIMARY KEY,
-                    value TEXT NOT NULL
-                )
-            """)
-
-            # ------------------------------------------------------------------
-            # Расписание
-            # ------------------------------------------------------------------
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS schedule (
-                    id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-                    time_utc   VARCHAR(5)  NOT NULL,
-                    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                    key   TEXT PRIMARY KEY,
+                    value TEXT
                 )
             """)
             cur.execute("""
-                ALTER TABLE schedule
-                    ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-            """)
-
-            # ------------------------------------------------------------------
-            # ИИ-платформы и модели
-            # ------------------------------------------------------------------
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS ai_platforms (
-                    id           UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
-                    name         VARCHAR(200) NOT NULL,
-                    url          VARCHAR(500) NOT NULL,
-                    env_key_name VARCHAR(200)
+                CREATE TABLE IF NOT EXISTS environment (
+                    key   TEXT PRIMARY KEY,
+                    value TEXT
                 )
             """)
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS ai_models (
-                    id          UUID         NOT NULL PRIMARY KEY DEFAULT gen_random_uuid(),
-                    name        VARCHAR(200) NOT NULL,
-                    url         VARCHAR(200) NOT NULL,
-                    body        JSONB        NOT NULL DEFAULT '{}',
-                    "order"     INTEGER      NOT NULL DEFAULT 0,
-                    active      BOOLEAN      NOT NULL DEFAULT FALSE,
-                    platform_id UUID,
-                    type        VARCHAR(50)  NOT NULL,
-                    grade       VARCHAR(20),
-                    note        TEXT,
-                    price       TEXT,
-                    created_at  TIMESTAMPTZ  NOT NULL DEFAULT now()
-                )
-            """)
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS model_durations (
-                    model_id UUID    NOT NULL,
-                    duration INTEGER NOT NULL,
-                    PRIMARY KEY (model_id, duration)
-                )
-            """)
-
-            # ------------------------------------------------------------------
-            # Таргеты (публикационные платформы)
-            # ------------------------------------------------------------------
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS targets (
-                    id              UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
-                    name            VARCHAR(200) NOT NULL,
-                    aspect_ratio_x  SMALLINT     NOT NULL DEFAULT 9,
-                    aspect_ratio_y  SMALLINT     NOT NULL DEFAULT 16,
-                    transcode       BOOLEAN      NOT NULL DEFAULT FALSE,
-                    config          JSONB        NOT NULL DEFAULT '{}',
-                    slug            VARCHAR(50),
-                    active          BOOLEAN      NOT NULL DEFAULT TRUE,
-                    "order"         INTEGER      NOT NULL DEFAULT 0,
-                    session_context JSONB
-                )
-            """)
-
-            # ------------------------------------------------------------------
-            # Сюжеты
-            # ------------------------------------------------------------------
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS stories (
-                    id             UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-                    model_id       UUID,
-                    title          TEXT,
-                    content        TEXT,
-                    grade          TEXT,
-                    created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
-                    manual_changed BOOLEAN     NOT NULL DEFAULT FALSE,
-                    pinned         BOOLEAN     NOT NULL DEFAULT FALSE
-                )
-            """)
-
-            # ------------------------------------------------------------------
-            # Видео
-            # ------------------------------------------------------------------
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS movies (
-                    id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-                    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-                    url             TEXT,
-                    raw_data        BYTEA,
-                    transcoded_data BYTEA,
-                    model_id        UUID,
-                    grade           TEXT
-                )
-            """)
-
-            # ------------------------------------------------------------------
-            # Батчи (задачи пайплайна)
-            # ------------------------------------------------------------------
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS batches (
-                    id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-                    scheduled_at TIMESTAMPTZ,
-                    type         TEXT,
-                    status       TEXT,
-                    story_id     UUID,
-                    movie_id     UUID,
-                    data         JSONB,
-                    created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-                    title        TEXT
-                )
-            """)
-
-            # ------------------------------------------------------------------
-            # Логи
-            # ------------------------------------------------------------------
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS log (
-                    id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+                    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                     batch_id   UUID,
-                    pipeline   VARCHAR(30) NOT NULL,
+                    pipeline   TEXT,
                     message    TEXT,
-                    status     VARCHAR(20),
-                    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                    status     TEXT,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
                 )
             """)
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS log_entries (
-                    id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+                    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                     log_id     UUID,
-                    message    TEXT        NOT NULL,
-                    level      VARCHAR(10) NOT NULL DEFAULT 'info',
-                    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                    message    TEXT,
+                    level      TEXT,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
                 )
             """)
-
-            # ------------------------------------------------------------------
-            # Пользователи и роли
-            # ------------------------------------------------------------------
             cur.execute("""
-                CREATE TABLE IF NOT EXISTS users (
+                CREATE TABLE IF NOT EXISTS model_durations (
                     id       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                    name     TEXT,
-                    login    TEXT,
-                    password TEXT
+                    model_id UUID NOT NULL,
+                    duration INTEGER NOT NULL
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS movies (
+                    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    raw_data        BYTEA,
+                    transcoded_data BYTEA,
+                    model_id        UUID,
+                    url             TEXT,
+                    grade           TEXT,
+                    created_at      TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS schedule (
+                    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    time_utc   TEXT NOT NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS settings (
+                    key   TEXT PRIMARY KEY,
+                    value TEXT
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS stories (
+                    id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    title          TEXT,
+                    content        TEXT,
+                    model_id       UUID,
+                    grade          TEXT,
+                    manual_changed BOOLEAN NOT NULL DEFAULT FALSE,
+                    pinned         BOOLEAN NOT NULL DEFAULT FALSE,
+                    created_at     TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS targets (
+                    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    name            TEXT NOT NULL,
+                    aspect_ratio_x  SMALLINT,
+                    aspect_ratio_y  SMALLINT,
+                    config          JSONB NOT NULL DEFAULT '{}',
+                    session_context JSONB,
+                    slug            TEXT,
+                    active          BOOLEAN NOT NULL DEFAULT TRUE,
+                    transcode       BOOLEAN NOT NULL DEFAULT FALSE,
+                    "order"         INTEGER NOT NULL DEFAULT 0
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS user_role_links (
+                    id      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    user_id UUID NOT NULL,
+                    role_id UUID NOT NULL
                 )
             """)
             cur.execute("""
@@ -201,15 +164,16 @@ def bootstrap():
                 )
             """)
             cur.execute("""
-                CREATE TABLE IF NOT EXISTS user_role_links (
-                    user_id UUID NOT NULL,
-                    role_id UUID NOT NULL,
-                    PRIMARY KEY (user_id, role_id)
+                CREATE TABLE IF NOT EXISTS users (
+                    id       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    name     TEXT,
+                    login    TEXT,
+                    password TEXT
                 )
             """)
 
             # ------------------------------------------------------------------
-            # Индексы (идемпотентны)
+            # Индексы
             # ------------------------------------------------------------------
             cur.execute("""
                 CREATE INDEX IF NOT EXISTS idx_ai_models_order
@@ -285,7 +249,7 @@ def bootstrap():
             """)
 
             # ------------------------------------------------------------------
-            # Хранимые функции для пула доноров
+            # Хранимые функции
             # ------------------------------------------------------------------
             cur.execute("""
                 CREATE OR REPLACE FUNCTION get_donor_count(p_good_only boolean)
