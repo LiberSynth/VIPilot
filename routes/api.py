@@ -897,15 +897,22 @@ def api_export_backup_movie_list():
     VIDEO_FIELDS = ["raw_data", "transcoded_data"]
     with get_db() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT id, raw_data, transcoded_data FROM movies ORDER BY created_at")
+            cur.execute("""
+                SELECT id,
+                       (raw_data IS NOT NULL)        AS has_raw,
+                       (transcoded_data IS NOT NULL) AS has_trans
+                FROM movies
+                ORDER BY created_at
+            """)
             rows = cur.fetchall()
     result = []
     for row in rows:
         movie_id = str(row[0])
         fields = []
-        for i, field in enumerate(VIDEO_FIELDS):
-            if row[i + 1] is not None:
-                fields.append(field)
+        if row[1]:
+            fields.append("raw_data")
+        if row[2]:
+            fields.append("transcoded_data")
         if fields:
             result.append({"id": movie_id, "fields": fields})
     return jsonify(result)
