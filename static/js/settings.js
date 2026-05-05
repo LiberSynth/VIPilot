@@ -193,6 +193,30 @@ function _schedulePubCounterSave() {
   el.addEventListener('change', _schedulePubCounterSave);
 })();
 
+async function downloadBackup(btn) {
+  btn.disabled = true;
+  try {
+    const r = await fetch('/api/export-backup/tables');
+    if (!r.ok) throw new Error('http ' + r.status);
+    const tables = await r.json();
+    for (const table of tables) {
+      const tr = await fetch('/api/export-backup/' + encodeURIComponent(table));
+      if (!tr.ok) continue;
+      const blob = await tr.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = table + '.yaml';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 function downloadUpdatePackage(btn) {
   btn.disabled = true;
   const a = document.createElement('a');

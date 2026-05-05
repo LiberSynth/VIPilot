@@ -867,6 +867,28 @@ def api_export_update_package():
     )
 
 
+@bp.route("/export-backup/tables")
+def api_export_backup_tables():
+    if not is_authenticated():
+        return Response("Unauthorized", status=401)
+    from utils.export_backup import list_tables
+    return jsonify(list_tables())
+
+
+@bp.route("/export-backup/<table>")
+def api_export_backup_table(table):
+    if not is_authenticated():
+        return Response("Unauthorized", status=401)
+    from utils.export_backup import export_table
+    data = export_table(table).encode("utf-8")
+    return send_file(
+        io.BytesIO(data),
+        mimetype="application/octet-stream",
+        as_attachment=True,
+        download_name=f"{table}.yaml",
+    )
+
+
 production_bp = Blueprint("production_api", __name__)
 
 

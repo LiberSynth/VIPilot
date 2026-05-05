@@ -286,6 +286,10 @@
         <button type="button" class="btn-secondary" onclick="uploadUpdatePackage(this)">Загрузить статический пакет</button>
         <div class="hint" style="margin-top:6px">Загружает update_package.yaml и синхронизирует справочные таблицы: новые записи добавляются, существующие обновляются, лишние удаляются.</div>
       </div>
+      <div style="margin-top:8px;padding-top:8px;border-top:1px solid #1e1e28">
+        <button type="button" class="btn-secondary" onclick="downloadBackup(this)">Выгрузить все данные</button>
+        <div class="hint" style="margin-top:6px">Скачивает все таблицы базы данных отдельными YAML-файлами. Бинарные поля (видео) не включаются.</div>
+      </div>
     </div>
 
   </div>
