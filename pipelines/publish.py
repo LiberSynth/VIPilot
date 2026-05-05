@@ -172,7 +172,6 @@ def _build_steps(active_targets):
 
 def run(batch_id, log_id):
     snap = environment.snapshot()
-    ensure_playwright_chromium(log_id)
     batch = db_get_batch_by_id(batch_id)
     if not batch:
         db_log_update(log_id, "Батч не найден", "error")
@@ -305,6 +304,8 @@ def run(batch_id, log_id):
     if pub_title:
         write_log_entry(log_id, f'Заголовок публикации (из БД): «{pub_title}»')
         write_log_entry(log_id, f"[publish] Заголовок публикации (из БД): {pub_title}", level='silent')
+
+    ensure_playwright_chromium(log_id)
 
     any_ok = False
     failed_steps = []
