@@ -105,7 +105,10 @@ def seed_db():
                     ) AS v(user_login, role_slug)
                     JOIN users      u ON u.login = v.user_login
                     JOIN user_roles r ON r.slug  = v.role_slug
-                    ON CONFLICT (user_id, role_id) DO NOTHING
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM user_role_links l
+                        WHERE l.user_id = u.id AND l.role_id = r.id
+                    )
                 """)
 
             conn.commit()
