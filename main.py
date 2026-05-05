@@ -82,7 +82,13 @@ def start_main_loop():
         ka.start()
 
 
-start_main_loop()
+try:
+    start_main_loop()
+except Exception as _e:
+    import traceback as _tb
+    print("STARTUP ERROR:", _e, flush=True)
+    _tb.print_exc()
+    raise
 
 app = flask_app
 
