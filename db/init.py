@@ -148,8 +148,8 @@ def bootstrap():
                 CREATE TABLE IF NOT EXISTS batches (
                     id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
                     scheduled_at TIMESTAMPTZ,
-                    type         VARCHAR(30) NOT NULL DEFAULT 'slot',
-                    status       VARCHAR(50) NOT NULL DEFAULT 'pending',
+                    type         TEXT,
+                    status       TEXT        NOT NULL DEFAULT 'pending',
                     story_id     UUID,
                     movie_id     UUID,
                     data         JSONB,
@@ -236,12 +236,32 @@ def bootstrap():
                     ON ai_models (created_at)
             """)
             cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_batches_scheduled_at
+                    ON batches (scheduled_at)
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_batches_type
+                    ON batches (type)
+            """)
+            cur.execute("""
                 CREATE INDEX IF NOT EXISTS idx_batches_status
                     ON batches (status)
             """)
             cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_batches_story_id
+                    ON batches (story_id)
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_batches_movie_id
+                    ON batches (movie_id)
+            """)
+            cur.execute("""
                 CREATE INDEX IF NOT EXISTS idx_batches_created_at
                     ON batches (created_at)
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_batches_title
+                    ON batches (title)
             """)
             cur.execute("""
                 CREATE INDEX IF NOT EXISTS idx_log_batch_id

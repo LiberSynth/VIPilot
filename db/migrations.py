@@ -48,8 +48,23 @@ def _m104_ai_models_grade_nullable(cur):
 # Реестр миграций — добавляйте только в конец, никогда не переиспользуйте номера
 # ---------------------------------------------------------------------------
 
+def _m105_batches_type_status_created_at(cur):
+    """
+    batches.type → TEXT, убирает NOT NULL и DEFAULT 'slot'.
+    batches.status → TEXT.
+    batches.created_at → DEFAULT now().
+    Deployed: -
+    """
+    cur.execute("ALTER TABLE batches ALTER COLUMN type TYPE TEXT")
+    cur.execute("ALTER TABLE batches ALTER COLUMN type DROP NOT NULL")
+    cur.execute("ALTER TABLE batches ALTER COLUMN type DROP DEFAULT")
+    cur.execute("ALTER TABLE batches ALTER COLUMN status TYPE TEXT")
+    cur.execute("ALTER TABLE batches ALTER COLUMN created_at SET DEFAULT now()")
+
+
 MIGRATIONS = [
     (104, _m104_ai_models_grade_nullable),
+    (105, _m105_batches_type_status_created_at),
 ]
 
 
