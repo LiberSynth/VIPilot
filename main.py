@@ -16,10 +16,7 @@ from pipelines.runner import start_batch_thread
 import common.environment as environment
 import utils.keepalive as keepalive
 from utils.middleware import register_middleware
-try:
-    from db.upgrade import check_upgrade
-except ImportError:
-    from db.upgrade import runcheck_upgrade as check_upgrade
+import db.upgrade as _db_upgrade
 
 flask_app = create_app()
 register_middleware(flask_app)
@@ -73,7 +70,7 @@ def start_main_loop():
     global _main_loop_started
     if not _main_loop_started:
         _main_loop_started = True
-        check_upgrade()
+        _db_upgrade.check_upgrade() if hasattr(_db_upgrade, 'check_upgrade') else _db_upgrade.runcheck_upgrade()
         init_app(flask_app)
         environment.init_from_db()
         db_interrupt_stale_logs()

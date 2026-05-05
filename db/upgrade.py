@@ -252,6 +252,3 @@ def check_upgrade():
     run_migrations()
     _run_post_migration_checks()
     env_set(_BUILD_KEY, BUILD)
-
-
-runcheck_upgrade = check_upgrade
