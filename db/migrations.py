@@ -32,11 +32,29 @@ from log.log import write_log_entry
 # Миграции 1–106 удалены.
 
 
+def _m107(cur):
+    """Удалить батчи со статусом NULL и связанные log/log_entries."""
+    cur.execute("""
+        DELETE FROM log_entries
+        WHERE log_id IN (
+            SELECT id FROM log
+            WHERE batch_id IN (SELECT id FROM batches WHERE status IS NULL)
+        )
+    """)
+    cur.execute("""
+        DELETE FROM log
+        WHERE batch_id IN (SELECT id FROM batches WHERE status IS NULL)
+    """)
+    cur.execute("DELETE FROM batches WHERE status IS NULL")
+
+
 # ---------------------------------------------------------------------------
 # Реестр миграций — добавляйте только в конец, никогда не переиспользуйте номера
 # ---------------------------------------------------------------------------
 
-MIGRATIONS = []
+MIGRATIONS = [
+    (107, _m107),
+]
 
 
 # ---------------------------------------------------------------------------
