@@ -232,20 +232,108 @@ def bootstrap():
                     ON log (batch_id)
             """)
             cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_log_pipeline
+                    ON log (pipeline)
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_log_status
+                    ON log (status)
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_log_created_at
+                    ON log (created_at)
+            """)
+            cur.execute("""
                 CREATE INDEX IF NOT EXISTS idx_log_entries_log_id
                     ON log_entries (log_id)
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_log_entries_level
+                    ON log_entries (level)
             """)
             cur.execute("""
                 CREATE INDEX IF NOT EXISTS idx_log_entries_created_at
                     ON log_entries (created_at)
             """)
             cur.execute("""
-                CREATE INDEX IF NOT EXISTS idx_stories_created_at
-                    ON stories (created_at)
+                CREATE INDEX IF NOT EXISTS idx_model_durations_model_id
+                    ON model_durations (model_id)
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_model_durations_duration
+                    ON model_durations (duration)
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_movies_model_id
+                    ON movies (model_id)
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_movies_grade
+                    ON movies (grade)
             """)
             cur.execute("""
                 CREATE INDEX IF NOT EXISTS idx_movies_created_at
                     ON movies (created_at)
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_schedule_time_utc
+                    ON schedule (time_utc)
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_schedule_created_at
+                    ON schedule (created_at)
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_stories_title
+                    ON stories (title)
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_stories_model_id
+                    ON stories (model_id)
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_stories_grade
+                    ON stories (grade)
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_stories_manual_changed
+                    ON stories (manual_changed)
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_stories_pinned
+                    ON stories (pinned)
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_stories_created_at
+                    ON stories (created_at)
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_targets_slug
+                    ON targets (slug)
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_targets_active
+                    ON targets (active)
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_targets_order
+                    ON targets ("order")
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_user_role_links_user_id
+                    ON user_role_links (user_id)
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_user_role_links_role_id
+                    ON user_role_links (role_id)
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_user_roles_slug
+                    ON user_roles (slug)
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_users_login
+                    ON users (login)
             """)
 
             # ------------------------------------------------------------------
