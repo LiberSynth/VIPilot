@@ -1,159 +1,75 @@
-# VIPilot — автопубликатор
+# VIPilot — Автоматическая публикация видеоисторий
 
-Flask-приложение для автоматической публикации видеоисторий в VK/Дзен/Рутьюб через 6-пайплайновую систему.
+Flask-приложение для автоматической публикации видеоисторий в VK, Дзен и Рутьюб через систему из шести пайплайнов.
 
-## Архитектура пайплайнов
+## Run & Operate
 
-Каждый пайплайн запускается отдельным потоком с интервалом `loop_interval` секунд:
+*   **Run application:** `python main.py`
+*   **Env vars:** `FAL_API_KEY`, `OPENROUTER_API_KEY`, `VK_USER_TOKEN`, `DZEN_OAUTH_TOKEN`, `DATABASE_URL`
+*   **Post-task check:** Always run `bash scripts/check_conventions.sh` before reporting task completion. Fix any violations.
 
-1. **planning.py** — создаёт батчи по расписанию (`schedule`), формирует `batches` со статусом `pending`
-2. **story.py** — генерирует текстовый сюжет через OpenRouter → статус `story_ready`
-3. **video.py** — запрашивает генерацию видео через fal.ai → статус `video_pending` → `video_ready`
-4. **transcode.py** — перекодирует видео через ffmpeg (H.264/AAC/faststart) → статус `transcode_ready`
-5. **publish.py** — публикует в VK (история/стена), Дзен и/или Рутьюб → статус `published` (с проверкой времени публикации)
-6. **cleanup.py** — удаляет устаревшие log_entries, log, batches/stories, файлы на диске
+## Stack
 
-Статусы батча: `pending → story_ready → video_pending → video_ready → transcode_ready → published`; `cancelled` может быть выставлен на любом этапе ожидания.
+*   **Framework:** Flask
+*   **ORM:** _Populate as you build_
+*   **Validation:** _Populate as you build_
+*   **Build Tool:** _Populate as you build_
+*   **Runtime:** Python
 
-Повторяющийся код вынесен в `pipelines/base.py`: `check_cancelled(pipeline_name, batch_id, batch)` — все пайплайны используют эту функцию вместо копипасты. Прерывающие ошибки внутри пайплайнов выбрасывают `AppException` (из `exceptions.py`), которое перехватывает `_batch_thread` в `main.py` и переводит батч в статус `error`. Неизвестные исключения переводят батч в `fatal_error`.
+## Where things live
 
-## Таблицы БД
+*   **Pipelined Workflow:** `pipelines/` (modules: `planning.py`, `story.py`, `video.py`, `transcode.py`, `publish.py`, `cleanup.py`)
+*   **Web Routes:** `routes/web.py` (frontend), `routes/api.py` (backend API)
+*   **Database Schema:** Defined implicitly by `db/migrations.py` and `db/seed.py`
+*   **Configuration:** `settings` and `cycle_config` tables in DB via `db/cycle_config.py`
+*   **AI Models:** `ai_models` table in DB, managed by `routes/api.py`
+*   **Logging:** `log/log.py`
+*   **Frontend Assets:** `static/` (CSS, JS, images)
+*   **HTML Templates:** `templates/` (Jinja2)
+*   **Core Application Logic:** `main.py`, `common/`, `utils/`
+*   **API Clients:** `clients/` (VK, Dzen, RuTube)
+*   **Browser Automation Services:** `services/` (`dzen_browser.py`, `rutube_browser.py`, `vkvideo_browser.py`)
 
-- `settings` — ключ/значение настроек (системные параметры: lifetime, buffer_hours, loop_interval, max_*)
-- `cycle_config` — настройки производственного цикла в формате key-value (`key VARCHAR PK, value TEXT`): text_prompt, format_prompt, video_post_prompt, video_duration, approve_stories, approve_movies, words_per_second
-- `schedule` — расписание публикаций (время UTC)
-- `targets` — целевые площадки (VK, Дзен, Рутьюб) с токенами и параметрами
-- `batches` — очередь задач пайплайна (UUID PK, все статусы и данные)
-- `stories` — сгенерированные тексты сюжетов
-- `ai_models` — модели fal.ai (name, url, body JSONB, order, active)
-- `ai_platforms` — платформы ИИ
-- `log` — корневые записи лога
-- `log_entries` — записи внутри корневых логов
+## Architecture decisions
 
-## Настройки (settings)
+*   **Pipeline-based processing:** A 6-stage pipeline (planning, story, video, transcode, publish, cleanup) handles video story generation and publication, with each stage running in its own thread.
+*   **Centralized error handling:** Custom `AppException` and `FatalError` classes are used for predictable and invariant-breaking errors, caught by the main loop.
+*   **Strict environment access:** Environment variables and settings are read into a snapshot at the beginning of each pipeline run to ensure consistency and prevent race conditions.
+*   **Browser automation for complex platforms:** Dzen and RuTube (and VK Video) publication is handled via Playwright-driven browser automation due to complex UI interactions.
+*   **Single point of DB access:** All database interactions are routed through `db/db.py` to ensure consistent connection management and transaction handling.
+*   **All JS dialogs and modals inherit from `Dialog`.**
+*   **Styling for `<textarea>` is done via tag-selector in `common.css`, not inline or via class.**
 
-Активные:
-- `buffer_hours` — временно́е окно до публикации для попадания в буфер
-- `loop_interval` — интервал опроса пайплайнов (секунды)
-- `emulation_mode` — режим эмуляции (без реальных запросов)
-- `log_lifetime` — подробный лог устаревает через N дней (default 30)
-- `short_log_lifetime` — краткий лог устаревает через N дней (default 365)
-- `batch_lifetime` — история батчей устаревает через N дней (default 7)
-- `file_lifetime` — видеофайлы на диске устаревают через N дней (default 7)
+## Product
 
-Настройки производственного цикла перенесены в `cycle_config` (key-value, аналогично `settings`).
+*   Automated scheduling and batching of video story generation.
+*   AI-powered text story generation (OpenRouter) and video generation (fal.ai).
+*   Video transcoding for platform compatibility (ffmpeg).
+*   Multi-platform publishing to VK (stories/wall), Dzen, and RuTube.
+*   Monitoring interface for pipeline status and logs.
+*   User-configurable production cycle settings (prompts, duration, approval flows).
 
-Отложено до реализации:
-- `notify_email` / `notify_phone` — уведомления при сбоях (функционал будет восстановлен позже)
+## User preferences
 
-## Секреты
+- **Strict adherence to conventions:** `scripts/check_conventions.sh` must pass before reporting task completion. Disabling or bypassing the `pre-commit` hook is forbidden.
+- **Error handling:** Exceptions should bubble up; direct `try-except` around DB operations is forbidden.
+- **Logging:** Use `write_log` / `write_log_entry` exclusively; direct `print()` or direct DB writes to logs are forbidden.
+- **Environment variables:** Read via `refresh_environment()` only; direct `db_get`/`env_get` for specific keys outside this function is forbidden.
+- **Thread environment:** Threads must read environment settings from a snapshot (`snap = environment.snapshot()`).
+- **GUID/UUID formatting:** Use `fmt_id_msg` for all GUID/UUID in log messages.
 
-- `FAL_API_KEY` — ключ fal.ai для генерации видео
-- `OPENROUTER_API_KEY` — ключ OpenRouter для генерации сюжетов
-- `VK_USER_TOKEN` — личный токен VK
-- `DZEN_OAUTH_TOKEN` — OAuth-токен Яндекса (живёт 12 месяцев, не требует обновления)
-- `DATABASE_URL` — строка подключения PostgreSQL
+## Gotchas
 
-## Файлы
+*   `pre-commit` hook: The `.git/hooks/pre-commit` hook is mandatory and should never be disabled or bypassed. Violations must be fixed.
+*   Direct DB access: Do not directly access environment variables or settings from the DB; use `environment.*` or `snap.*`.
+*   Logging bypass: Do not use `print()` for logging or directly write to log tables; use the provided `log/log.py` functions.
+*   `notify_failure` exceptions: `notify_failure` handles its own exceptions; do not wrap its calls in external `try-except` blocks.
 
-- `main.py` — Flask app, регистрация blueprints, middleware, main_loop, старт; при запуске вызывает `db_log_interrupt_running` для всех четырёх пайплайнов (сброс «висячих» running-записей в мониторе)
-- `common/exceptions.py` — классы `AppException(batch_id, pipeline, message)` и `FatalError` для прерывающих ошибок
-- `common/startup.py` — инициализация приложения (`init_app`, `create_app`)
-- `common/statuses.py` — константы статусов батчей (`KNOWN_BATCH_STATUSES`, `FINAL_BATCH_STATUSES` и др.)
-- `common/gunicorn.conf.py` — конфиг gunicorn (worker_class, threads, timeout)
-- `common/environment.py` — состояние процесса: ContextVar `asserted_log_entry`, слоты потоков батчей, wakeup-событие главного цикла
-- `utils/consts.py` — константы (FLASK_SECRET, MSK)
-- `utils/utils.py` — общие функции (parse_hhmm, to_msk, to_utc_from_msk, parse_short_log_days)
-- `utils/auth.py` — аутентификация (is_authenticated): проверяет session["auth"] и auth_ts (7 дней)
-- `routes/web.py` — Blueprint "web": веб-роуты (/, /web, /production, /save, /save-dzen, /logout, /favicon, /healthz)
-- `routes/api.py` — Blueprint: API-роуты (/api/*); модели через db_get/activate/reorder (таблица ai_models)
-- `clients/vk.py` — VK API-клиент (publish_story, publish_wall, is_configured)
-- `clients/dzen.py` — Дзен API-клиент: UI-driven через Playwright (8 шагов)
-- `clients/rutube.py` — Рутьюб API-клиент: UI-driven через Playwright (8 шагов)
-- `services/browser_base.py` — базовый класс `PlatformBrowser`: авторизация (persistent-профиль + SSE-трансляция кадров) и публикация (`run_pipeline_browser`)
-- `services/dzen_browser.py` — синглтон `PlatformBrowser` для Дзен
-- `services/rutube_browser.py` — синглтон `PlatformBrowser` для Рутьюба
-- `services/vkvideo_browser.py` — синглтон `PlatformBrowser` для VK Видео (start_url: vkvideo.ru, cookie_domains: vkvideo.ru + vk.com)
-- `routes/dzen_browser.py` — Blueprint `/api/dzen-browser/*` (start/stream/event/save-session/stop/status)
-- `routes/rutube_browser.py` — Blueprint `/api/rutube-browser/*`
-- `routes/vkvideo_browser.py` — Blueprint `/api/vkvideo-browser/*`
-- `static/js/dzen_browser.js` — виджет браузера Дзен (IIFE): SSE-кадры на canvas, мышь/клавиатура, авто-запуск
-- `static/js/rutube_browser.js` — виджет браузера Рутьюб
-- `static/js/vkvideo_browser.js` — виджет браузера VK Видео
-- `pipelines/base.py` — общие утилиты пайплайнов: `check_cancelled`, `pipeline_log`, `iterate_models`
-- `pipelines/planning.py` — MSK импортируется из utils.consts
-- `pipelines/story.py` — проверяет возвращаемое значение `db_set_batch_story`; при False — логирует ошибку и завершается через `return`
-- `pipelines/video.py` — video_duration читается в run(), передаётся в _build_body()
-- `pipelines/transcode.py` — os.makedirs вызывается внутри run()
-- `pipelines/publish.py` — публикация в VKontakte и Дзен
-- `pipelines/` — base.py, planning.py, story.py, video.py, transcode.py, publish.py, cleanup.py
-- `db/cycle_config.py` — доступ к таблице cycle_config: `cycle_config_get(key)` → типизированное значение, `cycle_config_set(key, value)` → INSERT ON CONFLICT UPDATE
-- `db/connection.py` — единственная точка создания соединения (`get_db()`)
-- `db/migrations.py` — реестр `MIGRATIONS` + `run_migrations()`; каждая миграция idempotent и завершается в своей транзакции; версия хранится в `settings.db_version`
-- `db/seed.py` — начальные данные (`seed_db()`): вставляет `user_roles`, `users`, `user_role_links` только если таблица `users` пуста
-- `db/init.py` — тонкий оркестратор: `bootstrap()` → `run_migrations()`
-- `db/db.py` — все функции работы с БД; использует `get_db` из `db.connection`
-- `db/upgrade.py` — пост-апгрейд обработка: проверка окружения и БД при каждом старте (`check_upgrade`); включает `_check_pg_repack` (CLI + extension, авто-установка extension)
-- `db/__init__.py` — реэкспорт всех публичных символов
-- `log/log.py` — логирование: `write_log`, `write_log_entry`, `db_log_update`, `db_get_monitor` и др.
-- `docs/conventions.md` — конвенции кода (обработка ошибок, логирование, GUID в логах)
-- `templates/root.html` — HTML-скелет панели администратора (5 вкладок); использует common/header.html и макрос info_panel
-- `templates/operator.html` — HTML-страница роли operator; рендерится **динамически** через роут `/<slug>` → `render_template(f"{slug}.html")` в `routes/web.py`. Прямого вызова `render_template('operator.html')` нет — шаблон жив.
-- `templates/production.html` — HTML-страница роли producer (модуль PRODUCTION); рендерится явно через `/production` И через тот же динамический роут `/<slug>`. Одна вкладка «Информация».
-- `templates/login.html` — страница входа (Логин + Пароль)
-- `templates/common/header.html` — общий заголовок, подключается через {% include %} в root.html и production.html
-- `templates/common/info_panel.html` — Jinja2-макрос info_panel(caption, description, show_developer=False)
-- `templates/common/controls.html` — общие UI-контролы: макрос modes_card(approve_stories, use_donor, approve_movies) — карточка «Режимы» (Утверждать сюжеты + Утверждать видео + Подбирать видео из пула); используется в root.html (Рабочий поток) и production.html (Режиссер)
-- `static/common.css` — все стили панели администратора (~850 строк)
-- `static/js/controls/toast.js` — утилита showToast
-- `static/js/controls/tooltip.js` — тач-тултип для мобильных устройств
-- `static/js/controls/dialog.js` — базовый класс `Dialog`: ловушка фокуса (Tab/Shift+Tab), Esc, восстановление фокуса; все диалоги и модалы наследуются от него
-- `static/js/controls/confirm-dialog.js` — `ConfirmDialog extends Dialog`: диалог подтверждения; принимает `{ title, text, confirmLabel, cancelLabel, confirmStyle, onConfirm(btn, dlg), onCancel, triggerBtn }`
-- `static/js/shell.js` — навигация: sidebar, switchPanel, часы монитора (загружается последним)
-- `static/js/screenwriter.js` — автосохранение черновика, список сюжетов, кнопка «Сгенерировать»
-- `static/js/workflow.js` — управление движком: start/pause/restart/emulation, диалоги
-- `static/js/settings.js` — автосохранение настроек: сюжет, видео, публикация, служебные; счётчики символов; AR-контрол; валидация lifetime
-- `static/js/monitor.js` — монитор: renderLogItem, renderBatch, renderSysGroup, buildTimeline, refreshMonitor
-- `static/js/models.js` — списки моделей (видео и текст): drag-and-drop, activate, grade cycle. Список моделей — единый параметризованный компонент (`renderModelList`). Любое новое отличие в поведении добавляется через параметр в `opts`. Создавать отдельные копии рендерера или ветвить логику через контекстные if-проверки внутри рендерера — запрещено.
-- `static/js/schedule.js` — управление расписанием: CRUD слотов, runNow
-- `static/js/modals.js` — модалки: video, probe (text/video с poll), story
+## Pointers
 
-## Конвенции (обязательно к исполнению, см. полный текст в docs/conventions.md)
-
-**1. Чтение-запись в БД не оборачивается `try-except`.** Исключения всплывают наверх — в главный цикл или раннер потока.
-
-**2. Единственный способ логирования — `write_log` / `write_log_entry`.** Прямой `print()` запрещён по всему проекту. Единственное исключение — внутри самого `log/log.py`. Прямая запись в БД-логи в обход `write_log_entry` запрещена.
-
-**3. Переменные окружения читаются из БД только в `refresh_environment()`.** Прямые `db_get`/`env_get` для ключей `deep_logging`, `emulation_mode`, `use_donor`, `loop_interval`, `max_threads` в любом другом месте запрещены. Доступ — только через `environment.*` или `snap.*`.
-
-**4. `notify_failure` владеет своим `try-except` сама.** Никто снаружи не оборачивает её вызов в `try-except`.
-
-**5. Два типа исключений.** `AppException(batch_id, pipeline, msg)` — прерывание пайплайна по ожидаемой причине. `FatalError(msg)` — нарушение инварианта приложения.
-
-**6. GUID/UUID в лог-сообщениях — только через `fmt_id_msg`.** Прямая вставка или обрезка идентификаторов запрещена.
-
-**7. Потоки читают окружение только через снимок.** Первая строка любого `run(batch_id, log_id)` в пайплайне: `snap = environment.snapshot()`. Далее только `snap.*`, обращение к `environment.*` внутри потока запрещено.
-
-**10. Все JS-диалоги и модалы наследуются от `Dialog`.** `ConfirmDialog extends Dialog` — для диалогов подтверждения; полноценные модалы (video, probe, story) тоже наследуют `Dialog`. Прямое создание DOM-элементов с классом `confirm-overlay` запрещено.
-
-**11. Стили `<textarea>` — через тег-селектор в `common.css`, без инлайна и класса.** Базовые стили — в блоке `textarea { … }`, индивидуальная высота — через ID-селектор. Инлайновый `style` и `min-height` на `<textarea>` запрещены.
-
-## Запуск
-
-Workflow "Start application": `python main.py`
-
-## Обязательно после каждой задачи
-
-Перед тем как сообщить о завершении задачи, всегда запускать: `bash scripts/check_conventions.sh`. Если скрипт возвращает нарушения — исправить их до отчёта.
-
-## ⛔ ЗАПРЕЩЕНО НАВСЕГДА — pre-commit хук
-
-`.git/hooks/pre-commit` подключён к `scripts/check_conventions.sh` и **НИКОГДА не должен отключаться**.
-
-Запрещено:
-- Заменять содержимое `.git/hooks/pre-commit` на `exit 0` или любой другой no-op
-- Удалять `.git/hooks/pre-commit`
-- Обходить хук через `git commit --no-verify`
-- Изменять `scripts/check_conventions.sh` так, чтобы он перестал проверять нарушения
-
-Если хук мешает коммиту — это значит, что в коде есть нарушение конвенции. Нарушение нужно исправить, а не отключать хук. Если исправить нарушение сложно — сообщить об этом разработчику и ждать решения. Тихо отключать хук запрещено. Пользователь явно запретил отключение хука.
+*   **Code Conventions:** `docs/conventions.md`
+*   **Flask Documentation:** [https://flask.palletsprojects.com/](https://flask.palletsprojects.com/)
+*   **OpenRouter API:** [https://openrouter.ai/docs](https://openrouter.ai/docs)
+*   **Fal.ai API:** [https://docs.fal.ai/](https://docs.fal.ai/)
+*   **FFmpeg Documentation:** [https://ffmpeg.org/documentation.html](https://ffmpeg.org/documentation.html)
+*   **Playwright Documentation:** [https://playwright.dev/python/docs/intro](https://playwright.dev/python/docs/intro)
