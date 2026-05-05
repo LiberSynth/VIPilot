@@ -298,11 +298,11 @@ class PlatformBrowser:
 
         return {"ok": True, "already": False}
 
-    def stop(self) -> dict:
+    def stop(self, log_id=None) -> dict:
         tag = f"[{self._platform}_browser]"
         with self._lock:
             self._running = False
-        write_log_entry(None, f"{tag} Остановка запрошена.", level='info')
+        write_log_entry(log_id, f"{tag} Остановка запрошена.", level='info')
         return {"ok": True}
 
     def send_event(self, ev: dict) -> bool:
@@ -349,7 +349,7 @@ class PlatformBrowser:
         with self._batch_frames_lock:
             return self._batch_frames.get(batch_id)
 
-    def run_pipeline_browser(self, fn, cookies: list) -> dict:
+    def run_pipeline_browser(self, fn, cookies: list, log_id=None) -> dict:
         """
         Запускает fn(page, context) в новом браузере с куками из cookies.
         БЛОКИРУЕТ вызывающий поток — вызывать из фонового потока пайплайна.
@@ -373,9 +373,9 @@ class PlatformBrowser:
                 if cookies:
                     try:
                         ctx.add_cookies(cookies)
-                        write_log_entry(None, f"{tag} Загружено {len(cookies)} куков", level='silent')
+                        write_log_entry(log_id, f"{tag} Загружено {len(cookies)} куков", level='silent')
                     except Exception as e:
-                        write_log_entry(None, f"{tag} Ошибка куков: {e}", level='silent')
+                        write_log_entry(log_id, f"{tag} Ошибка куков: {e}", level='silent')
 
                 page = ctx.new_page()
 
@@ -387,7 +387,7 @@ class PlatformBrowser:
                 finally:
                     try:
                         browser.close()
-                        write_log_entry(None, f"{tag} Браузер пайплайна закрыт.", level='silent')
+                        write_log_entry(log_id, f"{tag} Браузер пайплайна закрыт.", level='silent')
                     except Exception:
                         pass
 

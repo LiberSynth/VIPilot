@@ -108,7 +108,7 @@ def publish(
                 db_set_batch_vkvideo_clip_url(batch_id, _state["clip_url"])
 
         result = _get_browser("vkvideo").run_pipeline_browser(
-            _do_publish, saved_cookies
+            _do_publish, saved_cookies, log_id=log_id
         )
 
         if not result["ok"]:
@@ -120,7 +120,7 @@ def publish(
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
         try:
-            _get_browser("vkvideo").stop()
+            _get_browser("vkvideo").stop(log_id=log_id)
         except Exception:
             pass
 

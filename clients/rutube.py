@@ -86,7 +86,7 @@ def publish(
         def _do_publish(page, _ctx):
             _publish_ui(page, video_path, log_id, batch_id=batch_id)
 
-        result = _get_browser("rutube").run_pipeline_browser(_do_publish, saved_cookies)
+        result = _get_browser("rutube").run_pipeline_browser(_do_publish, saved_cookies, log_id=log_id)
 
         if not result["ok"]:
             err = result.get("error", "Неизвестная ошибка")
@@ -97,7 +97,7 @@ def publish(
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
         try:
-            _get_browser("rutube").stop()
+            _get_browser("rutube").stop(log_id=log_id)
         except Exception:
             pass
 
