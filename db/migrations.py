@@ -62,9 +62,19 @@ def _m105_batches_type_status_created_at(cur):
     cur.execute("ALTER TABLE batches ALTER COLUMN created_at SET DEFAULT now()")
 
 
+def _m106_batches_status_nullable(cur):
+    """
+    batches.status → убирает NOT NULL и DEFAULT 'pending'.
+    Deployed: -
+    """
+    cur.execute("ALTER TABLE batches ALTER COLUMN status DROP NOT NULL")
+    cur.execute("ALTER TABLE batches ALTER COLUMN status DROP DEFAULT")
+
+
 MIGRATIONS = [
     (104, _m104_ai_models_grade_nullable),
     (105, _m105_batches_type_status_created_at),
+    (106, _m106_batches_status_nullable),
 ]
 
 
