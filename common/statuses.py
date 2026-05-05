@@ -34,6 +34,8 @@ def batch_is_active(status: str) -> bool:
 
 
 def _assert_known_status(status: str) -> None:
+    if status is None:
+        return
     if status in KNOWN_BATCH_STATUSES:
         return
     # Для составных статусов вида {slug}.{method}.{phase} проверяется только суффикс (фаза).
