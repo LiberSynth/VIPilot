@@ -17,7 +17,8 @@ import subprocess
 
 from utils._build import BUILD
 from db import env_get, env_set
-from db.init import bootstrap, run_migrations, seed_db
+from db.init import bootstrap, run_migrations
+from db.seed import seed_db
 from common.exceptions import FatalError
 from log.log import write_log_entry
 
