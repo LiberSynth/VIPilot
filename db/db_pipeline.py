@@ -29,8 +29,9 @@ def db_ensure_batch(scheduled_at):
                 (scheduled_at,),
             )
             row = cur.fetchone()
-        conn.commit()
-    return str(row[0]) if row else None
+        batch_id = str(row[0])
+        db_set_batch_status(batch_id, 'pending', conn)
+    return batch_id
 
 
 def db_create_adhoc_batch():
@@ -42,8 +43,9 @@ def db_create_adhoc_batch():
                 RETURNING id
             """)
             row = cur.fetchone()
-        conn.commit()
-    return str(row[0]) if row else None
+        batch_id = str(row[0])
+        db_set_batch_status(batch_id, 'pending', conn)
+    return batch_id
 
 
 def db_create_video_batch(batch_type, movie_model_id=None, story_id=None):
