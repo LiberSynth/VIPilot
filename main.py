@@ -16,7 +16,10 @@ from pipelines.runner import start_batch_thread
 import common.environment as environment
 import utils.keepalive as keepalive
 from utils.middleware import register_middleware
-from db.upgrade import check_upgrade
+try:
+    from db.upgrade import check_upgrade
+except ImportError:
+    from db.upgrade import runcheck_upgrade as check_upgrade
 
 flask_app = create_app()
 register_middleware(flask_app)
