@@ -1,5 +1,8 @@
-from dotenv import load_dotenv
-load_dotenv()
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 import main
 main.flask_app.run(host="0.0.0.0", port=5000, debug=False)
