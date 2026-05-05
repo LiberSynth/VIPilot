@@ -218,7 +218,11 @@ async function downloadBackup(btn) {
 
   var total = tables.length + movieItems.length;
   btn.disabled = true;
-  var dlg = new ExportMoviesDialog({ total: total, title: 'Выгрузка данных' });
+  var dlg = new ExportMoviesDialog({
+    total: total,
+    title: 'Выгрузка данных',
+    onRetry: function(failedItems) { _retryDownloadBackup(btn, failedItems); },
+  });
   dlg.open();
 
   var done = 0;
@@ -352,6 +356,59 @@ async function _doUploadBackup(btn, files) {
 
   btn.disabled = false;
   dlg.finish(done, dlg.isCancelled(), failedItems);
+}
+
+async function _retryDownloadBackup(btn, failedItems) {
+  var MP4_RE = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}) - (raw_data|transcoded_data)\.mp4$/;
+  btn.disabled = true;
+  var dlg = new ExportMoviesDialog({
+    total: failedItems.length,
+    title: 'Повтор ошибок',
+    onRetry: function(items) { _retryDownloadBackup(btn, items); },
+  });
+  dlg.open();
+
+  var done = 0;
+  var newFailed = [];
+
+  for (var i = 0; i < failedItems.length; i++) {
+    if (dlg.isCancelled()) break;
+    var filename = failedItems[i].filename;
+    dlg.setCurrentFile(filename);
+    try {
+      var blob, url;
+      if (filename.endsWith('.yaml')) {
+        var table = filename.replace(/\.yaml$/, '');
+        var r = await fetch('/api/export-backup/' + encodeURIComponent(table));
+        if (!r.ok) throw new Error('http ' + r.status);
+        blob = await r.blob();
+      } else {
+        var m = filename.match(MP4_RE);
+        if (!m) throw new Error('bad filename');
+        var r = await fetch(
+          '/api/export-backup-video/' + encodeURIComponent(m[1]) + '/' + encodeURIComponent(m[2])
+        );
+        if (!r.ok) throw new Error('http ' + r.status);
+        blob = await r.blob();
+      }
+      url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      done++;
+      dlg.setProgress(done, filename);
+    } catch (e) {
+      if (dlg.isCancelled()) break;
+      newFailed.push({ filename: filename, reason: 'ошибка скачивания' });
+    }
+  }
+
+  btn.disabled = false;
+  dlg.finish(done, dlg.isCancelled(), newFailed);
 }
 
 function downloadUpdatePackage(btn) {

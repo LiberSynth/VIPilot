@@ -14,6 +14,7 @@ class ExportMoviesDialog extends Dialog {
     this._title    = opts.title    || 'Выгрузка роликов';
     this._cancelled = false;
     this._onCancel  = opts.onCancel || null;
+    this._onRetry   = opts.onRetry  || null;
   }
 
   overlayClass() { return 'confirm-overlay'; }
@@ -113,6 +114,19 @@ class ExportMoviesDialog extends Dialog {
 
     var btns = this._el ? this._el.querySelector('.confirm-box-btns') : null;
     if (btns) {
+      if (failed > 0 && this._onRetry) {
+        var retryBtn = document.createElement('button');
+        retryBtn.className = 'confirm-cancel';
+        retryBtn.id = '_emd-retry';
+        retryBtn.textContent = 'Повторить ошибки';
+        var self = this;
+        var _failedItems = failedItems;
+        retryBtn.addEventListener('click', function() {
+          self.close();
+          self._onRetry(_failedItems);
+        });
+        btns.appendChild(retryBtn);
+      }
       var closeBtn = document.createElement('button');
       closeBtn.className = 'confirm-cancel';
       closeBtn.id = '_emd-close';
@@ -120,7 +134,7 @@ class ExportMoviesDialog extends Dialog {
       var self = this;
       closeBtn.addEventListener('click', function() { self.close(); });
       btns.appendChild(closeBtn);
-      closeBtn.focus();
+      if (failed === 0 || !this._onRetry) closeBtn.focus();
     }
   }
 }
