@@ -15,16 +15,17 @@
 
 ### На деве (`REPLIT_DEPLOYMENT != "1"`)
 
-1. Если `build_number` отсутствует в `environment` — база новая: вызывается `_bootstrap()` и `seed_db()`.
+1. `bootstrap()` вызывается безусловно — idempotent (CREATE TABLE IF NOT EXISTS).
 2. `run_migrations()` вызывается **при каждом старте** — применяет все незапущенные миграции.
-3. Запускаются пост-миграционные проверки данных (`_run_post_migration_checks()`).
-4. Проверки серверного окружения (ffmpeg, chromium и т.д.) **не запускаются** — это только прод.
-5. Возвращает `False`.
+3. `seed_db()` вызывается при каждом старте, но внутри сама проверяет: если `users` не пуста — немедленно выходит.
+4. Запускаются пост-миграционные проверки данных (`_run_post_migration_checks()`).
+5. Проверки серверного окружения (ffmpeg, chromium и т.д.) **не запускаются** — это только прод.
+6. Возвращает `False`.
 
 ### На проде (`REPLIT_DEPLOYMENT == "1"`)
 
-1. Читает `build_number` из таблицы `environment`.
-2. Если база новая — вызывается `_bootstrap()`.
+1. `bootstrap()` вызывается безусловно.
+2. Читает `build_number` из таблицы `environment`.
 3. Если `build_number` совпадает с `BUILD` — ранний выход, ничего не делается.
 4. При обнаружении нового `BUILD`: запускается `_run_env_checks()` (бросает `RuntimeError` при неудаче).
 5. Затем `run_migrations()`, `seed_db()`, `_run_post_migration_checks()`.

@@ -230,19 +230,16 @@ def check_upgrade() -> bool:
     """
     Инициализирует БД и возвращает True если приложение обновилось с последнего запуска.
 
-    bootstrap() вызывается безусловно первым — он idempotent (CREATE TABLE IF NOT EXISTS),
-    что позволяет пережить восстановление старого бэкапа, в котором не было environment/settings.
-    seed_db() вызывается только если база совсем новая (build_number отсутствует).
+    bootstrap() вызывается безусловно первым — он idempotent (CREATE TABLE IF NOT EXISTS).
+    seed_db() вызывается после миграций и сама проверяет, нужен ли сид (таблица users пуста).
     run_migrations() вызывается при каждом старте — и на деве, и на проде.
     На проде дополнительно: проверка окружения, пост-миграционные проверки, запись build_number.
     """
     bootstrap()
 
     if os.environ.get('REPLIT_DEPLOYMENT') != '1':
-        stored = env_get(_BUILD_KEY, '')
         run_migrations()
-        if not stored:
-            seed_db()
+        seed_db()
         _run_post_migration_checks()
         return False
 

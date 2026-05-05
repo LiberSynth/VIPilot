@@ -9,7 +9,6 @@ bootstrap() вызывается безусловно при каждом ста
 
 from .connection import get_db
 from .migrations import run_migrations
-from .seed import seed_db
 from log.log import write_log_entry
 
 
@@ -390,7 +389,6 @@ def init_db():
     try:
         bootstrap()
         run_migrations()
-        seed_db()
     except Exception as e:
         write_log_entry(None, f"[DB] Ошибка инициализации: {e}", level="silent")
         raise
