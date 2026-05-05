@@ -889,11 +889,11 @@ def api_export_backup_table(table):
     )
 
 
-@bp.route("/export-backup/movie-list")
+@bp.route("/export-backup-video/list")
 def api_export_backup_movie_list():
     if not is_authenticated():
         return Response("Unauthorized", status=401)
-    from db.conn import get_db
+    from db.connection import get_db
     VIDEO_FIELDS = ["raw_data", "transcoded_data"]
     with get_db() as conn:
         with conn.cursor() as cur:
@@ -911,14 +911,14 @@ def api_export_backup_movie_list():
     return jsonify(result)
 
 
-@bp.route("/export-backup/movie/<movie_id>/<field>")
+@bp.route("/export-backup-video/<movie_id>/<field>")
 def api_export_backup_movie_field(movie_id, field):
     if not is_authenticated():
         return Response("Unauthorized", status=401)
     ALLOWED = {"raw_data", "transcoded_data"}
     if field not in ALLOWED:
         return jsonify({"error": "invalid field"}), 400
-    from db.conn import get_db
+    from db.connection import get_db
     import re
     if not re.match(r'^[0-9a-f-]{36}$', movie_id):
         return jsonify({"error": "invalid id"}), 400

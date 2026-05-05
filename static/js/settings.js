@@ -198,7 +198,7 @@ async function downloadBackup(btn) {
   try {
     var [rTables, rMovies] = await Promise.all([
       fetch('/api/export-backup/tables'),
-      fetch('/api/export-backup/movie-list'),
+      fetch('/api/export-backup-video/list'),
     ]);
     if (!rTables.ok) throw new Error('tables: http ' + rTables.status);
     if (!rMovies.ok) throw new Error('movies: http ' + rMovies.status);
@@ -256,7 +256,7 @@ async function downloadBackup(btn) {
     dlg.setCurrentFile(mvFilename);
     try {
       var mr = await fetch(
-        '/api/export-backup/movie/' + encodeURIComponent(item.id) + '/' + encodeURIComponent(item.field)
+        '/api/export-backup-video/' + encodeURIComponent(item.id) + '/' + encodeURIComponent(item.field)
       );
       if (!mr.ok) throw new Error('http ' + mr.status);
       var mvBlob = await mr.blob();
