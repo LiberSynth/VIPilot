@@ -1,6 +1,7 @@
 """
-Начальные данные: вставляются один раз при первом запуске, только если таблица users пуста.
+Начальные данные: вставляются один раз при первом запуске.
 Только users-семейство: user_roles, users, user_role_links.
+Вызывается из check_upgrade() только если build_number отсутствует в environment.
 """
 
 from .connection import get_db
@@ -11,10 +12,6 @@ def seed_db():
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
-                cur.execute("SELECT 1 FROM users LIMIT 1")
-                if cur.fetchone():
-                    return
-
                 cur.execute("""
                     INSERT INTO user_roles (name, slug, module) VALUES
                         ('root',     'root',     'ROOT'),

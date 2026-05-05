@@ -13,25 +13,28 @@
 
 ## Как работает `check_upgrade()`
 
-Порядок шагов одинаков на деве и проде: `bootstrap` → `seed_db` → `run_migrations` → `post_checks`.
+Признак первого запуска — отсутствие `build_number` в таблице `environment`.
+`seed_db()` вызывается **только при первом запуске**. `build_number` фиксируется после всех шагов.
 
 ### На деве (`REPLIT_DEPLOYMENT != "1"`)
 
 1. `bootstrap()` — idempotent (CREATE TABLE IF NOT EXISTS).
-2. `seed_db()` — вставляет users-семейство только если таблица `users` пуста, иначе выходит сразу.
+2. Если `build_number` отсутствует → `seed_db()` (users-семейство).
 3. `run_migrations()` — применяет все незапущенные миграции.
 4. `_run_post_migration_checks()` — проверки данных.
-5. Проверки серверного окружения (ffmpeg, chromium и т.д.) **не запускаются** — только прод.
-6. Возвращает `False`.
+5. `env_set(build_number)` — фиксируется после всех шагов.
+6. Проверки серверного окружения **не запускаются** — только прод.
+7. Возвращает `False`.
 
 ### На проде (`REPLIT_DEPLOYMENT == "1"`)
 
 1. `bootstrap()` — idempotent.
 2. Если `build_number` совпадает с `BUILD` — ранний выход, ничего не делается.
 3. `_run_env_checks()` — проверка окружения (бросает `RuntimeError` при неудаче).
-4. `seed_db()` → `run_migrations()` → `_run_post_migration_checks()`.
-5. `env_set(build_number)` — фиксируется **только после** успешного завершения всех шагов.
-6. Возвращает `True`.
+4. Если `build_number` отсутствует → `seed_db()` (users-семейство).
+5. `run_migrations()` → `_run_post_migration_checks()`.
+6. `env_set(build_number)` — фиксируется **только после** успешного завершения всех шагов.
+7. Возвращает `True`.
 
 ## Что делать если нужна новая проверка окружения
 
