@@ -108,19 +108,6 @@ def _check_chromium() -> tuple[bool, str]:
         return False, f'chromium: {e}'
 
 
-def ensure_dotenv() -> None:
-    """Устанавливает python-dotenv через pip если он не найден.
-    Вызывается из main.py до загрузки .env — не использует DB и логирование."""
-    import importlib.util
-    import sys
-    if importlib.util.find_spec("dotenv") is not None:
-        return
-    subprocess.run(
-        [sys.executable, "-m", "pip", "install", "python-dotenv"],
-        check=True,
-    )
-
-
 def _check_dotenv() -> tuple[bool, str]:
     try:
         import dotenv  # noqa: F401

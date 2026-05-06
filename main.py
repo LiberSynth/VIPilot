@@ -3,7 +3,7 @@ import pathlib
 import threading
 
 if pathlib.Path(".env").exists():
-    from db.upgrade import ensure_dotenv
+    from utils.pkg_bootstrap import ensure_dotenv
     ensure_dotenv()
     from dotenv import load_dotenv
     load_dotenv()
