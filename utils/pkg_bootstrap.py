@@ -194,7 +194,7 @@ def _install_pg_repack_windows() -> bool:
 
 def ensure_pg_repack_in_path() -> bool:
     """Проверяет наличие pg_repack. На Windows — ищет в стандартных папках PostgreSQL
-    и в bin/ приложения, затем пробует скачать с GitHub. Возвращает True если доступен."""
+    и в bin/ приложения, затем пробует скачать с GitHub (один раз). Возвращает True если доступен."""
     import os
     if platform.system() != "Windows":
         return shutil.which("pg_repack") is not None
@@ -215,13 +215,21 @@ def ensure_pg_repack_in_path() -> bool:
                 sys.stdout.write(f"[bootstrap] pg_repack найден: {exe}\n")
                 sys.stdout.flush()
                 return True
-    local_exe = pathlib.Path(__file__).resolve().parent.parent / "bin" / "pg_repack.exe"
+    bin_dir = pathlib.Path(__file__).resolve().parent.parent / "bin"
+    local_exe = bin_dir / "pg_repack.exe"
     if local_exe.exists():
-        os.environ["PATH"] = str(local_exe.parent) + os.pathsep + os.environ.get("PATH", "")
+        os.environ["PATH"] = str(bin_dir) + os.pathsep + os.environ.get("PATH", "")
         sys.stdout.write(f"[bootstrap] pg_repack найден: {local_exe}\n")
         sys.stdout.flush()
         return True
-    return _install_pg_repack_windows()
+    skip_flag = bin_dir / "pg_repack.skip"
+    if skip_flag.exists():
+        return False
+    result = _install_pg_repack_windows()
+    if not result:
+        bin_dir.mkdir(exist_ok=True)
+        skip_flag.write_text("unavailable")
+    return result
 
 
 def _ensure_ffmpeg() -> None:
