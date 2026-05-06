@@ -690,13 +690,18 @@
       btn.classList.add('copied');
       setTimeout(function() { btn.classList.remove('copied'); }, 2000);
     };
-    navigator.clipboard.writeText(text).then(doFlash).catch(function() {
+    const fallback = function() {
       var ta = document.createElement('textarea');
       ta.value = text; ta.style.cssText = 'position:fixed;opacity:0';
       document.body.appendChild(ta); ta.select();
       document.execCommand('copy'); document.body.removeChild(ta);
       doFlash();
-    });
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(doFlash).catch(fallback);
+    } else {
+      fallback();
+    }
   }
 
   function _batchInfoLines(batchEl) {
