@@ -111,6 +111,7 @@ def ensure_all_packages() -> None:
         ("flask_limiter", "Flask-Limiter"),
         ("playwright",    "playwright"),
         ("waitress",      "waitress"),
+        ("yaml",          "pyyaml"),
     ]
     for spec_name, pip_name in _packages:
         if importlib.util.find_spec(spec_name) is None:
