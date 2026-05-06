@@ -1,5 +1,6 @@
 import atexit
 import pathlib
+import platform
 import threading
 
 from utils.pkg_bootstrap import ensure_all_packages
@@ -95,4 +96,8 @@ start_main_loop()
 app = flask_app
 
 if __name__ == "__main__":
-    flask_app.run(host="0.0.0.0", port=5000, debug=False)
+    if platform.system() == "Windows":
+        from waitress import serve
+        serve(flask_app, host="0.0.0.0", port=5000)
+    else:
+        flask_app.run(host="0.0.0.0", port=5000, debug=False)
