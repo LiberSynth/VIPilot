@@ -3,6 +3,7 @@
 Вызывается из main.py до любых других импортов.
 """
 import importlib.util
+import pathlib
 import platform
 import shutil
 import subprocess
