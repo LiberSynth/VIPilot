@@ -2,15 +2,12 @@ import atexit
 import pathlib
 import threading
 
+from utils.pkg_bootstrap import ensure_all_packages
+ensure_all_packages()
+
 if pathlib.Path(".env").exists():
-    from utils.pkg_bootstrap import ensure_dotenv
-    ensure_dotenv()
     from dotenv import load_dotenv
     load_dotenv()
-
-from utils.pkg_bootstrap import ensure_psycopg2, ensure_all_packages
-ensure_psycopg2()
-ensure_all_packages()
 
 from db import (
     db_get_actionable_batches,

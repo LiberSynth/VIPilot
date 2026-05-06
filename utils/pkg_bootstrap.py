@@ -14,21 +14,11 @@ def _pip_install(package: str) -> None:
     )
 
 
-def ensure_dotenv() -> None:
-    """Устанавливает python-dotenv через pip если он не найден."""
-    if importlib.util.find_spec("dotenv") is None:
-        _pip_install("python-dotenv")
-
-
-def ensure_psycopg2() -> None:
-    """Устанавливает psycopg2-binary через pip если он не найден."""
-    if importlib.util.find_spec("psycopg2") is None:
-        _pip_install("psycopg2-binary")
-
-
 def ensure_all_packages() -> None:
     """Устанавливает все необходимые пакеты если они не найдены."""
     _packages = [
+        ("dotenv",       "python-dotenv"),
+        ("psycopg2",     "psycopg2-binary"),
         ("flask",        "flask"),
         ("requests",     "requests"),
         ("flask_limiter","Flask-Limiter"),
