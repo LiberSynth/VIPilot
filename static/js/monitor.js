@@ -97,7 +97,7 @@
   }
 
   const PIPELINE_RESTARTABLE    = ['story', 'video', 'transcode', 'publish'];
-  const PIPELINE_ERROR_STATUSES = ['error', 'video_error', 'transcode_error', 'publish_error'];
+  const PIPELINE_ERROR_STATUSES = ['error', 'video_error', 'transcode_error', 'publish_error', 'fatal_error'];
   const FINAL_BATCH_STATUSES    = ['published', 'published_partially', 'movie_probe', 'story_probe', 'cancelled', 'error', 'fatal_error', 'video_error', 'transcode_error', 'publish_error', 'donated'];
 
   const MON_SVG_EXPAND   = `<svg viewBox="0 0 16 16"><polyline points="2,6 2,2 6,2"/><polyline points="10,2 14,2 14,6"/><polyline points="14,10 14,14 10,14"/><polyline points="6,14 2,14 2,10"/></svg>`;
