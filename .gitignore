@@ -2,6 +2,7 @@
 videos/
 attached_assets/
 data/
+bin/
 
 # Python bytecode
 __pycache__/
