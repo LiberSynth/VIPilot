@@ -109,6 +109,27 @@ def _check_chromium() -> tuple[bool, str]:
         return False, f'chromium: {e}'
 
 
+def _check_dotenv() -> tuple[bool, str]:
+    try:
+        import dotenv  # noqa: F401
+        from importlib.metadata import version
+        ver = version('python-dotenv')
+        return True, f'python-dotenv {ver}'
+    except ImportError:
+        pass
+    try:
+        subprocess.run(
+            ['pip', 'install', 'python-dotenv'],
+            check=True,
+            timeout=60,
+            capture_output=True,
+        )
+        import dotenv  # noqa: F401
+        return True, 'python-dotenv: установлен через pip install'
+    except Exception as e:
+        return False, f'python-dotenv: не удалось установить — {e}'
+
+
 def _check_pg_repack() -> tuple[bool, str]:
     """Проверяет CLI pg_repack и серверное extension pg_repack.
 
@@ -178,13 +199,14 @@ def _check_model_durations() -> tuple[bool, str]:
 
 
 _CHECKS = [
-    ('ffmpeg',     _check_ffmpeg),
-    ('flask',      _check_flask),
-    ('requests',   _check_requests),
-    ('psycopg2',   _check_psycopg2),
-    ('playwright', _check_playwright),
-    ('chromium',   _check_chromium),
-    ('pg_repack',  _check_pg_repack),
+    ('ffmpeg',      _check_ffmpeg),
+    ('flask',       _check_flask),
+    ('requests',    _check_requests),
+    ('psycopg2',    _check_psycopg2),
+    ('dotenv',      _check_dotenv),
+    ('playwright',  _check_playwright),
+    ('chromium',    _check_chromium),
+    ('pg_repack',   _check_pg_repack),
 ]
 
 _POST_MIGRATION_CHECKS = [
