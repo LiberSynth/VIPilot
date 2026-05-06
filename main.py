@@ -1,8 +1,13 @@
 import atexit
+import importlib.util
 import pathlib
+import subprocess
+import sys
 import threading
 
 if pathlib.Path(".env").exists():
+    if importlib.util.find_spec("dotenv") is None:
+        subprocess.run([sys.executable, "-m", "pip", "install", "python-dotenv"], check=True)
     from dotenv import load_dotenv
     load_dotenv()
 
