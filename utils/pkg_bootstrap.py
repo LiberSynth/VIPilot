@@ -16,33 +16,55 @@ def _pip_install(package: str) -> None:
     )
 
 
+def _install_ffmpeg_windows() -> None:
+    import os
+    import urllib.request
+    import zipfile
+
+    _FFMPEG_URL = (
+        "https://github.com/GyanD/codexffmpeg/releases/download/"
+        "7.1.1/ffmpeg-7.1.1-essentials_build.zip"
+    )
+    dest_dir = pathlib.Path(__file__).resolve().parent.parent / "bin"
+    dest_dir.mkdir(exist_ok=True)
+    ffmpeg_exe = dest_dir / "ffmpeg.exe"
+
+    if not ffmpeg_exe.exists():
+        zip_path = dest_dir / "ffmpeg.zip"
+        sys.stdout.write(f"[bootstrap] Скачиваю ffmpeg из {_FFMPEG_URL} ...\n")
+        sys.stdout.flush()
+        urllib.request.urlretrieve(_FFMPEG_URL, zip_path)
+        sys.stdout.write("[bootstrap] Распаковываю ffmpeg...\n")
+        sys.stdout.flush()
+        with zipfile.ZipFile(zip_path, "r") as zf:
+            for member in zf.namelist():
+                if member.endswith("bin/ffmpeg.exe"):
+                    zf.extract(member, dest_dir)
+                    extracted = dest_dir / member
+                    extracted.rename(ffmpeg_exe)
+                    break
+        zip_path.unlink(missing_ok=True)
+        for d in dest_dir.rglob("*"):
+            if d.is_dir() and not any(d.iterdir()):
+                d.rmdir()
+
+    os.environ["PATH"] = str(dest_dir) + os.pathsep + os.environ.get("PATH", "")
+    sys.stdout.write(f"[bootstrap] ffmpeg установлен: {ffmpeg_exe}\n")
+    sys.stdout.flush()
+
+
 def _ensure_ffmpeg() -> None:
     if shutil.which("ffmpeg"):
         return
     system = platform.system()
     if system == "Windows":
-        try:
-            subprocess.run(
-                [
-                    "winget", "install", "--id", "Gyan.FFmpeg", "-e",
-                    "--silent", "--accept-package-agreements",
-                    "--accept-source-agreements",
-                ],
-                check=True,
-                timeout=180,
-            )
-        except Exception as e:
-            raise RuntimeError(
-                f"ffmpeg не удалось установить через winget: {e}\n"
-                "Установите вручную: https://www.gyan.dev/ffmpeg/builds/ "
-                "и добавьте ffmpeg.exe в PATH."
-            ) from e
+        _install_ffmpeg_windows()
     elif system == "Linux":
         try:
             subprocess.run(
                 ["apt-get", "install", "-y", "ffmpeg"],
                 check=True,
-                timeout=180,
+                timeout=300,
             )
         except Exception as e:
             raise RuntimeError(f"ffmpeg не удалось установить через apt-get: {e}") from e
