@@ -139,7 +139,17 @@ def _check_pg_repack() -> tuple[bool, str]:
     """
     cli_path = shutil.which('pg_repack')
     if not cli_path:
-        return False, 'pg_repack: CLI не найден (добавь pg_repack в replit.nix)'
+        write_log_entry(
+            None,
+            "[upgrade] ВНИМАНИЕ: pg_repack CLI не найден — онлайн-сжатие БД недоступно.\n"
+            "Установка:\n"
+            "  Windows: скачайте pg_repack с https://github.com/reorg/pg_repack/releases\n"
+            "           положите pg_repack.exe в папку bin PostgreSQL (например\n"
+            "           C:\\Program Files\\PostgreSQL\\<ver>\\bin\\) и перезапустите приложение.\n"
+            "  Linux:   sudo apt-get install postgresql-<ver>-repack",
+            level='warn',
+        )
+        return True, 'pg_repack: CLI не найден — онлайн-сжатие БД недоступно (см. консоль)'
     try:
         r = subprocess.run(['pg_repack', '--version'], capture_output=True, timeout=5)
         out = (r.stdout.decode() + r.stderr.decode()).strip()
