@@ -686,27 +686,10 @@
   window.monitorRefresh = refreshMonitor;
 
   function _monitorCopyText(text, btn) {
-    const doFlash = function() {
+    window.clipboardWrite(text, function() {
       btn.classList.add('copied');
       setTimeout(function() { btn.classList.remove('copied'); }, 2000);
-    };
-    const fallback = function() {
-      var ta = document.createElement('textarea');
-      ta.value = text;
-      ta.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;';
-      ta.setAttribute('readonly', '');
-      document.body.appendChild(ta);
-      ta.focus();
-      ta.select();
-      try { document.execCommand('copy'); } catch(_e) {}
-      document.body.removeChild(ta);
-      doFlash();
-    };
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(doFlash).catch(fallback);
-    } else {
-      fallback();
-    }
+    });
   }
 
   function _batchInfoLines(batchEl) {

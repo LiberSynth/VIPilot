@@ -129,7 +129,7 @@
     if (!body) return;
     var logList = body.querySelector('.monitor-log-list');
     var text = (logList || body).innerText || (logList || body).textContent || '';
-    navigator.clipboard.writeText(text.trim()).then(function() { _flashCopied(btn); }).catch(function() {});
+    window.clipboardWrite(text.trim(), function() { _flashCopied(btn); });
   };
 
   window.copyProbeModalInfo = function(btn) {
@@ -139,7 +139,7 @@
     var lines   = [];
     if (title)   lines.push(title.textContent);
     if (batchId) lines.push('batch: ' + batchId);
-    navigator.clipboard.writeText(lines.join('\n')).then(function() { _flashCopied(btn); }).catch(function() {});
+    window.clipboardWrite(lines.join('\n'), function() { _flashCopied(btn); });
   };
 
   window.exportProbeModal = function(btn) {
@@ -226,7 +226,7 @@
         copyBtn.innerHTML = _SVG_COPY;
         copyBtn.onclick   = function() {
           var copyText = d.title ? d.title + '\n\n' + d.text : d.text;
-          navigator.clipboard.writeText(copyText).then(function() { _flashCopied(copyBtn); }).catch(function() {});
+          window.clipboardWrite(copyText, function() { _flashCopied(copyBtn); });
         };
         hdr.appendChild(lbl);
         hdr.appendChild(copyBtn);
@@ -405,10 +405,10 @@
     var text = _storyModal.getStoryText();
     if (!text) return;
     var btn = document.getElementById('story-modal-copy-btn');
-    navigator.clipboard.writeText(text).then(function() {
+    window.clipboardWrite(text, function() {
       if (btn) btn.classList.add('copied');
       setTimeout(function() { if (btn) btn.classList.remove('copied'); }, 2000);
-    }).catch(function() {});
+    });
   };
 
   // ── popstate ───────────────────────────────────────────────────────────────

@@ -812,10 +812,10 @@ var setDraftStoryFromRecord;
         parts.push(window.wrapBlock('Сюжет', body, i + 1));
       }
       var text = parts.join('\n\n');
-      navigator.clipboard.writeText(text).then(function() {
+      window.clipboardWrite(text, function() {
         btn.classList.add('copied');
         setTimeout(function() { btn.classList.remove('copied'); }, 2000);
-      }).catch(function() {});
+      });
     });
   }
 

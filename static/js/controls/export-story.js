@@ -17,6 +17,27 @@
     setTimeout(function() { btn.classList.remove('copied'); }, 2000);
   };
 
+  window.clipboardWrite = function(text, cb) {
+    var done = typeof cb === 'function' ? cb : function() {};
+    var fallback = function() {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;';
+      ta.setAttribute('readonly', '');
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      try { document.execCommand('copy'); } catch(_e) {}
+      document.body.removeChild(ta);
+      done();
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(fallback);
+    } else {
+      fallback();
+    }
+  };
+
   function _processBlock(blockFactory, btn, clickTime) {
     var dt = clickTime - _lastClickAt;
     var isFirst = (_clipBuffer === null || dt > 10000);
@@ -24,7 +45,7 @@
     var block = blockFactory(isFirst);
     var toWrite = isFirst ? block : (_clipBuffer + '\n\n' + block);
     _clipBuffer = toWrite;
-    return navigator.clipboard.writeText(toWrite).then(function() { window.flashCopied(btn); }).catch(function() {});
+    window.clipboardWrite(toWrite, function() { window.flashCopied(btn); });
   }
 
   function _manualBlock(title, content) {

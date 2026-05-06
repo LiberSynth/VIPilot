@@ -189,10 +189,10 @@
       btn.addEventListener('click', function(e) {
         e.stopPropagation();
         var text = btn.getAttribute('data-copy') || '';
-        navigator.clipboard.writeText(text).then(function() {
+        window.clipboardWrite(text, function() {
           btn.classList.add('copied');
           setTimeout(function() { btn.classList.remove('copied'); }, 2000);
-        }).catch(function() {});
+        });
       });
     });
     container.querySelectorAll('.movie-goto-story-btn').forEach(function(btn) {
