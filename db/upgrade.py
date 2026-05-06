@@ -10,7 +10,6 @@ upgrade.py — пост-апгрейд обработка.
 и бросает исключение если хотя бы одна проверка не прошла.
 env_set(build_number) вызывается только после успешного завершения всех проверок.
 """
-import os
 import pathlib
 import shutil
 import subprocess
@@ -254,20 +253,18 @@ def check_upgrade():
     Инициализирует БД при старте приложения.
 
     Признак первого запуска — отсутствие build_number в environment.
-    Порядок: bootstrap → [прод: ранний выход / env_checks] →
+    Порядок: bootstrap → ранний выход если build не изменился → env_checks →
              seed_db (первый запуск) → run_migrations → post_checks → env_set.
     build_number фиксируется только после успешного завершения всех шагов.
     """
     bootstrap()
 
-    is_prod = os.environ.get('REPLIT_DEPLOYMENT') == '1'
-    stored  = env_get(_BUILD_KEY, '')
+    stored = env_get(_BUILD_KEY, '')
 
-    if is_prod:
-        if stored == BUILD:
-            return False
-        write_log_entry(None, f'[upgrade] Обновление: {stored or "первый запуск"} → {BUILD}', level='silent')
-        _run_env_checks()
+    if stored == BUILD:
+        return False
+    write_log_entry(None, f'[upgrade] Обновление: {stored or "первый запуск"} → {BUILD}', level='silent')
+    _run_env_checks()
 
     if not stored:
         seed_db()
