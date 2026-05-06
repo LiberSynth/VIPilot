@@ -5,9 +5,9 @@ import threading
 if pathlib.Path(".env").exists():
     try:
         from dotenv import load_dotenv
-        load_dotenv()
-    except ImportError:
-        pass
+    except ImportError as e:
+        raise ImportError("Файл .env найден, но пакет python-dotenv не установлен. Выполните: pip install python-dotenv") from e
+    load_dotenv()
 
 from db import (
     db_get_actionable_batches,
