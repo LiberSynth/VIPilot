@@ -15,3 +15,13 @@ def ensure_dotenv() -> None:
         [sys.executable, "-m", "pip", "install", "python-dotenv"],
         check=True,
     )
+
+
+def ensure_psycopg2() -> None:
+    """Устанавливает psycopg2-binary через pip если он не найден."""
+    if importlib.util.find_spec("psycopg2") is not None:
+        return
+    subprocess.run(
+        [sys.executable, "-m", "pip", "install", "psycopg2-binary"],
+        check=True,
+    )
