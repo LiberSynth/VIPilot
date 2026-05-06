@@ -128,20 +128,34 @@ def _install_pg_repack_windows() -> bool:
     exe_dest = dest_dir / "pg_repack.exe"
 
     if not exe_dest.exists():
-        url = (
-            f"https://github.com/reorg/pg_repack/releases/download/"
-            f"ver_{_PG_REPACK_VERSION}/"
-            f"pg_repack_pg{pg_ver}-{_PG_REPACK_VERSION}-x86-64.zip"
-        )
+        _PG_REPACK_MIN_VER = 13
         zip_path = dest_dir / "pg_repack.zip"
-        sys.stdout.write(f"[bootstrap] Скачиваю pg_repack для PostgreSQL {pg_ver}: {url}\n")
-        sys.stdout.flush()
-        try:
-            urllib.request.urlretrieve(url, zip_path)
-        except Exception as e:
-            sys.stdout.write(f"[bootstrap] pg_repack: ошибка скачивания — {e}\n")
+        downloaded = False
+        for try_ver in range(pg_ver, _PG_REPACK_MIN_VER - 1, -1):
+            url = (
+                f"https://github.com/reorg/pg_repack/releases/download/"
+                f"ver_{_PG_REPACK_VERSION}/"
+                f"pg_repack_pg{try_ver}-{_PG_REPACK_VERSION}-x86-64.zip"
+            )
+            sys.stdout.write(f"[bootstrap] Скачиваю pg_repack для PostgreSQL {try_ver}: {url}\n")
             sys.stdout.flush()
-            zip_path.unlink(missing_ok=True)
+            try:
+                urllib.request.urlretrieve(url, zip_path)
+                downloaded = True
+                break
+            except Exception as e:
+                zip_path.unlink(missing_ok=True)
+                if "404" in str(e) or "Not Found" in str(e):
+                    continue
+                sys.stdout.write(f"[bootstrap] pg_repack: ошибка скачивания — {e}\n")
+                sys.stdout.flush()
+                return False
+        if not downloaded:
+            sys.stdout.write(
+                f"[bootstrap] pg_repack: нет релиза для PostgreSQL {pg_ver}–{_PG_REPACK_MIN_VER} "
+                f"в версии {_PG_REPACK_VERSION}.\n"
+            )
+            sys.stdout.flush()
             return False
 
         sys.stdout.write("[bootstrap] Устанавливаю pg_repack...\n")
@@ -179,8 +193,8 @@ def _install_pg_repack_windows() -> bool:
 
 
 def ensure_pg_repack_in_path() -> bool:
-    """Проверяет наличие pg_repack. На Windows — ищет в стандартных папках PostgreSQL,
-    затем пробует скачать с GitHub. Возвращает True если доступен."""
+    """Проверяет наличие pg_repack. На Windows — ищет в стандартных папках PostgreSQL
+    и в bin/ приложения, затем пробует скачать с GitHub. Возвращает True если доступен."""
     import os
     if platform.system() != "Windows":
         return shutil.which("pg_repack") is not None
@@ -201,6 +215,12 @@ def ensure_pg_repack_in_path() -> bool:
                 sys.stdout.write(f"[bootstrap] pg_repack найден: {exe}\n")
                 sys.stdout.flush()
                 return True
+    local_exe = pathlib.Path(__file__).resolve().parent.parent / "bin" / "pg_repack.exe"
+    if local_exe.exists():
+        os.environ["PATH"] = str(local_exe.parent) + os.pathsep + os.environ.get("PATH", "")
+        sys.stdout.write(f"[bootstrap] pg_repack найден: {local_exe}\n")
+        sys.stdout.flush()
+        return True
     return _install_pg_repack_windows()
 
 
