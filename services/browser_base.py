@@ -140,10 +140,14 @@ class PlatformBrowser:
         self._set_status("starting", "Запуск браузера.")
 
         try:
+            import platform as _platform
+            _launch_args = ["--no-sandbox", "--disable-gpu"]
+            if _platform.system() != "Windows":
+                _launch_args.append("--disable-dev-shm-usage")
             with sync_playwright() as pw:
                 browser = pw.chromium.launch(
                     headless=True,
-                    args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
+                    args=_launch_args,
                 )
                 context = browser.new_context(
                     viewport={"width": self._VIEWPORT_W, "height": self._VIEWPORT_H},
@@ -243,7 +247,7 @@ class PlatformBrowser:
                             self._frame_counter += 1
                         self._new_frame_event.set()
                     except Exception as e:
-                        write_log_entry(None, f"{tag} Ошибка скриншота: {e}", level='silent')
+                        write_log_entry(None, f"{tag} Ошибка скриншота: {e}", level='info')
 
                     time.sleep(0.2)
 
@@ -359,11 +363,15 @@ class PlatformBrowser:
         result: dict = {"ok": False, "error": "Неизвестная ошибка"}
 
         try:
+            import platform as _platform
+            _pipeline_args = ["--no-sandbox", "--disable-gpu"]
+            if _platform.system() != "Windows":
+                _pipeline_args.append("--disable-dev-shm-usage")
             from playwright.sync_api import sync_playwright
             with sync_playwright() as pw:
                 browser = pw.chromium.launch(
                     headless=True,
-                    args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
+                    args=_pipeline_args,
                 )
                 ctx = browser.new_context(
                     user_agent=self._USER_AGENT,
