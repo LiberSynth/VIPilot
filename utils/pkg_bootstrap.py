@@ -54,147 +54,10 @@ def _install_ffmpeg_windows() -> None:
     sys.stdout.flush()
 
 
-def _find_pg_install_dir() -> pathlib.Path | None:
-    """Ищет директорию установки PostgreSQL на Windows."""
-    search_roots = [
-        pathlib.Path(r"C:\Program Files\PostgreSQL"),
-        pathlib.Path(r"C:\Program Files (x86)\PostgreSQL"),
-        pathlib.Path(r"C:\PostgreSQL"),
-    ]
-    for root in search_roots:
-        if not root.exists():
-            continue
-        candidates = sorted(
-            (d for d in root.iterdir() if d.is_dir()),
-            key=lambda p: p.name,
-            reverse=True,
-        )
-        for candidate in candidates:
-            if (candidate / "bin" / "postgres.exe").exists():
-                return candidate
-    return None
-
-
-def _get_pg_major_version(pg_dir: pathlib.Path) -> int | None:
-    """Возвращает мажорную версию PostgreSQL (например 17) из директории установки."""
-    pg_config = pg_dir / "bin" / "pg_config.exe"
-    if pg_config.exists():
-        try:
-            r = subprocess.run(
-                [str(pg_config), "--version"],
-                capture_output=True, timeout=5,
-            )
-            out = r.stdout.decode().strip()
-            for part in out.split():
-                if part[0].isdigit():
-                    return int(part.split(".")[0])
-        except Exception:
-            pass
-    try:
-        return int(pg_dir.name.split(".")[0])
-    except ValueError:
-        return None
-
-
-def _install_pg_repack_windows() -> bool:
-    """Скачивает pg_repack с GitHub, копирует файлы в PostgreSQL и добавляет в PATH.
-    Возвращает True при успехе."""
-    import os
-    import urllib.request
-    import zipfile
-
-    _PG_REPACK_VERSION = "1.5.2"
-
-    pg_dir = _find_pg_install_dir()
-    if pg_dir is None:
-        sys.stdout.write(
-            "[bootstrap] pg_repack: директория PostgreSQL не найдена — "
-            "авто-установка невозможна.\n"
-        )
-        sys.stdout.flush()
-        return False
-
-    pg_ver = _get_pg_major_version(pg_dir)
-    if pg_ver is None:
-        sys.stdout.write(
-            f"[bootstrap] pg_repack: не удалось определить версию PostgreSQL "
-            f"в {pg_dir} — авто-установка невозможна.\n"
-        )
-        sys.stdout.flush()
-        return False
-
-    dest_dir = pathlib.Path(__file__).resolve().parent.parent / "bin"
-    dest_dir.mkdir(exist_ok=True)
-    exe_dest = dest_dir / "pg_repack.exe"
-
-    if not exe_dest.exists():
-        _PG_REPACK_MIN_VER = 13
-        zip_path = dest_dir / "pg_repack.zip"
-        downloaded = False
-        for try_ver in range(pg_ver, _PG_REPACK_MIN_VER - 1, -1):
-            url = (
-                f"https://github.com/reorg/pg_repack/releases/download/"
-                f"ver_{_PG_REPACK_VERSION}/"
-                f"pg_repack_pg{try_ver}-{_PG_REPACK_VERSION}-x86-64.zip"
-            )
-            sys.stdout.write(f"[bootstrap] Скачиваю pg_repack для PostgreSQL {try_ver}: {url}\n")
-            sys.stdout.flush()
-            try:
-                urllib.request.urlretrieve(url, zip_path)
-                downloaded = True
-                break
-            except Exception as e:
-                zip_path.unlink(missing_ok=True)
-                if "404" in str(e) or "Not Found" in str(e):
-                    continue
-                sys.stdout.write(f"[bootstrap] pg_repack: ошибка скачивания — {e}\n")
-                sys.stdout.flush()
-                return False
-        if not downloaded:
-            sys.stdout.write(
-                f"[bootstrap] pg_repack: нет релиза для PostgreSQL {pg_ver}–{_PG_REPACK_MIN_VER} "
-                f"в версии {_PG_REPACK_VERSION}.\n"
-            )
-            sys.stdout.flush()
-            return False
-
-        sys.stdout.write("[bootstrap] Устанавливаю pg_repack...\n")
-        sys.stdout.flush()
-        try:
-            with zipfile.ZipFile(zip_path, "r") as zf:
-                names = zf.namelist()
-                for member in names:
-                    fname = pathlib.Path(member).name
-                    data = zf.read(member)
-
-                    if fname == "pg_repack.exe":
-                        exe_dest.write_bytes(data)
-
-                    elif fname == "pg_repack.dll":
-                        lib_dir = pg_dir / "lib"
-                        lib_dir.mkdir(exist_ok=True)
-                        (lib_dir / fname).write_bytes(data)
-
-                    elif fname.endswith(".sql") or fname.endswith(".control"):
-                        ext_dir = pg_dir / "share" / "extension"
-                        ext_dir.mkdir(parents=True, exist_ok=True)
-                        (ext_dir / fname).write_bytes(data)
-        except Exception as e:
-            sys.stdout.write(f"[bootstrap] pg_repack: ошибка распаковки — {e}\n")
-            sys.stdout.flush()
-            return False
-        finally:
-            zip_path.unlink(missing_ok=True)
-
-    os.environ["PATH"] = str(dest_dir) + os.pathsep + os.environ.get("PATH", "")
-    sys.stdout.write(f"[bootstrap] pg_repack установлен: {exe_dest}\n")
-    sys.stdout.flush()
-    return True
-
-
 def ensure_pg_repack_in_path() -> bool:
-    """Проверяет наличие pg_repack. На Windows — ищет в стандартных папках PostgreSQL
-    и в bin/ приложения, затем пробует скачать с GitHub (один раз). Возвращает True если доступен."""
+    """Ищет pg_repack в PATH и стандартных папках PostgreSQL, добавляет в PATH если найден.
+    Возвращает True если доступен. На Windows бинарников нет в открытом доступе —
+    установка через EDB StackBuilder (при установке PostgreSQL)."""
     import os
     if platform.system() != "Windows":
         return shutil.which("pg_repack") is not None
@@ -215,21 +78,7 @@ def ensure_pg_repack_in_path() -> bool:
                 sys.stdout.write(f"[bootstrap] pg_repack найден: {exe}\n")
                 sys.stdout.flush()
                 return True
-    bin_dir = pathlib.Path(__file__).resolve().parent.parent / "bin"
-    local_exe = bin_dir / "pg_repack.exe"
-    if local_exe.exists():
-        os.environ["PATH"] = str(bin_dir) + os.pathsep + os.environ.get("PATH", "")
-        sys.stdout.write(f"[bootstrap] pg_repack найден: {local_exe}\n")
-        sys.stdout.flush()
-        return True
-    skip_flag = bin_dir / "pg_repack.skip"
-    if skip_flag.exists():
-        return False
-    result = _install_pg_repack_windows()
-    if not result:
-        bin_dir.mkdir(exist_ok=True)
-        skip_flag.write_text("unavailable")
-    return result
+    return False
 
 
 def _ensure_ffmpeg() -> None:
