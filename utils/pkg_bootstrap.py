@@ -54,6 +54,32 @@ def _install_ffmpeg_windows() -> None:
     sys.stdout.flush()
 
 
+def ensure_pg_repack_in_path() -> bool:
+    """На Windows ищет pg_repack.exe в стандартных папках PostgreSQL и добавляет в PATH.
+    Возвращает True если нашёл, False если не нашёл."""
+    import os
+    if platform.system() != "Windows":
+        return shutil.which("pg_repack") is not None
+    if shutil.which("pg_repack"):
+        return True
+    search_roots = [
+        pathlib.Path(r"C:\Program Files\PostgreSQL"),
+        pathlib.Path(r"C:\Program Files (x86)\PostgreSQL"),
+        pathlib.Path(r"C:\PostgreSQL"),
+    ]
+    for root in search_roots:
+        if not root.exists():
+            continue
+        for candidate in sorted(root.iterdir(), reverse=True):
+            exe = candidate / "bin" / "pg_repack.exe"
+            if exe.exists():
+                os.environ["PATH"] = str(exe.parent) + os.pathsep + os.environ.get("PATH", "")
+                sys.stdout.write(f"[bootstrap] pg_repack найден: {exe}\n")
+                sys.stdout.flush()
+                return True
+    return False
+
+
 def _ensure_ffmpeg() -> None:
     if shutil.which("ffmpeg"):
         return
@@ -89,3 +115,4 @@ def ensure_all_packages() -> None:
         if importlib.util.find_spec(spec_name) is None:
             _pip_install(pip_name)
     _ensure_ffmpeg()
+    ensure_pg_repack_in_path()
