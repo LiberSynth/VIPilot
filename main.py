@@ -3,8 +3,11 @@ import pathlib
 import threading
 
 if pathlib.Path(".env").exists():
-    from dotenv import load_dotenv
-    load_dotenv()
+    try:
+        from dotenv import load_dotenv
+        load_dotenv()
+    except ImportError:
+        pass
 
 from db import (
     db_get_actionable_batches,
