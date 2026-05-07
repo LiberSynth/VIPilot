@@ -38,6 +38,7 @@ from utils.utils import (
 bp = Blueprint("web", __name__)
 
 RESERVED_SLUGS = {"web", "save", "logout", "select-module", "healthz", "favicon.ico", "icon-preview", "root", "production"}
+failed_logins = {}
 
 
 def _get_session_roles():
@@ -130,13 +131,23 @@ def login():
     if request.method == "POST":
         login_val = request.form.get("login", "").strip()
         password_val = request.form.get("password", "")
+        now = time.time()
+        state = failed_logins.get(login_val, {"count": 0, "blocked_until": 0})
+        if state["blocked_until"] > now:
+            error = True
+            no_roles = False
+            return render_template("login.html", error=error, no_roles=no_roles)
         user = db_get_user_by_login(login_val)
         if user and user["password"] == password_val:
+            failed_logins.pop(login_val, None)
             session["auth"] = True
             session["auth_ts"] = time.time()
             session["roles"] = user["roles"]
             session.permanent = True
             return _redirect_after_login()
+        state["count"] += 1
+        state["blocked_until"] = now + 300 if state["count"] >= 3 else 0
+        failed_logins[login_val] = state
         error = True
         no_roles = False
     return render_template("login.html", error=error, no_roles=no_roles)
