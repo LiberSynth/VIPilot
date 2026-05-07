@@ -2,6 +2,8 @@ import os
 import secrets
 from datetime import timezone, timedelta
 
+PLAYWRIGHT_BROWSERS_PATH = '/usr/local/share/ms-playwright'
+
 
 def _get_flask_secret():
     secret = os.environ.get("FLASK_SECRET", "").strip()

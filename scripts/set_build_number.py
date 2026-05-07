@@ -47,6 +47,10 @@ def main() -> None:
         )
     print(f'[set_build_number] BUILD = {count} → {build_file}')
 
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+    from utils.consts import PLAYWRIGHT_BROWSERS_PATH
+    os.environ.setdefault('PLAYWRIGHT_BROWSERS_PATH', PLAYWRIGHT_BROWSERS_PATH)
+
     try:
         pw_result = subprocess.run(
             ['playwright', 'install', 'chromium'],

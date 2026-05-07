@@ -10,6 +10,9 @@ if pathlib.Path(".env").exists():
     from dotenv import load_dotenv
     load_dotenv()
 
+from utils.consts import PLAYWRIGHT_BROWSERS_PATH
+os.environ.setdefault('PLAYWRIGHT_BROWSERS_PATH', PLAYWRIGHT_BROWSERS_PATH)
+
 from db import (
     db_get_actionable_batches,
     db_set_batch_status,
