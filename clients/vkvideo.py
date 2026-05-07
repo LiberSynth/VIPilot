@@ -225,6 +225,16 @@ def _publish_ui(
             "Сессия истекла — авторизуйтесь снова в браузере (вкладка «Публикация»)"
         )
 
+    # ── Шаг 1б: Обрабатываем CAPTCHA-диалог «Проверяем, что вы не робот» ──
+    try:
+        cont_btn = page.get_by_text("Продолжить", exact=False).first
+        cont_btn.wait_for(state="visible", timeout=10_000)
+        cont_btn.click()
+        write_log_entry(log_id, "VK Видео: CAPTCHA-диалог закрыт («Продолжить» нажато).")
+        _snap(page, batch_id)
+    except Exception:
+        pass  # диалога нет — продолжаем в штатном режиме
+
     # ── Шаг 2: Ждём появления кнопки «Выбрать файл» ──────────────────────
     write_log_entry(log_id, "VK Видео: Жду модал загрузки клипа.")
     choose_btn = page.get_by_text("Выбрать файл", exact=False).first
