@@ -118,7 +118,7 @@
   <div class="warning">Вашему аккаунту не назначены роли. Обратитесь к администратору.</div>
   {% endif %}
   {% if error %}
-  <div class="error">Неверный логин или пароль</div>
+  <div class="error">{{ error_text or "Неверный логин или пароль" }}</div>
   {% endif %}
   <form method="post">
     <div class="field">

@@ -123,23 +123,35 @@ def icon_preview():
 @bp.route("/", methods=["GET", "POST"])
 @limiter.limit("10 per minute", exempt_when=lambda: request.method != "POST")
 def login():
+    def _render_login():
+        resp = make_response(render_template("login.html", error=error, error_text=error_text, no_roles=no_roles))
+        resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        resp.headers["Pragma"] = "no-cache"
+        resp.headers["Expires"] = "0"
+        return resp
+
     if is_authenticated():
         return _redirect_after_login()
 
     no_roles = request.args.get("reason") == "no_roles"
     error = False
+    error_text = "Неверный логин или пароль"
     if request.method == "POST":
         login_val = request.form.get("login", "").strip()
+        login_key = login_val.lower()
         password_val = request.form.get("password", "")
         now = time.time()
-        state = failed_logins.get(login_val, {"count": 0, "blocked_until": 0})
+        state = failed_logins.get(login_key, {"count": 0, "blocked_until": 0})
+        if state["blocked_until"] and state["blocked_until"] <= now:
+            state = {"count": 0, "blocked_until": 0}
         if state["blocked_until"] > now:
             error = True
             no_roles = False
-            return render_template("login.html", error=error, no_roles=no_roles)
+            error_text = "Слишком много попыток. Повторите через 5 минут."
+            return _render_login()
         user = db_get_user_by_login(login_val)
         if user and user["password"] == password_val:
-            failed_logins.pop(login_val, None)
+            failed_logins.pop(login_key, None)
             session["auth"] = True
             session["auth_ts"] = time.time()
             session["roles"] = user["roles"]
@@ -147,10 +159,15 @@ def login():
             return _redirect_after_login()
         state["count"] += 1
         state["blocked_until"] = now + 300 if state["count"] >= 3 else 0
-        failed_logins[login_val] = state
+        failed_logins[login_key] = state
         error = True
         no_roles = False
-    return render_template("login.html", error=error, no_roles=no_roles)
+        if state["blocked_until"] > now:
+            error_text = "Слишком много попыток. Повторите через 5 минут."
+        else:
+            left = max(0, 3 - state["count"])
+            error_text = f"Неверный логин или пароль. Осталось попыток: {left}"
+    return _render_login()
 
 
 @bp.route("/web")
