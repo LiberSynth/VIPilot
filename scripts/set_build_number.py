@@ -53,7 +53,7 @@ def main() -> None:
 
     try:
         pw_result = subprocess.run(
-            ['playwright', 'install', 'chromium'],
+            [sys.executable, '-m', 'playwright', 'install', 'chromium', 'chromium-headless-shell'],
             timeout=300,
         )
         if pw_result.returncode != 0:

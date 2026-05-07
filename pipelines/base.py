@@ -50,8 +50,9 @@ def ensure_playwright_chromium(log_id) -> None:
         return
 
     write_log_entry(log_id, 'Playwright Chromium не установлен — выполняю установку…')
+    import sys
     result = subprocess.run(
-        ['playwright', 'install', 'chromium'],
+        [sys.executable, '-m', 'playwright', 'install', 'chromium', 'chromium-headless-shell'],
         capture_output=True,
         text=True,
         timeout=300,

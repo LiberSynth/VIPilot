@@ -74,10 +74,11 @@ def _check_playwright() -> tuple[bool, str]:
 
 
 def _install_chromium() -> bool:
-    """Запускает playwright install chromium. Возвращает True при успехе."""
+    """Запускает playwright install chromium chromium-headless-shell. Возвращает True при успехе."""
+    import sys
     try:
         result = subprocess.run(
-            ["playwright", "install", "chromium"],
+            [sys.executable, "-m", "playwright", "install", "chromium", "chromium-headless-shell"],
             timeout=180,
             check=False,
         )

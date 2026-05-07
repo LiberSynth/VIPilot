@@ -1,8 +1,13 @@
 import os
+import platform
 import secrets
 from datetime import timezone, timedelta
 
-PLAYWRIGHT_BROWSERS_PATH = '/usr/local/share/ms-playwright'
+PLAYWRIGHT_BROWSERS_PATH = (
+    r'C:\ProgramData\ms-playwright'
+    if platform.system() == 'Windows'
+    else '/usr/local/share/ms-playwright'
+)
 
 
 def _get_flask_secret():
