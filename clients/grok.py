@@ -6,6 +6,7 @@ xAI Grok API client.
 
 import os
 import time
+import json
 import requests
 
 from log import write_log_entry
@@ -23,6 +24,17 @@ def _headers():
         'Authorization': f'Bearer {_XAI_KEY}',
         'Content-Type': 'application/json',
     }
+
+
+def _compact_json(value, limit: int = 1200) -> str:
+    """Возвращает компактный JSON/строку для диагностических логов с ограничением размера."""
+    try:
+        text = json.dumps(value, ensure_ascii=False, separators=(',', ':'))
+    except Exception:
+        text = str(value)
+    if len(text) <= limit:
+        return text
+    return text[:limit] + '...'
 
 
 def submit(log_id, model_name: str, submit_url: str, platform_url: str,
@@ -81,9 +93,36 @@ def poll(log_id, status_url: str, response_url: str):
     for attempt in range(_POLL_MAX):
         time.sleep(_POLL_INTERVAL)
         try:
-            s = requests.get(status_url, headers=_headers(), timeout=15).json()
+            resp = requests.get(status_url, headers=_headers(), timeout=15)
+            try:
+                s = resp.json()
+            except ValueError:
+                write_log_entry(
+                    log_id,
+                    f"Grok poll [{attempt + 1}] не-JSON (HTTP {resp.status_code}): {_compact_json(resp.text)}",
+                    level='warn',
+                )
+                write_log_entry(log_id, f"Статус [{attempt + 1}]: None")
+                continue
+
             status = s.get('status')
+            keys = list(s.keys()) if isinstance(s, dict) else []
             write_log_entry(log_id, f"Статус [{attempt + 1}]: {status}")
+            write_log_entry(
+                log_id,
+                (
+                    f"[video] Grok poll [{attempt + 1}] "
+                    f"http={resp.status_code}, status={status}, keys={keys}"
+                ),
+                level='silent',
+            )
+
+            if status is None:
+                write_log_entry(
+                    log_id,
+                    f"Grok poll [{attempt + 1}] вернул status=None, body={_compact_json(s)}",
+                    level='warn',
+                )
 
             if status in ('completed', 'done'):
                 video_url = (s.get('video') or {}).get('url')

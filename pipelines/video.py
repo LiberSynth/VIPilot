@@ -291,6 +291,8 @@ def run(batch_id, log_id):
                 if video_url:
                     used_model_id = str(m['id'])
                     return video_url
+                if poll_err:
+                    write_log_entry(log_id, f"Поллинг завершился с ошибкой: {poll_err}", level='warn')
                 write_log_entry(log_id, f"Поллинг не дал результата, сброс handshake", level='warn')
                 db_save_video_job_and_set_pending(batch_id, {
                     'request_id':   None,
@@ -340,6 +342,8 @@ def run(batch_id, log_id):
                 used_model_id = m_id
                 return video_url
 
+            if poll_err:
+                write_log_entry(log_id, f"Поллинг завершился с ошибкой: {poll_err}", level='warn')
             write_log_entry(log_id, f"Поллинг не дал результата, сброс handshake", level='warn')
             db_save_video_job_and_set_pending(batch_id, {
                 'request_id':   None,
