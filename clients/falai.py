@@ -6,6 +6,7 @@ fal.ai API client.
 
 import os
 import time
+import json
 import requests
 
 from log import write_log_entry
@@ -26,6 +27,17 @@ def _headers():
         'Authorization': f'Key {_FAL_KEY}',
         'Content-Type': 'application/json',
     }
+
+
+def _compact_json(value, limit: int = 1200) -> str:
+    """Возвращает компактный JSON/строку для диагностики с ограничением размера."""
+    try:
+        text = json.dumps(value, ensure_ascii=False, separators=(',', ':'))
+    except Exception:
+        text = str(value)
+    if len(text) <= limit:
+        return text
+    return text[:limit] + '...'
 
 
 def _is_fatal_fal(status_code: int, body) -> bool:
@@ -158,13 +170,33 @@ def poll(log_id, status_url: str, response_url: str):
     for attempt in range(_POLL_MAX):
         time.sleep(_POLL_INTERVAL)
         try:
-            s = requests.get(
+            resp = requests.get(
                 status_url,
                 headers=_headers(),
                 timeout=15,
-            ).json()
+            )
+            try:
+                s = resp.json()
+            except ValueError:
+                consecutive_errors += 1
+                write_log_entry(log_id, f"fal.ai poll [{attempt + 1}] не-JSON (HTTP {resp.status_code})", level='warn')
+                write_log_entry(
+                    log_id,
+                    f"[video] fal.ai poll [{attempt + 1}] http={resp.status_code}, body={_compact_json(resp.text)}",
+                    level='silent',
+                )
+                if consecutive_errors >= _POLL_MAX_ERRORS:
+                    msg = f'fal.ai недоступен: {_POLL_MAX_ERRORS} ошибок подряд — прерываем поллинг'
+                    write_log_entry(log_id, msg, level='error')
+                    return None, msg
+                continue
             status = s.get('status')
             write_log_entry(log_id, f"Статус [{attempt + 1}]: {status}")
+            write_log_entry(
+                log_id,
+                f"[video] fal.ai poll [{attempt + 1}] http={resp.status_code}, status={status}, keys={list(s.keys()) if isinstance(s, dict) else []}",
+                level='silent',
+            )
             consecutive_errors = 0
 
             if status == 'COMPLETED':
@@ -195,6 +227,7 @@ def poll(log_id, status_url: str, response_url: str):
         except Exception as e:
             consecutive_errors += 1
             write_log_entry(log_id, f"Ошибка опроса статуса: {e}", level='warn')
+            write_log_entry(log_id, f"[video] fal.ai poll [{attempt + 1}] exception={type(e).__name__}: {e}", level='silent')
             if consecutive_errors >= _POLL_MAX_ERRORS:
                 msg = f'fal.ai недоступен: {_POLL_MAX_ERRORS} ошибок подряд — прерываем поллинг'
                 write_log_entry(log_id, msg, level='error')

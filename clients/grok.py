@@ -112,7 +112,7 @@ def poll(log_id, status_url: str, response_url: str):
                 log_id,
                 (
                     f"[video] Grok poll [{attempt + 1}] "
-                    f"http={resp.status_code}, status={status}, keys={keys}"
+                    f"http={resp.status_code}, status={status}, keys={keys}, status_url={status_url}"
                 ),
                 level='silent',
             )

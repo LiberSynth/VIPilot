@@ -68,6 +68,11 @@ def run(batch_id, log_id):
             return
 
         status = batch['status']
+        write_log_entry(
+            log_id,
+            fmt_id_msg("[video] Батч {} — phase=run_start, status={}", batch_id, status),
+            level='silent',
+        )
 
         # Три допустимых входных статуса:
         # - video_pending:    handshake с провайдером уже существует — это подхват
@@ -88,6 +93,11 @@ def run(batch_id, log_id):
         else:
             db_log_update(log_id, "Пайплайн уже выполнен — пропуск", "ok")
             return
+        write_log_entry(
+            log_id,
+            fmt_id_msg("[video] Батч {} — phase=run_mode, resumed={}", batch_id, resumed),
+            level='silent',
+        )
 
         # is_probe: батч создан вручную для тестирования конкретной модели (movie_probe).
         # Для проба aspect ratio жёстко 9:16 — результат идёт на просмотр, а не в эфир.
@@ -117,6 +127,11 @@ def run(batch_id, log_id):
             target = tgt.get('name') or 'adhoc'
             ar_x   = tgt.get('aspect_ratio_x') or 9
             ar_y   = tgt.get('aspect_ratio_y') or 16
+        write_log_entry(
+            log_id,
+            fmt_id_msg("[video] Батч {} — phase=target_resolved, target={}, probe={}, ar={}:{}", batch_id, target, is_probe, ar_x, ar_y),
+            level='silent',
+        )
 
         # Режим пула (donor): только для slot/adhoc и только при первом запуске (not resumed).
         # Story-пайплайн уже записал donor_batch_id в batches.data; здесь переносим
@@ -189,6 +204,11 @@ def run(batch_id, log_id):
                 db_link_batch_story_only(batch_id, donor_story_id)
                 write_log_entry(log_id, fmt_id_msg("story_id подменён: {} → {}", story_id, donor_story_id), level='silent')
             db_set_batch_status(batch_id, 'video_ready')
+            write_log_entry(
+                log_id,
+                fmt_id_msg("[video] Батч {} — phase=emulation_done, status=video_ready", batch_id),
+                level='silent',
+            )
             db_log_update(log_id, 'Видео [эмуляция]', 'ok')
             return
 
@@ -271,6 +291,14 @@ def run(batch_id, log_id):
             model_name = m['name']
             cnt = attempt_counts.get(model_name, 0)
             attempt_counts[model_name] = cnt + 1
+            write_log_entry(
+                log_id,
+                fmt_id_msg(
+                    "[video] Батч {} — phase=model_callback_enter, model={}, attempt={}, resumed={}",
+                    batch_id, model_name, cnt + 1, resumed,
+                ),
+                level='silent',
+            )
 
             if first_model_log:
                 first_model_log = False
@@ -292,12 +320,36 @@ def run(batch_id, log_id):
             if saved_request_id:
                 write_log_entry(log_id, "Возобновление предыдущего запроса.")
                 write_log_entry(log_id, fmt_id_msg("Возобновление: request_id={}", saved_request_id), level='silent')
+                write_log_entry(
+                    log_id,
+                    fmt_id_msg(
+                        "[video] Батч {} — phase=poll_resume_start, model={}, request_id={}, status_url={}, response_url={}",
+                        batch_id, model_name, saved_request_id, saved_status_url, saved_response_url,
+                    ),
+                    level='silent',
+                )
                 video_url, poll_err = client.poll(log_id, saved_status_url, saved_response_url)
                 if video_url:
                     used_model_id = str(m['id'])
+                    write_log_entry(
+                        log_id,
+                        fmt_id_msg(
+                            "[video] Батч {} — phase=poll_resume_success, model={}, request_id={}",
+                            batch_id, model_name, saved_request_id,
+                        ),
+                        level='silent',
+                    )
                     return video_url
                 if poll_err:
                     write_log_entry(log_id, f"Поллинг завершился с ошибкой: {poll_err}", level='warn')
+                    write_log_entry(
+                        log_id,
+                        fmt_id_msg(
+                            "[video] Батч {} — phase=poll_resume_error, model={}, request_id={}, error={}",
+                            batch_id, model_name, saved_request_id, poll_err,
+                        ),
+                        level='silent',
+                    )
                     if _is_content_moderation_error(poll_err):
                         msg = 'Видео отклонено модерацией контента провайдера'
                         db_log_update(log_id, msg, 'error')
@@ -305,7 +357,21 @@ def run(batch_id, log_id):
                         write_log_entry(log_id, f"[video] {msg}", level='silent')
                         db_set_batch_status(batch_id, 'video_error')
                         raise AppException(batch_id, 'video', msg, log_id)
+                else:
+                    write_log_entry(
+                        log_id,
+                        fmt_id_msg(
+                            "[video] Батч {} — phase=poll_resume_no_result, model={}, request_id={}, error=None",
+                            batch_id, model_name, saved_request_id,
+                        ),
+                        level='silent',
+                    )
                 write_log_entry(log_id, f"Поллинг не дал результата, сброс handshake", level='warn')
+                write_log_entry(
+                    log_id,
+                    fmt_id_msg("[video] Батч {} — phase=handshake_reset_after_resume, model={}, request_id={}", batch_id, model_name, saved_request_id),
+                    level='silent',
+                )
                 db_save_video_job_and_set_pending(batch_id, {
                     'request_id':   None,
                     'status_url':   None,
@@ -330,6 +396,15 @@ def run(batch_id, log_id):
                 m['body_tpl'], story_text, ar_x, ar_y, actual_duration,
             )
             if not sr:
+                write_log_entry(log_id, "Провайдер не принял запрос — переход к следующей попытке.", level='warn')
+                write_log_entry(
+                    log_id,
+                    fmt_id_msg(
+                        "[video] Батч {} — phase=submit_failed, model={}, attempt={}, submit_url={}",
+                        batch_id, model_name, cnt + 1, m.get('submit_url'),
+                    ),
+                    level='silent',
+                )
                 return None
 
             req_id = sr['request_id']
@@ -347,15 +422,39 @@ def run(batch_id, log_id):
             })
             write_log_entry(log_id, "Запрос принят, ожидаю результат.")
             write_log_entry(log_id, fmt_id_msg("[video] Генерация запущена: request_id={}", req_id), level='silent')
+            write_log_entry(
+                log_id,
+                fmt_id_msg(
+                    "[video] Батч {} — phase=submit_ok, model={}, request_id={}, status_url={}, response_url={}",
+                    batch_id, model_name, req_id, s_url, r_url,
+                ),
+                level='silent',
+            )
 
             video_url, poll_err = client.poll(log_id, s_url, r_url)
             if video_url:
                 used_model    = model_name
                 used_model_id = m_id
+                write_log_entry(
+                    log_id,
+                    fmt_id_msg(
+                        "[video] Батч {} — phase=poll_submit_success, model={}, request_id={}",
+                        batch_id, model_name, req_id,
+                    ),
+                    level='silent',
+                )
                 return video_url
 
             if poll_err:
                 write_log_entry(log_id, f"Поллинг завершился с ошибкой: {poll_err}", level='warn')
+                write_log_entry(
+                    log_id,
+                    fmt_id_msg(
+                        "[video] Батч {} — phase=poll_submit_error, model={}, request_id={}, error={}",
+                        batch_id, model_name, req_id, poll_err,
+                    ),
+                    level='silent',
+                )
                 if _is_content_moderation_error(poll_err):
                     msg = 'Видео отклонено модерацией контента провайдера'
                     db_log_update(log_id, msg, 'error')
@@ -363,7 +462,21 @@ def run(batch_id, log_id):
                     write_log_entry(log_id, f"[video] {msg}", level='silent')
                     db_set_batch_status(batch_id, 'video_error')
                     raise AppException(batch_id, 'video', msg, log_id)
+            else:
+                write_log_entry(
+                    log_id,
+                    fmt_id_msg(
+                        "[video] Батч {} — phase=poll_submit_no_result, model={}, request_id={}, error=None",
+                        batch_id, model_name, req_id,
+                    ),
+                    level='silent',
+                )
             write_log_entry(log_id, f"Поллинг не дал результата, сброс handshake", level='warn')
+            write_log_entry(
+                log_id,
+                fmt_id_msg("[video] Батч {} — phase=handshake_reset_after_submit, model={}, request_id={}", batch_id, model_name, req_id),
+                level='silent',
+            )
             db_save_video_job_and_set_pending(batch_id, {
                 'request_id':   None,
                 'status_url':   None,
@@ -420,6 +533,11 @@ def run(batch_id, log_id):
                 db_log_update(log_id, msg, 'error')
                 write_log_entry(log_id, msg, level='error')
                 write_log_entry(log_id, f"[video] {msg}", level='silent')
+                write_log_entry(
+                    log_id,
+                    fmt_id_msg("[video] Батч {} — phase=models_exhausted, action=story_ready", batch_id),
+                    level='silent',
+                )
                 db_set_batch_status(batch_id, 'story_ready')
                 return
 
@@ -443,6 +561,11 @@ def run(batch_id, log_id):
         db_log_update(log_id, msg, 'ok')
         write_log_entry(log_id, 'Готово: batch → video_ready')
         write_log_entry(log_id, f"[video] URL: {video_url}", level='silent')
+        write_log_entry(
+            log_id,
+            fmt_id_msg("[video] Батч {} — phase=run_done, status=video_ready, model_id={}", batch_id, used_model_id),
+            level='silent',
+        )
 
     except AspectRatioConflictError as e:
         msg = str(e)

@@ -6,6 +6,7 @@ API ключ передаётся в теле запроса (поле api_key),
 
 import os
 import time
+import json
 import requests
 
 from clients.falai import build_body, ProviderFatalError
@@ -20,6 +21,17 @@ _POLL_MAX      = 480  # 480 × 15 с = 2 часа
 
 def _headers():
     return {'Content-Type': 'application/json'}
+
+
+def _compact_json(value, limit: int = 1200) -> str:
+    """Возвращает компактный JSON/строку для диагностики с ограничением размера."""
+    try:
+        text = json.dumps(value, ensure_ascii=False, separators=(',', ':'))
+    except Exception:
+        text = str(value)
+    if len(text) <= limit:
+        return text
+    return text[:limit] + '...'
 
 
 def submit(log_id, model_name: str, submit_url: str, platform_url: str,
@@ -84,10 +96,25 @@ def poll(log_id, status_url: str, response_url: str):
         time.sleep(_POLL_INTERVAL)
         try:
             resp = requests.get(status_url, params=params, timeout=15)
-            data = resp.json()
+            try:
+                data = resp.json()
+            except ValueError:
+                write_log_entry(log_id, f"SkyReels poll [{attempt + 1}] не-JSON (HTTP {resp.status_code})", level='warn')
+                write_log_entry(
+                    log_id,
+                    f"[video] SkyReels poll [{attempt + 1}] http={resp.status_code}, body={_compact_json(resp.text)}",
+                    level='silent',
+                )
+                write_log_entry(log_id, f"Статус [{attempt + 1}]: None")
+                continue
 
             status = (data.get('status') or '').upper()
             write_log_entry(log_id, f"Статус [{attempt + 1}]: {status}")
+            write_log_entry(
+                log_id,
+                f"[video] SkyReels poll [{attempt + 1}] http={resp.status_code}, status={status}, keys={list(data.keys()) if isinstance(data, dict) else []}",
+                level='silent',
+            )
 
             if status in ('SUCCEEDED', 'COMPLETED', 'SUCCESS'):
                 video_url = (
@@ -108,6 +135,7 @@ def poll(log_id, status_url: str, response_url: str):
 
         except Exception as e:
             write_log_entry(log_id, f"Ошибка опроса статуса: {e}", level='warn')
+            write_log_entry(log_id, f"[video] SkyReels poll [{attempt + 1}] exception={type(e).__name__}: {e}", level='silent')
 
     msg = 'Таймаут генерации видео SkyReels (2 часа)'
     write_log_entry(log_id, msg, level='error')
