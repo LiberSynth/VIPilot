@@ -38,6 +38,11 @@ def run(batch_id, log_id):
     if not batch:
         db_log_update(log_id, "Батч не найден", "error")
         return
+    write_log_entry(
+        log_id,
+        fmt_id_msg("[story] Батч {} — phase=run_start, status={}, type={}", batch_id, batch.get("status"), batch.get("type")),
+        level='silent',
+    )
 
     # Два допустимых входных статуса:
     # - pending:          батч только что создан. CAS-переход pending → story_generating
@@ -63,6 +68,11 @@ def run(batch_id, log_id):
         active_targets = db_get_active_targets()
         tgt = active_targets[0] if active_targets else {}
         target = tgt.get("name") or "adhoc"
+    write_log_entry(
+        log_id,
+        fmt_id_msg("[story] Батч {} — phase=target_resolved, probe={}, target={}", batch_id, is_probe, target),
+        level='silent',
+    )
 
     # movie_probe с уже заданным story_id: пользователь прикрепил конкретный сюжет
     # к пробному запуску видеомодели. Генерация сюжета не нужна — сразу story_ready.
@@ -77,7 +87,12 @@ def run(batch_id, log_id):
         write_log_entry(log_id, 'Используется заданный сюжет.')
         write_log_entry(
             log_id,
-            f"[story] Батч {batch_id} — story_id назначен пользователем ({preset_story_id}), сюжет: «{_story_title}», батч → story_ready",
+            fmt_id_msg(
+                "[story] Батч {} — phase=user_story_assigned, story_id={}, title=«{}», batch → story_ready",
+                batch_id,
+                preset_story_id,
+                _story_title,
+            ),
             level='silent',
         )
         db_set_batch_story(batch_id, preset_story_id)
@@ -140,9 +155,12 @@ def run(batch_id, log_id):
             write_log_entry(log_id, "Видео подобрано из пула, генерация сюжета не требуется.")
             write_log_entry(
                 log_id,
-                f"[story] Батч {batch_id} — подобрано видео из пула {donor_batch_id}"
-                + (f", сюжет: «{donor_title}»" if donor_title else "")
-                + ", батч → story_ready",
+                fmt_id_msg(
+                    "[story] Батч {} — phase=donor_selected, donor_batch_id={}{}",
+                    batch_id,
+                    donor_batch_id,
+                    (f", title=«{donor_title}», batch → story_ready" if donor_title else ", batch → story_ready"),
+                ),
                 level='silent',
             )
             return
@@ -276,6 +294,14 @@ def run(batch_id, log_id):
     write_log_entry(
         log_id, f"Моделей: {len(models)}, попыток на модель: {max_attempts_per_model}", level='silent'
     )
+    write_log_entry(
+        log_id,
+        fmt_id_msg(
+            "[story] Батч {} — phase=models_selected, count={}, pinned={}, max_attempts={}",
+            batch_id, len(models), bool(pinned_model_id), max_attempts_per_model,
+        ),
+        level='silent',
+    )
 
     story_id = None
     used_model_name = None
@@ -288,6 +314,14 @@ def run(batch_id, log_id):
         model_name = m["name"]
         cnt = attempt_counters.get(model_name, 0)
         attempt_counters[model_name] = cnt + 1
+        write_log_entry(
+            log_id,
+            fmt_id_msg(
+                "[story] Батч {} — phase=model_callback_enter, model={}, attempt={}",
+                batch_id, model_name, cnt + 1,
+            ),
+            level='silent',
+        )
         if cnt == 0:
             write_log_entry(log_id, f"Модель: {model_name}")
             write_log_entry(
@@ -307,9 +341,25 @@ def run(batch_id, log_id):
                 story_id = sid
                 used_model_name = model_name
                 used_model_id = m["id"]
+                write_log_entry(
+                    log_id,
+                    fmt_id_msg(
+                        "[story] Батч {} — phase=model_callback_success, model={}, story_id={}",
+                        batch_id, model_name, sid,
+                    ),
+                    level='silent',
+                )
                 return (sid, title, text)
             write_log_entry(
                 log_id, f"[{model_name}] не удалось сохранить сюжет", level="warn"
+            )
+            write_log_entry(
+                log_id,
+                fmt_id_msg(
+                    "[story] Батч {} — phase=story_save_failed, model={}, attempt={}",
+                    batch_id, model_name, cnt + 1,
+                ),
+                level='silent',
             )
         else:
             write_log_entry(
@@ -317,9 +367,22 @@ def run(batch_id, log_id):
                 f"[{model_name}] попытка {attempt_counters[model_name]}/{max_attempts_per_model} не удалась",
                 level="warn",
             )
+            write_log_entry(
+                log_id,
+                fmt_id_msg(
+                    "[story] Батч {} — phase=model_callback_no_result, model={}, attempt={}",
+                    batch_id, model_name, attempt_counters[model_name],
+                ),
+                level='silent',
+            )
         return None
 
     max_passes = 1 if pinned_model_id else snap.max_model_passes
+    write_log_entry(
+        log_id,
+        fmt_id_msg("[story] Батч {} — phase=iterate_start, max_passes={}", batch_id, max_passes),
+        level='silent',
+    )
     iterate_result = iterate_models(
         models, max_attempts_per_model, story_callback, max_passes=max_passes
     )
@@ -335,6 +398,11 @@ def run(batch_id, log_id):
         db_log_update(log_id, msg, "error")
         write_log_entry(log_id, msg, level="error")
         write_log_entry(log_id, f"[story] {msg}", level='silent')
+        write_log_entry(
+            log_id,
+            fmt_id_msg("[story] Батч {} — phase=iterate_failed, max_passes={}", batch_id, max_passes),
+            level='silent',
+        )
         raise AppException(batch_id, "story", msg, log_id)
 
     story_id, title, result = iterate_result
@@ -363,6 +431,11 @@ def run(batch_id, log_id):
             ),
             level='silent',
         )
+        write_log_entry(
+            log_id,
+            fmt_id_msg("[story] Батч {} — phase=run_done, status=story_probe, story_id={}", batch_id, story_id),
+            level='silent',
+        )
     else:
         if not db_set_batch_story(batch_id, story_id):
             msg = (
@@ -384,5 +457,10 @@ def run(batch_id, log_id):
             fmt_id_msg(
                 "[story] Готово: story_id={}, batch → story_ready", story_id
             ),
+            level='silent',
+        )
+        write_log_entry(
+            log_id,
+            fmt_id_msg("[story] Батч {} — phase=run_done, status=story_ready, story_id={}", batch_id, story_id),
             level='silent',
         )

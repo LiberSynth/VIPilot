@@ -5,6 +5,7 @@
 """
 
 import os
+import json
 import requests
 
 from log import write_log_entry
@@ -40,6 +41,17 @@ def _build_body(body_tpl, model_url, system_prompt, user_prompt):
     return body
 
 
+def _compact_json(value, limit: int = 1200) -> str:
+    """Возвращает компактный JSON/строку для диагностических логов с ограничением размера."""
+    try:
+        text = json.dumps(value, ensure_ascii=False, separators=(',', ':'))
+    except Exception:
+        text = str(value)
+    if len(text) <= limit:
+        return text
+    return text[:limit] + '...'
+
+
 def generate(log_id, model_name: str, model: dict, system_prompt: str, user_prompt: str):
     """
     Выполняет один запрос к текстовой платформе.
@@ -53,6 +65,15 @@ def generate(log_id, model_name: str, model: dict, system_prompt: str, user_prom
     """
     try:
         body = _build_body(model['body_tpl'], model['model_url'], system_prompt, user_prompt)
+        write_log_entry(
+            log_id,
+            (
+                f"[story] text request: model={model_name}, "
+                f"platform_url={model.get('platform_url')}, model_url={model.get('model_url')}, "
+                f"env_key_name={model.get('env_key_name')}"
+            ),
+            level='silent',
+        )
         resp = requests.post(
             model['platform_url'],
             headers=_headers(model.get('env_key_name')),
@@ -70,23 +91,55 @@ def generate(log_id, model_name: str, model: dict, system_prompt: str, user_prom
         data = resp.json()
     except ValueError:
         write_log_entry(log_id, f"[{model_name}] не-JSON (HTTP {resp.status_code}): {resp.text}", level='warn')
+        write_log_entry(
+            log_id,
+            f"[story] text response non-json: model={model_name}, http={resp.status_code}, body={_compact_json(resp.text)}",
+            level='silent',
+        )
         return None
+
+    write_log_entry(
+        log_id,
+        f"[story] text response: model={model_name}, http={resp.status_code}, keys={list(data.keys()) if isinstance(data, dict) else []}",
+        level='silent',
+    )
 
     if resp.status_code >= 400:
         err = data.get('error', {})
         if isinstance(err, dict):
             err = err.get('message', data)
         write_log_entry(log_id, f"[{model_name}] HTTP {resp.status_code}: {err}", level='warn')
+        write_log_entry(
+            log_id,
+            f"[story] text response error: model={model_name}, http={resp.status_code}, error={_compact_json(err)}",
+            level='silent',
+        )
         return None
 
     choices = data.get('choices')
     if not choices:
         write_log_entry(log_id, f"[{model_name}] нет поля choices в ответе", level='warn')
+        write_log_entry(
+            log_id,
+            f"[story] text response invalid: model={model_name}, reason=no_choices, body={_compact_json(data)}",
+            level='silent',
+        )
         return None
 
     result = ((choices[0].get('message') or {}).get('content') or '').strip()
     if not result:
         write_log_entry(log_id, f"[{model_name}] пустой текст", level='warn')
+        write_log_entry(
+            log_id,
+            f"[story] text response invalid: model={model_name}, reason=empty_content, body={_compact_json(data)}",
+            level='silent',
+        )
         return None
+
+    write_log_entry(
+        log_id,
+        f"[story] text response ok: model={model_name}, chars={len(result)}",
+        level='silent',
+    )
 
     return result
