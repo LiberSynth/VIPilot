@@ -117,6 +117,17 @@ def poll(log_id, status_url: str, response_url: str):
                 level='silent',
             )
 
+            if resp.status_code >= 400:
+                provider_error = s.get('error', s) if isinstance(s, dict) else s
+                provider_error_lc = str(provider_error).lower()
+                if 'moderation' in provider_error_lc or 'policy' in provider_error_lc:
+                    msg = f'xAI Grok: генерация отклонена модерацией контента: {provider_error}'
+                    write_log_entry(log_id, msg, level='error')
+                    return None, msg
+                msg = f'xAI Grok: HTTP {resp.status_code}: {provider_error}'
+                write_log_entry(log_id, msg, level='warn')
+                return None, msg
+
             if status is None:
                 write_log_entry(
                     log_id,

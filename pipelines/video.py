@@ -54,6 +54,11 @@ class AspectRatioConflictError(Exception):
     """Raised when active targets have different aspect ratios."""
 
 
+def _is_content_moderation_error(err_text: str) -> bool:
+    low = (err_text or '').lower()
+    return 'moderation' in low or 'политик' in low or 'content policy' in low
+
+
 def run(batch_id, log_id):
     snap = environment.snapshot()
     try:
@@ -293,6 +298,13 @@ def run(batch_id, log_id):
                     return video_url
                 if poll_err:
                     write_log_entry(log_id, f"Поллинг завершился с ошибкой: {poll_err}", level='warn')
+                    if _is_content_moderation_error(poll_err):
+                        msg = 'Видео отклонено модерацией контента провайдера'
+                        db_log_update(log_id, msg, 'error')
+                        write_log_entry(log_id, msg, level='error')
+                        write_log_entry(log_id, f"[video] {msg}", level='silent')
+                        db_set_batch_status(batch_id, 'video_error')
+                        raise AppException(batch_id, 'video', msg, log_id)
                 write_log_entry(log_id, f"Поллинг не дал результата, сброс handshake", level='warn')
                 db_save_video_job_and_set_pending(batch_id, {
                     'request_id':   None,
@@ -344,6 +356,13 @@ def run(batch_id, log_id):
 
             if poll_err:
                 write_log_entry(log_id, f"Поллинг завершился с ошибкой: {poll_err}", level='warn')
+                if _is_content_moderation_error(poll_err):
+                    msg = 'Видео отклонено модерацией контента провайдера'
+                    db_log_update(log_id, msg, 'error')
+                    write_log_entry(log_id, msg, level='error')
+                    write_log_entry(log_id, f"[video] {msg}", level='silent')
+                    db_set_batch_status(batch_id, 'video_error')
+                    raise AppException(batch_id, 'video', msg, log_id)
             write_log_entry(log_id, f"Поллинг не дал результата, сброс handshake", level='warn')
             db_save_video_job_and_set_pending(batch_id, {
                 'request_id':   None,
