@@ -223,8 +223,14 @@ def _try_click_captcha_checkbox(page, log_id) -> bool:
 
 
 def _has_publish_confirm_dialog(page) -> bool:
-    """Возвращает True если в DOM видна кнопка подтверждения публикации."""
-    for text in ("Опубликовать после обработки", "Опубликовать после подтверждения"):
+    """
+    Возвращает True если виден вторичный диалог подтверждения.
+
+    Не считаем «Опубликовать после обработки» — это часто основная CTA
+    в модалке «Публикация ролика»; автоклик до тегов/комментариев уводит
+    в список студии, а дальше скрипт бесконечно ждёт «Опубликовать».
+    """
+    for text in ("Опубликовать после подтверждения",):
         try:
             btn = page.locator(f"button:has-text('{text}')")
             if btn.count() > 0 and btn.first.is_visible(timeout=300):
@@ -282,8 +288,8 @@ def _handle_captcha_element(page, log_id, batch_id) -> None:
 
 
 def _handle_confirm_element(page, log_id, batch_id) -> None:
-    """Обрабатывает диалог подтверждения публикации: кликает кнопку."""
-    for text in ("Опубликовать после подтверждения", "Опубликовать после обработки"):
+    """Обрабатывает вторичный диалог подтверждения (не основную CTA модалки)."""
+    for text in ("Опубликовать после подтверждения",):
         try:
             btn = page.locator(f"button:has-text('{text}')").first
             if btn.is_visible(timeout=300):
@@ -294,6 +300,63 @@ def _handle_confirm_element(page, log_id, batch_id) -> None:
                 return
         except Exception:
             pass
+
+
+def _dzen_step7_success_without_click(page, url_step7_start: str) -> bool:
+    """Признак что публикация уже ушла без финального клика «Опубликовать»."""
+    u = page.url
+    if "state=published" in u or "state=pending" in u:
+        return True
+    if re.search(r"/video/|/shorts/|/watch\?", u):
+        return True
+    if (
+        "videoEditorPublicationId" in url_step7_start
+        and "videoEditorPublicationId" not in u
+    ):
+        return True
+    return False
+
+
+def _find_primary_publish_control(page):
+    """
+    Основная кнопка/ссылка публикации в актуальной вёрстке Дзена
+    (текст, роль, data-testid).
+    """
+    for sel in ('[data-testid="publish-btn"]',):
+        try:
+            loc = page.locator(sel).first
+            if loc.is_visible(timeout=400):
+                return loc
+        except Exception:
+            pass
+    for name in ("Опубликовать", "ОПУБЛИКОВАТЬ", "Опубликовать после обработки"):
+        for role in ("button", "link"):
+            try:
+                loc = page.get_by_role(role, name=name).first
+                if loc.is_visible(timeout=400):
+                    return loc
+            except Exception:
+                pass
+    try:
+        loc = page.locator("button").filter(
+            has_text=re.compile(r"^\s*Опубликовать\s*$")
+        ).first
+        if loc.is_visible(timeout=400):
+            return loc
+    except Exception:
+        pass
+    for sel in (
+        "button:has-text('Опубликовать после обработки')",
+        "button:has-text('Опубликовать')",
+        "[role='button']:has-text('Опубликовать')",
+    ):
+        try:
+            loc = page.locator(sel).first
+            if loc.is_visible(timeout=400):
+                return loc
+        except Exception:
+            pass
+    return None
 
 
 _EXPECTED_ELEMENTS = [
@@ -674,30 +737,55 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
     _dismiss_unknown(page, log_id)
 
     # ── Шаг 7: Публикуем ─────────────────────────────────────────────────
-    write_log_entry(log_id, "Дзен: Нажимаю «Опубликовать».")
-    pub_btn = page.locator("button:has-text('Опубликовать')").first
-    pub_btn.wait_for(state="visible", timeout=180_000)
+    write_log_entry(
+        log_id,
+        "Дзен: Жду кнопку публикации или признак что материал уже отправлен.",
+    )
+    url_step7_start = page.url
+    _step7_deadline = _time.monotonic() + 180
+    pub_btn = None
+    while _time.monotonic() < _step7_deadline:
+        if _dzen_step7_success_without_click(page, url_step7_start):
+            write_log_entry(
+                log_id,
+                "Дзен: Публикация уже ушла (редирект/студия) — отдельный клик не нужен.",
+            )
+            write_log_entry(log_id, f"[dzen] URL: {page.url}", level='silent')
+            pub_btn = None
+            break
+        pub_btn = _find_primary_publish_control(page)
+        if pub_btn is not None:
+            write_log_entry(log_id, "Дзен: Элемент публикации найден, нажимаю.")
+            break
+        _handle_popups(page, log_id, batch_id)
+        page.wait_for_timeout(1_500)
+
+    if pub_btn is None and not _dzen_step7_success_without_click(page, url_step7_start):
+        raise DzenApiError(
+            "Не дождались кнопки публикации и не обнаружили успешный редирект за 3 минуты."
+        )
 
     # Перед кликом — проверяем на капчу и закрываем всё лишнее.
     # Капча от VK блокирует pointer events на всей странице, поэтому
     # она должна быть обработана ДО попытки клика.
     _handle_popups(page, log_id, batch_id)
 
-    try:
-        # Таймаут 3 сек: если confirm-диалог уже был обработан в _handle_popups
-        # выше, главная кнопка дизейблится и ждать её enable бессмысленно —
-        # публикация уже отправлена. JS-клик ниже останется как страховка.
-        pub_btn.click(timeout=3_000)
-    except Exception as _click_err:
-        write_log_entry(log_id, "[dzen] Обычный клик не прошёл — пробую JS-клик.", level='silent')
-        write_log_entry(log_id, f"[dzen] Причина: {_click_err}", level='silent')
+    if pub_btn is not None:
         try:
-            page.evaluate(
-                "() => { const b = document.querySelector('[data-testid=\"publish-btn\"]') "
-                "|| document.querySelector('button[type=\"submit\"]'); if(b) b.click(); }"
-            )
-        except Exception as _js_err:
-            write_log_entry(log_id, f"[dzen] JS-клик тоже не прошёл: {_js_err}", level='silent')
+            # Таймаут 3 сек: если confirm-диалог уже был обработан в _handle_popups
+            # выше, главная кнопка дизейблится и ждать её enable бессмысленно —
+            # публикация уже отправлена. JS-клик ниже останется как страховка.
+            pub_btn.click(timeout=3_000)
+        except Exception as _click_err:
+            write_log_entry(log_id, "[dzen] Обычный клик не прошёл — пробую JS-клик.", level='silent')
+            write_log_entry(log_id, f"[dzen] Причина: {_click_err}", level='silent')
+            try:
+                page.evaluate(
+                    "() => { const b = document.querySelector('[data-testid=\"publish-btn\"]') "
+                    "|| document.querySelector('button[type=\"submit\"]'); if(b) b.click(); }"
+                )
+            except Exception as _js_err:
+                write_log_entry(log_id, f"[dzen] JS-клик тоже не прошёл: {_js_err}", level='silent')
 
     # Ждём появления диалога подтверждения или капчи до 12 секунд.
     # Если за 12 сек ничего не появилось — продолжаем в шаг 8.
