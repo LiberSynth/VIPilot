@@ -474,7 +474,9 @@
   .monitor-sysgroup-pip.orphan-pip { color: #404058; }
   .monitor-sysgroup-msg { color: #b0b0c8; flex: 1; word-break: break-word; }
   .monitor-sysgroup-msg.error { color: #ff7070; }
+  .monitor-sysgroup-msg.fatal_error { color: #ff7070; }
   .monitor-sysgroup-msg.warn  { color: #f5a623; }
+  .monitor-sysgroup-msg.warning { color: #f5a623; }
   .monitor-sysgroup-msg.ok    { color: #3ecf8e; }
   .monitor-batch {
     background: #1a1a24;
@@ -596,6 +598,12 @@
   .monitor-log-dot.ls-ok,
   .monitor-log-dot.ls-info      { background: #3ecf8e; }
   .monitor-log-dot.ls-error     { background: #ff6060; }
+  .monitor-log-dot.ls-fatal_error { background: #ff6060; }
+  .monitor-log-dot.ls-video_error,
+  .monitor-log-dot.ls-transcode_error,
+  .monitor-log-dot.ls-publish_error { background: #ff6060; }
+  .monitor-log-dot.ls-warn,
+  .monitor-log-dot.ls-warning   { background: #f5a623; }
   .monitor-log-dot.ls-cancelled    { background: #555; }
   .monitor-log-dot.ls-interrupted  { background: #555; }
   .monitor-log-dot.ls-running   { background: #4a7cf7; }
@@ -612,6 +620,14 @@
   .monitor-log-pipeline { color: #d0d0ec; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
   .monitor-log-model { color: #888; font-size: 10px; font-weight: 400; margin-left: 5px; }
   .monitor-log-comment  { color: #9090b8; font-size: 12px; padding-left: 39px; word-break: break-word; white-space: pre-wrap; line-height: 1.4; }
+  .monitor-log-item[data-status="warn"] .monitor-log-comment,
+  .monitor-log-item[data-status="warning"] .monitor-log-comment { color: #f5a623; }
+  .monitor-log-item[data-status="error"] .monitor-log-comment,
+  .monitor-log-item[data-status="fatal_error"] .monitor-log-comment,
+  .monitor-log-item[data-status="video_error"] .monitor-log-comment,
+  .monitor-log-item[data-status="transcode_error"] .monitor-log-comment,
+  .monitor-log-item[data-status="publish_error"] .monitor-log-comment,
+  .monitor-log-item[data-status$=".failed"] .monitor-log-comment { color: #ff7070; }
   .monitor-log-chevron  { font-size: 10px; color: #7070a0; flex-shrink: 0; transition: transform .15s; }
   .monitor-log-item.open .monitor-log-chevron { transform: rotate(180deg); }
 
@@ -646,7 +662,9 @@
   .monitor-entry-ts  { color: #6868a0; flex-shrink: 0; font-variant-numeric: tabular-nums; }
   .monitor-entry-msg { color: #b8b8d8; word-break: break-word; white-space: pre-wrap; }
   .monitor-entry-msg.error { color: #ff7070; }
+  .monitor-entry-msg.fatal_error { color: #ff7070; }
   .monitor-entry-msg.warn  { color: #f5a623; }
+  .monitor-entry-msg.warning  { color: #f5a623; }
   .monitor-entry-msg.ok    { color: #3ecf8e; }
 
   /* ── Collapsible panel ── */
