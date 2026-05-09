@@ -409,10 +409,39 @@ def _dismiss_unknown(page, log_id=None) -> None:
         write_log_entry(log_id, f"[dzen] hint close target class={cls_before!r}", level='silent')
 
         try:
+            url_before_click = page.url
+        except Exception:
+            url_before_click = ""
+
+        try:
             btn.click(timeout=2_000)
         except Exception as _e:
             write_log_entry(log_id, f"[dzen] hint click failed: {_e}", level='silent')
-            break
+            # Во время публикации страница может мгновенно перейти в список материалов.
+            # В этом случае close-кнопка хинта естественно detatch'ится, это не ошибка.
+            try:
+                url_now = page.url
+            except Exception:
+                url_now = ""
+            try:
+                still_visible = page.locator(_HINT_CLOSE_SELECTOR).first.is_visible(timeout=200)
+            except Exception:
+                still_visible = False
+
+            if not still_visible:
+                write_log_entry(log_id, "Дзен: Хинт закрыт.", level=_user_lvl)
+                return
+
+            left_editor = (
+                ("videoEditorPublicationId" in (url_before_click or ""))
+                and ("videoEditorPublicationId" not in (url_now or ""))
+            ) or ("state=published" in (url_now or "")) or ("state=pending" in (url_now or ""))
+            if left_editor:
+                write_log_entry(log_id, f"[dzen] hint close interrupted by navigation: {url_now}", level='silent')
+                return
+
+            write_log_entry(log_id, "[dzen] hint click failed, retrying.", level='silent')
+            continue
 
         page.wait_for_timeout(300)
 
