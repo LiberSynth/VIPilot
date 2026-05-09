@@ -21,6 +21,7 @@ _VK_VER   = '5.131'
 
 def publish_story(video_data: bytes, group_id: int, log_id, pub_title: str = "") -> int | None:
     """Публикует видео как историю ВКонтакте. Возвращает story_id или None."""
+    write_log_entry(log_id, fmt_id_msg("[publish] VK story start: group_id={}, bytes={}", group_id, len(video_data)), level='silent')
     r = requests.post(f'{_VK_API}/stories.getVideoUploadServer', data={
         'group_id':    group_id,
         'add_to_news': 1,
@@ -34,6 +35,7 @@ def publish_story(video_data: bytes, group_id: int, log_id, pub_title: str = "")
 
     upload_url = r['response']['upload_url']
     filename = publication_file_name(pub_title)
+    write_log_entry(log_id, f"[publish] VK story upload_url received: {upload_url}", level='silent')
 
     for attempt in range(3):
         try:
@@ -53,6 +55,7 @@ def publish_story(video_data: bytes, group_id: int, log_id, pub_title: str = "")
                 time.sleep(5)
                 continue
             upload_result = up_data['response']['upload_result']
+            write_log_entry(log_id, f"[publish] VK story upload completed on attempt {attempt+1}", level='silent')
             break
         except Exception as e:
             write_log_entry(log_id, f'Ошибка загрузки (попытка {attempt+1}/3): {e}', level='warn')
@@ -70,6 +73,7 @@ def publish_story(video_data: bytes, group_id: int, log_id, pub_title: str = "")
     if 'response' in save:
         story_id = save['response']['items'][0]['id']
         write_log_entry(log_id, fmt_id_msg('История опубликована: id={}', story_id))
+        write_log_entry(log_id, fmt_id_msg("[publish] VK story done: story_id={}", story_id), level='silent')
         return story_id
 
     write_log_entry(log_id, f"stories.save: {save.get('error', save)}", level='error')
@@ -103,6 +107,7 @@ def publish_clip_wall(clip_url: str, title: str, group_id: int, log_id) -> int |
         return None
 
     write_log_entry(log_id, fmt_id_msg("VK: Публикую пост с клипом: attachment={}, title={}", attachment, title))
+    write_log_entry(log_id, fmt_id_msg("[publish] VK clip_wall start: group_id={}, attachment={}", group_id, attachment), level='silent')
 
     post_resp = requests.post(f'{_VK_API}/wall.post', data={
         'owner_id':     -group_id,
@@ -116,6 +121,7 @@ def publish_clip_wall(clip_url: str, title: str, group_id: int, log_id) -> int |
     if 'response' in post_resp:
         post_id = post_resp['response']['post_id']
         write_log_entry(log_id, fmt_id_msg('VK: Пост с клипом опубликован: post_id={}', post_id))
+        write_log_entry(log_id, fmt_id_msg("[publish] VK clip_wall done: post_id={}", post_id), level='silent')
         return post_id
 
     write_log_entry(log_id, f"VK: wall.post: {post_resp.get('error', post_resp)}", level='error')
@@ -124,6 +130,7 @@ def publish_clip_wall(clip_url: str, title: str, group_id: int, log_id) -> int |
 
 def publish_wall(video_data: bytes, group_id: int, log_id, pub_title: str = "") -> int | None:
     """Публикует видео на стену сообщества ВКонтакте. Возвращает post_id или None."""
+    write_log_entry(log_id, fmt_id_msg("[publish] VK wall start: group_id={}, bytes={}", group_id, len(video_data)), level='silent')
     save_resp = requests.post(f'{_VK_API}/video.save', data={
         'group_id':     group_id,
         'name':         pub_title,
@@ -141,6 +148,7 @@ def publish_wall(video_data: bytes, group_id: int, log_id, pub_title: str = "") 
     video_id   = save_resp['response']['video_id']
     owner_id   = save_resp['response']['owner_id']
     filename = publication_file_name(pub_title)
+    write_log_entry(log_id, fmt_id_msg("[publish] VK wall upload prepared: owner_id={}, video_id={}", owner_id, video_id), level='silent')
 
     for attempt in range(3):
         try:
@@ -159,6 +167,7 @@ def publish_wall(video_data: bytes, group_id: int, log_id, pub_title: str = "") 
                 write_log_entry(log_id, f'Неожиданный ответ CDN wall (попытка {attempt+1}/3): {up.text[:200]}', level='warn')
                 time.sleep(5)
                 continue
+            write_log_entry(log_id, f"[publish] VK wall upload completed on attempt {attempt+1}", level='silent')
             break
         except Exception as e:
             write_log_entry(log_id, f'Ошибка загрузки wall (попытка {attempt+1}/3): {e}', level='warn')
@@ -178,6 +187,7 @@ def publish_wall(video_data: bytes, group_id: int, log_id, pub_title: str = "") 
     if 'response' in post_resp:
         post_id = post_resp['response']['post_id']
         write_log_entry(log_id, f'Пост на стене: post_id={post_id}')
+        write_log_entry(log_id, fmt_id_msg("[publish] VK wall done: post_id={}", post_id), level='silent')
         return post_id
 
     write_log_entry(log_id, f"wall.post: {post_resp.get('error', post_resp)}", level='error')

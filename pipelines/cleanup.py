@@ -39,35 +39,45 @@ def run():
         log_lifetime        = parse_long_lifetime(settings_get("log_lifetime", "365"))
         batch_lifetime      = parse_batch_lifetime(settings_get("batch_lifetime", "7"))
         file_lifetime       = parse_file_lifetime(settings_get("file_lifetime", "7"))
+        write_log_entry(
+            None,
+            f"[cleanup] phase=run_start, entries_lifetime={entries_lifetime}, log_lifetime={log_lifetime}, batch_lifetime={batch_lifetime}, file_lifetime={file_lifetime}",
+            level='silent',
+        )
 
         summary = []
 
         if entries_lifetime > 0:
             n = db_cleanup_log_entries(entries_lifetime)
+            write_log_entry(None, f"[cleanup] phase=entries_cleanup_done, affected={n}", level='silent')
             if n:
                 summary.append(f"log_entries: -{n}")
                 write_log_entry(None, f"[cleanup] Удалено log_entries: {n}", level='silent')
 
         if log_lifetime > 0:
             n = db_cleanup_logs(log_lifetime)
+            write_log_entry(None, f"[cleanup] phase=logs_cleanup_done, affected={n}", level='silent')
             if n:
                 summary.append(f"log: -{n}")
                 write_log_entry(None, f"[cleanup] Удалено log-записей: {n}", level='silent')
 
         if batch_lifetime > 0:
             n = db_cleanup_batches(batch_lifetime)
+            write_log_entry(None, f"[cleanup] phase=batches_cleanup_done, affected={n}", level='silent')
             if n:
                 summary.append(f"batches: -{n}")
                 write_log_entry(None, f"[cleanup] Удалено батчей: {n}", level='silent')
 
         if file_lifetime > 0:
             n = db_cleanup_video_data(file_lifetime)
+            write_log_entry(None, f"[cleanup] phase=video_data_cleanup_done, affected={n}", level='silent')
             if n:
                 summary.append(f"movies.video_data: -{n}")
                 write_log_entry(None, f"[cleanup] Обнулено movies.raw_data/transcoded_data: {n}", level='silent')
 
         if summary:
             write_log_entry(None, "[cleanup] Очистка: " + ", ".join(summary), level='silent')
+        write_log_entry(None, f"[cleanup] phase=run_done, had_changes={bool(summary)}", level='silent')
 
     except Exception as e:
         write_log_entry(None, f"[cleanup] Необработанная ошибка: {e}", level='silent')

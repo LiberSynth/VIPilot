@@ -47,11 +47,15 @@ def _get_video(batch_id, log_id):
     video_data = db_get_batch_video_data(batch_id)
     if video_data is None:
         write_log_entry(log_id, 'movies.transcoded_data отсутствует — использую оригинал (movies.raw_data)')
+        write_log_entry(log_id, fmt_id_msg("[publish] Батч {} — phase=video_source_fallback, source=raw_data", batch_id), level='silent')
         video_data = db_get_batch_original_video(batch_id)
         if video_data is None:
             msg = 'Ни movies.transcoded_data, ни movies.raw_data не найдены в БД — ошибка логики'
             write_log_entry(log_id, msg, level='error')
             raise RuntimeError(msg)
+        write_log_entry(log_id, fmt_id_msg("[publish] Батч {} — phase=video_source_selected, source=raw_data, bytes={}", batch_id, len(video_data)), level='silent')
+    else:
+        write_log_entry(log_id, fmt_id_msg("[publish] Батч {} — phase=video_source_selected, source=transcoded_data, bytes={}", batch_id, len(video_data)), level='silent')
     return video_data
 
 
@@ -179,6 +183,14 @@ def run(batch_id, log_id):
 
     status = batch['status']
     active_targets = db_get_active_targets()
+    write_log_entry(
+        log_id,
+        fmt_id_msg(
+            "[publish] Батч {} — phase=run_start, status={}, type={}, targets_count={}, emulation_mode={}",
+            batch_id, status, batch.get('type'), len(active_targets), snap.emulation_mode,
+        ),
+        level='silent',
+    )
 
     parsed = _parse_composite_status(status)
 
@@ -221,6 +233,11 @@ def run(batch_id, log_id):
             raise AppException(batch_id, 'publish', msg, log_id)
 
     steps = _build_steps(active_targets)
+    write_log_entry(
+        log_id,
+        fmt_id_msg("[publish] Батч {} — phase=steps_built, steps_count={}", batch_id, len(steps)),
+        level='silent',
+    )
     if not steps:
         if parsed is None:
             msg = 'Батч отменён — нет методов публикации в конфиге таргетов'
@@ -259,6 +276,11 @@ def run(batch_id, log_id):
         log_label = f'Публикация ({target_names}).'
 
     db_log_update(log_id, log_label, 'running')
+    write_log_entry(
+        log_id,
+        fmt_id_msg("[publish] Батч {} — phase=run_mode, parsed_status={}, resume_from={}", batch_id, bool(parsed), resume_from),
+        level='silent',
+    )
 
     resume_from = None
     if parsed is not None:
@@ -306,6 +328,7 @@ def run(batch_id, log_id):
         write_log_entry(log_id, f"[publish] Заголовок публикации (из БД): {pub_title}", level='silent')
 
     ensure_playwright_chromium(log_id)
+    write_log_entry(log_id, fmt_id_msg("[publish] Батч {} — phase=playwright_checked", batch_id), level='silent')
 
     any_ok = False
     failed_steps = []
@@ -319,6 +342,14 @@ def run(batch_id, log_id):
         posting_status = f"{slug}.{method}.posting"
         published_status = f"{slug}.{method}.published"
         failed_status = f"{slug}.{method}.failed"
+        write_log_entry(
+            log_id,
+            fmt_id_msg(
+                "[publish] Батч {} — phase=step_prepare, index={}, step={}.{}, expected_from={}, posting_status={}",
+                batch_id, step_idx + 1, slug, method, expected_from, posting_status,
+            ),
+            level='silent',
+        )
 
         if not db_claim_batch_status(batch_id, expected_from, posting_status):
             write_log_entry(log_id, 'Батч уже захвачен другим процессом — пропуск')
@@ -342,10 +373,12 @@ def run(batch_id, log_id):
             ok = False
             step_error = str(e)
             write_log_entry(log_id, f'{slug}.{method}: {e}', level='error')
+            write_log_entry(log_id, fmt_id_msg("[publish] Батч {} — phase=step_exception, step={}.{}, type={}, msg={}", batch_id, slug, method, type(e).__name__, step_error), level='silent')
         except Exception as e:
             ok = False
             step_error = str(e)
             write_log_entry(log_id, f'{slug}.{method}: неожиданная ошибка: {e}', level='error')
+            write_log_entry(log_id, fmt_id_msg("[publish] Батч {} — phase=step_exception, step={}.{}, type={}, msg={}", batch_id, slug, method, type(e).__name__, step_error), level='silent')
 
         if not ok:
             failed_steps.append(f"{slug}.{method}")
@@ -353,6 +386,7 @@ def run(batch_id, log_id):
             write_log_entry(log_id, fmt_id_msg("[publish] Батч {} ошибка {}.{}: {}", batch_id, slug, method, err_msg), level='silent')
             db_set_batch_status(batch_id, failed_status)
             expected_from = failed_status
+            write_log_entry(log_id, fmt_id_msg("[publish] Батч {} — phase=step_failed, step={}.{}, next_expected_from={}", batch_id, slug, method, expected_from), level='silent')
             continue
 
         any_ok = True
@@ -361,6 +395,7 @@ def run(batch_id, log_id):
         write_log_entry(log_id, f'Шаг {slug}.{method}: опубликовано')
         write_log_entry(log_id, fmt_id_msg("[publish] Батч {}: шаг {}.{} — завершено успешно", batch_id, slug, method), level='silent')
         expected_from = published_status
+        write_log_entry(log_id, fmt_id_msg("[publish] Батч {} — phase=step_success, step={}.{}, next_expected_from={}", batch_id, slug, method, expected_from), level='silent')
 
     if any_ok:
         if failed_steps:
@@ -376,6 +411,7 @@ def run(batch_id, log_id):
                 log_entries=err_entries,
                 partial=True,
             )
+            write_log_entry(log_id, fmt_id_msg("[publish] Батч {} — phase=run_done, status=published_partially", batch_id), level='silent')
         else:
             db_set_batch_status(batch_id, 'published')
             db_log_update(log_id, f'Опубликовано ({target_names})', 'ok')
@@ -389,9 +425,11 @@ def run(batch_id, log_id):
                     log_entries=warn_entries,
                     partial=True,
                 )
+            write_log_entry(log_id, fmt_id_msg("[publish] Батч {} — phase=run_done, status=published", batch_id), level='silent')
     else:
         abt_msg = f'Ошибка публикации батча в {target_names}'
         db_log_update(log_id, 'Ошибка публикации', 'error')
         write_log_entry(log_id, f'Ошибка публикации батча в {target_names}', level='error')
         write_log_entry(log_id, fmt_id_msg("[publish] Батч {} ошибка публикации", batch_id), level='silent')
+        write_log_entry(log_id, fmt_id_msg("[publish] Батч {} — phase=run_done, status=error", batch_id), level='silent')
         raise AppException(batch_id, 'publish', abt_msg, log_id)
