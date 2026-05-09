@@ -34,6 +34,10 @@ function createBrowserWidget(slug) {
 
   var STATE = { IDLE: 'idle', STARTING: 'starting', OPEN: 'open', STOPPING: 'stopping' };
   var state = STATE.IDLE;
+  var MOVE_THROTTLE_MS = 60;
+  var _lastMoveSentAt = 0;
+  var _pendingMove = null;
+  var _moveTimer = null;
 
   var API = '/api/' + slug + '-browser/';
 
@@ -66,6 +70,20 @@ function createBrowserWidget(slug) {
     };
   }
 
+  function flushMouseMove() {
+    if (_moveTimer) {
+      clearTimeout(_moveTimer);
+      _moveTimer = null;
+    }
+    if (!active || !_pendingMove) {
+      _pendingMove = null;
+      return;
+    }
+    sendEvent({ type: 'move', x: _pendingMove.x, y: _pendingMove.y });
+    _pendingMove = null;
+    _lastMoveSentAt = Date.now();
+  }
+
   canvas.addEventListener('click', function (e) {
     if (!active) return;
     var c = canvasCoords(e);
@@ -76,8 +94,14 @@ function createBrowserWidget(slug) {
 
   canvas.addEventListener('mousemove', function (e) {
     if (!active) return;
-    var c = canvasCoords(e);
-    sendEvent({ type: 'move', x: c.x, y: c.y });
+    _pendingMove = canvasCoords(e);
+    var now = Date.now();
+    var wait = MOVE_THROTTLE_MS - (now - _lastMoveSentAt);
+    if (wait <= 0) {
+      flushMouseMove();
+    } else if (!_moveTimer) {
+      _moveTimer = setTimeout(flushMouseMove, wait);
+    }
   });
 
   canvas.addEventListener('wheel', function (e) {
@@ -155,6 +179,11 @@ function createBrowserWidget(slug) {
   function handleStopped() {
     active = false;
     firstFrame = false;
+    if (_moveTimer) {
+      clearTimeout(_moveTimer);
+      _moveTimer = null;
+    }
+    _pendingMove = null;
     if (sse) { sse.close(); sse = null; }
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     overlay.style.display = 'none';
