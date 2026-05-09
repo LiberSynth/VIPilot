@@ -276,11 +276,6 @@ def run(batch_id, log_id):
         log_label = f'Публикация ({target_names}).'
 
     db_log_update(log_id, log_label, 'running')
-    write_log_entry(
-        log_id,
-        fmt_id_msg("[publish] Батч {} — phase=run_mode, parsed_status={}, resume_from={}", batch_id, bool(parsed), resume_from),
-        level='silent',
-    )
 
     resume_from = None
     if parsed is not None:
@@ -321,6 +316,17 @@ def run(batch_id, log_id):
                 write_log_entry(log_id, 'Опубликовано (возобновление — все шаги завершены)')
                 write_log_entry(log_id, fmt_id_msg("[publish] Батч {} опубликован (возобновление)", batch_id), level='silent')
                 return
+
+    write_log_entry(
+        log_id,
+        fmt_id_msg(
+            "[publish] Батч {} — phase=run_mode, parsed_status={}, resume_from={}",
+            batch_id,
+            bool(parsed),
+            resume_from,
+        ),
+        level='silent',
+    )
 
     pub_title = batch.get('title') or ''
     if pub_title:
