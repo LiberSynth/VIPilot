@@ -4,13 +4,15 @@ upgrade.py — пост-апгрейд обработка.
 Единственная точка, где проверяется и устанавливается серверное окружение.
 Вызывается из main.py при каждом старте приложения.
 
-На деве (REPLIT_DEPLOYMENT != "1") возвращает управление немедленно.
-На проде сравнивает build_number из таблицы environment с BUILD из _build.py.
-При обнаружении обновления запускает проверку всего серверного окружения
-и бросает исключение если хотя бы одна проверка не прошла.
-env_set(build_number) вызывается только после успешного завершения всех проверок.
+При совпадении build_number с BUILD выполнения нет (ранний выход).
+При смене BUILD — полный цикл: проверки окружения, миграции и т.д.
+На деве Windows pg_repack может быть пропущен (см. _check_pg_repack), если нет MSVC для сборки.
+На проде (REPLIT_DEPLOYMENT == "1") проверки строгие; сбой любой проверки — исключение.
+env_set(build_number) вызывается только после успешного завершения всех шагов.
 """
+import os
 import pathlib
+import platform
 import shutil
 import subprocess
 
@@ -137,10 +139,28 @@ def _check_pg_repack() -> tuple[bool, str]:
     `_check_chromium`, который сам устанавливает Chromium). Возвращает False
     только если: автоустановка CLI не удалась; CREATE EXTENSION упал; версии CLI и extension
     не совпадают.
+
+    На деве Windows без MSVC сборка через pgxn невозможна — если CLI так и не появился,
+    проверка смягчается (warn в лог), чтобы приложение стартовало. На проде (`REPLIT_DEPLOYMENT`)
+    и при `VIPILOT_REQUIRE_PG_REPACK=1` смягчение выключено.
     """
     from utils.pkg_bootstrap import ensure_pg_repack_in_path
 
     if not ensure_pg_repack_in_path(auto_install=True):
+        prod = os.environ.get('REPLIT_DEPLOYMENT') == '1'
+        force = os.environ.get('VIPILOT_REQUIRE_PG_REPACK') == '1'
+        if platform.system() == 'Windows' and not prod and not force:
+            write_log_entry(
+                None,
+                '[upgrade] pg_repack: на деве Windows CLI недоступен после автоустановки '
+                '(обычно нет MSVC «Desktop development with C++» / vcvars64.bat). '
+                'Кнопка онлайн-сжатия БД работать не будет. '
+                'Установите Build Tools или задайте VIPILOT_REQUIRE_PG_REPACK=1 для строгой проверки.',
+                level='warn',
+            )
+            return True, (
+                'pg_repack: пропуск на деве Windows — нет CLI (нужен MSVC для сборки через pgxn)'
+            )
         return False, 'pg_repack: CLI не найден и автоустановка не удалась'
     cli_path = shutil.which('pg_repack')
     if not cli_path:
