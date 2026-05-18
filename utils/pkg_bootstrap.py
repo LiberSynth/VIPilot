@@ -217,12 +217,35 @@ def _install_pg_repack_macos() -> bool:
     return shutil.which("pg_repack") is not None
 
 
+def _windows_powershell_exe() -> str | None:
+    """Полный путь к powershell.exe — в службах PATH часто без System32."""
+    sysroot = pathlib.Path(os.environ.get("SystemRoot", r"C:\Windows"))
+    bundled = (
+        sysroot
+        / "System32"
+        / "WindowsPowerShell"
+        / "v1.0"
+        / "powershell.exe"
+    )
+    if bundled.is_file():
+        return str(bundled)
+    for name in ("powershell.exe", "pwsh.exe"):
+        w = shutil.which(name)
+        if w:
+            return w
+    return None
+
+
 def _windows_elevated_run_argv(argv: list[str], timeout: int) -> tuple[int, str]:
     """Один запуск с UAC (подтвердить окно), ожидание завершения. Только Windows."""
     import tempfile
 
     if len(argv) < 1:
         return -1, "empty argv"
+    ps_exe = _windows_powershell_exe()
+    if not ps_exe:
+        return -1, "powershell.exe не найден (ожидался в System32 или PATH)"
+
     pyexe = argv[0]
     rest = argv[1:]
 
@@ -245,7 +268,7 @@ def _windows_elevated_run_argv(argv: list[str], timeout: int) -> tuple[int, str]
     try:
         r = subprocess.run(
             [
-                "powershell",
+                ps_exe,
                 "-NoProfile",
                 "-ExecutionPolicy",
                 "Bypass",
@@ -257,6 +280,8 @@ def _windows_elevated_run_argv(argv: list[str], timeout: int) -> tuple[int, str]
         )
         combined = (r.stderr.decode(errors="replace") + "\n" + r.stdout.decode(errors="replace")).strip()
         return r.returncode, combined or f"код {r.returncode}"
+    except OSError as e:
+        return -1, f"{type(e).__name__}: {e}"
     finally:
         try:
             pathlib.Path(ps1).unlink(missing_ok=True)
@@ -353,7 +378,13 @@ def ensure_pg_repack_in_path(auto_install: bool = False) -> bool:
 
     sys.stdout.write("[bootstrap] pg_repack не найден — запускаю автоустановку.\n")
     sys.stdout.flush()
-    if not _auto_install_pg_repack():
+    try:
+        ok = _auto_install_pg_repack()
+    except Exception as e:
+        sys.stdout.write(f"[bootstrap] pg_repack: исключение при автоустановке: {e}\n")
+        sys.stdout.flush()
+        ok = False
+    if not ok:
         return False
 
     if platform.system() == "Windows":
