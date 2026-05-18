@@ -424,6 +424,17 @@ def _public_tables() -> list[tuple[str, str]]:
             return [(r[0], r[1]) for r in cur.fetchall()]
 
 
+def _flush_bootstrap_events_to_log() -> None:
+    from utils.pkg_bootstrap import drain_bootstrap_events
+
+    for level, message in drain_bootstrap_events():
+        try:
+            write_log_entry(None, message, level=level)
+        except Exception:
+            # Bootstrap-события вспомогательные: не ломаем основную операцию обслуживания БД.
+            continue
+
+
 def _db_vacuum_full_fallback(tables: list[tuple[str, str]]) -> dict:
     """Fallback для Windows: обычный VACUUM FULL (с блокировкой таблиц)."""
     from psycopg2 import sql
@@ -491,8 +502,12 @@ def db_vacuum_full() -> dict:
     from utils.pkg_bootstrap import ensure_pg_repack_in_path, get_pg_repack_bootstrap_error
 
     tables = _public_tables()
+    write_log_entry(None, "[DB] Дефрагментация: pre-setup pg_repack (auto_install=1)", level='silent')
     ensure_pg_repack_in_path(auto_install=True)
+    _flush_bootstrap_events_to_log()
     cli = shutil.which('pg_repack')
+    if cli:
+        write_log_entry(None, f"[DB] Дефрагментация: pg_repack доступен: {cli}", level='silent')
     if not cli:
         bootstrap_error = get_pg_repack_bootstrap_error()
         if platform.system() == "Windows":

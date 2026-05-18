@@ -4,7 +4,7 @@ import pathlib
 import platform
 import threading
 
-from utils.pkg_bootstrap import ensure_all_packages
+from utils.pkg_bootstrap import ensure_all_packages, drain_bootstrap_events
 ensure_all_packages()
 
 if pathlib.Path(".env").exists():
@@ -33,6 +33,15 @@ import db.upgrade as _db_upgrade
 
 flask_app = create_app()
 register_middleware(flask_app)
+
+
+def _flush_bootstrap_events_to_log():
+    for level, message in drain_bootstrap_events():
+        try:
+            write_log_entry(None, message, level=level)
+        except Exception:
+            # Лог bootstrap вспомогательный: не останавливаем запуск приложения.
+            continue
 
 
 def main_loop():
@@ -86,6 +95,8 @@ def start_main_loop():
         _db_upgrade.check_upgrade() if hasattr(_db_upgrade, 'check_upgrade') else _db_upgrade.runcheck_upgrade()
         init_app(flask_app)
         environment.init_from_db()
+        environment.refresh_environment()
+        _flush_bootstrap_events_to_log()
         db_interrupt_stale_logs()
         write_log_entry(None, "[main] Приложение запущено", level='info')
         atexit.register(_on_exit)
