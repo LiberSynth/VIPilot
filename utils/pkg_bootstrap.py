@@ -155,8 +155,7 @@ def _run_cmd(args: list[str], timeout: int) -> tuple[bool, str]:
         return False, f"{type(e).__name__}: {e}"
 
 
-    import os
-
+def _detect_pg_major_from_database_url() -> int | None:
     dsn = os.environ.get("DATABASE_URL")
     if not dsn:
         return None
@@ -173,6 +172,101 @@ def _run_cmd(args: list[str], timeout: int) -> tuple[bool, str]:
         return ver_num // 10000
     except Exception:
         return None
+
+
+def _resolved_python_exe() -> str:
+    """Реальный python.exe (не shim py.exe), нужен для UAC и pgxn-install."""
+    base = getattr(sys, "_base_executable", "") or ""
+    cand = pathlib.Path(base) if base else pathlib.Path(sys.executable)
+    try:
+        if cand.exists():
+            return str(cand.resolve(strict=False))
+    except OSError:
+        pass
+    return str(pathlib.Path(sys.executable).resolve(strict=False))
+
+
+def _windows_vcvars64_bat() -> pathlib.Path | None:
+    """Путь к vcvars64.bat если установлен VS / Build Tools (для сборки pgxn на Windows)."""
+    pf86 = pathlib.Path(os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)"))
+    vswhere = pf86 / "Microsoft Visual Studio" / "Installer" / "vswhere.exe"
+    if not vswhere.is_file():
+        return None
+    try:
+        r = subprocess.run(
+            [
+                str(vswhere),
+                "-latest",
+                "-products",
+                "*",
+                "-property",
+                "installationPath",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=25,
+        )
+        if r.returncode != 0:
+            return None
+        root = (r.stdout or "").strip().strip("\r\n")
+        if not root:
+            return None
+        vcvars = pathlib.Path(root) / "VC" / "Auxiliary" / "Build" / "vcvars64.bat"
+        return vcvars if vcvars.is_file() else None
+    except Exception:
+        return None
+
+
+def _windows_elevated_run_cmd_inner(inner_cmd: str, timeout: int) -> tuple[int, str]:
+    """Поднимает права и выполняет одну строку cmd.exe /c ..."""
+    import tempfile
+
+    sysroot = pathlib.Path(os.environ.get("SystemRoot", r"C:\Windows"))
+    cmd_exe = sysroot / "System32" / "cmd.exe"
+    if not cmd_exe.is_file():
+        return -1, "cmd.exe не найден"
+
+    ps_exe = _windows_powershell_exe()
+    if not ps_exe:
+        return -1, "powershell.exe не найден"
+
+    def _ps_sq(s: str) -> str:
+        return "'" + s.replace("'", "''") + "'"
+
+    script = (
+        f"$p = Start-Process -FilePath {_ps_sq(str(cmd_exe))} "
+        f"-ArgumentList @('/c', {_ps_sq(inner_cmd)}) "
+        f"-Verb RunAs -PassThru -Wait\n"
+        "if ($null -eq $p) { exit 1 }\n"
+        "exit $p.ExitCode\n"
+    )
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".ps1", delete=False, encoding="utf-8", newline="\n"
+    ) as tf:
+        tf.write(script)
+        ps1 = tf.name
+    try:
+        r = subprocess.run(
+            [
+                ps_exe,
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                ps1,
+            ],
+            capture_output=True,
+            timeout=timeout + 120,
+        )
+        combined = (r.stderr.decode(errors="replace") + "\n" + r.stdout.decode(errors="replace")).strip()
+        return r.returncode, combined or f"код {r.returncode}"
+    except OSError as e:
+        return -1, f"{type(e).__name__}: {e}"
+    finally:
+        try:
+            pathlib.Path(ps1).unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 def _install_pg_repack_linux() -> bool:
@@ -292,8 +386,8 @@ def _windows_elevated_run_argv(argv: list[str], timeout: int) -> tuple[int, str]
 def _install_pg_repack_windows() -> bool:
     """Ставит pg_repack через pgxn-install (исходники + установка в дерево PostgreSQL).
 
-    В Program Files без прав обычного пользователя запускаем тот же установщик
-    повторно с UAC — одно окно подтверждения.
+    На Windows сборке нужны права на запись в каталог PostgreSQL и toolchain MSVC.
+    Порядок: обычный запуск → UAC → UAC с вызовом vcvars64.bat (Visual Studio Build Tools).
     """
     if _find_pg_repack_windows():
         return True
@@ -305,8 +399,10 @@ def _install_pg_repack_windows() -> bool:
         return False
     _prepend_to_path(pg_config.parent)
 
+    py_exe = _resolved_python_exe()
+
     if _find_pgxn_install_script() is None:
-        ok, err = _run_cmd([sys.executable, "-m", "pip", "install", "pgxnclient"], timeout=240)
+        ok, err = _run_cmd([py_exe, "-m", "pip", "install", "pgxnclient"], timeout=240)
         if not ok:
             sys.stdout.write(f"[bootstrap] Не удалось установить pgxnclient: {err}\n")
             sys.stdout.flush()
@@ -321,7 +417,7 @@ def _install_pg_repack_windows() -> bool:
         return False
 
     install_argv = [
-        sys.executable,
+        py_exe,
         str(pgxn_install),
         "--yes",
         "pg_repack",
@@ -329,24 +425,53 @@ def _install_pg_repack_windows() -> bool:
         str(pg_config),
     ]
 
-    sys.stdout.write(f"[bootstrap] Устанавливаю pg_repack: {pgxn_install}\n")
+    def _cmd_quote_batch(s: str) -> str:
+        return '"' + s.replace('"', '""') + '"'
+
+    sys.stdout.write(f"[bootstrap] Устанавливаю pg_repack (python={py_exe}): {pgxn_install}\n")
     sys.stdout.flush()
-    ok, err = _run_cmd(install_argv, timeout=1200)
-    if ok:
-        return _find_pg_repack_windows()
+    ok, err = _run_cmd(install_argv, timeout=2400)
+    if ok and _find_pg_repack_windows():
+        return True
 
     sys.stdout.write(f"[bootstrap] pg_repack: обычная установка не удалась: {err}\n")
     sys.stdout.write("[bootstrap] Запрос прав администратора (UAC) для записи в каталог PostgreSQL...\n")
     sys.stdout.flush()
 
-    code, out = _windows_elevated_run_argv(install_argv, timeout=1200)
+    code, out = _windows_elevated_run_argv(install_argv, timeout=2400)
     if code != 0:
         sys.stdout.write(f"[bootstrap] pg_repack: установка с повышением: код {code}\n{out}\n")
         sys.stdout.flush()
-        return _find_pg_repack_windows()
+    else:
+        sys.stdout.write("[bootstrap] pg_repack: установка с повышением завершилась (код 0).\n")
+        sys.stdout.flush()
 
-    sys.stdout.write("[bootstrap] pg_repack: установка с повышением завершена.\n")
+    if _find_pg_repack_windows():
+        return True
+
+    vcvars = _windows_vcvars64_bat()
+    if not vcvars:
+        sys.stdout.write(
+            "[bootstrap] pg_repack: vcvars64.bat не найден — для сборки нужны "
+            "\"Desktop development with C++\" / MSVC Build Tools.\n"
+        )
+        sys.stdout.flush()
+        return False
+
+    inner = (
+        f'call {_cmd_quote_batch(str(vcvars))} && '
+        f'{_cmd_quote_batch(py_exe)} {_cmd_quote_batch(str(pgxn_install))} '
+        f'--yes pg_repack --pg_config {_cmd_quote_batch(str(pg_config))}'
+    )
+    sys.stdout.write(
+        "[bootstrap] Повтор с MSVC (vcvars64.bat) под UAC — может занять несколько минут...\n"
+    )
     sys.stdout.flush()
+    code2, out2 = _windows_elevated_run_cmd_inner(inner, timeout=7200)
+    if code2 != 0:
+        sys.stdout.write(f"[bootstrap] pg_repack: MSVC+UAC код {code2}\n{out2}\n")
+        sys.stdout.flush()
+
     return _find_pg_repack_windows()
 
 
