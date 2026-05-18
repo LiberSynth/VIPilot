@@ -770,13 +770,16 @@ def api_reset_batch_pipeline(batch_id, pipeline):
 def api_workflow_restart():
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
-    write_log_entry(None, "[api] Перезапуск приложения вручную", level='silent')
+    from log.log import log_system_event
+    log_system_event("[api] Перезапуск приложения вручную", status="info")
 
     def _do_restart():
         import time as _time
         import sys as _sys
+        from log.log import log_app_stopped
 
         _time.sleep(0.8)
+        log_app_stopped()
         # Закрываем все унаследованные файловые дескрипторы (в т.ч. сокет Flask),
         # чтобы новый процесс мог занять порт 5000 без конфликтов.
         try:

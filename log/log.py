@@ -8,6 +8,7 @@ _ALLOWED_PIPELINES = {
     "video",
     "transcode",
     "publish",
+    "system",
 }
 
 _ALLOWED_LOG_LEVELS = {
@@ -17,6 +18,26 @@ _ALLOWED_LOG_LEVELS = {
     "error",
     "fatal_error",
 }
+
+_lifecycle_stop_logged = False
+
+
+def log_system_event(message: str, status: str = "ok"):
+    """Системное событие без батча — строка в log, видна в мониторе как «Система»."""
+    return write_log("system", message, status=status, batch_id=None)
+
+
+def log_app_started():
+    log_system_event("[main] Приложение запущено", status="ok")
+
+
+def log_app_stopped():
+    global _lifecycle_stop_logged
+    if _lifecycle_stop_logged:
+        return
+    _lifecycle_stop_logged = True
+    log_system_event("[main] Приложение остановлено", status="info")
+
 
 def write_log(pipeline, message, status="info", batch_id=None):
     """Записывает событие пайплайна в таблицу log. Возвращает log_id или None."""

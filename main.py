@@ -2,6 +2,7 @@ import atexit
 import os
 import pathlib
 import platform
+import signal
 import threading
 
 from utils.pkg_bootstrap import ensure_all_packages
@@ -21,7 +22,7 @@ from db import (
 )
 from common.exceptions import AppException
 from common.startup import init_app, create_app
-from log import write_log_entry
+from log import log_app_started, log_app_stopped, write_log_entry
 from pipelines import publish, cleanup
 import pipelines.planning as planning
 from pipelines.routing import get_pipeline
@@ -76,7 +77,23 @@ _main_loop_started = False
 
 
 def _on_exit():
-    write_log_entry(None, "[main] Приложение остановлено", level='info')
+    log_app_stopped()
+
+
+def _install_shutdown_hooks():
+    def _handler(signum, _frame):
+        log_app_stopped()
+
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        try:
+            signal.signal(sig, _handler)
+        except (ValueError, OSError):
+            pass
+    if hasattr(signal, "SIGBREAK"):
+        try:
+            signal.signal(signal.SIGBREAK, _handler)
+        except (ValueError, OSError):
+            pass
 
 
 def start_main_loop():
@@ -87,7 +104,8 @@ def start_main_loop():
         init_app(flask_app)
         environment.init_from_db()
         db_interrupt_stale_logs()
-        write_log_entry(None, "[main] Приложение запущено", level='info')
+        log_app_started()
+        _install_shutdown_hooks()
         atexit.register(_on_exit)
         t = threading.Thread(target=main_loop, daemon=True)
         t.start()

@@ -1,6 +1,7 @@
 (function() {
   const PIPELINE_LABELS = {
     root:        'Система',
+    system:      'Система',
     planning:    'Планирование',
     story:       'Сюжет',
     video:       'Видео',
@@ -282,21 +283,30 @@
     '</div>';
   }
 
+  function _sysgroupEventCount(items, orphList, orphanCount) {
+    const rowCount = (items ? items.length : 0) + (orphList ? orphList.length : 0);
+    if (rowCount > 0) return rowCount;
+    return orphanCount != null ? orphanCount : 0;
+  }
+
   function renderSysGroup(items, posKey, dateBefore, dateAfter, orphanCount, orphanMinAt, orphans) {
     const key      = posKey || '';
     const orphList = orphans || [];
-    const n        = (orphanCount != null) ? orphanCount : (items.length + orphList.length);
+    const n        = _sysgroupEventCount(items, orphList, orphanCount);
     const headTime = orphanMinAt || (items.length > 0 ? items[items.length - 1].created_at : null);
     const sub      = n > 0 ? ('Событий ' + n) : '…';
 
     const rows = items.map(function(e) {
       const st = e.status || 'info';
-      return '<div class="monitor-sysgroup-item monitor-sysgroup-log-item" data-lid="' + esc(e.id) + '" onclick="monitorToggleSysLog(event,this)">' +
+      const expandable = e.pipeline !== 'system';
+      const clickAttr  = expandable ? ' onclick="monitorToggleSysLog(event,this)"' : '';
+      const chevron    = expandable ? '<span class="monitor-syslog-chevron">\u25bc</span>' : '';
+      return '<div class="monitor-sysgroup-item monitor-sysgroup-log-item" data-lid="' + esc(e.id) + '"' + clickAttr + '>' +
         '<div class="monitor-sysgroup-log-row">' +
           '<span class="monitor-sysgroup-ts">'  + fmtMsk(e.created_at)                          + '</span>' +
           '<span class="monitor-sysgroup-pip">' + esc(PIPELINE_LABELS[e.pipeline] || e.pipeline) + '</span>' +
           '<span class="monitor-sysgroup-msg '  + esc(st) + '">' + esc(e.message || '')          + '</span>' +
-          '<span class="monitor-syslog-chevron">▼</span>' +
+          chevron +
         '</div>' +
       '</div>';
     }).join('') + _renderOrphanRows(orphList);
@@ -776,7 +786,7 @@
   }
 
   function _updateSgInPlace(sgEl, g) {
-    var n = (g._orphanCount != null) ? g._orphanCount : (g.items ? g.items.length : 0);
+    var n = _sysgroupEventCount(g.items || [], g._orphans || [], g._orphanCount);
     var headTime = g._orphanMinAt || (g.items && g.items.length > 0 ? g.items[g.items.length - 1].created_at : null);
     var titleEl = sgEl.querySelector('.monitor-sysgroup-title');
     var subEl   = sgEl.querySelector('.monitor-sysgroup-sub');
