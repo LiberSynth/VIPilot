@@ -560,17 +560,30 @@ def api_clear_history():
 def api_vacuum_db():
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
+    write_log_entry(None, "[api] Дефрагментация БД запущена вручную.", level='info')
     try:
         result = db_vacuum_full()
     except Exception as e:
+        write_log_entry(None, f"[api] Дефрагментация БД: ошибка — {e}", level='error')
         return jsonify({"ok": False, "error": str(e)}), 500
+    summary = (
+        f"mode={result.get('mode', 'pg_repack')}, "
+        f"tables_ok={result.get('tables_ok')}/{result.get('tables_total')}, "
+        f"freed_bytes={result.get('freed_bytes', 0)}"
+    )
     if result.get("tables_failed", 0) > 0:
         failed = [r["table"] for r in result.get("results", []) if not r.get("ok")]
+        write_log_entry(
+            None,
+            f"[api] Дефрагментация БД завершена с ошибками: {summary}",
+            level='warn',
+        )
         return jsonify({
             "ok": False,
             "error": f"Сбой по таблицам: {', '.join(failed)}",
             "result": result,
         })
+    write_log_entry(None, f"[api] Дефрагментация БД завершена ({summary}).", level='info')
     return jsonify({"ok": True, "result": result})
 
 

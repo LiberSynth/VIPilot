@@ -243,30 +243,77 @@ function openClearHistoryDialog() {
 }
 
 
+var VACUUM_DB_TIMEOUT_MS = 15 * 60 * 1000;
+
+function fetchWithTimeout(url, options, timeoutMs) {
+  var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  var timer;
+  var opts = options ? Object.assign({}, options) : {};
+  if (controller) {
+    opts.signal = controller.signal;
+    timer = setTimeout(function() { controller.abort(); }, timeoutMs);
+  }
+  return fetch(url, opts).finally(function() {
+    if (timer) clearTimeout(timer);
+  });
+}
+
+function formatVacuumSummary(res) {
+  var mb = ((res.freed_bytes || 0) / (1024 * 1024)).toFixed(1);
+  var base = 'таблиц: ' + (res.tables_ok || 0) + '/' + (res.tables_total || 0)
+           + ', освобождено: ' + mb + ' МБ';
+  if (res.mode === 'vacuum_full_fallback') {
+    return 'VACUUM FULL, ' + base;
+  }
+  if (res.mode === 'pg_repack') {
+    return 'pg_repack, ' + base;
+  }
+  return base;
+}
+
 function openVacuumDbDialog() {
   new ConfirmDialog({
     title: 'Сжать базу данных?',
     text:
-      'Запустит pg_repack по всем таблицам схемы public. Операция онлайн — приложение не блокируется, но может занять несколько минут и временно требует свободного места на диске. Не запускайте во время деплоя.',
+      'Сжатие всех таблиц схемы public. На Windows (VPS) — VACUUM FULL, таблицы кратковременно блокируются; '
+      + 'при наличии pg_repack — онлайн. Может занять несколько минут, нужно свободное место на диске. '
+      + 'Не закрывайте страницу до завершения. Не запускайте во время деплоя.',
     confirmLabel: 'Сжать',
     onConfirm: function(btn, dlg) {
       btn.disabled    = true;
       btn.textContent = 'Сжимаем…';
-      fetch('/api/vacuum_db', { method: 'POST' })
-        .then(function(r) { return r.json(); })
+      fetchWithTimeout('/api/vacuum_db', { method: 'POST' }, VACUUM_DB_TIMEOUT_MS)
+        .then(function(r) {
+          if (!r.ok) {
+            return r.text().then(function(body) {
+              throw new Error('HTTP ' + r.status + (body ? ': ' + body.slice(0, 120) : ''));
+            });
+          }
+          return r.json();
+        })
         .then(function(data) {
           dlg.close();
           var res  = data.result || {};
-          var mb   = ((res.freed_bytes || 0) / (1024 * 1024)).toFixed(1);
-          var base = 'таблиц: ' + (res.tables_ok || 0) + '/' + (res.tables_total || 0)
-                   + ', освобождено: ' + mb + ' МБ';
+          var base = formatVacuumSummary(res);
           if (data.ok) {
             showToast('БД сжата (' + base + ')', 'success');
           } else {
             showToast('Сжатие с ошибками: ' + (data.error || 'неизвестная ошибка') + ' (' + base + ')', 'error');
           }
         })
-        .catch(function() { dlg.close(); showToast('Ошибка соединения', 'error'); });
+        .catch(function(err) {
+          dlg.close();
+          if (err && err.name === 'AbortError') {
+            showToast(
+              'Ответ в браузере не дождались (таймаут). Сжатие на сервере может ещё идти — '
+              + 'проверьте лог: «Дефрагментация БД завершена».',
+              'warn'
+            );
+            return;
+          }
+          var msg = (err && err.message) ? err.message : 'неизвестная ошибка';
+          showToast('Ошибка запроса: ' + msg, 'error');
+        });
     },
   }).open();
 }
