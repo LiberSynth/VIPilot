@@ -3,6 +3,7 @@
 Вызывается из main.py до любых других импортов.
 """
 import importlib.util
+import os
 import pathlib
 import platform
 import shutil
@@ -60,9 +61,61 @@ def _prepend_to_path(path: pathlib.Path) -> None:
     os.environ["PATH"] = str(path) + os.pathsep + os.environ.get("PATH", "")
 
 
-def _find_pg_repack_windows() -> bool:
-    import os
+def _iter_windows_postgres_bin_dirs():
+    seen: set[str] = set()
+    search_roots = [
+        pathlib.Path(r"C:\Program Files\PostgreSQL"),
+        pathlib.Path(r"C:\Program Files (x86)\PostgreSQL"),
+        pathlib.Path(r"C:\PostgreSQL"),
+    ]
+    for root in search_roots:
+        if not root.exists():
+            continue
+        for candidate in sorted(root.iterdir(), reverse=True):
+            bin_dir = candidate / "bin"
+            if not bin_dir.exists():
+                continue
+            key = str(bin_dir).lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            yield bin_dir
 
+
+def _find_pg_config_windows() -> pathlib.Path | None:
+    configured = os.environ.get("PG_CONFIG", "").strip().strip('"')
+    if configured:
+        configured_path = pathlib.Path(configured)
+        if configured_path.exists():
+            return configured_path
+    for bin_dir in _iter_windows_postgres_bin_dirs():
+        exe = bin_dir / "pg_config.exe"
+        if exe.exists():
+            return exe
+    return None
+
+
+def _find_pgxn_install_script() -> pathlib.Path | None:
+    try:
+        from pgxnclient import find_script
+        script = find_script("pgxn-install")
+        if script:
+            p = pathlib.Path(script)
+            if p.exists():
+                return p
+    except Exception:
+        pass
+    try:
+        import pgxnclient
+        p = pathlib.Path(pgxnclient.__file__).resolve().parent / "libexec" / "pgxn-install"
+        if p.exists():
+            return p
+    except Exception:
+        pass
+    return None
+
+
+def _find_pg_repack_windows() -> bool:
     if shutil.which("pg_repack"):
         return True
 
@@ -77,21 +130,13 @@ def _find_pg_repack_windows() -> bool:
             sys.stdout.flush()
             return True
 
-    search_roots = [
-        pathlib.Path(r"C:\Program Files\PostgreSQL"),
-        pathlib.Path(r"C:\Program Files (x86)\PostgreSQL"),
-        pathlib.Path(r"C:\PostgreSQL"),
-    ]
-    for root in search_roots:
-        if not root.exists():
-            continue
-        for candidate in sorted(root.iterdir(), reverse=True):
-            exe = candidate / "bin" / "pg_repack.exe"
-            if exe.exists():
-                _prepend_to_path(exe.parent)
-                sys.stdout.write(f"[bootstrap] pg_repack найден: {exe}\n")
-                sys.stdout.flush()
-                return True
+    for bin_dir in _iter_windows_postgres_bin_dirs():
+        exe = bin_dir / "pg_repack.exe"
+        if exe.exists():
+            _prepend_to_path(exe.parent)
+            sys.stdout.write(f"[bootstrap] pg_repack найден: {exe}\n")
+            sys.stdout.flush()
+            return True
     return False
 
 
@@ -174,27 +219,62 @@ def _install_pg_repack_macos() -> bool:
 
 
 def _install_pg_repack_windows() -> bool:
-    # Официальных поддерживаемых бинарников под Windows нет.
-    # Пытаемся best-effort через pgxnclient (если в системе есть сборочные инструменты).
+    # На Windows бинарный entrypoint pgxn.exe в pgxnclient ломается (execv no such file),
+    # поэтому запускаем внутренний скрипт pgxn-install напрямую через Python.
     if _find_pg_repack_windows():
         return True
 
-    if shutil.which("pgxn") is None:
+    if _find_pg_config_windows() is None:
+        sys.stdout.write("[bootstrap] pg_repack: pg_config.exe не найден в установке PostgreSQL.\n")
+        sys.stdout.flush()
+        return False
+    pg_config = _find_pg_config_windows()
+    if not pg_config:
+        return False
+    _prepend_to_path(pg_config.parent)
+
+    lib_dir = pg_config.parent.parent / "lib"
+    probe = lib_dir / "__pg_repack_write_test__.tmp"
+    try:
+        with open(probe, "w", encoding="ascii") as f:
+            f.write("ok")
+    except Exception:
+        sys.stdout.write(
+            f"[bootstrap] pg_repack: нет прав на запись в {lib_dir} (запустите терминал от администратора).\n"
+        )
+        sys.stdout.flush()
+        return False
+    finally:
+        probe.unlink(missing_ok=True)
+
+    if _find_pgxn_install_script() is None:
         ok, err = _run_cmd([sys.executable, "-m", "pip", "install", "pgxnclient"], timeout=240)
         if not ok:
             sys.stdout.write(f"[bootstrap] Не удалось установить pgxnclient: {err}\n")
             sys.stdout.flush()
             return False
 
-    pgxn = shutil.which("pgxn")
-    if not pgxn:
+    pgxn_install = _find_pgxn_install_script()
+    if not pgxn_install:
+        sys.stdout.write("[bootstrap] pg_repack: скрипт pgxn-install не найден после установки pgxnclient.\n")
+        sys.stdout.flush()
         return False
 
-    sys.stdout.write("[bootstrap] Пытаюсь установить pg_repack через pgxn...\n")
+    sys.stdout.write(f"[bootstrap] Пытаюсь установить pg_repack через {pgxn_install}...\n")
     sys.stdout.flush()
-    ok, err = _run_cmd([pgxn, "install", "pg_repack"], timeout=1200)
+    ok, err = _run_cmd(
+        [
+            sys.executable,
+            str(pgxn_install),
+            "--yes",
+            "pg_repack",
+            "--pg_config",
+            str(pg_config),
+        ],
+        timeout=1200,
+    )
     if not ok:
-        sys.stdout.write(f"[bootstrap] pgxn install pg_repack: {err}\n")
+        sys.stdout.write(f"[bootstrap] pgxn-install pg_repack: {err}\n")
         sys.stdout.flush()
     return _find_pg_repack_windows()
 
