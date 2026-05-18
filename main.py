@@ -36,7 +36,10 @@ register_middleware(flask_app)
 
 
 def _flush_bootstrap_events_to_log():
-    for level, message in drain_bootstrap_events():
+    events = drain_bootstrap_events()
+    write_log_entry(None, "[main] Стартовый setup окружения завершён.", level='info')
+    write_log_entry(None, f"[main] startup_setup: events={len(events)}", level='silent')
+    for level, message in events:
         try:
             write_log_entry(None, message, level=level)
         except Exception:
@@ -86,6 +89,7 @@ _main_loop_started = False
 
 def _on_exit():
     write_log_entry(None, "[main] Приложение остановлено", level='info')
+    write_log_entry(None, f"[main] shutdown: pid={os.getpid()}", level='silent')
 
 
 def start_main_loop():
@@ -99,6 +103,11 @@ def start_main_loop():
         _flush_bootstrap_events_to_log()
         db_interrupt_stale_logs()
         write_log_entry(None, "[main] Приложение запущено", level='info')
+        write_log_entry(
+            None,
+            f"[main] startup: pid={os.getpid()}, platform={platform.system()}, loop_interval={environment.loop_interval}, max_threads={environment.max_threads}",
+            level='silent',
+        )
         atexit.register(_on_exit)
         t = threading.Thread(target=main_loop, daemon=True)
         t.start()
