@@ -560,33 +560,17 @@ def api_clear_history():
 def api_vacuum_db():
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
-    write_log_entry(None, "[api] Дефрагментация БД запущена вручную.", level='info')
-    write_log_entry(None, "[api] vacuum_db: source=webui, phase=start", level='silent')
     try:
         result = db_vacuum_full()
     except Exception as e:
-        write_log_entry(None, f"[api] Дефрагментация БД не выполнена: {e}", level='warn')
-        write_log_entry(None, f"[api] vacuum_db: phase=error, type={type(e).__name__}, detail={e}", level='silent')
         return jsonify({"ok": False, "error": str(e)}), 500
     if result.get("tables_failed", 0) > 0:
         failed = [r["table"] for r in result.get("results", []) if not r.get("ok")]
-        write_log_entry(None, "[api] Дефрагментация БД завершилась с ошибками.", level='warn')
-        write_log_entry(
-            None,
-            f"[api] vacuum_db: phase=done_with_failures, mode={result.get('mode')}, failed_tables={len(failed)}, total={result.get('tables_total', 0)}",
-            level='silent',
-        )
         return jsonify({
             "ok": False,
             "error": f"Сбой по таблицам: {', '.join(failed)}",
             "result": result,
         })
-    write_log_entry(None, "[api] Дефрагментация БД завершена.", level='info')
-    write_log_entry(
-        None,
-        f"[api] vacuum_db: phase=done_ok, mode={result.get('mode')}, tables_ok={result.get('tables_ok', 0)}/{result.get('tables_total', 0)}, freed_bytes={result.get('freed_bytes', 0)}",
-        level='silent',
-    )
     return jsonify({"ok": True, "result": result})
 
 
@@ -605,8 +589,7 @@ def api_workflow_start():
         return jsonify({"error": "unauthorized"}), 401
     env_set("workflow_state", "running")
     environment.set_running()
-    write_log_entry(None, "[api] Движок запущен вручную.", level='info')
-    write_log_entry(None, "[api] workflow_state: action=start, new_state=running, source=webui", level='silent')
+    write_log_entry(None, "[api] Движок запущен вручную", level='silent')
     return jsonify({"ok": True, "state": "running"})
 
 
@@ -616,8 +599,7 @@ def api_workflow_pause():
         return jsonify({"error": "unauthorized"}), 401
     env_set("workflow_state", "pause")
     environment.set_paused()
-    write_log_entry(None, "[api] Движок приостановлен вручную.", level='info')
-    write_log_entry(None, "[api] workflow_state: action=pause, new_state=pause, source=webui", level='silent')
+    write_log_entry(None, "[api] Движок приостановлен вручную", level='silent')
     return jsonify({"ok": True, "state": "pause"})
 
 
@@ -629,8 +611,7 @@ def api_workflow_deep_debugging():
     val = "1" if body.get("enabled") == "1" else "0"
     env_set("deep_debugging", val)
     label = "включена" if val == "1" else "выключена"
-    write_log_entry(None, f"[api] Глубокая отладка {label}.", level='info')
-    write_log_entry(None, f"[api] deep_debugging: action=set, value={val}, source=webui", level='silent')
+    write_log_entry(None, f"[api] Глубокая отладка {label}", level='silent')
     return jsonify({"ok": True, "deep_debugging": val})
 
 
@@ -642,8 +623,7 @@ def api_workflow_use_donor():
     val = "1" if body.get("enabled") == "1" else "0"
     env_set("use_donor", val)
     label = "включен" if val == "1" else "выключен"
-    write_log_entry(None, f"[api] Подбор видео из пула {label}.", level='info')
-    write_log_entry(None, f"[api] use_donor: action=set, value={val}, source=webui", level='silent')
+    write_log_entry(None, f"[api] Подбирать видео из пула: {label}", level='silent')
     return jsonify({"ok": True, "use_donor": val})
 
 
@@ -664,17 +644,10 @@ def api_workflow_approve_movies():
     body = request.get_json(silent=True) or {}
     val = "1" if body.get("enabled") == "1" else "0"
     cycle_config_set("approve_movies", val == "1")
-    donor_forced = False
     if val == "1":
         env_set("use_donor", "1")
-        donor_forced = True
     label = "включено" if val == "1" else "выключено"
-    write_log_entry(None, f"[api] Утверждение видео {label}.", level='info')
-    write_log_entry(
-        None,
-        f"[api] approve_movies: action=set, value={val}, source=webui, donor_forced={donor_forced}",
-        level='silent',
-    )
+    write_log_entry(None, f"[api] Утверждать видео: {label}", level='silent')
     return jsonify({"ok": True, "approve_movies": val})
 
 
@@ -716,8 +689,7 @@ def api_workflow_emulation():
     val = "1" if body.get("enabled") == "1" else "0"
     env_set("emulation_mode", val)
     label = "включена" if val == "1" else "выключена"
-    write_log_entry(None, f"[api] Эмуляция {label}.", level='info')
-    write_log_entry(None, f"[api] emulation_mode: action=set, value={val}, source=webui", level='silent')
+    write_log_entry(None, f"[api] Эмуляция {label}", level='silent')
     return jsonify({"ok": True, "emulation_mode": val})
 
 
@@ -785,8 +757,7 @@ def api_reset_batch_pipeline(batch_id, pipeline):
 def api_workflow_restart():
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
-    write_log_entry(None, "[api] Перезапуск приложения запрошен вручную.", level='info')
-    write_log_entry(None, "[api] workflow_restart: requested_by=webui, delay_sec=0.8", level='silent')
+    write_log_entry(None, "[api] Перезапуск приложения вручную", level='silent')
 
     def _do_restart():
         import time as _time
