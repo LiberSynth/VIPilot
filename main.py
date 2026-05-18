@@ -5,12 +5,48 @@ import platform
 import sys
 import threading
 
+_APP_ROOT = pathlib.Path(__file__).resolve().parent
+_ENV_FILE = _APP_ROOT / ".env"
+
+
+def _unquote_env_value(value: str) -> str:
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+        return value[1:-1]
+    return value
+
+
+def _load_env_file_early(env_path: pathlib.Path) -> None:
+    """Загружает .env через stdlib, чтобы bootstrap видел переменные и под NSSM."""
+    if not env_path.exists():
+        return
+    try:
+        for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip()
+            if key.startswith("export "):
+                key = key[7:].strip()
+            if not key:
+                continue
+            os.environ.setdefault(key, _unquote_env_value(value.strip()))
+    except Exception:
+        # Ошибка чтения .env не должна ломать запуск; fallback на окружение процесса.
+        return
+
+
+_load_env_file_early(_ENV_FILE)
+
 from utils.pkg_bootstrap import ensure_all_packages, drain_bootstrap_events
 ensure_all_packages()
 
-if pathlib.Path(".env").exists():
-    from dotenv import load_dotenv
-    load_dotenv()
+if _ENV_FILE.exists():
+    try:
+        from dotenv import load_dotenv
+        load_dotenv(dotenv_path=_ENV_FILE, override=False)
+    except Exception:
+        pass
 
 from utils.consts import PLAYWRIGHT_BROWSERS_PATH
 os.environ.setdefault('PLAYWRIGHT_BROWSERS_PATH', PLAYWRIGHT_BROWSERS_PATH)

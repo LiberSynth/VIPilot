@@ -3,6 +3,7 @@
 Вызывается из main.py до любых других импортов.
 """
 import importlib.util
+import os
 import pathlib
 import platform
 import shutil
@@ -42,10 +43,18 @@ def get_pg_repack_bootstrap_error() -> str:
 
 
 def _pip_install(package: str) -> None:
-    subprocess.run(
-        [sys.executable, "-m", "pip", "install", package],
-        check=True,
-    )
+    try:
+        subprocess.run(
+            [sys.executable, "-m", "pip", "install", package],
+            check=True,
+        )
+    except Exception:
+        # Для сервисного запуска (NSSM) часто не хватает прав в системный site-packages.
+        # Повторяем установку в user-site.
+        subprocess.run(
+            [sys.executable, "-m", "pip", "install", "--user", package],
+            check=True,
+        )
 
 
 def _install_ffmpeg_windows() -> None:
@@ -97,6 +106,43 @@ def _prepend_to_path(path: pathlib.Path) -> None:
 
 
 def _iter_windows_postgres_bin_dirs():
+    seen: set[str] = set()
+
+    def _yield_bin_dir(candidate: pathlib.Path):
+        try:
+            bin_dir = candidate if candidate.name.lower() == "bin" else candidate / "bin"
+            if not bin_dir.exists():
+                return
+            key = str(bin_dir).lower()
+            if key in seen:
+                return
+            seen.add(key)
+            yield bin_dir
+        except Exception:
+            return
+
+    # Подсказки из окружения (актуально для NSSM, где PATH часто отличается от интерактивного shell).
+    env_hints = [
+        os.environ.get("PG_BIN_DIR", ""),
+        os.environ.get("POSTGRES_BIN_DIR", ""),
+        os.environ.get("POSTGRESQL_BIN", ""),
+        os.environ.get("PG_HOME", ""),
+        os.environ.get("POSTGRES_HOME", ""),
+    ]
+    pg_config_hint = os.environ.get("PG_CONFIG", "").strip().strip('"')
+    if pg_config_hint:
+        pg_config_path = pathlib.Path(pg_config_hint)
+        if pg_config_path.exists():
+            env_hints.append(str(pg_config_path.parent))
+
+    for raw in env_hints:
+        for chunk in raw.split(os.pathsep):
+            hint = chunk.strip().strip('"')
+            if not hint:
+                continue
+            for bin_dir in _yield_bin_dir(pathlib.Path(hint)):
+                yield bin_dir
+
     search_roots = [
         pathlib.Path(r"C:\Program Files\PostgreSQL"),
         pathlib.Path(r"C:\Program Files (x86)\PostgreSQL"),
@@ -106,12 +152,16 @@ def _iter_windows_postgres_bin_dirs():
         if not root.exists():
             continue
         for candidate in sorted(root.iterdir(), reverse=True):
-            bin_dir = candidate / "bin"
-            if bin_dir.exists():
+            for bin_dir in _yield_bin_dir(candidate):
                 yield bin_dir
 
 
 def _find_pg_config_windows() -> pathlib.Path | None:
+    configured = os.environ.get("PG_CONFIG", "").strip().strip('"')
+    if configured:
+        configured_path = pathlib.Path(configured)
+        if configured_path.exists():
+            return configured_path
     for bin_dir in _iter_windows_postgres_bin_dirs():
         for name in ("pg_config.exe", "pg_config"):
             exe = bin_dir / name
@@ -121,6 +171,21 @@ def _find_pg_config_windows() -> pathlib.Path | None:
 
 
 def _find_pg_repack_windows() -> bool:
+    configured = os.environ.get("PG_REPACK_PATH", "").strip().strip('"')
+    if configured:
+        configured_path = pathlib.Path(configured)
+        if configured_path.is_file():
+            _prepend_to_path(configured_path.parent)
+            _emit_step("[bootstrap] pg_repack найден по PG_REPACK_PATH.", f"[bootstrap] pg_repack: path={configured_path}")
+            return True
+        if configured_path.is_dir():
+            for name in ("pg_repack.exe", "pg_repack"):
+                exe = configured_path / name
+                if exe.exists():
+                    _prepend_to_path(exe.parent)
+                    _emit_step("[bootstrap] pg_repack найден по PG_REPACK_PATH.", f"[bootstrap] pg_repack: path={exe}")
+                    return True
+
     if shutil.which("pg_repack"):
         _emit_step(
             "[bootstrap] pg_repack уже установлен.",
@@ -235,6 +300,9 @@ def _install_pg_repack_windows() -> bool:
             "[bootstrap] pg_repack: phase=install_pgxnclient",
         )
         ok, err = _run_cmd([sys.executable, "-m", "pip", "install", "pgxnclient"], timeout=240)
+        if not ok:
+            _emit_bootstrap("[bootstrap] pgxnclient: retry install --user", level="silent")
+            ok, err = _run_cmd([sys.executable, "-m", "pip", "install", "--user", "pgxnclient"], timeout=240)
         if not ok:
             _set_pg_repack_bootstrap_error(f"не удалось установить pgxnclient: {err}")
             _emit_bootstrap(f"[bootstrap] Не удалось установить pgxnclient: {err}", level="warn")
