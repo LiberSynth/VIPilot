@@ -155,7 +155,6 @@ def _run_cmd(args: list[str], timeout: int) -> tuple[bool, str]:
         return False, f"{type(e).__name__}: {e}"
 
 
-def _detect_pg_major_from_database_url() -> int | None:
     import os
 
     dsn = os.environ.get("DATABASE_URL")
@@ -218,34 +217,68 @@ def _install_pg_repack_macos() -> bool:
     return shutil.which("pg_repack") is not None
 
 
+def _windows_elevated_run_argv(argv: list[str], timeout: int) -> tuple[int, str]:
+    """Один запуск с UAC (подтвердить окно), ожидание завершения. Только Windows."""
+    import tempfile
+
+    if len(argv) < 1:
+        return -1, "empty argv"
+    pyexe = argv[0]
+    rest = argv[1:]
+
+    def _ps_sq(s: str) -> str:
+        return "'" + s.replace("'", "''") + "'"
+
+    arg_block = ",\n  ".join(_ps_sq(a) for a in rest)
+    script = (
+        f"$p = Start-Process -FilePath {_ps_sq(pyexe)} "
+        f"-ArgumentList @(\n  {arg_block}\n) "
+        f"-Verb RunAs -PassThru -Wait\n"
+        "if ($null -eq $p) { exit 1 }\n"
+        "exit $p.ExitCode\n"
+    )
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".ps1", delete=False, encoding="utf-8", newline="\n"
+    ) as tf:
+        tf.write(script)
+        ps1 = tf.name
+    try:
+        r = subprocess.run(
+            [
+                "powershell",
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                ps1,
+            ],
+            capture_output=True,
+            timeout=timeout + 60,
+        )
+        combined = (r.stderr.decode(errors="replace") + "\n" + r.stdout.decode(errors="replace")).strip()
+        return r.returncode, combined or f"код {r.returncode}"
+    finally:
+        try:
+            pathlib.Path(ps1).unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
 def _install_pg_repack_windows() -> bool:
-    # На Windows бинарный entrypoint pgxn.exe в pgxnclient ломается (execv no such file),
-    # поэтому запускаем внутренний скрипт pgxn-install напрямую через Python.
+    """Ставит pg_repack через pgxn-install (исходники + установка в дерево PostgreSQL).
+
+    В Program Files без прав обычного пользователя запускаем тот же установщик
+    повторно с UAC — одно окно подтверждения.
+    """
     if _find_pg_repack_windows():
         return True
 
-    if _find_pg_config_windows() is None:
+    pg_config = _find_pg_config_windows()
+    if not pg_config:
         sys.stdout.write("[bootstrap] pg_repack: pg_config.exe не найден в установке PostgreSQL.\n")
         sys.stdout.flush()
         return False
-    pg_config = _find_pg_config_windows()
-    if not pg_config:
-        return False
     _prepend_to_path(pg_config.parent)
-
-    lib_dir = pg_config.parent.parent / "lib"
-    probe = lib_dir / "__pg_repack_write_test__.tmp"
-    try:
-        with open(probe, "w", encoding="ascii") as f:
-            f.write("ok")
-    except Exception:
-        sys.stdout.write(
-            f"[bootstrap] pg_repack: нет прав на запись в {lib_dir} (запустите терминал от администратора).\n"
-        )
-        sys.stdout.flush()
-        return False
-    finally:
-        probe.unlink(missing_ok=True)
 
     if _find_pgxn_install_script() is None:
         ok, err = _run_cmd([sys.executable, "-m", "pip", "install", "pgxnclient"], timeout=240)
@@ -256,26 +289,39 @@ def _install_pg_repack_windows() -> bool:
 
     pgxn_install = _find_pgxn_install_script()
     if not pgxn_install:
-        sys.stdout.write("[bootstrap] pg_repack: скрипт pgxn-install не найден после установки pgxnclient.\n")
+        sys.stdout.write(
+            "[bootstrap] pg_repack: скрипт pgxn-install не найден после установки pgxnclient.\n"
+        )
         sys.stdout.flush()
         return False
 
-    sys.stdout.write(f"[bootstrap] Пытаюсь установить pg_repack через {pgxn_install}...\n")
+    install_argv = [
+        sys.executable,
+        str(pgxn_install),
+        "--yes",
+        "pg_repack",
+        "--pg_config",
+        str(pg_config),
+    ]
+
+    sys.stdout.write(f"[bootstrap] Устанавливаю pg_repack: {pgxn_install}\n")
     sys.stdout.flush()
-    ok, err = _run_cmd(
-        [
-            sys.executable,
-            str(pgxn_install),
-            "--yes",
-            "pg_repack",
-            "--pg_config",
-            str(pg_config),
-        ],
-        timeout=1200,
-    )
-    if not ok:
-        sys.stdout.write(f"[bootstrap] pgxn-install pg_repack: {err}\n")
+    ok, err = _run_cmd(install_argv, timeout=1200)
+    if ok:
+        return _find_pg_repack_windows()
+
+    sys.stdout.write(f"[bootstrap] pg_repack: обычная установка не удалась: {err}\n")
+    sys.stdout.write("[bootstrap] Запрос прав администратора (UAC) для записи в каталог PostgreSQL...\n")
+    sys.stdout.flush()
+
+    code, out = _windows_elevated_run_argv(install_argv, timeout=1200)
+    if code != 0:
+        sys.stdout.write(f"[bootstrap] pg_repack: установка с повышением: код {code}\n{out}\n")
         sys.stdout.flush()
+        return _find_pg_repack_windows()
+
+    sys.stdout.write("[bootstrap] pg_repack: установка с повышением завершена.\n")
+    sys.stdout.flush()
     return _find_pg_repack_windows()
 
 

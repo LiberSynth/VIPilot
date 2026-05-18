@@ -268,7 +268,7 @@ def check_upgrade():
 
     if stored == BUILD:
         return False
-    write_log_entry(None, f'[upgrade] Обновление: {stored or "первый запуск"} → {BUILD}', level='silent')
+    write_log_entry(None, f'[upgrade] Обновление: {stored or "первый запуск"} -> {BUILD}', level='silent')
     _run_env_checks()
 
     if not stored:
