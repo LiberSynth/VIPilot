@@ -135,22 +135,16 @@ def _check_pg_repack() -> tuple[bool, str]:
 
     Если extension не установлен — пытается создать его сам (по образцу
     `_check_chromium`, который сам устанавливает Chromium). Возвращает False
-    только если: нет CLI; CREATE EXTENSION упал; версии CLI и extension
+    только если: автоустановка CLI не удалась; CREATE EXTENSION упал; версии CLI и extension
     не совпадают.
     """
+    from utils.pkg_bootstrap import ensure_pg_repack_in_path
+
+    if not ensure_pg_repack_in_path(auto_install=True):
+        return False, 'pg_repack: CLI не найден и автоустановка не удалась'
     cli_path = shutil.which('pg_repack')
     if not cli_path:
-        write_log_entry(
-            None,
-            "[upgrade] ВНИМАНИЕ: pg_repack CLI не найден — онлайн-сжатие БД недоступно.\n"
-            "Установка:\n"
-            "  Windows: скачайте pg_repack с https://github.com/reorg/pg_repack/releases\n"
-            "           положите pg_repack.exe в папку bin PostgreSQL (например\n"
-            "           C:\\Program Files\\PostgreSQL\\<ver>\\bin\\) и перезапустите приложение.\n"
-            "  Linux:   sudo apt-get install postgresql-<ver>-repack",
-            level='warn',
-        )
-        return True, 'pg_repack: CLI не найден — онлайн-сжатие БД недоступно (см. консоль)'
+        return False, 'pg_repack: CLI не найден после автоустановки'
     try:
         r = subprocess.run(['pg_repack', '--version'], capture_output=True, timeout=5)
         out = (r.stdout.decode() + r.stderr.decode()).strip()
