@@ -9,6 +9,17 @@ import shutil
 import subprocess
 import sys
 
+_PG_REPACK_BOOTSTRAP_ERROR = ""
+
+
+def _set_pg_repack_bootstrap_error(msg: str | None) -> None:
+    global _PG_REPACK_BOOTSTRAP_ERROR
+    _PG_REPACK_BOOTSTRAP_ERROR = (msg or "").strip()
+
+
+def get_pg_repack_bootstrap_error() -> str:
+    return _PG_REPACK_BOOTSTRAP_ERROR
+
 
 def _pip_install(package: str) -> None:
     subprocess.run(
@@ -57,12 +68,39 @@ def _install_ffmpeg_windows() -> None:
 def _prepend_to_path(path: pathlib.Path) -> None:
     import os
 
-    os.environ["PATH"] = str(path) + os.pathsep + os.environ.get("PATH", "")
+    current = os.environ.get("PATH", "")
+    parts = current.split(os.pathsep) if current else []
+    path_str = str(path)
+    if path_str in parts:
+        return
+    os.environ["PATH"] = path_str + os.pathsep + current
+
+
+def _iter_windows_postgres_bin_dirs():
+    search_roots = [
+        pathlib.Path(r"C:\Program Files\PostgreSQL"),
+        pathlib.Path(r"C:\Program Files (x86)\PostgreSQL"),
+        pathlib.Path(r"C:\PostgreSQL"),
+    ]
+    for root in search_roots:
+        if not root.exists():
+            continue
+        for candidate in sorted(root.iterdir(), reverse=True):
+            bin_dir = candidate / "bin"
+            if bin_dir.exists():
+                yield bin_dir
+
+
+def _find_pg_config_windows() -> pathlib.Path | None:
+    for bin_dir in _iter_windows_postgres_bin_dirs():
+        for name in ("pg_config.exe", "pg_config"):
+            exe = bin_dir / name
+            if exe.exists():
+                return exe
+    return None
 
 
 def _find_pg_repack_windows() -> bool:
-    import os
-
     if shutil.which("pg_repack"):
         return True
 
@@ -77,16 +115,9 @@ def _find_pg_repack_windows() -> bool:
             sys.stdout.flush()
             return True
 
-    search_roots = [
-        pathlib.Path(r"C:\Program Files\PostgreSQL"),
-        pathlib.Path(r"C:\Program Files (x86)\PostgreSQL"),
-        pathlib.Path(r"C:\PostgreSQL"),
-    ]
-    for root in search_roots:
-        if not root.exists():
-            continue
-        for candidate in sorted(root.iterdir(), reverse=True):
-            exe = candidate / "bin" / "pg_repack.exe"
+    for bin_dir in _iter_windows_postgres_bin_dirs():
+        for name in ("pg_repack.exe", "pg_repack"):
+            exe = bin_dir / name
             if exe.exists():
                 _prepend_to_path(exe.parent)
                 sys.stdout.write(f"[bootstrap] pg_repack найден: {exe}\n")
@@ -176,27 +207,49 @@ def _install_pg_repack_macos() -> bool:
 def _install_pg_repack_windows() -> bool:
     # Официальных поддерживаемых бинарников под Windows нет.
     # Пытаемся best-effort через pgxnclient (если в системе есть сборочные инструменты).
+    _set_pg_repack_bootstrap_error("")
     if _find_pg_repack_windows():
         return True
 
-    if shutil.which("pgxn") is None:
+    if shutil.which("pgxnclient") is None:
         ok, err = _run_cmd([sys.executable, "-m", "pip", "install", "pgxnclient"], timeout=240)
         if not ok:
+            _set_pg_repack_bootstrap_error(f"не удалось установить pgxnclient: {err}")
             sys.stdout.write(f"[bootstrap] Не удалось установить pgxnclient: {err}\n")
             sys.stdout.flush()
             return False
 
-    pgxn = shutil.which("pgxn")
-    if not pgxn:
+    pgxnclient = shutil.which("pgxnclient")
+    if not pgxnclient:
+        _set_pg_repack_bootstrap_error("pgxnclient не найден после установки")
         return False
 
-    sys.stdout.write("[bootstrap] Пытаюсь установить pg_repack через pgxn...\n")
-    sys.stdout.flush()
-    ok, err = _run_cmd([pgxn, "install", "pg_repack"], timeout=1200)
-    if not ok:
-        sys.stdout.write(f"[bootstrap] pgxn install pg_repack: {err}\n")
+    pg_config = _find_pg_config_windows()
+    if pg_config:
+        _prepend_to_path(pg_config.parent)
+        sys.stdout.write(f"[bootstrap] Найден pg_config: {pg_config}\n")
         sys.stdout.flush()
-    return _find_pg_repack_windows()
+
+    sys.stdout.write("[bootstrap] Пытаюсь установить pg_repack через pgxnclient...\n")
+    sys.stdout.flush()
+    cmd = [pgxnclient, "install", "--yes", "pg_repack"]
+    if pg_config:
+        cmd += ["--pg_config", str(pg_config)]
+    else:
+        # pgxnclient на Windows ищет файл буквально, поэтому расширение .exe важно.
+        cmd += ["--pg_config", "pg_config.exe"]
+    ok, err = _run_cmd(cmd, timeout=1200)
+    if not ok:
+        _set_pg_repack_bootstrap_error(err)
+        sys.stdout.write(f"[bootstrap] pgxnclient install pg_repack: {err}\n")
+        sys.stdout.flush()
+    found = _find_pg_repack_windows()
+    if found:
+        _set_pg_repack_bootstrap_error("")
+        return True
+    if not get_pg_repack_bootstrap_error():
+        _set_pg_repack_bootstrap_error("pg_repack не найден после попытки установки")
+    return False
 
 
 def _auto_install_pg_repack() -> bool:
@@ -216,23 +269,31 @@ def ensure_pg_repack_in_path(auto_install: bool = False) -> bool:
     - Сначала ищет бинарник в PATH/стандартных путях.
     - При auto_install=True пытается установить автоматически (best-effort).
     """
+    _set_pg_repack_bootstrap_error("")
     if platform.system() == "Windows":
         found = _find_pg_repack_windows()
     else:
         found = shutil.which("pg_repack") is not None
     if found:
         return True
+    _set_pg_repack_bootstrap_error("pg_repack не найден в PATH")
     if not auto_install:
         return False
 
     sys.stdout.write("[bootstrap] pg_repack не найден — запускаю автоустановку.\n")
     sys.stdout.flush()
     if not _auto_install_pg_repack():
+        if not get_pg_repack_bootstrap_error():
+            _set_pg_repack_bootstrap_error("автоустановка pg_repack завершилась без результата")
         return False
 
     if platform.system() == "Windows":
-        return _find_pg_repack_windows()
-    return shutil.which("pg_repack") is not None
+        found = _find_pg_repack_windows()
+    else:
+        found = shutil.which("pg_repack") is not None
+    if not found and not get_pg_repack_bootstrap_error():
+        _set_pg_repack_bootstrap_error("pg_repack не найден после автоустановки")
+    return found
 
 
 def _ensure_ffmpeg() -> None:

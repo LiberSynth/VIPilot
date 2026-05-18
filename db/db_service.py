@@ -1,5 +1,6 @@
 import json
 import os
+import platform
 import shutil
 import subprocess
 from urllib.parse import urlparse, unquote, parse_qsl
@@ -411,25 +412,7 @@ def _parse_db_url() -> dict:
     }
 
 
-def db_vacuum_full() -> dict:
-    """Сжимает все таблицы схемы public через pg_repack (онлайн, без блокировки).
-
-    По каждой таблице запускает отдельный процесс `pg_repack -t schema.table`,
-    собирает размер до/после из `pg_total_relation_size`. Падение по одной
-    таблице не валит весь прогон. Возвращает сводку:
-    `{tables_total, tables_ok, tables_failed, freed_bytes, results: [...]}`.
-    """
-    from utils.pkg_bootstrap import ensure_pg_repack_in_path
-
-    ensure_pg_repack_in_path(auto_install=True)
-    cli = shutil.which('pg_repack')
-    if not cli:
-        raise RuntimeError(
-            'pg_repack CLI не найден в окружении '
-            '(автоустановка не удалась — см. stdout bootstrap).'
-        )
-    conn_params = _parse_db_url()
-
+def _public_tables() -> list[tuple[str, str]]:
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute("""
@@ -438,7 +421,91 @@ def db_vacuum_full() -> dict:
                 WHERE schemaname = 'public'
                 ORDER BY tablename
             """)
-            tables = [(r[0], r[1]) for r in cur.fetchall()]
+            return [(r[0], r[1]) for r in cur.fetchall()]
+
+
+def _db_vacuum_full_fallback(tables: list[tuple[str, str]]) -> dict:
+    """Fallback для Windows: обычный VACUUM FULL (с блокировкой таблиц)."""
+    from psycopg2 import sql
+    import psycopg2
+
+    dsn = os.environ.get('DATABASE_URL')
+    if not dsn:
+        raise RuntimeError('DATABASE_URL не задан')
+
+    conn = psycopg2.connect(dsn)
+    conn.autocommit = True  # VACUUM FULL нельзя запускать внутри транзакции.
+    results = []
+    freed_total = 0
+    ok_count = 0
+    failed_count = 0
+    try:
+        with conn.cursor() as cur:
+            for schema, table in tables:
+                full = f'{schema}.{table}'
+                size_before = _table_size(full)
+                try:
+                    cur.execute(
+                        sql.SQL("VACUUM (FULL, ANALYZE) {}.{}").format(
+                            sql.Identifier(schema),
+                            sql.Identifier(table),
+                        )
+                    )
+                except Exception as e:
+                    results.append({
+                        'table': full, 'ok': False,
+                        'freed_bytes': 0, 'error': f'{type(e).__name__}: {e}'[:500],
+                    })
+                    failed_count += 1
+                    continue
+
+                size_after = _table_size(full)
+                freed = max(0, (size_before or 0) - (size_after or 0))
+                freed_total += freed
+                ok_count += 1
+                results.append({
+                    'table': full, 'ok': True,
+                    'freed_bytes': freed, 'error': None,
+                })
+    finally:
+        conn.close()
+
+    return {
+        'mode': 'vacuum_full_fallback',
+        'tables_total': len(tables),
+        'tables_ok': ok_count,
+        'tables_failed': failed_count,
+        'freed_bytes': freed_total,
+        'results': results,
+    }
+
+
+def db_vacuum_full() -> dict:
+    """Сжимает все таблицы схемы public через pg_repack (онлайн, без блокировки).
+
+    По каждой таблице запускает отдельный процесс `pg_repack -t schema.table`,
+    собирает размер до/после из `pg_total_relation_size`. Падение по одной
+    таблице не валит весь прогон. Возвращает сводку:
+    `{tables_total, tables_ok, tables_failed, freed_bytes, results: [...]}`.
+    """
+    from utils.pkg_bootstrap import ensure_pg_repack_in_path, get_pg_repack_bootstrap_error
+
+    tables = _public_tables()
+    ensure_pg_repack_in_path(auto_install=True)
+    cli = shutil.which('pg_repack')
+    if not cli:
+        bootstrap_error = get_pg_repack_bootstrap_error()
+        if platform.system() == "Windows":
+            write_log_entry(
+                None,
+                '[DB] pg_repack не найден, выполняю fallback VACUUM FULL: '
+                + (bootstrap_error or 'причина неизвестна'),
+                level='warn',
+            )
+            return _db_vacuum_full_fallback(tables)
+        details = f": {bootstrap_error}" if bootstrap_error else ""
+        raise RuntimeError(f'pg_repack CLI не найден в окружении{details}')
+    conn_params = _parse_db_url()
 
     env = os.environ.copy()
     if conn_params['password']:
@@ -502,6 +569,7 @@ def db_vacuum_full() -> dict:
         })
 
     summary = {
+        'mode': 'pg_repack',
         'tables_total': len(tables),
         'tables_ok': ok_count,
         'tables_failed': failed_count,
