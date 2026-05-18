@@ -2,6 +2,7 @@ import atexit
 import os
 import pathlib
 import platform
+import sys
 import threading
 
 from utils.pkg_bootstrap import ensure_all_packages, drain_bootstrap_events
@@ -96,12 +97,27 @@ def start_main_loop():
     global _main_loop_started
     if not _main_loop_started:
         _main_loop_started = True
-        _db_upgrade.check_upgrade() if hasattr(_db_upgrade, 'check_upgrade') else _db_upgrade.runcheck_upgrade()
-        init_app(flask_app)
-        environment.init_from_db()
-        environment.refresh_environment()
-        _flush_bootstrap_events_to_log()
-        db_interrupt_stale_logs()
+        write_log_entry(None, "[main] Старт службы: вход в инициализацию.", level='info')
+        write_log_entry(
+            None,
+            f"[main] startup_entry: pid={os.getpid()}, cwd={os.getcwd()}, argv={' '.join(sys.argv)}",
+            level='silent',
+        )
+        try:
+            _db_upgrade.check_upgrade() if hasattr(_db_upgrade, 'check_upgrade') else _db_upgrade.runcheck_upgrade()
+            init_app(flask_app)
+            environment.init_from_db()
+            environment.refresh_environment()
+            _flush_bootstrap_events_to_log()
+            db_interrupt_stale_logs()
+        except Exception as e:
+            write_log_entry(None, "[main] Ошибка инициализации приложения.", level='error')
+            write_log_entry(
+                None,
+                f"[main] startup_init_failed: type={type(e).__name__}, detail={e}",
+                level='silent',
+            )
+            raise
         write_log_entry(None, "[main] Приложение запущено", level='info')
         write_log_entry(
             None,
