@@ -49,10 +49,19 @@ def _flush_bootstrap_events_to_log():
 
 
 def main_loop():
+    global _runtime_started_logged
     while True:
         try:
             environment.wait_if_paused()
             environment.refresh_environment()
+            if not _runtime_started_logged:
+                _runtime_started_logged = True
+                write_log_entry(None, "[main] Служба запущена и вошла в рабочий цикл.", level='info')
+                write_log_entry(
+                    None,
+                    f"[main] runtime_start: pid={os.getpid()}, loop_interval={environment.loop_interval}, max_threads={environment.max_threads}",
+                    level='silent',
+                )
 
             planning.run()
 
@@ -86,6 +95,7 @@ def main_loop():
 
 
 _main_loop_started = False
+_runtime_started_logged = False
 
 
 def _on_exit():
