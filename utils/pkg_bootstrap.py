@@ -10,6 +10,25 @@ import shutil
 import subprocess
 import sys
 
+_PG_REPACK_VERSION = "1.5.2"
+_PG_REPACK_MIN_PG_MAJOR = 13
+_PG_REPACK_BOOTSTRAP_ERROR = ""
+
+
+def _set_pg_repack_bootstrap_error(msg: str | None) -> None:
+    global _PG_REPACK_BOOTSTRAP_ERROR
+    _PG_REPACK_BOOTSTRAP_ERROR = (msg or "").strip()
+
+
+def get_pg_repack_bootstrap_error() -> str:
+    return _PG_REPACK_BOOTSTRAP_ERROR
+
+
+def _project_bin_dir() -> pathlib.Path:
+    d = pathlib.Path(__file__).resolve().parent.parent / "bin"
+    d.mkdir(exist_ok=True)
+    return d
+
 
 def _pip_install(package: str) -> None:
     subprocess.run(
@@ -95,24 +114,46 @@ def _find_pg_config_windows() -> pathlib.Path | None:
     return None
 
 
-def _find_pgxn_install_script() -> pathlib.Path | None:
-    try:
-        from pgxnclient import find_script
-        script = find_script("pgxn-install")
-        if script:
-            p = pathlib.Path(script)
-            if p.exists():
-                return p
-    except Exception:
-        pass
-    try:
-        import pgxnclient
-        p = pathlib.Path(pgxnclient.__file__).resolve().parent / "libexec" / "pgxn-install"
-        if p.exists():
-            return p
-    except Exception:
-        pass
+def _find_pg_install_dir() -> pathlib.Path | None:
+    for bin_dir in _iter_windows_postgres_bin_dirs():
+        pg_dir = bin_dir.parent
+        if (bin_dir / "postgres.exe").exists():
+            return pg_dir
     return None
+
+
+def _get_pg_major_version(pg_dir: pathlib.Path) -> int | None:
+    pg_config = pg_dir / "bin" / "pg_config.exe"
+    if pg_config.exists():
+        try:
+            r = subprocess.run(
+                [str(pg_config), "--version"],
+                capture_output=True,
+                timeout=5,
+            )
+            out = r.stdout.decode(errors="replace").strip()
+            for part in out.split():
+                if part and part[0].isdigit():
+                    return int(part.split(".")[0])
+        except Exception:
+            pass
+    try:
+        return int(pg_dir.name.split(".")[0])
+    except ValueError:
+        return None
+
+
+def _write_pg_repack_file(path: pathlib.Path, data: bytes) -> bool:
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+        return True
+    except OSError as e:
+        sys.stdout.write(
+            f"[bootstrap] pg_repack: не удалось записать {path}: {e}\n"
+        )
+        sys.stdout.flush()
+        return False
 
 
 def _find_pg_repack_windows() -> bool:
@@ -174,101 +215,6 @@ def _detect_pg_major_from_database_url() -> int | None:
         return None
 
 
-def _resolved_python_exe() -> str:
-    """Реальный python.exe (не shim py.exe), нужен для UAC и pgxn-install."""
-    base = getattr(sys, "_base_executable", "") or ""
-    cand = pathlib.Path(base) if base else pathlib.Path(sys.executable)
-    try:
-        if cand.exists():
-            return str(cand.resolve(strict=False))
-    except OSError:
-        pass
-    return str(pathlib.Path(sys.executable).resolve(strict=False))
-
-
-def _windows_vcvars64_bat() -> pathlib.Path | None:
-    """Путь к vcvars64.bat если установлен VS / Build Tools (для сборки pgxn на Windows)."""
-    pf86 = pathlib.Path(os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)"))
-    vswhere = pf86 / "Microsoft Visual Studio" / "Installer" / "vswhere.exe"
-    if not vswhere.is_file():
-        return None
-    try:
-        r = subprocess.run(
-            [
-                str(vswhere),
-                "-latest",
-                "-products",
-                "*",
-                "-property",
-                "installationPath",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=25,
-        )
-        if r.returncode != 0:
-            return None
-        root = (r.stdout or "").strip().strip("\r\n")
-        if not root:
-            return None
-        vcvars = pathlib.Path(root) / "VC" / "Auxiliary" / "Build" / "vcvars64.bat"
-        return vcvars if vcvars.is_file() else None
-    except Exception:
-        return None
-
-
-def _windows_elevated_run_cmd_inner(inner_cmd: str, timeout: int) -> tuple[int, str]:
-    """Поднимает права и выполняет одну строку cmd.exe /c ..."""
-    import tempfile
-
-    sysroot = pathlib.Path(os.environ.get("SystemRoot", r"C:\Windows"))
-    cmd_exe = sysroot / "System32" / "cmd.exe"
-    if not cmd_exe.is_file():
-        return -1, "cmd.exe не найден"
-
-    ps_exe = _windows_powershell_exe()
-    if not ps_exe:
-        return -1, "powershell.exe не найден"
-
-    def _ps_sq(s: str) -> str:
-        return "'" + s.replace("'", "''") + "'"
-
-    script = (
-        f"$p = Start-Process -FilePath {_ps_sq(str(cmd_exe))} "
-        f"-ArgumentList @('/c', {_ps_sq(inner_cmd)}) "
-        f"-Verb RunAs -PassThru -Wait\n"
-        "if ($null -eq $p) { exit 1 }\n"
-        "exit $p.ExitCode\n"
-    )
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".ps1", delete=False, encoding="utf-8", newline="\n"
-    ) as tf:
-        tf.write(script)
-        ps1 = tf.name
-    try:
-        r = subprocess.run(
-            [
-                ps_exe,
-                "-NoProfile",
-                "-ExecutionPolicy",
-                "Bypass",
-                "-File",
-                ps1,
-            ],
-            capture_output=True,
-            timeout=timeout + 120,
-        )
-        combined = (r.stderr.decode(errors="replace") + "\n" + r.stdout.decode(errors="replace")).strip()
-        return r.returncode, combined or f"код {r.returncode}"
-    except OSError as e:
-        return -1, f"{type(e).__name__}: {e}"
-    finally:
-        try:
-            pathlib.Path(ps1).unlink(missing_ok=True)
-        except OSError:
-            pass
-
-
 def _install_pg_repack_linux() -> bool:
     if shutil.which("apt-get") is None:
         return shutil.which("pg_repack") is not None
@@ -311,168 +257,128 @@ def _install_pg_repack_macos() -> bool:
     return shutil.which("pg_repack") is not None
 
 
-def _windows_powershell_exe() -> str | None:
-    """Полный путь к powershell.exe — в службах PATH часто без System32."""
-    sysroot = pathlib.Path(os.environ.get("SystemRoot", r"C:\Windows"))
-    bundled = (
-        sysroot
-        / "System32"
-        / "WindowsPowerShell"
-        / "v1.0"
-        / "powershell.exe"
-    )
-    if bundled.is_file():
-        return str(bundled)
-    for name in ("powershell.exe", "pwsh.exe"):
-        w = shutil.which(name)
-        if w:
-            return w
-    return None
-
-
-def _windows_elevated_run_argv(argv: list[str], timeout: int) -> tuple[int, str]:
-    """Один запуск с UAC (подтвердить окно), ожидание завершения. Только Windows."""
-    import tempfile
-
-    if len(argv) < 1:
-        return -1, "empty argv"
-    ps_exe = _windows_powershell_exe()
-    if not ps_exe:
-        return -1, "powershell.exe не найден (ожидался в System32 или PATH)"
-
-    pyexe = argv[0]
-    rest = argv[1:]
-
-    def _ps_sq(s: str) -> str:
-        return "'" + s.replace("'", "''") + "'"
-
-    arg_block = ",\n  ".join(_ps_sq(a) for a in rest)
-    script = (
-        f"$p = Start-Process -FilePath {_ps_sq(pyexe)} "
-        f"-ArgumentList @(\n  {arg_block}\n) "
-        f"-Verb RunAs -PassThru -Wait\n"
-        "if ($null -eq $p) { exit 1 }\n"
-        "exit $p.ExitCode\n"
-    )
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".ps1", delete=False, encoding="utf-8", newline="\n"
-    ) as tf:
-        tf.write(script)
-        ps1 = tf.name
-    try:
-        r = subprocess.run(
-            [
-                ps_exe,
-                "-NoProfile",
-                "-ExecutionPolicy",
-                "Bypass",
-                "-File",
-                ps1,
-            ],
-            capture_output=True,
-            timeout=timeout + 60,
-        )
-        combined = (r.stderr.decode(errors="replace") + "\n" + r.stdout.decode(errors="replace")).strip()
-        return r.returncode, combined or f"код {r.returncode}"
-    except OSError as e:
-        return -1, f"{type(e).__name__}: {e}"
-    finally:
-        try:
-            pathlib.Path(ps1).unlink(missing_ok=True)
-        except OSError:
-            pass
-
-
 def _install_pg_repack_windows() -> bool:
-    """Ставит pg_repack через pgxn-install (исходники + установка в дерево PostgreSQL).
+    """Скачивает готовый pg_repack с GitHub в bin/ приложения (без UAC).
 
-    На Windows сборке нужны права на запись в каталог PostgreSQL и toolchain MSVC.
-    Порядок: обычный запуск → UAC → UAC с вызовом vcvars64.bat (Visual Studio Build Tools).
+    При наличии локального PostgreSQL по возможности копирует dll и extension
+    в его каталог; ошибки записи в Program Files не блокируют установку CLI.
     """
+    import urllib.error
+    import urllib.request
+    import zipfile
+
+    _set_pg_repack_bootstrap_error("")
     if _find_pg_repack_windows():
         return True
 
-    pg_config = _find_pg_config_windows()
-    if not pg_config:
-        sys.stdout.write("[bootstrap] pg_repack: pg_config.exe не найден в установке PostgreSQL.\n")
-        sys.stdout.flush()
+    dest_dir = _project_bin_dir()
+    skip_flag = dest_dir / "pg_repack.download_failed"
+    legacy_skip = dest_dir / "pg_repack.skip"
+    legacy_skip.unlink(missing_ok=True)
+    if skip_flag.exists():
+        _set_pg_repack_bootstrap_error(
+            "ранее не удалось скачать pg_repack (удалите bin/pg_repack.download_failed и повторите)"
+        )
         return False
-    _prepend_to_path(pg_config.parent)
 
-    py_exe = _resolved_python_exe()
+    exe_dest = dest_dir / "pg_repack.exe"
+    if exe_dest.exists():
+        _prepend_to_path(dest_dir)
+        return True
 
-    if _find_pgxn_install_script() is None:
-        ok, err = _run_cmd([py_exe, "-m", "pip", "install", "pgxnclient"], timeout=240)
-        if not ok:
-            sys.stdout.write(f"[bootstrap] Не удалось установить pgxnclient: {err}\n")
+    pg_dir = _find_pg_install_dir()
+    pg_ver = _detect_pg_major_from_database_url()
+    if pg_ver is None and pg_dir is not None:
+        pg_ver = _get_pg_major_version(pg_dir)
+    if pg_ver is None:
+        pg_ver = 16
+
+    zip_path = dest_dir / "pg_repack.zip"
+    downloaded = False
+    last_err = ""
+    for try_ver in range(pg_ver, _PG_REPACK_MIN_PG_MAJOR - 1, -1):
+        url = (
+            f"https://github.com/reorg/pg_repack/releases/download/"
+            f"ver_{_PG_REPACK_VERSION}/"
+            f"pg_repack_pg{try_ver}-{_PG_REPACK_VERSION}-x86-64.zip"
+        )
+        sys.stdout.write(f"[bootstrap] Скачиваю pg_repack для PostgreSQL {try_ver}: {url}\n")
+        sys.stdout.flush()
+        try:
+            urllib.request.urlretrieve(url, zip_path)
+            downloaded = True
+            break
+        except urllib.error.HTTPError as e:
+            last_err = str(e)
+            zip_path.unlink(missing_ok=True)
+            if e.code == 404:
+                continue
+            _set_pg_repack_bootstrap_error(f"ошибка скачивания: {e}")
+            sys.stdout.write(f"[bootstrap] pg_repack: ошибка скачивания — {e}\n")
             sys.stdout.flush()
+            skip_flag.write_text(last_err, encoding="utf-8")
+            return False
+        except Exception as e:
+            last_err = f"{type(e).__name__}: {e}"
+            zip_path.unlink(missing_ok=True)
+            if "404" in str(e) or "Not Found" in str(e):
+                continue
+            _set_pg_repack_bootstrap_error(last_err)
+            sys.stdout.write(f"[bootstrap] pg_repack: ошибка скачивания — {e}\n")
+            sys.stdout.flush()
+            skip_flag.write_text(last_err, encoding="utf-8")
             return False
 
-    pgxn_install = _find_pgxn_install_script()
-    if not pgxn_install:
-        sys.stdout.write(
-            "[bootstrap] pg_repack: скрипт pgxn-install не найден после установки pgxnclient.\n"
+    if not downloaded:
+        msg = (
+            f"нет релиза pg_repack {_PG_REPACK_VERSION} для PostgreSQL "
+            f"{pg_ver}–{_PG_REPACK_MIN_PG_MAJOR}"
         )
+        _set_pg_repack_bootstrap_error(msg)
+        sys.stdout.write(f"[bootstrap] pg_repack: {msg}\n")
         sys.stdout.flush()
+        skip_flag.write_text(msg, encoding="utf-8")
         return False
 
-    install_argv = [
-        py_exe,
-        str(pgxn_install),
-        "--yes",
-        "pg_repack",
-        "--pg_config",
-        str(pg_config),
-    ]
-
-    def _cmd_quote_batch(s: str) -> str:
-        return '"' + s.replace('"', '""') + '"'
-
-    sys.stdout.write(f"[bootstrap] Устанавливаю pg_repack (python={py_exe}): {pgxn_install}\n")
+    sys.stdout.write("[bootstrap] Устанавливаю pg_repack...\n")
     sys.stdout.flush()
-    ok, err = _run_cmd(install_argv, timeout=2400)
-    if ok and _find_pg_repack_windows():
-        return True
-
-    sys.stdout.write(f"[bootstrap] pg_repack: обычная установка не удалась: {err}\n")
-    sys.stdout.write("[bootstrap] Запрос прав администратора (UAC) для записи в каталог PostgreSQL...\n")
-    sys.stdout.flush()
-
-    code, out = _windows_elevated_run_argv(install_argv, timeout=2400)
-    if code != 0:
-        sys.stdout.write(f"[bootstrap] pg_repack: установка с повышением: код {code}\n{out}\n")
+    try:
+        with zipfile.ZipFile(zip_path, "r") as zf:
+            for member in zf.namelist():
+                fname = pathlib.Path(member).name
+                if not fname:
+                    continue
+                data = zf.read(member)
+                if fname == "pg_repack.exe":
+                    if not _write_pg_repack_file(exe_dest, data):
+                        return False
+                elif fname == "pg_repack.dll":
+                    _write_pg_repack_file(dest_dir / fname, data)
+                    if pg_dir is not None:
+                        _write_pg_repack_file(pg_dir / "lib" / fname, data)
+                elif fname.endswith(".sql") or fname.endswith(".control"):
+                    if pg_dir is not None:
+                        _write_pg_repack_file(pg_dir / "share" / "extension" / fname, data)
+    except Exception as e:
+        last_err = f"{type(e).__name__}: {e}"
+        _set_pg_repack_bootstrap_error(last_err)
+        sys.stdout.write(f"[bootstrap] pg_repack: ошибка распаковки — {e}\n")
         sys.stdout.flush()
-    else:
-        sys.stdout.write("[bootstrap] pg_repack: установка с повышением завершилась (код 0).\n")
-        sys.stdout.flush()
+        skip_flag.write_text(last_err, encoding="utf-8")
+        return False
+    finally:
+        zip_path.unlink(missing_ok=True)
 
-    if _find_pg_repack_windows():
-        return True
-
-    vcvars = _windows_vcvars64_bat()
-    if not vcvars:
-        sys.stdout.write(
-            "[bootstrap] pg_repack: vcvars64.bat не найден — для сборки нужны "
-            "\"Desktop development with C++\" / MSVC Build Tools.\n"
-        )
-        sys.stdout.flush()
+    if not exe_dest.exists():
+        _set_pg_repack_bootstrap_error("pg_repack.exe отсутствует в архиве")
+        skip_flag.write_text("pg_repack.exe отсутствует в архиве", encoding="utf-8")
         return False
 
-    inner = (
-        f'call {_cmd_quote_batch(str(vcvars))} && '
-        f'{_cmd_quote_batch(py_exe)} {_cmd_quote_batch(str(pgxn_install))} '
-        f'--yes pg_repack --pg_config {_cmd_quote_batch(str(pg_config))}'
-    )
-    sys.stdout.write(
-        "[bootstrap] Повтор с MSVC (vcvars64.bat) под UAC — может занять несколько минут...\n"
-    )
+    skip_flag.unlink(missing_ok=True)
+    _prepend_to_path(dest_dir)
+    sys.stdout.write(f"[bootstrap] pg_repack установлен: {exe_dest}\n")
     sys.stdout.flush()
-    code2, out2 = _windows_elevated_run_cmd_inner(inner, timeout=7200)
-    if code2 != 0:
-        sys.stdout.write(f"[bootstrap] pg_repack: MSVC+UAC код {code2}\n{out2}\n")
-        sys.stdout.flush()
-
-    return _find_pg_repack_windows()
+    return True
 
 
 def _auto_install_pg_repack() -> bool:
@@ -489,9 +395,10 @@ def _auto_install_pg_repack() -> bool:
 def ensure_pg_repack_in_path(auto_install: bool = False) -> bool:
     """Гарантирует доступность pg_repack в PATH.
 
-    - Сначала ищет бинарник в PATH/стандартных путях.
-    - При auto_install=True пытается установить автоматически (best-effort).
+    - Сначала ищет бинарник в PATH/стандартных путях и в bin/ приложения.
+    - На Windows при auto_install скачивает готовый бинарник с GitHub (без UAC).
     """
+    _set_pg_repack_bootstrap_error("")
     if platform.system() == "Windows":
         found = _find_pg_repack_windows()
     else:
@@ -499,6 +406,7 @@ def ensure_pg_repack_in_path(auto_install: bool = False) -> bool:
     if found:
         return True
     if not auto_install:
+        _set_pg_repack_bootstrap_error("pg_repack не найден в PATH")
         return False
 
     sys.stdout.write("[bootstrap] pg_repack не найден — запускаю автоустановку.\n")
@@ -506,15 +414,23 @@ def ensure_pg_repack_in_path(auto_install: bool = False) -> bool:
     try:
         ok = _auto_install_pg_repack()
     except Exception as e:
+        err = f"{type(e).__name__}: {e}"
+        _set_pg_repack_bootstrap_error(err)
         sys.stdout.write(f"[bootstrap] pg_repack: исключение при автоустановке: {e}\n")
         sys.stdout.flush()
         ok = False
     if not ok:
+        if not get_pg_repack_bootstrap_error():
+            _set_pg_repack_bootstrap_error("автоустановка pg_repack завершилась без результата")
         return False
 
     if platform.system() == "Windows":
-        return _find_pg_repack_windows()
-    return shutil.which("pg_repack") is not None
+        found = _find_pg_repack_windows()
+    else:
+        found = shutil.which("pg_repack") is not None
+    if not found and not get_pg_repack_bootstrap_error():
+        _set_pg_repack_bootstrap_error("pg_repack не найден после автоустановки")
+    return found
 
 
 def _ensure_ffmpeg() -> None:
