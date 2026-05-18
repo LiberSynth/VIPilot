@@ -1,6 +1,6 @@
-# _build.py - pinned app build number.
+# _build.py — фиксированный номер сборки приложения.
 #
-# Purpose: keep BUILD between runs when git is unavailable on prod.
-# Rewritten by scripts/set_build_number.py during deployment.
-# Used in upgrade.py to compare against DB build_number.
-BUILD = "2398"
+# Назначение: хранить BUILD между запусками, когда git недоступен на проде.
+# Перезаписывается скриптом scripts/set_build_number.py в момент деплоя.
+# Значение используется в upgrade.py для сравнения с build_number в БД.
+BUILD = "2400"

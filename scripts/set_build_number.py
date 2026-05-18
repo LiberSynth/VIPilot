@@ -4,6 +4,9 @@ set_build_number.py — фиксирует номер сборки в utils/_bui
 Запускается как build-шаг деплоя, пока git ещё доступен.
 Завершается с ошибкой (exit code 1), если git недоступен — чтобы деплой
 не прошёл молча с неверным значением.
+
+Режим `--build-only` обновляет только utils/_build.py и завершает работу
+без post-deploy шагов (Playwright/pg_repack).
 """
 import subprocess
 import sys
@@ -15,6 +18,7 @@ _BUILD_FILE = os.path.join(os.path.dirname(__file__), '..', 'utils', '_build.py'
 
 
 def main() -> None:
+    build_only = '--build-only' in sys.argv[1:]
     try:
         result = subprocess.run(
             ['git', 'rev-list', '--count', 'HEAD'],
@@ -36,7 +40,7 @@ def main() -> None:
         sys.exit(1)
 
     build_file = os.path.normpath(_BUILD_FILE)
-    with open(build_file, 'w') as f:
+    with open(build_file, 'w', encoding='utf-8', newline='\n') as f:
         f.write(
             '# _build.py — фиксированный номер сборки приложения.\n'
             '#\n'
@@ -45,7 +49,10 @@ def main() -> None:
             '# Значение используется в upgrade.py для сравнения с build_number в БД.\n'
             f'BUILD = "{count}"\n'
         )
-    print(f'[set_build_number] BUILD = {count} → {build_file}')
+    print(f'[set_build_number] BUILD = {count} -> {build_file}')
+
+    if build_only:
+        return
 
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
     from utils.consts import PLAYWRIGHT_BROWSERS_PATH
