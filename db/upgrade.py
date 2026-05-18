@@ -6,7 +6,7 @@ upgrade.py — пост-апгрейд обработка.
 
 При совпадении build_number с BUILD выполнения нет (ранний выход).
 При смене BUILD — полный цикл: проверки окружения, миграции и т.д.
-На деве Windows pg_repack может быть пропущен (см. _check_pg_repack), если скачивание не удалось.
+На деве Windows pg_repack CLI обычно отсутствует (см. _check_pg_repack); сжатие — VACUUM FULL.
 На проде (REPLIT_DEPLOYMENT == "1") проверки строгие; сбой любой проверки — исключение.
 env_set(build_number) вызывается только после успешного завершения всех шагов.
 """
@@ -140,9 +140,9 @@ def _check_pg_repack() -> tuple[bool, str]:
     только если: автоустановка CLI не удалась; CREATE EXTENSION упал; версии CLI и extension
     не совпадают.
 
-    На деве Windows, если скачивание pg_repack с GitHub не удалось, проверка смягчается
-    (warn в лог), чтобы приложение стартовало. На проде (`REPLIT_DEPLOYMENT`)
-    и при `VIPILOT_REQUIRE_PG_REPACK=1` смягчение выключено.
+    На деве Windows официального pg_repack CLI нет — проверка смягчается (сжатие через
+    VACUUM FULL). На проде Linux (`REPLIT_DEPLOYMENT`) ставится пакетом; при
+    `VIPILOT_REQUIRE_PG_REPACK=1` на Windows проверка строгая.
     """
     from utils.pkg_bootstrap import ensure_pg_repack_in_path
 
@@ -152,14 +152,13 @@ def _check_pg_repack() -> tuple[bool, str]:
         if platform.system() == 'Windows' and not prod and not force:
             write_log_entry(
                 None,
-                '[upgrade] pg_repack: на деве Windows CLI недоступен после автоустановки '
-                '(не удалось скачать бинарник с GitHub — см. [bootstrap] в stdout). '
-                'Кнопка сжатия БД попробует fallback VACUUM FULL. '
-                'Задайте VIPILOT_REQUIRE_PG_REPACK=1 для строгой проверки.',
-                level='warn',
+                '[upgrade] pg_repack: на Windows CLI не установлен — '
+                'кнопка «Дефрагментация» использует VACUUM FULL. '
+                'Задайте VIPILOT_REQUIRE_PG_REPACK=1, если нужен строгий pg_repack.',
+                level='silent',
             )
             return True, (
-                'pg_repack: пропуск на деве Windows — нет CLI (скачивание с GitHub не удалось)'
+                'pg_repack: пропуск на Windows — нет CLI (сжатие через VACUUM FULL)'
             )
         return False, 'pg_repack: CLI не найден и автоустановка не удалась'
     cli_path = shutil.which('pg_repack')

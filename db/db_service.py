@@ -499,7 +499,8 @@ def db_vacuum_full() -> dict:
     from utils.pkg_bootstrap import ensure_pg_repack_in_path, get_pg_repack_bootstrap_error
 
     tables = _public_tables()
-    ensure_pg_repack_in_path(auto_install=True)
+    # На Windows официального pg_repack нет — только поиск уже установленного CLI.
+    ensure_pg_repack_in_path(auto_install=(platform.system() != 'Windows'))
     cli = shutil.which('pg_repack')
     if not cli:
         bootstrap_error = get_pg_repack_bootstrap_error()
