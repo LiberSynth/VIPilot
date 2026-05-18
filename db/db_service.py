@@ -419,9 +419,15 @@ def db_vacuum_full() -> dict:
     таблице не валит весь прогон. Возвращает сводку:
     `{tables_total, tables_ok, tables_failed, freed_bytes, results: [...]}`.
     """
+    from utils.pkg_bootstrap import ensure_pg_repack_in_path
+
+    ensure_pg_repack_in_path(auto_install=True)
     cli = shutil.which('pg_repack')
     if not cli:
-        raise RuntimeError('pg_repack CLI не найден в окружении')
+        raise RuntimeError(
+            'pg_repack CLI не найден в окружении '
+            '(автоустановка не удалась — см. stdout bootstrap).'
+        )
     conn_params = _parse_db_url()
 
     with get_db() as conn:
