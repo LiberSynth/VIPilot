@@ -19,6 +19,12 @@ def _emit_bootstrap(message: str, level: str = "silent") -> None:
     _BOOTSTRAP_EVENTS.append((lvl, message))
 
 
+def _emit_step(info_message: str, detail_message: str | None = None) -> None:
+    """Ключевой шаг: пишем и user-friendly info, и технический silent."""
+    _emit_bootstrap(info_message, level="info")
+    _emit_bootstrap(detail_message or info_message, level="silent")
+
+
 def drain_bootstrap_events() -> list[tuple[str, str]]:
     """Возвращает накопленные bootstrap-сообщения и очищает буфер."""
     events = list(_BOOTSTRAP_EVENTS)
@@ -57,9 +63,12 @@ def _install_ffmpeg_windows() -> None:
 
     if not ffmpeg_exe.exists():
         zip_path = dest_dir / "ffmpeg.zip"
-        _emit_bootstrap(f"[bootstrap] Скачиваю ffmpeg из {_FFMPEG_URL} ...")
+        _emit_step(
+            "[bootstrap] ffmpeg: скачиваю архив.",
+            f"[bootstrap] ffmpeg: phase=download, url={_FFMPEG_URL}",
+        )
         urllib.request.urlretrieve(_FFMPEG_URL, zip_path)
-        _emit_bootstrap("[bootstrap] Распаковываю ffmpeg...")
+        _emit_step("[bootstrap] ffmpeg: распаковываю архив.", "[bootstrap] ffmpeg: phase=extract")
         with zipfile.ZipFile(zip_path, "r") as zf:
             for member in zf.namelist():
                 if member.endswith("bin/ffmpeg.exe"):
@@ -73,7 +82,7 @@ def _install_ffmpeg_windows() -> None:
                 d.rmdir()
 
     os.environ["PATH"] = str(dest_dir) + os.pathsep + os.environ.get("PATH", "")
-    _emit_bootstrap(f"[bootstrap] ffmpeg установлен: {ffmpeg_exe}")
+    _emit_step("[bootstrap] ffmpeg готов к работе.", f"[bootstrap] ffmpeg: phase=done, path={ffmpeg_exe}")
 
 
 def _prepend_to_path(path: pathlib.Path) -> None:
@@ -113,7 +122,10 @@ def _find_pg_config_windows() -> pathlib.Path | None:
 
 def _find_pg_repack_windows() -> bool:
     if shutil.which("pg_repack"):
-        _emit_bootstrap("[bootstrap] pg_repack уже доступен в PATH.")
+        _emit_step(
+            "[bootstrap] pg_repack уже установлен.",
+            f"[bootstrap] pg_repack: result=present, path={shutil.which('pg_repack')}",
+        )
         return True
 
     local_candidates = [
@@ -123,7 +135,7 @@ def _find_pg_repack_windows() -> bool:
     for exe in local_candidates:
         if exe.exists():
             _prepend_to_path(exe.parent)
-            _emit_bootstrap(f"[bootstrap] pg_repack найден: {exe}")
+            _emit_step("[bootstrap] pg_repack найден в локальном bin.", f"[bootstrap] pg_repack: path={exe}")
             return True
 
     for bin_dir in _iter_windows_postgres_bin_dirs():
@@ -131,7 +143,7 @@ def _find_pg_repack_windows() -> bool:
             exe = bin_dir / name
             if exe.exists():
                 _prepend_to_path(exe.parent)
-                _emit_bootstrap(f"[bootstrap] pg_repack найден: {exe}")
+                _emit_step("[bootstrap] pg_repack найден в установке PostgreSQL.", f"[bootstrap] pg_repack: path={exe}")
                 return True
     return False
 
@@ -218,6 +230,10 @@ def _install_pg_repack_windows() -> bool:
         return True
 
     if shutil.which("pgxnclient") is None:
+        _emit_step(
+            "[bootstrap] pgxnclient не найден, устанавливаю.",
+            "[bootstrap] pg_repack: phase=install_pgxnclient",
+        )
         ok, err = _run_cmd([sys.executable, "-m", "pip", "install", "pgxnclient"], timeout=240)
         if not ok:
             _set_pg_repack_bootstrap_error(f"не удалось установить pgxnclient: {err}")
@@ -232,9 +248,15 @@ def _install_pg_repack_windows() -> bool:
     pg_config = _find_pg_config_windows()
     if pg_config:
         _prepend_to_path(pg_config.parent)
-        _emit_bootstrap(f"[bootstrap] Найден pg_config: {pg_config}")
+        _emit_step(
+            "[bootstrap] Найден pg_config для установки pg_repack.",
+            f"[bootstrap] pg_repack: pg_config={pg_config}",
+        )
 
-    _emit_bootstrap("[bootstrap] Пытаюсь установить pg_repack через pgxnclient...")
+    _emit_step(
+        "[bootstrap] pg_repack не найден, запускаю доустановку.",
+        "[bootstrap] pg_repack: phase=install_start, installer=pgxnclient",
+    )
     cmd = [pgxnclient, "install", "--yes", "pg_repack"]
     if pg_config:
         cmd += ["--pg_config", str(pg_config)]
@@ -278,14 +300,23 @@ def ensure_pg_repack_in_path(auto_install: bool = False) -> bool:
         found = shutil.which("pg_repack") is not None
     if found:
         if platform.system() != "Windows":
-            _emit_bootstrap("[bootstrap] pg_repack уже доступен в PATH.")
+            _emit_step(
+                "[bootstrap] pg_repack уже установлен.",
+                f"[bootstrap] pg_repack: result=present, path={shutil.which('pg_repack')}",
+            )
         return True
     _set_pg_repack_bootstrap_error("pg_repack не найден в PATH")
     if not auto_install:
-        _emit_bootstrap("[bootstrap] pg_repack не найден (auto_install=0).")
+        _emit_step(
+            "[bootstrap] pg_repack не найден.",
+            "[bootstrap] pg_repack: result=missing, auto_install=0",
+        )
         return False
 
-    _emit_bootstrap("[bootstrap] pg_repack не найден — запускаю автоустановку.")
+    _emit_step(
+        "[bootstrap] pg_repack не найден, запускаю доустановку.",
+        "[bootstrap] pg_repack: result=missing, auto_install=1, action=install",
+    )
     if not _auto_install_pg_repack():
         if not get_pg_repack_bootstrap_error():
             _set_pg_repack_bootstrap_error("автоустановка pg_repack завершилась без результата")
@@ -302,7 +333,10 @@ def ensure_pg_repack_in_path(auto_install: bool = False) -> bool:
     if not found and not get_pg_repack_bootstrap_error():
         _set_pg_repack_bootstrap_error("pg_repack не найден после автоустановки")
     if found:
-        _emit_bootstrap("[bootstrap] pg_repack доступен после автоустановки.")
+        _emit_step(
+            "[bootstrap] pg_repack доступен.",
+            f"[bootstrap] pg_repack: result=ready, path={shutil.which('pg_repack')}",
+        )
     else:
         _emit_bootstrap(
             f"[bootstrap] pg_repack всё ещё недоступен: {get_pg_repack_bootstrap_error()}",
@@ -312,10 +346,15 @@ def ensure_pg_repack_in_path(auto_install: bool = False) -> bool:
 
 
 def _ensure_ffmpeg() -> None:
-    if shutil.which("ffmpeg"):
-        _emit_bootstrap("[bootstrap] ffmpeg уже доступен в PATH.")
+    ffmpeg_path = shutil.which("ffmpeg")
+    if ffmpeg_path:
+        _emit_step("[bootstrap] ffmpeg уже установлен.", f"[bootstrap] ffmpeg: result=present, path={ffmpeg_path}")
         return
     system = platform.system()
+    _emit_step(
+        "[bootstrap] ffmpeg не найден, запускаю доустановку.",
+        f"[bootstrap] ffmpeg: result=missing, action=install, platform={system}",
+    )
     if system == "Windows":
         _install_ffmpeg_windows()
     elif system == "Linux":
@@ -324,6 +363,10 @@ def _ensure_ffmpeg() -> None:
                 ["apt-get", "install", "-y", "ffmpeg"],
                 check=True,
                 timeout=300,
+            )
+            _emit_step(
+                "[bootstrap] ffmpeg установлен через apt-get.",
+                f"[bootstrap] ffmpeg: phase=done, path={shutil.which('ffmpeg')}",
             )
         except Exception as e:
             raise RuntimeError(f"ffmpeg не удалось установить через apt-get: {e}") from e
@@ -335,8 +378,9 @@ def _ensure_ffmpeg() -> None:
 
 def ensure_all_packages() -> None:
     """Устанавливает все необходимые пакеты если они не найдены."""
-    _emit_bootstrap(
-        f"[bootstrap] Старт setup окружения: os={platform.system()}, py={sys.version.split()[0]}"
+    _emit_step(
+        "[bootstrap] Вход в проверку окружения.",
+        f"[bootstrap] setup: phase=start, os={platform.system()}, py={sys.version.split()[0]}",
     )
     _packages = [
         ("dotenv",        "python-dotenv"),
@@ -349,16 +393,38 @@ def ensure_all_packages() -> None:
         ("yaml",          "pyyaml"),
     ]
     for spec_name, pip_name in _packages:
+        _emit_step(
+            f"[bootstrap] Проверка Python-пакета {pip_name}.",
+            f"[bootstrap] package_check: spec={spec_name}, pip_name={pip_name}, phase=check",
+        )
         if importlib.util.find_spec(spec_name) is None:
-            _emit_bootstrap(f"[bootstrap] Python-пакет {pip_name} не найден — устанавливаю...")
+            _emit_step(
+                f"[bootstrap] Python-пакет {pip_name} не установлен, запускаю доустановку.",
+                f"[bootstrap] package_check: pip_name={pip_name}, result=missing, action=install",
+            )
             try:
                 _pip_install(pip_name)
             except Exception as e:
                 _emit_bootstrap(f"[bootstrap] Ошибка установки {pip_name}: {e}", level="error")
+                _emit_bootstrap(
+                    f"[bootstrap] package_check: pip_name={pip_name}, result=error, error={type(e).__name__}: {e}",
+                    level="silent",
+                )
                 raise
-            _emit_bootstrap(f"[bootstrap] Python-пакет {pip_name} установлен.")
+            _emit_step(
+                f"[bootstrap] Python-пакет {pip_name} установлен.",
+                f"[bootstrap] package_check: pip_name={pip_name}, result=installed",
+            )
         else:
-            _emit_bootstrap(f"[bootstrap] Python-пакет {pip_name} уже установлен.")
+            _emit_step(
+                f"[bootstrap] Python-пакет {pip_name} уже установлен.",
+                f"[bootstrap] package_check: pip_name={pip_name}, result=present",
+            )
     _ensure_ffmpeg()
-    ensure_pg_repack_in_path()
-    _emit_bootstrap("[bootstrap] Setup окружения завершён.")
+    _emit_step(
+        "[bootstrap] Проверка pg_repack в окружении.",
+        "[bootstrap] pg_repack: phase=check",
+    )
+    # Доустанавливаем pg_repack только при отсутствии в окружении.
+    ensure_pg_repack_in_path(auto_install=True)
+    _emit_step("[bootstrap] Проверка окружения завершена.", "[bootstrap] setup: phase=done")
