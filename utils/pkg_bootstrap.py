@@ -378,53 +378,73 @@ def _ensure_ffmpeg() -> None:
 
 def ensure_all_packages() -> None:
     """Устанавливает все необходимые пакеты если они не найдены."""
+    phase = "enter"
     _emit_step(
         "[bootstrap] Вход в проверку окружения.",
-        f"[bootstrap] setup: phase=start, os={platform.system()}, py={sys.version.split()[0]}",
+        f"[bootstrap] setup: phase=enter, os={platform.system()}, py={sys.version.split()[0]}",
     )
-    _packages = [
-        ("dotenv",        "python-dotenv"),
-        ("psycopg2",      "psycopg2-binary"),
-        ("flask",         "flask"),
-        ("requests",      "requests"),
-        ("flask_limiter", "Flask-Limiter"),
-        ("playwright",    "playwright"),
-        ("waitress",      "waitress"),
-        ("yaml",          "pyyaml"),
-    ]
-    for spec_name, pip_name in _packages:
+    try:
+        phase = "checks_start"
         _emit_step(
-            f"[bootstrap] Проверка Python-пакета {pip_name}.",
-            f"[bootstrap] package_check: spec={spec_name}, pip_name={pip_name}, phase=check",
+            "[bootstrap] Старт проверки компонентов окружения.",
+            "[bootstrap] setup: phase=checks_start",
         )
-        if importlib.util.find_spec(spec_name) is None:
+        _packages = [
+            ("dotenv",        "python-dotenv"),
+            ("psycopg2",      "psycopg2-binary"),
+            ("flask",         "flask"),
+            ("requests",      "requests"),
+            ("flask_limiter", "Flask-Limiter"),
+            ("playwright",    "playwright"),
+            ("waitress",      "waitress"),
+            ("yaml",          "pyyaml"),
+        ]
+        for spec_name, pip_name in _packages:
+            phase = f"package_check:{pip_name}"
             _emit_step(
-                f"[bootstrap] Python-пакет {pip_name} не установлен, запускаю доустановку.",
-                f"[bootstrap] package_check: pip_name={pip_name}, result=missing, action=install",
+                f"[bootstrap] Проверка Python-пакета {pip_name}.",
+                f"[bootstrap] package_check: spec={spec_name}, pip_name={pip_name}, phase=check",
             )
-            try:
-                _pip_install(pip_name)
-            except Exception as e:
-                _emit_bootstrap(f"[bootstrap] Ошибка установки {pip_name}: {e}", level="error")
-                _emit_bootstrap(
-                    f"[bootstrap] package_check: pip_name={pip_name}, result=error, error={type(e).__name__}: {e}",
-                    level="silent",
+            if importlib.util.find_spec(spec_name) is None:
+                _emit_step(
+                    f"[bootstrap] Python-пакет {pip_name} не установлен, запускаю доустановку.",
+                    f"[bootstrap] package_check: pip_name={pip_name}, result=missing, action=install",
                 )
-                raise
-            _emit_step(
-                f"[bootstrap] Python-пакет {pip_name} установлен.",
-                f"[bootstrap] package_check: pip_name={pip_name}, result=installed",
-            )
-        else:
-            _emit_step(
-                f"[bootstrap] Python-пакет {pip_name} уже установлен.",
-                f"[bootstrap] package_check: pip_name={pip_name}, result=present",
-            )
-    _ensure_ffmpeg()
-    _emit_step(
-        "[bootstrap] Проверка pg_repack в окружении.",
-        "[bootstrap] pg_repack: phase=check",
-    )
-    # Доустанавливаем pg_repack только при отсутствии в окружении.
-    ensure_pg_repack_in_path(auto_install=True)
+                try:
+                    _pip_install(pip_name)
+                except Exception as e:
+                    _emit_bootstrap(f"[bootstrap] Ошибка установки {pip_name}: {e}", level="error")
+                    _emit_bootstrap(
+                        f"[bootstrap] package_check: pip_name={pip_name}, result=error, error={type(e).__name__}: {e}",
+                        level="silent",
+                    )
+                    raise
+                _emit_step(
+                    f"[bootstrap] Python-пакет {pip_name} установлен.",
+                    f"[bootstrap] package_check: pip_name={pip_name}, result=installed",
+                )
+            else:
+                _emit_step(
+                    f"[bootstrap] Python-пакет {pip_name} уже установлен.",
+                    f"[bootstrap] package_check: pip_name={pip_name}, result=present",
+                )
+
+        phase = "ffmpeg_check"
+        _ensure_ffmpeg()
+
+        phase = "pg_repack_check"
+        _emit_step(
+            "[bootstrap] Проверка pg_repack в окружении.",
+            "[bootstrap] pg_repack: phase=check",
+        )
+        # Доустанавливаем pg_repack только при отсутствии в окружении.
+        ensure_pg_repack_in_path(auto_install=True)
+    except Exception as e:
+        _emit_bootstrap("[bootstrap] Ошибка в проверке окружения.", level="error")
+        _emit_bootstrap(
+            f"[bootstrap] setup: phase=error, step={phase}, type={type(e).__name__}, detail={e}",
+            level="silent",
+        )
+        raise
+
     _emit_step("[bootstrap] Проверка окружения завершена.", "[bootstrap] setup: phase=done")

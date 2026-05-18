@@ -37,8 +37,18 @@ register_middleware(flask_app)
 
 def _flush_bootstrap_events_to_log():
     events = drain_bootstrap_events()
+    has_enter_log = any(
+        "[bootstrap] setup: phase=enter" in message or "[bootstrap] Вход в проверку окружения." in message
+        for _, message in events
+    )
     write_log_entry(None, "[main] Стартовый setup окружения завершён.", level='info')
     write_log_entry(None, f"[main] startup_setup: events={len(events)}", level='silent')
+    if not has_enter_log:
+        write_log_entry(
+            None,
+            "[bootstrap] ВНИМАНИЕ: не найден лог входа в проверку окружения.",
+            level='warn',
+        )
     for level, message in events:
         try:
             write_log_entry(None, message, level=level)
