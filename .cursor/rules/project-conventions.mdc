@@ -1,0 +1,19 @@
+---
+description: Always apply FlaskApp source conventions
+alwaysApply: true
+---
+
+# FlaskApp Conventions
+
+In this repository, always treat these files as mandatory guidance:
+
+- `docs/conventions.md`
+- `docs/upgrade-convention.md`
+- `docs/project-conventions.md`
+
+Required behavior:
+
+- Apply all three documents in every chat/session for this repo.
+- Follow their standards for error handling, logging, environment access, and UI/backend patterns.
+- If any rule is ambiguous or conflicting, ask the user before implementing.
+- After substantial code edits, run `bash scripts/check_conventions.sh` when available and fix reported violations.

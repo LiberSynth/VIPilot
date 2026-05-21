@@ -28,7 +28,6 @@ import pipelines.planning as planning
 from pipelines.routing import get_pipeline
 from pipelines.runner import start_batch_thread
 import common.environment as environment
-import utils.keepalive as keepalive
 from utils.middleware import register_middleware
 import db.upgrade as _db_upgrade
 
@@ -109,8 +108,6 @@ def start_main_loop():
         atexit.register(_on_exit)
         t = threading.Thread(target=main_loop, daemon=True)
         t.start()
-        ka = threading.Thread(target=keepalive.loop, daemon=True)
-        ka.start()
 
 
 start_main_loop()

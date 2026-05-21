@@ -6,8 +6,8 @@ upgrade.py — пост-апгрейд обработка.
 
 При совпадении build_number с BUILD выполнения нет (ранний выход).
 При смене BUILD — полный цикл: проверки окружения, миграции и т.д.
-На деве Windows pg_repack CLI обычно отсутствует (см. _check_pg_repack); сжатие — VACUUM FULL.
-На проде (REPLIT_DEPLOYMENT == "1") проверки строгие; сбой любой проверки — исключение.
+На Windows pg_repack CLI обычно отсутствует (см. _check_pg_repack); сжатие — VACUUM FULL.
+На Linux проверки окружения строгие; сбой любой проверки — исключение.
 env_set(build_number) вызывается только после успешного завершения всех шагов.
 """
 import os
@@ -140,16 +140,15 @@ def _check_pg_repack() -> tuple[bool, str]:
     только если: автоустановка CLI не удалась; CREATE EXTENSION упал; версии CLI и extension
     не совпадают.
 
-    На деве Windows официального pg_repack CLI нет — проверка смягчается (сжатие через
-    VACUUM FULL). На проде Linux (`REPLIT_DEPLOYMENT`) ставится пакетом; при
-    `VIPILOT_REQUIRE_PG_REPACK=1` на Windows проверка строгая.
+    На Windows официального pg_repack CLI обычно нет — проверка смягчается
+    (сжатие через VACUUM FULL). При `VIPILOT_REQUIRE_PG_REPACK=1` на Windows
+    проверка строгая.
     """
     from utils.pkg_bootstrap import ensure_pg_repack_in_path
 
     if not ensure_pg_repack_in_path(auto_install=True):
-        prod = os.environ.get('REPLIT_DEPLOYMENT') == '1'
         force = os.environ.get('VIPILOT_REQUIRE_PG_REPACK') == '1'
-        if platform.system() == 'Windows' and not prod and not force:
+        if platform.system() == 'Windows' and not force:
             write_log_entry(
                 None,
                 '[upgrade] pg_repack: на Windows CLI не установлен — '

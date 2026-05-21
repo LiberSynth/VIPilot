@@ -5,7 +5,6 @@ _SILENT_GET_PATHS = {
     '/api/monitor',
     '/api/workflow/state',
     '/api/donors/count',
-    '/healthz',
     '/favicon.ico',
 }
 

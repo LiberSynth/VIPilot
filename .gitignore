@@ -17,8 +17,3 @@ __pycache__/
 # Flask instance folder
 instance/
 
-# Replit
-.pythonlibs/
-.cache/
-.upm/
-.local/

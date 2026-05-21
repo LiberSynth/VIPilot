@@ -37,7 +37,7 @@ from utils.utils import (
 
 bp = Blueprint("web", __name__)
 
-RESERVED_SLUGS = {"web", "save", "logout", "select-module", "healthz", "favicon.ico", "icon-preview", "root", "production"}
+RESERVED_SLUGS = {"web", "save", "logout", "select-module", "favicon.ico", "icon-preview", "root", "production"}
 failed_logins = {}
 
 
@@ -108,11 +108,6 @@ def _redirect_after_login():
 @bp.route("/favicon.ico")
 def favicon():
     return send_file("generated-icon.png", mimetype="image/png")
-
-
-@bp.route("/healthz")
-def healthz():
-    return "ok", 200
 
 
 @bp.route("/icon-preview")

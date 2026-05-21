@@ -16,17 +16,7 @@
 Признак первого запуска — отсутствие `build_number` в таблице `environment`.
 `seed_db()` вызывается **только при первом запуске**. `build_number` фиксируется после всех шагов.
 
-### На деве (`REPLIT_DEPLOYMENT != "1"`)
-
-1. `bootstrap()` — idempotent (CREATE TABLE IF NOT EXISTS).
-2. Если `build_number` отсутствует → `seed_db()` (users-семейство).
-3. `run_migrations()` — применяет все незапущенные миграции.
-4. `_run_post_migration_checks()` — проверки данных.
-5. `env_set(build_number)` — фиксируется после всех шагов.
-6. Проверки серверного окружения **не запускаются** — только прод.
-7. Возвращает `False`.
-
-### На проде (`REPLIT_DEPLOYMENT == "1"`)
+### Во всех средах
 
 1. `bootstrap()` — idempotent.
 2. Если `build_number` совпадает с `BUILD` — ранний выход, ничего не делается.
@@ -34,7 +24,11 @@
 4. Если `build_number` отсутствует → `seed_db()` (users-семейство).
 5. `run_migrations()` → `_run_post_migration_checks()`.
 6. `env_set(build_number)` — фиксируется **только после** успешного завершения всех шагов.
-7. Возвращает `True`.
+7. Возвращает `True` при выполнении апгрейда, `False` при раннем выходе.
+
+Примечание по `pg_repack`:
+- На Windows отсутствие `pg_repack` CLI допускается (дефрагментация идёт через `VACUUM FULL`).
+- Для строгой проверки на Windows задаётся `VIPILOT_REQUIRE_PG_REPACK=1`.
 
 ## Что делать если нужна новая проверка окружения
 

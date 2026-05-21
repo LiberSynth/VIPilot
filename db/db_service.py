@@ -390,7 +390,7 @@ def _parse_db_url() -> dict:
     Возвращает host/port/user/password/dbname плюс `extra_env` —
     libpq-переменные (PGSSLMODE, PGOPTIONS и т.п.), извлечённые из
     query-строки DSN. Это нужно, чтобы pg_repack подключался ровно с
-    теми же опциями, что и приложение (в Replit/Neon обычно требуется
+    теми же опциями, что и приложение (например, когда нужен
     sslmode=require).
     """
     dsn = os.environ.get('DATABASE_URL')
