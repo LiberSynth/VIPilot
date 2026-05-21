@@ -16,6 +16,7 @@ from db import (
     init_db,
     db_clear_all_history,
     db_vacuum_full,
+    db_get_database_size_bytes,
 )
 from db import (
     env_get,
@@ -71,6 +72,23 @@ import common.environment as environment
 from common.statuses import batch_is_active
 
 bp = Blueprint("api", __name__, url_prefix="/api")
+
+
+def _fmt_bytes_short(value: int) -> str:
+    size = float(max(0, int(value or 0)))
+    units = ("Б", "КБ", "МБ", "ГБ", "ТБ")
+    for unit in units:
+        if size < 1024.0 or unit == units[-1]:
+            if unit == "Б":
+                return f"{int(size)} {unit}"
+            return f"{size:.2f} {unit}"
+        size /= 1024.0
+    return "0 Б"
+
+
+def _fmt_signed_bytes(value: int) -> str:
+    sign = "+" if value >= 0 else "-"
+    return f"{sign}{_fmt_bytes_short(abs(int(value or 0)))}"
 
 
 _RUBRICATOR = {
@@ -560,22 +578,38 @@ def api_clear_history():
 def api_vacuum_db():
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
-    write_log_entry(None, "[api] Дефрагментация БД запущена вручную.", level='info')
+    size_before = db_get_database_size_bytes()
+    write_log_entry(
+        None,
+        "[api] Дефрагментация БД запущена вручную. "
+        f"Размер БД: {_fmt_bytes_short(size_before)} ({size_before} байт).",
+        level='info',
+    )
     try:
         result = db_vacuum_full()
     except Exception as e:
         write_log_entry(None, f"[api] Дефрагментация БД: ошибка — {e}", level='error')
         return jsonify({"ok": False, "error": str(e)}), 500
+    size_after = db_get_database_size_bytes()
+    size_delta = size_after - size_before
+    result["db_size_before_bytes"] = size_before
+    result["db_size_after_bytes"] = size_after
+    result["db_size_delta_bytes"] = size_delta
     summary = (
         f"mode={result.get('mode', 'pg_repack')}, "
         f"tables_ok={result.get('tables_ok')}/{result.get('tables_total')}, "
         f"freed_bytes={result.get('freed_bytes', 0)}"
     )
+    db_size_summary = (
+        f"db_before={_fmt_bytes_short(size_before)} ({size_before} байт), "
+        f"db_after={_fmt_bytes_short(size_after)} ({size_after} байт), "
+        f"db_delta={_fmt_signed_bytes(size_delta)}"
+    )
     if result.get("tables_failed", 0) > 0:
         failed = [r["table"] for r in result.get("results", []) if not r.get("ok")]
         write_log_entry(
             None,
-            f"[api] Дефрагментация БД завершена с ошибками: {summary}",
+            f"[api] Дефрагментация БД завершена с ошибками: {summary}, {db_size_summary}",
             level='warn',
         )
         return jsonify({
@@ -583,7 +617,11 @@ def api_vacuum_db():
             "error": f"Сбой по таблицам: {', '.join(failed)}",
             "result": result,
         })
-    write_log_entry(None, f"[api] Дефрагментация БД завершена ({summary}).", level='info')
+    write_log_entry(
+        None,
+        f"[api] Дефрагментация БД завершена ({summary}, {db_size_summary}).",
+        level='info',
+    )
     return jsonify({"ok": True, "result": result})
 
 

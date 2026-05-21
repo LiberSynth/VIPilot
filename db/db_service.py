@@ -612,6 +612,14 @@ def _table_size(qualified: str) -> int:
             return int(row[0]) if row and row[0] is not None else 0
 
 
+def db_get_database_size_bytes() -> int:
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute('SELECT pg_database_size(current_database())')
+            row = cur.fetchone()
+            return int(row[0]) if row and row[0] is not None else 0
+
+
 def db_clear_all_history():
     with get_db() as conn:
         with conn.cursor() as cur:
