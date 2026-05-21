@@ -289,27 +289,66 @@
     return orphanCount != null ? orphanCount : 0;
   }
 
+  function _tsMs(iso) {
+    const ts = Date.parse(iso || '');
+    return Number.isNaN(ts) ? 0 : ts;
+  }
+
+  function _sysgroupHeadTime(items, orphList, fallbackIso) {
+    const merged = [];
+    (items || []).forEach(function(e) {
+      if (e && e.created_at) merged.push(e.created_at);
+    });
+    (orphList || []).forEach(function(e) {
+      if (e && e.created_at) merged.push(e.created_at);
+    });
+    if (!merged.length) return fallbackIso || null;
+    merged.sort(function(a, b) { return _tsMs(b) - _tsMs(a); });
+    return merged[0];
+  }
+
+  function _renderSysRows(items, orphList) {
+    const merged = [];
+    (items || []).forEach(function(e) {
+      merged.push({ kind: 'log', created_at: e.created_at, data: e });
+    });
+    (orphList || []).forEach(function(e) {
+      merged.push({ kind: 'orphan', created_at: e.created_at, data: e });
+    });
+    merged.sort(function(a, b) { return _tsMs(b.created_at) - _tsMs(a.created_at); });
+    return merged.map(function(row) {
+      if (row.kind === 'log') {
+        const e = row.data || {};
+        const st = e.status || 'info';
+        const expandable = e.pipeline !== 'system';
+        const clickAttr  = expandable ? ' onclick="monitorToggleSysLog(event,this)"' : '';
+        const chevron    = expandable ? '<span class="monitor-syslog-chevron">\u25bc</span>' : '';
+        return '<div class="monitor-sysgroup-item monitor-sysgroup-log-item" data-lid="' + esc(e.id) + '"' + clickAttr + '>' +
+          '<div class="monitor-sysgroup-log-row">' +
+            '<span class="monitor-sysgroup-ts">'  + fmtMsk(e.created_at)                            + '</span>' +
+            '<span class="monitor-sysgroup-pip">' + esc(PIPELINE_LABELS[e.pipeline] || e.pipeline) + '</span>' +
+            '<span class="monitor-sysgroup-msg '  + esc(st) + '">' + esc(e.message || '')           + '</span>' +
+            chevron +
+          '</div>' +
+        '</div>';
+      }
+      const e = row.data || {};
+      const lvl = e.level || 'info';
+      return '<div class="monitor-sysgroup-item monitor-sysgroup-orphan-item">' +
+        '<span class="monitor-sysgroup-ts">'  + fmtMsk(e.created_at)                   + '</span>' +
+        '<span class="monitor-sysgroup-pip orphan-pip">—</span>'                        +
+        '<span class="monitor-sysgroup-msg ' + esc(lvl) + '">' + esc(e.message || '')  + '</span>' +
+      '</div>';
+    }).join('');
+  }
+
   function renderSysGroup(items, posKey, dateBefore, dateAfter, orphanCount, orphanMinAt, orphans) {
     const key      = posKey || '';
     const orphList = orphans || [];
     const n        = _sysgroupEventCount(items, orphList, orphanCount);
-    const headTime = orphanMinAt || (items.length > 0 ? items[items.length - 1].created_at : null);
+    const headTime = _sysgroupHeadTime(items, orphList, orphanMinAt || null);
     const sub      = n > 0 ? ('Событий ' + n) : '…';
-
-    const rows = items.map(function(e) {
-      const st = e.status || 'info';
-      const expandable = e.pipeline !== 'system';
-      const clickAttr  = expandable ? ' onclick="monitorToggleSysLog(event,this)"' : '';
-      const chevron    = expandable ? '<span class="monitor-syslog-chevron">\u25bc</span>' : '';
-      return '<div class="monitor-sysgroup-item monitor-sysgroup-log-item" data-lid="' + esc(e.id) + '"' + clickAttr + '>' +
-        '<div class="monitor-sysgroup-log-row">' +
-          '<span class="monitor-sysgroup-ts">'  + fmtMsk(e.created_at)                          + '</span>' +
-          '<span class="monitor-sysgroup-pip">' + esc(PIPELINE_LABELS[e.pipeline] || e.pipeline) + '</span>' +
-          '<span class="monitor-sysgroup-msg '  + esc(st) + '">' + esc(e.message || '')          + '</span>' +
-          chevron +
-        '</div>' +
-      '</div>';
-    }).join('') + _renderOrphanRows(orphList);
+    const rows = _renderSysRows(items, orphList);
 
     const sysActions =
       '<div class="monitor-hdr-actions-always" onclick="event.stopPropagation()">' +
@@ -640,7 +679,7 @@
       if (existing) {
         if (g.type === 'sysgroup') {
           _updateSgInPlace(existing, g);
-          _injectOrphansIntoSg(existing, g._orphans || []);
+          _injectOrphansIntoSg(existing, g);
           _lastRenderedHtml[key] = newHtml;
           return existing;
         }
@@ -772,31 +811,15 @@
       });
   }
 
-  function _renderOrphanRows(entries) {
-    return entries.map(function(e) {
-      var lvl = e.level || 'info';
-      return '<div class="monitor-sysgroup-item monitor-sysgroup-orphan-item">' +
-        '<span class="monitor-sysgroup-ts">'  + fmtMsk(e.created_at)                + '</span>' +
-        '<span class="monitor-sysgroup-pip orphan-pip">—</span>'                     +
-        '<span class="monitor-sysgroup-msg '  + esc(lvl) + '">' + esc(e.message || '') + '</span>' +
-      '</div>';
-    }).join('');
-  }
-
-  function _injectOrphansIntoSg(sgEl, entries) {
+  function _injectOrphansIntoSg(sgEl, g) {
     var itemsEl = sgEl.querySelector('.monitor-sysgroup-items');
     if (!itemsEl) return;
-    Array.prototype.slice.call(itemsEl.children).forEach(function(child) {
-      if (child.classList.contains('monitor-sysgroup-orphan-item')) {
-        itemsEl.removeChild(child);
-      }
-    });
-    if (entries.length) itemsEl.insertAdjacentHTML('beforeend', _renderOrphanRows(entries));
+    itemsEl.innerHTML = _renderSysRows(g.items || [], g._orphans || []);
   }
 
   function _updateSgInPlace(sgEl, g) {
     var n = _sysgroupEventCount(g.items || [], g._orphans || [], g._orphanCount);
-    var headTime = g._orphanMinAt || (g.items && g.items.length > 0 ? g.items[g.items.length - 1].created_at : null);
+    var headTime = _sysgroupHeadTime(g.items || [], g._orphans || [], g._orphanMinAt || null);
     var titleEl = sgEl.querySelector('.monitor-sysgroup-title');
     var subEl   = sgEl.querySelector('.monitor-sysgroup-sub');
     var newTitle = headTime ? fmtMsk(headTime) : '';

@@ -82,6 +82,10 @@ def _on_exit():
 def _install_shutdown_hooks():
     def _handler(signum, _frame):
         log_app_stopped()
+        if signum == signal.SIGINT:
+            # Preserve standard Ctrl+C behavior in dev console.
+            signal.default_int_handler(signum, _frame)
+        raise SystemExit(0)
 
     for sig in (signal.SIGTERM, signal.SIGINT):
         try:
