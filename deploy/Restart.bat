@@ -1,3 +1,10 @@
 @echo off
-powershell -NoProfile -ExecutionPolicy Bypass -Command "Restart-Service -Name 'VIPilotService' -ErrorAction Stop"
+setlocal
+
+call "%~dp0Stop.bat"
+if errorlevel 1 exit /b %ERRORLEVEL%
+
+timeout /t 1 /nobreak >nul
+
+call "%~dp0Start.bat"
 exit /b %ERRORLEVEL%
