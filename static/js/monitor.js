@@ -403,7 +403,16 @@
       for (var i = 0; i < groups.length; i++) {
         if (groups[i].type === 'batch') { firstBatch = groups[i].data; break; }
       }
-      if (!(groups.length > 0 && groups[0].type === 'sysgroup')) {
+      if (groups.length > 0 && groups[0].type === 'sysgroup') {
+        // Если верхний sysgroup уже есть (например, из pipeline=system),
+        // подмешиваем в него orphan-записи из log_entries с log_id IS NULL.
+        var topOrphans = hasSystemTop.orphan_entries || [];
+        groups[0]._orphans = (groups[0]._orphans || []).concat(topOrphans);
+        groups[0]._orphanCount = (groups[0]._orphanCount || 0) + (hasSystemTop.orphan_count || topOrphans.length);
+        if (hasSystemTop.orphan_min_at && (!groups[0]._orphanMinAt || new Date(hasSystemTop.orphan_min_at) < new Date(groups[0]._orphanMinAt))) {
+          groups[0]._orphanMinAt = hasSystemTop.orphan_min_at;
+        }
+      } else {
         var topKey = 'top:' + (firstBatch ? firstBatch.batch_id : 'bottom');
         groups.unshift({
           type:         'sysgroup',
