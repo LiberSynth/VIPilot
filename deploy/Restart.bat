@@ -2,9 +2,9 @@
 setlocal
 
 call "%~dp0Stop.bat"
-if errorlevel 1 exit /b %ERRORLEVEL%
-
-timeout /t 1 /nobreak >nul
+set "RC=%ERRORLEVEL%"
+if not "%RC%"=="0" exit /b %RC%
 
 call "%~dp0Start.bat"
-exit /b %ERRORLEVEL%
+set "RC=%ERRORLEVEL%"
+exit /b %RC%
