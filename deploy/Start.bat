@@ -12,6 +12,10 @@ if "%RC%"=="1056" (
 if not "%RC%"=="0" if not "%RC%"=="1056" (
   echo [ERROR] Failed to start %SERVICE%. SC code: %RC%
   sc query "%SERVICE%"
+  if /I not "%VIPILOT_NO_PAUSE%"=="1" (
+    echo.
+    pause
+  )
   exit /b %RC%
 )
 
@@ -19,6 +23,10 @@ call :WaitForState RUNNING 60
 if not "%ERRORLEVEL%"=="0" (
   echo [ERROR] %SERVICE% did not reach RUNNING state in time.
   sc query "%SERVICE%"
+  if /I not "%VIPILOT_NO_PAUSE%"=="1" (
+    echo.
+    pause
+  )
   exit /b 1
 )
 
