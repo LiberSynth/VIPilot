@@ -1,7 +1,11 @@
 @echo off
 setlocal
 
-cd /d "%~dp0..\.."
+cd /d "%~dp0.."
+if not exist ".git" (
+  echo [ERROR] Repository root not found: %CD%
+  exit /b 1
+)
 
 echo [1/3] Stopping VIPilotService...
 powershell -NoProfile -ExecutionPolicy Bypass -Command "Stop-Service -Name 'VIPilotService' -ErrorAction Stop"
