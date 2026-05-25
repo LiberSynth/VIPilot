@@ -22,7 +22,6 @@ import tempfile
 import common.environment as environment
 from utils.notify import notify_failure
 from db import (
-    cycle_config_get,
     db_get_batch_by_id,
     db_get_active_targets,
     db_claim_batch_status,
@@ -37,8 +36,6 @@ from utils.utils import fmt_id_msg
 
 
 def _ffmpeg(src, dst, log_id):
-    duration = float(cycle_config_get('video_duration'))
-
     cmd = [
         'ffmpeg', '-y',
         '-i', src,
@@ -51,15 +48,15 @@ def _ffmpeg(src, dst, log_id):
         '-r', '30',
         '-c:a', 'aac',
         '-b:a', '96k',
+        '-af', 'apad',
+        '-shortest',
         '-movflags', '+faststart',
     ]
-
-    cmd += ['-t', str(duration)]
 
     cmd.append(dst)
     write_log_entry(
         log_id,
-        f"[transcode] phase=ffmpeg_start, src={src}, dst={dst}, duration={duration}, cmd={' '.join(cmd)}",
+        f"[transcode] phase=ffmpeg_start, src={src}, dst={dst}, cmd={' '.join(cmd)}",
         level='silent',
     )
 
