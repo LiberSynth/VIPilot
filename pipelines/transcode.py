@@ -94,7 +94,7 @@ def _ffmpeg(src, dst, log_id):
 
 
 def run(batch_id, log_id):
-    environment.snapshot()
+    snap = environment.snapshot()
     batch = db_get_batch_by_id(batch_id)
     if not batch:
         db_log_update(log_id, "Батч не найден", "error")
