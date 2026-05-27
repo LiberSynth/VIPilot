@@ -1,9 +1,18 @@
 import json
+from pathlib import Path
 import psycopg2
 import psycopg2.extras
 
 from .connection import get_db
 from common.statuses import _assert_known_status, PIPELINE_RESET_STATUS
+
+_RAW_FIELD = "raw_data"
+_TRANSCODED_FIELD = "transcoded_data"
+_VIDEO_DIR = Path(__file__).resolve().parents[1] / "video"
+
+
+def _movie_video_file_exists(movie_id: str, field: str) -> bool:
+    return (_VIDEO_DIR / f"{movie_id} - {field}.mp4").exists()
 
 
 def db_ensure_batch(scheduled_at):
@@ -299,12 +308,10 @@ def db_transfer_donor_movie(donor_batch_id: str, batch_id: str) -> str | None:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT b.id, b.movie_id,
-                       (m.transcoded_data IS NOT NULL) AS has_transcoded,
-                       (m.raw_data IS NOT NULL) AS has_raw
+                SELECT b.id, b.movie_id
                 FROM batches b
-                JOIN movies m ON m.id = b.movie_id
                 WHERE b.id = %s::uuid
+                  AND b.movie_id IS NOT NULL
             """,
                 (donor_batch_id,),
             )
@@ -312,7 +319,8 @@ def db_transfer_donor_movie(donor_batch_id: str, batch_id: str) -> str | None:
             if not donor:
                 return None
 
-            donor_id, donor_movie_id, has_transcoded, has_raw = donor
+            donor_id, donor_movie_id = donor
+            has_transcoded = _movie_video_file_exists(str(donor_movie_id), _TRANSCODED_FIELD)
 
             new_status = "transcode_ready" if has_transcoded else "video_ready"
             cur.execute(
