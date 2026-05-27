@@ -888,60 +888,6 @@ def api_export_backup_table(table):
     )
 
 
-@bp.route("/export-backup-video/list")
-def api_export_backup_movie_list():
-    if not is_authenticated():
-        return Response("Unauthorized", status=401)
-    from db.connection import get_db
-    VIDEO_FIELDS = ["raw_data", "transcoded_data"]
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT id,
-                       (raw_data IS NOT NULL)        AS has_raw,
-                       (transcoded_data IS NOT NULL) AS has_trans
-                FROM movies
-                ORDER BY created_at
-            """)
-            rows = cur.fetchall()
-    result = []
-    for row in rows:
-        movie_id = str(row[0])
-        fields = []
-        if row[1]:
-            fields.append("raw_data")
-        if row[2]:
-            fields.append("transcoded_data")
-        if fields:
-            result.append({"id": movie_id, "fields": fields})
-    return jsonify(result)
-
-
-@bp.route("/export-backup-video/<movie_id>/<field>")
-def api_export_backup_movie_field(movie_id, field):
-    if not is_authenticated():
-        return Response("Unauthorized", status=401)
-    ALLOWED = {"raw_data", "transcoded_data"}
-    if field not in ALLOWED:
-        return jsonify({"error": "invalid field"}), 400
-    from db.connection import get_db
-    import re
-    if not re.match(r'^[0-9a-f-]{36}$', movie_id):
-        return jsonify({"error": "invalid id"}), 400
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute(f"SELECT {field} FROM movies WHERE id = %s", (movie_id,))
-            row = cur.fetchone()
-    if not row or row[0] is None:
-        return jsonify({"error": "not_found"}), 404
-    return send_file(
-        io.BytesIO(bytes(row[0])),
-        mimetype="video/mp4",
-        as_attachment=True,
-        download_name=f"{movie_id} - {field}.mp4",
-    )
-
-
 @bp.route("/import-backup/table", methods=["POST"])
 def api_import_backup_table():
     if not is_authenticated():
@@ -957,31 +903,6 @@ def api_import_backup_table():
     from utils.import_backup import import_table
     summary = import_table(table, content)
     return jsonify(summary)
-
-
-@bp.route("/import-backup-video/<movie_id>/<field>", methods=["POST"])
-def api_import_backup_video_field(movie_id, field):
-    if not is_authenticated():
-        return Response("Unauthorized", status=401)
-    ALLOWED = {"raw_data", "transcoded_data"}
-    if field not in ALLOWED:
-        return jsonify({"error": "invalid field"}), 400
-    import re as _re
-    if not _re.match(r'^[0-9a-f-]{36}$', movie_id):
-        return jsonify({"error": "invalid id"}), 400
-    data = request.get_data()
-    if not data:
-        return jsonify({"error": "empty body"}), 400
-    from db.connection import get_db
-    from psycopg2 import Binary
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                f'INSERT INTO movies (id, "{field}") VALUES (%s, %s) '
-                f'ON CONFLICT (id) DO UPDATE SET "{field}" = EXCLUDED."{field}"',
-                (movie_id, Binary(data)),
-            )
-    return jsonify({"ok": True})
 
 
 production_bp = Blueprint("production_api", __name__)
