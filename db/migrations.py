@@ -29,57 +29,14 @@ from log.log import write_log_entry
 # Функции миграций
 # ---------------------------------------------------------------------------
 
-# Миграции 1–107 удалены.
-
-
-def _m108_drop_file_lifetime_setting(cur):
-    """Удаляет устаревший параметр settings.file_lifetime."""
-    cur.execute("DELETE FROM settings WHERE key = 'file_lifetime'")
-
-
-def _m109_drop_emulation_mode_environment_key(cur):
-    """Удаляет устаревший параметр environment.emulation_mode."""
-    cur.execute("DELETE FROM environment WHERE key = 'emulation_mode'")
-
-
-def _m110_rename_legacy_batch_types_to_manual(cur):
-    """Переименовывает legacy типы/статусы батчей в manual."""
-    cur.execute("""
-        UPDATE batches
-           SET type = CASE
-               WHEN type = 'movie_probe' THEN 'movie_manual'
-               WHEN type = 'story_probe' THEN 'story_manual'
-               ELSE type
-           END
-         WHERE type IN ('movie_probe', 'story_probe')
-    """)
-    cur.execute("""
-        UPDATE batches
-           SET status = CASE
-               WHEN status = 'movie_probe' THEN 'movie_manual'
-               WHEN status = 'story_probe' THEN 'story_manual'
-               ELSE status
-           END
-         WHERE status IN ('movie_probe', 'story_probe')
-    """)
-
-
-def _m111_drop_legacy_movie_bytea_columns(cur):
-    """Удаляет legacy BYTEA-колонки видеоданных из movies."""
-    cur.execute("ALTER TABLE movies DROP COLUMN IF EXISTS raw_data")
-    cur.execute("ALTER TABLE movies DROP COLUMN IF EXISTS transcoded_data")
+# Все миграции удалены.
 
 
 # ---------------------------------------------------------------------------
 # Реестр миграций — добавляйте только в конец, никогда не переиспользуйте номера
 # ---------------------------------------------------------------------------
 
-MIGRATIONS = [
-    (108, _m108_drop_file_lifetime_setting),
-    (109, _m109_drop_emulation_mode_environment_key),
-    (110, _m110_rename_legacy_batch_types_to_manual),
-    (111, _m111_drop_legacy_movie_bytea_columns),
-]
+MIGRATIONS = []
 
 
 # ---------------------------------------------------------------------------
