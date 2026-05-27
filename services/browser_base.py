@@ -6,7 +6,6 @@
 """
 
 import base64
-import os
 import queue
 import threading
 import time

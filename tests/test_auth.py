@@ -4,10 +4,6 @@ Tests that protected API endpoints return HTTP 401 for unauthenticated requests.
 This catches bugs where the auth guard is accidentally removed or calls an
 undefined function (which would produce a 500 instead of a 401).
 """
-import pytest
-from unittest.mock import patch, MagicMock
-
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
