@@ -7,9 +7,9 @@ Pipeline 4 — Транскодирование.
 transcode_ready без единой записи в лог.
 
 Если включено:
-  - Отсутствие оригинала в БД → fatal_error (ошибка логики приложения).
+  - Отсутствие оригинального raw-файла → fatal_error (ошибка логики приложения).
   - Любой другой сбой (ffmpeg и т.п.) → некритично: лог-предупреждение,
-    батч всё равно переходит в transcode_ready с пустым movies.transcoded_data
+    батч всё равно переходит в transcode_ready без transcoded-файла
     (пайплайн публикации возьмёт оригинал как запасной вариант).
 
 Статус: video_ready → transcoding → transcode_ready / transcode_error.
@@ -162,12 +162,12 @@ def run(batch_id, log_id):
 
     original_data = db_get_batch_original_video(batch_id)
     if original_data is None:
-        msg = 'movies.raw_data = NULL у батча в статусе video_ready — ошибка логики'
+        msg = 'Оригинальный raw-файл не найден у батча в статусе video_ready — ошибка логики'
         write_log_entry(log_id, msg, level='error')
         raise FatalError(msg)
 
     src_mb = round(len(original_data) / 1024 / 1024, 1)
-    write_log_entry(log_id, 'Оригинал получен из БД, запускаю ffmpeg.')
+    write_log_entry(log_id, 'Оригинал получен из файла, запускаю ffmpeg.')
     write_log_entry(log_id, f"[transcode] Оригинал {src_mb} МБ, запускаю ffmpeg.", level='silent')
 
     tmp_src_path = None
@@ -234,7 +234,7 @@ def run(batch_id, log_id):
     write_log_entry(log_id, msg)
     db_save_transcoded_data(batch_id, video_data)
     db_set_batch_status(batch_id, 'transcode_ready')
-    write_log_entry(log_id, f"[transcode] Готово: {out_mb} МБ → БД", level='silent')
+    write_log_entry(log_id, f"[transcode] Готово: {out_mb} МБ → transcoded-файл", level='silent')
     write_log_entry(
         log_id,
         fmt_id_msg("[transcode] Батч {} — phase=run_done, status=transcode_ready, transcoded_mb={}", batch_id, out_mb),
