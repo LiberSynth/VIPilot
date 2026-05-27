@@ -349,7 +349,7 @@ def bootstrap():
                     FROM batches b
                     JOIN movies m ON m.id = b.movie_id
                     WHERE (m.transcoded_data IS NOT NULL OR m.raw_data IS NOT NULL)
-                      AND b.status IN ('cancelled', 'movie_probe')
+                      AND b.status IN ('cancelled', 'movie_manual')
                       AND (NOT p_good_only OR m.grade = 'good');
                     RETURN v_count;
                 END;
@@ -367,7 +367,7 @@ def bootstrap():
                     FROM batches b
                     JOIN movies m ON m.id = b.movie_id
                     WHERE (m.transcoded_data IS NOT NULL OR m.raw_data IS NOT NULL)
-                      AND b.status IN ('cancelled', 'movie_probe')
+                      AND b.status IN ('cancelled', 'movie_manual')
                       AND (NOT p_good_only OR m.grade = 'good')
                     ORDER BY b.created_at ASC
                     LIMIT 1 FOR UPDATE OF b;

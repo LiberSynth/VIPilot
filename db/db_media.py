@@ -120,7 +120,7 @@ def db_get_movie_video_data(movie_id) -> bytes | None:
 
 
 def db_create_manual_movie(title: str, video_data: bytes) -> str:
-    """Создаёт сюжет, батч movie_probe и ролик из файла в одной транзакции.
+    """Создаёт сюжет, батч movie_manual и ролик из файла в одной транзакции.
 
     Если в stories уже есть запись с таким же title — переиспользует её.
     Батч сразу переводится в статус video_ready, минуя pending.
@@ -143,7 +143,7 @@ def db_create_manual_movie(title: str, video_data: bytes) -> str:
                 )
                 story_id = cur.fetchone()[0]
             cur.execute(
-                "INSERT INTO batches (type, story_id) VALUES ('movie_probe', %s) RETURNING id",
+                "INSERT INTO batches (type, story_id) VALUES ('movie_manual', %s) RETURNING id",
                 (story_id,),
             )
             batch_id = str(cur.fetchone()[0])

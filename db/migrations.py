@@ -42,6 +42,28 @@ def _m109_drop_emulation_mode_environment_key(cur):
     cur.execute("DELETE FROM environment WHERE key = 'emulation_mode'")
 
 
+def _m110_rename_legacy_batch_types_to_manual(cur):
+    """Переименовывает legacy типы/статусы батчей в manual."""
+    cur.execute("""
+        UPDATE batches
+           SET type = CASE
+               WHEN type = 'movie_probe' THEN 'movie_manual'
+               WHEN type = 'story_probe' THEN 'story_manual'
+               ELSE type
+           END
+         WHERE type IN ('movie_probe', 'story_probe')
+    """)
+    cur.execute("""
+        UPDATE batches
+           SET status = CASE
+               WHEN status = 'movie_probe' THEN 'movie_manual'
+               WHEN status = 'story_probe' THEN 'story_manual'
+               ELSE status
+           END
+         WHERE status IN ('movie_probe', 'story_probe')
+    """)
+
+
 # ---------------------------------------------------------------------------
 # Реестр миграций — добавляйте только в конец, никогда не переиспользуйте номера
 # ---------------------------------------------------------------------------
@@ -49,6 +71,7 @@ def _m109_drop_emulation_mode_environment_key(cur):
 MIGRATIONS = [
     (108, _m108_drop_file_lifetime_setting),
     (109, _m109_drop_emulation_mode_environment_key),
+    (110, _m110_rename_legacy_batch_types_to_manual),
 ]
 
 

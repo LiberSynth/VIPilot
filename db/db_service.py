@@ -851,8 +851,8 @@ def db_cleanup_batches(batch_lifetime_days: int) -> int:
                 SELECT id FROM batches
                 WHERE (
                     status IN ('published', 'cancelled')
-                    OR (type = 'movie_probe' AND status = 'movie_probe')
-                    OR (type = 'story_probe' AND status = 'story_probe')
+                    OR (type = 'movie_manual' AND status = 'movie_manual')
+                    OR (type = 'story_manual' AND status = 'story_manual')
                 )
                   AND created_at < now() - make_interval(days => %s)
             """, (batch_lifetime_days,))

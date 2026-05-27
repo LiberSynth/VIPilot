@@ -28,8 +28,8 @@
     published:            'опубликовано',
     published_partially:  'частично опубликовано',
     publish_error:        'публикация: ошибка',
-    movie_probe:      'пробный',
-    story_probe:      'пробный (сюжет)',
+    movie_manual:     'ручной',
+    story_manual:     'ручной (сюжет)',
     cancelled:        'отменён',
     donated:          'из пула',
   };
@@ -99,7 +99,7 @@
 
   const PIPELINE_RESTARTABLE    = ['story', 'video', 'transcode', 'publish'];
   const PIPELINE_ERROR_STATUSES = ['error', 'video_error', 'transcode_error', 'publish_error', 'fatal_error'];
-  const FINAL_BATCH_STATUSES    = ['published', 'published_partially', 'movie_probe', 'story_probe', 'cancelled', 'error', 'fatal_error', 'video_error', 'transcode_error', 'publish_error', 'donated'];
+  const FINAL_BATCH_STATUSES    = ['published', 'published_partially', 'movie_manual', 'story_manual', 'cancelled', 'error', 'fatal_error', 'video_error', 'transcode_error', 'publish_error', 'donated'];
   const PUBLISH_FRAME_POLL_MS   = 700;
 
   const MON_SVG_EXPAND   = `<svg viewBox="0 0 16 16"><polyline points="2,6 2,2 6,2"/><polyline points="10,2 14,2 14,6"/><polyline points="14,10 14,14 10,14"/><polyline points="6,14 2,14 2,10"/></svg>`;
@@ -197,12 +197,12 @@
     const headTime = batch.created_at;
     const schedStr = batch.type === 'slot'
       ? 'Публикация: ' + fmtMskShort(batch.scheduled_at)
-      : batch.type === 'movie_probe'
-        ? 'Пробное видео'
-        : batch.type === 'story_probe'
-          ? 'Пробный сюжет'
+      : batch.type === 'movie_manual'
+        ? 'Ручное видео'
+        : batch.type === 'story_manual'
+          ? 'Ручной сюжет'
           : 'Публикация: сейчас';
-    const statusLabel = (bs === 'movie_probe' || bs === 'story_probe') ? 'выполнен' : translateStatus(bs);
+    const statusLabel = (bs === 'movie_manual' || bs === 'story_manual') ? 'выполнен' : translateStatus(bs);
     const sub = [schedStr, statusLabel, batch.title || '']
       .filter(Boolean).join(' · ');
 
@@ -219,7 +219,7 @@
       '</div>';
     }
 
-    const doneStatuses    = ['published', 'movie_probe', 'story_probe'];
+    const doneStatuses    = ['published', 'movie_manual', 'story_manual'];
     const partialStatuses = ['published_partially'];
     const waitStatuses    = ['story_ready', 'video_pending', 'video_ready', 'transcode_ready'];
     const errorStatuses   = ['error', 'video_error', 'transcode_error', 'publish_error', 'fatal_error'];

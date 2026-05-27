@@ -27,7 +27,7 @@ from db import (
     db_get_batch_video_data,
     db_get_movie_video_data,
     db_create_video_batch,
-    db_create_story_probe_batch,
+    db_create_story_manual_batch,
     db_get_batch_logs,
     cycle_config_get,
     cycle_config_set,
@@ -1351,10 +1351,10 @@ def api_production_video_generate():
     story_id = data.get("story_id") or None
     if model_id:
         batch_id = db_create_video_batch(
-            "movie_probe", movie_model_id=model_id, story_id=story_id
+            "movie_manual", movie_model_id=model_id, story_id=story_id
         )
     else:
-        batch_id = db_create_video_batch("movie_probe", story_id=story_id)
+        batch_id = db_create_video_batch("movie_manual", story_id=story_id)
     if not batch_id:
         return jsonify({"error": "db_error"}), 500
     environment.wakeup_loop()
@@ -1372,7 +1372,7 @@ def api_production_story_generate():
     data = request.get_json(silent=True) or {}
     model_id = data.get("model_id") or None
     if model_id:
-        batch_id = db_create_story_probe_batch(model_id)
+        batch_id = db_create_story_manual_batch(model_id)
     else:
         batch_id = db_create_story_autogenerate_batch()
     if not batch_id:

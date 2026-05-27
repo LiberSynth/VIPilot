@@ -199,12 +199,12 @@ def run(batch_id, log_id):
         return
 
     if parsed is None:
-        if batch['type'] == 'movie_probe':
-            db_log_update(log_id, 'Публикация (пробный).', 'running')
-            write_log_entry(log_id, 'Пробный батч — публикация на платформу не выполняется')
-            write_log_entry(log_id, fmt_id_msg("[publish] Батч {} пробный — публикация пропущена", batch_id), level='silent')
-            db_set_batch_status(batch_id, 'movie_probe')
-            db_log_update(log_id, 'Без публикации (пробный батч)', 'ok')
+        if batch['type'] == 'movie_manual':
+            db_log_update(log_id, 'Публикация (ручной).', 'running')
+            write_log_entry(log_id, 'Ручной батч — публикация на платформу не выполняется')
+            write_log_entry(log_id, fmt_id_msg("[publish] Батч {} ручной — публикация пропущена", batch_id), level='silent')
+            db_set_batch_status(batch_id, 'movie_manual')
+            db_log_update(log_id, 'Без публикации (ручной батч)', 'ok')
             return
 
         if check_cancelled('publish', batch_id, batch, log_id):

@@ -3,14 +3,14 @@ KNOWN_BATCH_STATUSES = frozenset({
     'story_ready', 'video_generating', 'video_pending',
     'video_ready', 'transcoding',
     'transcode_ready',
-    'story_probe',
-    'cancelled', 'error', 'movie_probe', 'donated', 'reserved',
+    'story_manual',
+    'cancelled', 'error', 'movie_manual', 'donated', 'reserved',
     'video_error', 'transcode_error', 'publish_error', 'published',
     'published_partially', 'fatal_error',
 })
 
 FINAL_BATCH_STATUSES = (
-    'published', 'published_partially', 'movie_probe', 'story_probe',
+    'published', 'published_partially', 'movie_manual', 'story_manual',
     'cancelled', 'error', 'fatal_error',
     'video_error', 'transcode_error', 'publish_error',
     'donated', 'reserved',

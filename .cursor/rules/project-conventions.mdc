@@ -17,3 +17,16 @@ Required behavior:
 - Follow their standards for error handling, logging, environment access, and UI/backend patterns.
 - If any rule is ambiguous or conflicting, ask the user before implementing.
 - After substantial code edits, run `bash scripts/check_conventions.sh` when available and fix reported violations.
+
+## Hard Execution Gate (User Controlled)
+
+- Default mode is analysis-only. Do not edit files, run modifying shell commands, or perform git write actions unless the user explicitly authorizes execution in the current message.
+- Forbidden without explicit user command in the current message:
+  - Any file modifications (`ApplyPatch`, notebook edits, file delete/create).
+  - Any git write operations (`git add`, `git commit`, `git push`, branch changes that modify state).
+  - Any command with side effects on project code or data.
+- Before any modification, ask for explicit confirmation with this exact phrase:
+  - `Готов выполнить. Подтвердите командой: Выполняй.`
+- Commit is allowed only on the explicit user command:
+  - `Комит`
+- If the user says `ничего не делать`, `стоп`, `только обсудить`, or equivalent, perform read-only analysis only.

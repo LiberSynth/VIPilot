@@ -647,7 +647,7 @@ var setDraftStoryFromRecord;
           }
           if (entries.length) setHint(prefix + entries[entries.length - 1].message);
           var status = d.batch_status;
-          if (status === 'story_probe') {
+          if (status === 'story_manual') {
             _batchDone++;
             var storyId = d.story_id;
             if (storyId) {

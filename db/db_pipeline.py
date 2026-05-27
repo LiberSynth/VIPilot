@@ -78,13 +78,13 @@ def db_create_video_batch(batch_type, movie_model_id=None, story_id=None):
     return batch_id
 
 
-def db_create_story_probe_batch(text_model_id):
+def db_create_story_manual_batch(text_model_id):
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
                 INSERT INTO batches (type, data)
-                VALUES ('story_probe', %s)
+                VALUES ('story_manual', %s)
                 RETURNING id
                 """,
                 (json.dumps({"story_model_id": str(text_model_id)}),),
@@ -100,7 +100,7 @@ def db_create_story_autogenerate_batch():
         with conn.cursor() as cur:
             cur.execute("""
                 INSERT INTO batches (type)
-                VALUES ('story_probe')
+                VALUES ('story_manual')
                 RETURNING id
             """)
             row = cur.fetchone()
@@ -124,14 +124,14 @@ def db_update_batch_current_movie_model_id(batch_id, model_id):
         conn.commit()
 
 
-def db_finalize_story_probe(batch_id, story_id):
+def db_finalize_story_manual(batch_id, story_id):
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 "UPDATE batches SET story_id = %s WHERE id = %s",
                 (story_id, batch_id),
             )
-        db_set_batch_status(batch_id, "story_probe", conn)
+        db_set_batch_status(batch_id, "story_manual", conn)
 
 
 def db_set_batch_story(batch_id, story_id):
@@ -219,7 +219,7 @@ def db_claim_unused_story_for_batch(batch_id: str, grade_required: bool) -> dict
                     WHERE id NOT IN (
                         SELECT story_id
                         FROM batches
-                        WHERE story_id IS NOT NULL AND type != 'story_probe'
+                        WHERE story_id IS NOT NULL AND type != 'story_manual'
                     )
                       AND grade = 'good'
                     ORDER BY created_at ASC, id ASC
@@ -233,7 +233,7 @@ def db_claim_unused_story_for_batch(batch_id: str, grade_required: bool) -> dict
                     WHERE id NOT IN (
                         SELECT story_id
                         FROM batches
-                        WHERE story_id IS NOT NULL AND type != 'story_probe'
+                        WHERE story_id IS NOT NULL AND type != 'story_manual'
                     )
                     ORDER BY created_at ASC, id ASC
                     LIMIT 1

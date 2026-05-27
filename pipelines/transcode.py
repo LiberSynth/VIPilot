@@ -122,13 +122,13 @@ def run(batch_id, log_id):
             level='silent',
         )
 
-    is_probe = batch['type'] == 'movie_probe'
+    is_manual = batch['type'] == 'movie_manual'
 
-    if not is_probe and check_cancelled('transcode', batch_id, batch, log_id):
+    if not is_manual and check_cancelled('transcode', batch_id, batch, log_id):
         return
 
-    if is_probe:
-        target       = 'пробный'
+    if is_manual:
+        target       = 'ручной'
         do_transcode = True
     else:
         active_targets = db_get_active_targets()
@@ -138,8 +138,8 @@ def run(batch_id, log_id):
     write_log_entry(
         log_id,
         fmt_id_msg(
-            "[transcode] Батч {} — phase=target_resolved, target={}, probe={}, do_transcode={}",
-            batch_id, target, is_probe, do_transcode,
+            "[transcode] Батч {} — phase=target_resolved, target={}, manual={}, do_transcode={}",
+            batch_id, target, is_manual, do_transcode,
         ),
         level='silent',
     )

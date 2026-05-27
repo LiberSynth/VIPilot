@@ -18,7 +18,7 @@ from db import (
     db_get_text_model_by_id,
     db_create_story,
     db_set_batch_story,
-    db_finalize_story_probe,
+    db_finalize_story_manual,
     db_claim_donor_batch,
     db_set_batch_story_ready_from_donor,
     db_claim_unused_story_for_batch,
@@ -58,25 +58,25 @@ def run(batch_id, log_id):
             db_log_update(log_id, "Захват батча не удался — пропуск", "cancelled")
             return
 
-    # is_probe: батч создан вручную (story_probe — тест текстовой модели,
-    # movie_probe — тест видеомодели, которому нужен сюжет).
-    # Для probe: пул, донор и отмена не применяются — нужен живой результат.
-    is_probe = batch["type"] in ("story_probe", "movie_probe")
-    if is_probe:
-        target = "пробный"
+    # is_manual: батч создан вручную (story_manual — ручная генерация сюжета,
+    # movie_manual — ручная генерация видео, которому нужен сюжет).
+    # Для manual-режима: пул, донор и отмена не применяются — нужен живой результат.
+    is_manual = batch["type"] in ("story_manual", "movie_manual")
+    if is_manual:
+        target = "ручной"
     else:
         active_targets = db_get_active_targets()
         tgt = active_targets[0] if active_targets else {}
         target = tgt.get("name") or "adhoc"
     write_log_entry(
         log_id,
-        fmt_id_msg("[story] Батч {} — phase=target_resolved, probe={}, target={}", batch_id, is_probe, target),
+        fmt_id_msg("[story] Батч {} — phase=target_resolved, manual={}, target={}", batch_id, is_manual, target),
         level='silent',
     )
 
-    # movie_probe с уже заданным story_id: пользователь прикрепил конкретный сюжет
-    # к пробному запуску видеомодели. Генерация сюжета не нужна — сразу story_ready.
-    if batch.get("story_id") is not None and batch["type"] == "movie_probe":
+    # movie_manual с уже заданным story_id: пользователь прикрепил конкретный сюжет
+    # к ручному запуску видеомодели. Генерация сюжета не нужна — сразу story_ready.
+    if batch.get("story_id") is not None and batch["type"] == "movie_manual":
         preset_story_id = str(batch["story_id"])
         db_log_update(
             log_id,
@@ -99,8 +99,8 @@ def run(batch_id, log_id):
         return
 
     # Проверка отмены: только для slot/adhoc.
-    # Probe запускается пользователем явно — отменять его нет смысла.
-    if not is_probe and check_cancelled("story", batch_id, batch, log_id):
+    # Manual-батч запускается пользователем явно — отменять его нет смысла.
+    if not is_manual and check_cancelled("story", batch_id, batch, log_id):
         return
 
     # Режим пула (donor): только для slot/adhoc, когда use_donor включён
@@ -112,7 +112,7 @@ def run(batch_id, log_id):
     # если пул пуст — ошибка (AI-генерация запрещена).
     approve_movies = cycle_config_get("approve_movies")
     if (
-        not is_probe
+        not is_manual
         and snap.use_donor
         and batch.get("story_id") is None
     ):
@@ -173,11 +173,11 @@ def run(batch_id, log_id):
                 )
                 raise AppException(batch_id, "story", msg, log_id)
 
-    # Поиск готового сюжета в пуле: только для slot/adhoc (не story_probe).
+    # Поиск готового сюжета в пуле: только для slot/adhoc (не story_manual).
     # Если approve_stories включён — берём только grade=good (одобренные вручную).
     # Нашли → story_ready без AI. Не нашли → идём в AI-генерацию.
     # Если approve_stories включён и пул пуст — ошибка (AI-генерация запрещена).
-    if batch["type"] != "story_probe":
+    if batch["type"] != "story_manual":
         approve_stories = cycle_config_get("approve_stories")
         grade_required = approve_stories
         condition_label = (
@@ -254,21 +254,21 @@ def run(batch_id, log_id):
         raise AppException(batch_id, "story", msg, log_id)
 
     batch_data = batch.get("data") or {}
-    is_story_probe = batch["type"] == "story_probe"
+    is_story_manual = batch["type"] == "story_manual"
     # pinned_model_id (из batches.data.story_model_id): пользователь задал
-    # конкретную текстовую модель для story_probe.
-    # Только для story_probe — для slot/adhoc story_model_id не пишется,
-    # поэтому на практике pinned_model_id бывает только при is_story_probe.
+    # конкретную текстовую модель для story_manual.
+    # Только для story_manual — для slot/adhoc story_model_id не пишется,
+    # поэтому на практике pinned_model_id бывает только при is_story_manual.
     pinned_model_id = (
         batch_data.get("story_model_id") if isinstance(batch_data, dict) else None
     )
 
     # Выбор набора моделей:
-    # - story_probe + pinned: список из одной модели, один проход.
+    # - story_manual + pinned: список из одной модели, один проход.
     # - всё остальное: перебор всех активных текстовых моделей.
-    if is_story_probe and pinned_model_id:
-        probe_model = db_get_text_model_by_id(pinned_model_id)
-        models = [probe_model] if probe_model else []
+    if is_story_manual and pinned_model_id:
+        manual_model = db_get_text_model_by_id(pinned_model_id)
+        models = [manual_model] if manual_model else []
     else:
         models = db_get_active_text_models()
 
@@ -387,8 +387,8 @@ def run(batch_id, log_id):
     )
 
     if not iterate_result:
-        if is_story_probe:
-            msg = f"Модель не ответила после {max_attempts_per_model} попыток — пробный сюжет не получен"
+        if is_story_manual:
+            msg = f"Модель не ответила после {max_attempts_per_model} попыток — ручной сюжет не получен"
             db_log_update(log_id, msg, "error")
             write_log_entry(log_id, msg, level='error')
             write_log_entry(log_id, f"[story] {msg}", level='silent')
@@ -414,25 +414,25 @@ def run(batch_id, log_id):
         level='silent',
     )
 
-    if is_story_probe:
-        db_finalize_story_probe(batch_id, story_id)
+    if is_story_manual:
+        db_finalize_story_manual(batch_id, story_id)
         db_set_story_model(story_id, used_model_id)
         msg = f"Сюжет сгенерирован ({used_model_name})"
         db_log_update(log_id, msg, "ok")
         write_log_entry(
             log_id,
-            fmt_id_msg("Сохранён как story {}, батч → story_probe", story_id),
+            fmt_id_msg("Сохранён как story {}, батч → story_manual", story_id),
         )
         write_log_entry(
             log_id,
             fmt_id_msg(
-                "[story] Пробный сюжет: story_id={}, batch → story_probe", story_id
+                "[story] Ручной сюжет: story_id={}, batch → story_manual", story_id
             ),
             level='silent',
         )
         write_log_entry(
             log_id,
-            fmt_id_msg("[story] Батч {} — phase=run_done, status=story_probe, story_id={}", batch_id, story_id),
+            fmt_id_msg("[story] Батч {} — phase=run_done, status=story_manual, story_id={}", batch_id, story_id),
             level='silent',
         )
     else:

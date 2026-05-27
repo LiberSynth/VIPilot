@@ -96,13 +96,13 @@ def run(batch_id, log_id):
             level='silent',
         )
 
-        # is_probe: батч создан вручную для тестирования конкретной модели (movie_probe).
-        # Для проба aspect ratio жёстко 9:16 — результат идёт на просмотр, а не в эфир.
+        # is_manual: батч создан вручную для генерации конкретной модели (movie_manual).
+        # Для ручного батча aspect ratio жёстко 9:16 — результат идёт на просмотр, а не в эфир.
         # Для slot/adhoc aspect ratio берётся из конфигурации активного таргета.
         # Конфликт соотношений у нескольких таргетов — фатальная ошибка конфигурации.
-        is_probe        = batch['type'] == 'movie_probe'
-        if is_probe:
-            target = 'пробный'
+        is_manual       = batch['type'] == 'movie_manual'
+        if is_manual:
+            target = 'ручной'
             ar_x   = 9
             ar_y   = 16
         else:
@@ -126,15 +126,15 @@ def run(batch_id, log_id):
             ar_y   = tgt.get('aspect_ratio_y') or 16
         write_log_entry(
             log_id,
-            fmt_id_msg("[video] Батч {} — phase=target_resolved, target={}, probe={}, ar={}:{}", batch_id, target, is_probe, ar_x, ar_y),
+            fmt_id_msg("[video] Батч {} — phase=target_resolved, target={}, manual={}, ar={}:{}", batch_id, target, is_manual, ar_x, ar_y),
             level='silent',
         )
 
         # Режим пула (donor): только для slot/adhoc и только при первом запуске (not resumed).
         # Story-пайплайн уже записал donor_batch_id в batches.data; здесь переносим
         # готовое видео из донорского батча, минуя генерацию полностью.
-        # Для probe пул не используется — нам важен результат конкретной модели.
-        if not resumed and not is_probe:
+        # Для manual-батча пул не используется — нам важен результат конкретной модели.
+        if not resumed and not is_manual:
             batch_data = batch.get('data') or {}
             donor_batch_id = batch_data.get('donor_batch_id') if isinstance(batch_data, dict) else None
             if donor_batch_id:
@@ -177,8 +177,8 @@ def run(batch_id, log_id):
         video_duration = max(1, min(60, cycle_config_get('video_duration')))
 
         # Проверка отмены: только для slot/adhoc.
-        # Probe-батч запускается пользователем явно — отменять его нет смысла.
-        if not is_probe and check_cancelled('video', batch_id, batch, log_id):
+        # Manual-батч запускается пользователем явно — отменять его нет смысла.
+        if not is_manual and check_cancelled('video', batch_id, batch, log_id):
             return
 
         if not client_is_configured('falai'):
@@ -200,7 +200,7 @@ def run(batch_id, log_id):
         if pinned_model_id:
             pinned_m = db_get_video_model_by_id(pinned_model_id)
             if not pinned_m:
-                msg = fmt_id_msg('Пробная модель {} не найдена', pinned_model_id)
+                msg = fmt_id_msg('Ручная модель {} не найдена', pinned_model_id)
                 db_log_update(log_id, msg, 'error')
                 write_log_entry(log_id, msg, level='error')
                 write_log_entry(log_id, f"[video] {msg}", level='silent')
@@ -232,8 +232,8 @@ def run(batch_id, log_id):
 
         db_log_update(log_id, f"Генерация видео. {'(возобновление)' if resumed else ''}".strip(), 'running')
         write_log_entry(log_id, f"Соотношение сторон: {ar_x}:{ar_y}", level='silent')
-        if is_probe:
-            write_log_entry(log_id, f"Пробная модель: {models[0]['name']}, попыток: {max_attempts_per_model}", level='silent')
+        if is_manual:
+            write_log_entry(log_id, f"Ручная модель: {models[0]['name']}, попыток: {max_attempts_per_model}", level='silent')
         else:
             write_log_entry(log_id, f"Моделей: {len(models)}, попыток на модель: {max_attempts_per_model}", level='silent')
 
@@ -491,8 +491,8 @@ def run(batch_id, log_id):
         video_url = iterate_models(models, max_attempts_per_model, cb, max_passes=max_passes)
 
         if not video_url:
-            if is_probe:
-                msg = f'Пробная модель {models[0]["name"]} не дала результата ({max_attempts_per_model} попыток)'
+            if is_manual:
+                msg = f'Ручная модель {models[0]["name"]} не дала результата ({max_attempts_per_model} попыток)'
                 db_log_update(log_id, msg, 'error')
                 write_log_entry(log_id, msg, level='error')
                 write_log_entry(log_id, f"[video] {msg}", level='silent')

@@ -5,7 +5,7 @@
   var _forceNoAutoplay = false;
 
   var _FINAL_STATUSES = [
-    'published', 'published_partially', 'movie_probe', 'story_probe',
+    'published', 'published_partially', 'movie_manual', 'story_manual',
     'cancelled', 'error', 'fatal_error',
     'video_error', 'transcode_error', 'publish_error', 'donated',
   ];
@@ -100,13 +100,13 @@
     var wrap = document.getElementById('director-video-wrap');
     if (!wrap) return;
     if (!movieId) {
-      wrap.innerHTML = '<video class="probe-video" controls></video>';
+      wrap.innerHTML = '<video class="movie-video" controls></video>';
       return;
     }
     var src = '/production/movie/' + encodeURIComponent(movieId) + '/video';
     var autoplayChk = document.getElementById('director-autoplay-check');
     var autoplayAttr = (!forceNoAutoplay && autoplayChk && autoplayChk.checked) ? ' autoplay' : '';
-    wrap.innerHTML = '<video class="probe-video" controls' + autoplayAttr + ' src="' + src + '"></video>';
+    wrap.innerHTML = '<video class="movie-video" controls' + autoplayAttr + ' src="' + src + '"></video>';
   }
 
   /* ── кнопки роликов ── */

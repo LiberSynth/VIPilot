@@ -259,7 +259,7 @@ def db_get_movies_list(show_published=True, show_bad=True, for_approval=False, p
                     SELECT b2.id
                     FROM batches b2
                     WHERE b2.story_id = lb.story_id
-                      AND b2.type != 'story_probe'
+                      AND b2.type != 'story_manual'
                       AND b2.status IN (
                           'pending', 'story_generating', 'story_ready',
                           'video_generating', 'video_pending'
@@ -327,7 +327,7 @@ def db_count_good_pool(grade_required: bool = True) -> int:
                   NOT EXISTS (
                       SELECT 1 FROM batches b
                       WHERE b.story_id = stories.id
-                        AND b.type != 'story_probe'
+                        AND b.type != 'story_manual'
                   )
             """)
             row = cur.fetchone()
