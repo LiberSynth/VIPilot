@@ -74,9 +74,15 @@ def run(batch_id, log_id):
         level='silent',
     )
 
-    # movie_manual с уже заданным story_id: пользователь прикрепил конкретный сюжет
-    # к ручному запуску видеомодели. Генерация сюжета не нужна — сразу story_ready.
-    if batch.get("story_id") is not None and batch["type"] == "movie_manual":
+    # movie_manual всегда должен запускаться с выбранным story_id из панели «Режиссёр».
+    # Генерация/поиск сюжета для него больше не допускаются.
+    if batch["type"] == "movie_manual":
+        if batch.get("story_id") is None:
+            msg = "Ручная генерация видео требует выбранный сюжет (story_id не задан)"
+            db_log_update(log_id, msg, "error")
+            write_log_entry(log_id, msg, level='error')
+            write_log_entry(log_id, fmt_id_msg("[story] Батч {} — {}", batch_id, msg), level='silent')
+            raise AppException(batch_id, "story", msg, log_id)
         preset_story_id = str(batch["story_id"])
         db_log_update(
             log_id,

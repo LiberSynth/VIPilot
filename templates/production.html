@@ -142,13 +142,12 @@
       <div class="hint" style="margin-bottom:4px">Сюжет</div>
       <div class="cust-select" id="director-story-wrap">
         <button type="button" class="cust-select-btn" id="director-story-btn">
-          <span id="director-story-label">Сгенерировать</span>
+          <span id="director-story-label">Выберите сюжет</span>
           <svg class="cust-select-arrow" xmlns="http://www.w3.org/2000/svg" width="12" height="7" viewBox="0 0 12 7" fill="none">
             <path d="M1 1l5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </button>
         <div class="cust-select-list" id="director-story-list" hidden>
-          <div class="cust-select-option selected" data-value="">Сгенерировать</div>
         </div>
       </div>
       <input type="hidden" id="director-story-id" value="">
@@ -160,19 +159,19 @@
         </div>
         <div class="cust-select" id="director-video-model-wrap">
           <button type="button" class="cust-select-btn" id="director-video-model-btn">
-            <span id="director-video-model-label">Подобрать</span>
+            <span id="director-video-model-label">Выберите модель</span>
             <svg class="cust-select-arrow" xmlns="http://www.w3.org/2000/svg" width="12" height="7" viewBox="0 0 12 7" fill="none">
               <path d="M1 1l5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           </button>
           <div class="cust-select-list" id="director-video-model-list" hidden>
-            <div class="cust-select-option selected" data-value="">Подобрать</div>
+            <div class="cust-select-option" data-value="__iterate__">Перебрать</div>
           </div>
         </div>
         <input type="hidden" id="director-video-model-id" value="">
       </div>
       <div style="display:flex; align-items:center; gap:10px; margin-top:8px">
-        <button type="button" id="btn-director-generate" class="btn-run-now">Сгенерировать</button>
+        <button type="button" id="btn-director-generate" class="btn-run-now" disabled>Сгенерировать</button>
         <input type="number" id="director-video-count" class="story-generate-count" value="1" min="1" max="50" autocomplete="off">
         <span class="story-generate-count-label">штук</span>
       </div>
@@ -276,6 +275,9 @@
 (function() {
   var _storyPoolData = [];
   var _storyPoolReqId = 0;
+  var _directorActiveVideoModels = [];
+  var _directorGenerateInProgress = false;
+  var _DIRECTOR_ITERATE_SENTINEL = '__iterate__';
 
   function selectOption(id, label) {
     var lbl = document.getElementById('director-story-label');
@@ -287,10 +289,14 @@
       o.classList.toggle('selected', o.dataset.value === id);
     });
     if (ta) {
-      if (!id) { ta.value = ''; return; }
-      var story = _storyPoolData.find(function(s) { return s.id === id; });
-      ta.value = story ? (story.content || '') : '';
+      if (!id) {
+        ta.value = '';
+      } else {
+        var story = _storyPoolData.find(function(s) { return s.id === id; });
+        ta.value = story ? (story.content || '') : '';
+      }
     }
+    _syncDirectorGenerateButtonState();
   }
 
   function closeList() {
@@ -325,7 +331,10 @@
       .then(function(r) { return r.json(); })
       .then(function(stories) {
         if (reqId !== _storyPoolReqId) return;
-        if (!Array.isArray(stories)) return;
+        if (!Array.isArray(stories)) {
+          selectOption('', 'Выберите сюжет');
+          return;
+        }
         _storyPoolData = stories;
         stories.forEach(function(s) {
           addOption(s.id, s.title || ('Сюжет ' + s.id.slice(0, 8)));
@@ -334,12 +343,12 @@
         if (match) {
           selectOption(match.id, match.title || ('Сюжет ' + match.id.slice(0, 8)));
         } else {
-          selectOption('', 'Сгенерировать');
+          selectOption('', 'Выберите сюжет');
         }
       })
       .catch(function() {
         if (reqId !== _storyPoolReqId) return;
-        selectOption('', 'Сгенерировать');
+        selectOption('', 'Выберите сюжет');
       });
   }
 
@@ -365,11 +374,6 @@
     });
   }
 
-  var defaultOpt = document.querySelector('#director-story-list .cust-select-option[data-value=""]');
-  if (defaultOpt) {
-    defaultOpt.addEventListener('click', function() { selectOption('', 'Сгенерировать'); closeList(); });
-  }
-
   document.addEventListener('click', function() { closeList(); });
 
   /* ── Сохранение содержания сюжета ── */
@@ -391,43 +395,131 @@
   }
 
   /* ── Комбобокс видеомодели ── */
-  function loadDirectorVideoModels() {
-    fetch('/api/models')
-      .then(function(r) { return r.json(); })
+  function _sanitizeDirectorGenerateCountInput(el) {
+    if (!el) return;
+    var raw = String(el.value || '').trim();
+    if (!raw) {
+      el.value = '';
+      return;
+    }
+    var normalized = raw;
+    if (!/^\d+$/.test(normalized)) {
+      var lead = normalized.match(/^\d+/);
+      if (!lead) {
+        el.value = '';
+        return;
+      }
+      normalized = lead[0];
+    }
+    var num = parseInt(normalized, 10);
+    if (!isFinite(num) || num <= 0) {
+      el.value = '';
+      return;
+    }
+    if (num > 50) num = 50;
+    el.value = String(num);
+  }
+
+  function _readDirectorGenerateCount() {
+    var input = document.getElementById('director-video-count');
+    if (!input) return null;
+    var raw = String(input.value || '').trim();
+    if (!raw) return null;
+    if (!/^\d+$/.test(raw)) return null;
+    var num = parseInt(raw, 10);
+    if (!isFinite(num) || num <= 0) return null;
+    if (num > 50) return 50;
+    return num;
+  }
+
+  function _syncDirectorGenerateButtonState() {
+    var btn = document.getElementById('btn-director-generate');
+    if (!btn) return;
+    var storyId = ((document.getElementById('director-story-id') || {}).value || '').trim();
+    var selectedModel = ((document.getElementById('director-video-model-id') || {}).value || '').trim();
+    var count = _readDirectorGenerateCount();
+    var hasStory = !!storyId;
+    var hasModel = !!selectedModel;
+    var hasModels = _directorActiveVideoModels.length > 0;
+    var hasCount = count !== null;
+    btn.disabled = _directorGenerateInProgress || !(hasStory && hasModel && hasModels && hasCount);
+  }
+
+  function _formatDirectorModelLabel(model) {
+    if (!model) return '';
+    var hasPrice = model.price != null && String(model.price).trim() !== '';
+    return hasPrice ? (model.name + ' (' + model.price + ')') : model.name;
+  }
+
+  function _findModelById(models, id) {
+    var sid = String(id || '');
+    for (var i = 0; i < models.length; i++) {
+      if (String(models[i].id) === sid) return models[i];
+    }
+    return null;
+  }
+
+  function _fetchActiveDirectorVideoModels() {
+    return fetch('/api/models')
+      .then(function(r) { return r.ok ? r.json() : []; })
       .then(function(data) {
-        var list = document.getElementById('director-video-model-list');
-        if (!list) return;
-        var active = (data || []).filter(function(m) { return m.active; });
-        var existing = list.querySelectorAll('.cust-select-option:not([data-value=""])');
+        if (!Array.isArray(data)) return [];
+        return data.filter(function(m) { return m && m.active; });
+      })
+      .catch(function() { return []; });
+  }
+
+  function loadDirectorVideoModels() {
+    var prevId = ((document.getElementById('director-video-model-id') || {}).value || '').trim();
+    return _fetchActiveDirectorVideoModels().then(function(active) {
+      _directorActiveVideoModels = active;
+      var list = document.getElementById('director-video-model-list');
+      if (list) {
+        var existing = list.querySelectorAll('.cust-select-option[data-role="model-option"]');
         existing.forEach(function(el) { el.remove(); });
         active.forEach(function(m) {
           var opt = document.createElement('div');
           opt.className = 'cust-select-option';
-          opt.dataset.value = m.id;
-          var label = m.price != null ? m.name + ' (' + m.price + ')' : m.name;
+          opt.dataset.value = String(m.id);
+          opt.dataset.role = 'model-option';
+          var label = _formatDirectorModelLabel(m);
           opt.textContent = label;
           opt.addEventListener('click', function() {
-            selectVideoModel(m.id, label);
+            selectVideoModel(String(m.id), label);
             closeVideoModelList();
           });
           list.appendChild(opt);
         });
-        var cntEl = document.getElementById('director-model-count');
-        if (cntEl) cntEl.textContent = 'Записей: ' + active.length;
-      });
+      }
+      var cntEl = document.getElementById('director-model-count');
+      if (cntEl) cntEl.textContent = 'Записей: ' + active.length;
+
+      var selected = (prevId && prevId !== _DIRECTOR_ITERATE_SENTINEL) ? _findModelById(active, prevId) : null;
+      if (selected) {
+        selectVideoModel(String(selected.id), _formatDirectorModelLabel(selected));
+      } else if (prevId === _DIRECTOR_ITERATE_SENTINEL) {
+        selectVideoModel(_DIRECTOR_ITERATE_SENTINEL, 'Перебрать');
+      } else {
+        selectVideoModel('', 'Выберите модель');
+      }
+      _syncDirectorGenerateButtonState();
+      return active;
+    });
   }
 
   function selectVideoModel(id, label) {
+    var sid = String(id || '');
     var lbl = document.getElementById('director-video-model-label');
     var hid = document.getElementById('director-video-model-id');
     var list = document.getElementById('director-video-model-list');
     if (lbl) lbl.textContent = label;
-    if (hid) hid.value = id;
+    if (hid) hid.value = sid;
     if (list) {
       list.querySelectorAll('.cust-select-option').forEach(function(o) {
-        o.classList.toggle('selected', o.dataset.value === id);
+        o.classList.toggle('selected', String(o.dataset.value || '') === sid);
       });
     }
+    _syncDirectorGenerateButtonState();
   }
 
   function closeVideoModelList() {
@@ -452,11 +544,23 @@
     });
   }
 
-  var vmDefaultOpt = document.querySelector('#director-video-model-list .cust-select-option[data-value=""]');
+  var vmDefaultOpt = document.querySelector('#director-video-model-list .cust-select-option[data-value="__iterate__"]');
   if (vmDefaultOpt) {
     vmDefaultOpt.addEventListener('click', function() {
-      selectVideoModel('', 'Подобрать');
+      selectVideoModel(_DIRECTOR_ITERATE_SENTINEL, 'Перебрать');
       closeVideoModelList();
+    });
+  }
+
+  var countInputEl = document.getElementById('director-video-count');
+  if (countInputEl) {
+    countInputEl.addEventListener('input', function() {
+      _sanitizeDirectorGenerateCountInput(countInputEl);
+      _syncDirectorGenerateButtonState();
+    });
+    countInputEl.addEventListener('blur', function() {
+      _sanitizeDirectorGenerateCountInput(countInputEl);
+      _syncDirectorGenerateButtonState();
     });
   }
 
@@ -467,64 +571,210 @@
     var btn = document.getElementById('btn-director-generate');
     if (!btn) return;
     var _hint_default = 'Вы можете сгенерировать ролик при помощи AI-модели.';
+
     function setHint(text) {
       var el = document.getElementById('director-generate-hint');
       if (el) el.textContent = text;
     }
-    function resetHint() { setHint(_hint_default); }
-    btn.addEventListener('click', function() {
-      if (btn.disabled) return;
-      var countInput = document.getElementById('director-video-count');
-      var count = Math.max(1, Math.min(50, parseInt((countInput && countInput.value) || '1') || 1));
-      var modelId = (document.getElementById('director-video-model-id') || {}).value || '';
-      var storyId = (document.getElementById('director-story-id') || {}).value || '';
-      var movieId = window._directorApi ? window._directorApi.getSelectedMovieId() : null;
-      btn.disabled = true;
-      setHint(count > 1 ? 'Создаю ' + count + ' батчей…' : 'Запускаю генерацию…');
-      var body = JSON.stringify(
-        Object.assign(
-          modelId ? { model_id: modelId } : {},
-          storyId ? { story_id: storyId } : {}
-        )
-      );
-      var remaining = count;
-      var created = 0;
-      var pollingStarted = false;
-      for (var i = 0; i < count; i++) {
-        fetch('/production/video/generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: body,
-        })
-          .then(function(r) { return r.json(); })
-          .then(function(d) {
-            if (d.batch_id) {
-              created++;
-              if (!pollingStarted && window._directorApi) {
-                pollingStarted = true;
-                window._directorApi.startBatchPoll(d.batch_id, null);
-              }
-            }
-            remaining--;
-            if (remaining === 0) {
-              btn.disabled = false;
-              if (!pollingStarted) {
-                setHint('Не удалось создать батчи');
-                setTimeout(resetHint, 3000);
-              }
-            }
-          })
-          .catch(function() {
-            remaining--;
-            if (remaining === 0) {
-              btn.disabled = false;
-              if (!pollingStarted) {
-                setHint('Ошибка запроса');
-                setTimeout(resetHint, 4000);
-              }
-            }
-          });
+
+    function resetHint() {
+      setHint(_hint_default);
+    }
+
+    function _setGeneratingState(value) {
+      _directorGenerateInProgress = !!value;
+      if (_directorGenerateInProgress) {
+        btn.disabled = true;
+      } else {
+        _syncDirectorGenerateButtonState();
       }
+    }
+
+    function _parseFirstRealNumber(text) {
+      var m = String(text || '').match(/[-+]?\d+(?:[.,]\d+)?/);
+      if (!m) return null;
+      var value = parseFloat(String(m[0]).replace(',', '.'));
+      return isFinite(value) ? value : null;
+    }
+
+    function _parseModelPriceMeta(priceText) {
+      var src = String(priceText || '');
+      var amount = _parseFirstRealNumber(src);
+      if (amount === null || amount < 0) return null;
+      var parts = src.split('/');
+      if (parts.length < 2) return null;
+      var basisSeconds = _parseFirstRealNumber(parts[1]);
+      if (basisSeconds === null || basisSeconds <= 0) return null;
+      return { amount: amount, basisSeconds: basisSeconds };
+    }
+
+    function _getVideoDurationForEstimate() {
+      var raw = (document.getElementById('video_duration') || {}).value || '';
+      var duration = _parseFirstRealNumber(raw);
+      if (duration === null || duration <= 0) return 10;
+      return duration;
+    }
+
+    function _formatUsd(value) {
+      return (Math.round(value * 100) / 100).toFixed(2) + ' $';
+    }
+
+    function _estimateIterateOrderCost(models, perModelCount) {
+      var duration = _getVideoDurationForEstimate();
+      var parsedCosts = [];
+      var costByModel = [];
+      var invalidCount = 0;
+      models.forEach(function(m) {
+        var meta = _parseModelPriceMeta(m.price);
+        if (!meta) {
+          invalidCount++;
+          costByModel.push(null);
+          return;
+        }
+        var modelCost = meta.amount * (duration / meta.basisSeconds);
+        parsedCosts.push(modelCost);
+        costByModel.push(modelCost);
+      });
+      var fallbackCost;
+      if (parsedCosts.length > 0) {
+        var sum = parsedCosts.reduce(function(acc, v) { return acc + v; }, 0);
+        fallbackCost = sum / parsedCosts.length;
+      } else {
+        fallbackCost = 1 * (duration / 10);
+      }
+      var totalCost = 0;
+      costByModel.forEach(function(v) {
+        totalCost += (v == null ? fallbackCost : v) * perModelCount;
+      });
+      return {
+        totalGenerations: models.length * perModelCount,
+        totalCost: totalCost,
+        invalidCount: invalidCount,
+        fallbackMode: parsedCosts.length === 0 && invalidCount > 0,
+      };
+    }
+
+    function _buildBatchPlan(models, perModelCount) {
+      var plan = [];
+      models.forEach(function(m) {
+        for (var i = 0; i < perModelCount; i++) {
+          plan.push({ model_id: String(m.id) });
+        }
+      });
+      return plan;
+    }
+
+    function _sendGenerateRequest(payload) {
+      return fetch('/production/video/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+        .then(function(r) {
+          return r.json()
+            .then(function(d) { return { ok: r.ok, data: d || {} }; })
+            .catch(function() { return { ok: r.ok, data: {} }; });
+        })
+        .then(function(res) {
+          if (res.ok && res.data && res.data.batch_id) return String(res.data.batch_id);
+          throw new Error('batch_create_failed');
+        });
+    }
+
+    function _dispatchGeneratePlanSequentially(plan, storyId, onBatchCreated, onDone) {
+      var created = 0;
+      var idx = 0;
+      function next() {
+        if (idx >= plan.length) {
+          if (onDone) onDone(created);
+          return;
+        }
+        var item = plan[idx++];
+        var payload = { story_id: storyId, model_id: item.model_id };
+        _sendGenerateRequest(payload)
+          .then(function(batchId) {
+            created++;
+            if (onBatchCreated) onBatchCreated(batchId);
+          })
+          .catch(function() {})
+          .then(next);
+      }
+      next();
+    }
+
+    function _startDirectorGeneration(plan, storyId) {
+      if (!plan.length) {
+        _setGeneratingState(false);
+        return;
+      }
+      _setGeneratingState(true);
+      setHint(plan.length > 1 ? ('Создаю ' + plan.length + ' батчей…') : 'Запускаю генерацию…');
+      var pollingStarted = false;
+      _dispatchGeneratePlanSequentially(
+        plan,
+        storyId,
+        function(batchId) {
+          if (!pollingStarted && window._directorApi) {
+            pollingStarted = true;
+            window._directorApi.startBatchPoll(batchId, null);
+          }
+        },
+        function(created) {
+          _setGeneratingState(false);
+          if (!pollingStarted) {
+            setHint(created > 0 ? 'Батчи созданы' : 'Не удалось создать батчи');
+            setTimeout(resetHint, 3000);
+          }
+        }
+      );
+    }
+
+    btn.addEventListener('click', function() {
+      if (btn.disabled || _directorGenerateInProgress) return;
+      var count = _readDirectorGenerateCount();
+      var storyId = ((document.getElementById('director-story-id') || {}).value || '').trim();
+      var requestedModelId = ((document.getElementById('director-video-model-id') || {}).value || '').trim();
+      if (!storyId || !requestedModelId || count === null) return;
+
+      loadDirectorVideoModels().then(function(activeModels) {
+        if (!Array.isArray(activeModels) || activeModels.length === 0) return;
+
+        if (requestedModelId !== _DIRECTOR_ITERATE_SENTINEL) {
+          var selectedModel = _findModelById(activeModels, requestedModelId);
+          if (!selectedModel) {
+            setHint('Выбранная модель недоступна');
+            setTimeout(resetHint, 3000);
+            return;
+          }
+          _startDirectorGeneration(_buildBatchPlan([selectedModel], count), storyId);
+          return;
+        }
+
+        var estimate = _estimateIterateOrderCost(activeModels, count);
+        var warningExtra = '';
+        if (estimate.invalidCount > 0) {
+          warningExtra = estimate.fallbackMode
+            ? '<br>Цена моделей не распознана: применён дефолт 1 $/10 сек.'
+            : '<br>Для части моделей цена не распознана: использовано среднее по распознанным.';
+        }
+        new ConfirmDialog({
+          title: 'Запустить перебор моделей?',
+          text:
+            'Будет выполнен большой заказ генераций.<br><br>' +
+            'Всего генераций: <b>' + estimate.totalGenerations + '</b><br>' +
+            'Схема запуска: <b>' + count + '</b> × каждая из <b>' + activeModels.length + '</b> активных моделей.<br>' +
+            'Ориентировочная стоимость: <b>' + _formatUsd(estimate.totalCost) + '</b>.' +
+            warningExtra,
+          confirmLabel: 'Запустить',
+          triggerBtn: btn,
+          onConfirm: function(confirmBtn, dlg) {
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = 'Запускаю…';
+            dlg.close();
+            _startDirectorGeneration(_buildBatchPlan(activeModels, count), storyId);
+          },
+        }).open();
+      });
     });
   })();
 

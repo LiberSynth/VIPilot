@@ -1349,6 +1349,8 @@ def api_production_video_generate():
     data = request.get_json(silent=True) or {}
     model_id = data.get("model_id") or None
     story_id = data.get("story_id") or None
+    if not story_id:
+        return jsonify({"error": "story_id_required"}), 400
     if model_id:
         batch_id = db_create_video_batch(
             "movie_manual", movie_model_id=model_id, story_id=story_id
