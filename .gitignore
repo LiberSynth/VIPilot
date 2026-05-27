@@ -1,19 +1,10 @@
-# Runtime data
-videos/
-attached_assets/
-data/
-bin/
-
-# Python bytecode
-__pycache__/
+/video
+/attached_assets
+/data
+/bin
+/__pycache__
+/instance
+/video
 *.py[cod]
-
-# Environment variables
 .env
-
-# Logs
 *.log
-
-# Flask instance folder
-instance/
-
