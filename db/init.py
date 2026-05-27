@@ -100,8 +100,6 @@ def bootstrap():
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS movies (
                     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                    raw_data        BYTEA,
-                    transcoded_data BYTEA,
                     model_id        UUID,
                     url             TEXT,
                     grade           TEXT,
@@ -348,7 +346,7 @@ def bootstrap():
                     SELECT COUNT(*) INTO v_count
                     FROM batches b
                     JOIN movies m ON m.id = b.movie_id
-                    WHERE (m.transcoded_data IS NOT NULL OR m.raw_data IS NOT NULL)
+                    WHERE b.movie_id IS NOT NULL
                       AND b.status IN ('cancelled', 'movie_manual')
                       AND (NOT p_good_only OR m.grade = 'good');
                     RETURN v_count;
@@ -366,7 +364,7 @@ def bootstrap():
                     SELECT b.id INTO v_donor_id
                     FROM batches b
                     JOIN movies m ON m.id = b.movie_id
-                    WHERE (m.transcoded_data IS NOT NULL OR m.raw_data IS NOT NULL)
+                    WHERE b.movie_id IS NOT NULL
                       AND b.status IN ('cancelled', 'movie_manual')
                       AND (NOT p_good_only OR m.grade = 'good')
                     ORDER BY b.created_at ASC
