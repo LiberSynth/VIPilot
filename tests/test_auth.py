@@ -212,12 +212,6 @@ class TestProductionBlueprintAuth:
     def test_post_movies_delete_bad(self, client):
         _assert_401(client.post("/production/movies/delete_bad"))
 
-    def test_get_movies_good_meta(self, client):
-        _assert_401(client.get("/production/movies/good_meta"))
-
-    def test_get_movie_download(self, client):
-        _assert_401(client.get("/production/movies/1/download"))
-
     def test_post_movies_upload(self, client):
         _assert_401(client.post("/production/movies/upload"))
 

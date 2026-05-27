@@ -1290,35 +1290,6 @@ def api_production_delete_bad_movies():
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
-@production_bp.route("/production/movies/good_meta", methods=["GET"])
-def api_production_good_movies_meta():
-    err = _production_auth_check()
-    if err:
-        return err
-    from db import db_get_movies_list
-
-    show_published = request.args.get("show_published", "1") != "0"
-    show_bad = request.args.get("show_bad", "1") != "0"
-    for_approval = request.args.get("for_approval", "0") == "1"
-    rows = db_get_movies_list(
-        show_published=show_published,
-        show_bad=show_bad,
-        for_approval=for_approval,
-    )
-    return jsonify(rows)
-
-
-@production_bp.route("/production/movies/<movie_id>/download", methods=["GET"])
-def api_production_movie_download(movie_id):
-    err = _production_auth_check()
-    if err:
-        return err
-    data = db_get_movie_video_data(movie_id)
-    if data is None:
-        return jsonify({"error": "not_found"}), 404
-    return Response(data, mimetype="video/mp4")
-
-
 @production_bp.route("/production/movies/upload", methods=["POST"])
 def api_production_movies_upload():
     err = _production_auth_check()
