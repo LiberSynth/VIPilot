@@ -10,8 +10,7 @@ from utils.notify import notify_failure
 from db import (
     db_get_active_targets,
     db_get_batch_by_id,
-    db_get_batch_video_data,
-    db_get_batch_original_video,
+    db_get_batch_video_data_with_source,
     db_set_batch_status,
     db_claim_batch_status,
     db_set_batch_title,
@@ -43,19 +42,20 @@ def is_scheduled(batch) -> bool:
 
 def _get_video(batch_id, log_id):
     """Возвращает видеоданные батча (transcoded или original).
-    Бросает RuntimeError если оба поля NULL."""
-    video_data = db_get_batch_video_data(batch_id)
+    Бросает RuntimeError если отсутствуют оба файла."""
+    video_data, source = db_get_batch_video_data_with_source(batch_id)
     if video_data is None:
-        write_log_entry(log_id, 'movies.transcoded_data отсутствует — использую оригинал (movies.raw_data)')
+        msg = 'Ни transcoded-файл, ни raw-файл не найдены у батча — ошибка логики'
+        write_log_entry(log_id, msg, level='error')
+        raise RuntimeError(msg)
+    if source == 'raw_data':
+        write_log_entry(log_id, 'transcoded-файл отсутствует — использую оригинал (raw-файл)')
         write_log_entry(log_id, fmt_id_msg("[publish] Батч {} — phase=video_source_fallback, source=raw_data", batch_id), level='silent')
-        video_data = db_get_batch_original_video(batch_id)
-        if video_data is None:
-            msg = 'Ни movies.transcoded_data, ни movies.raw_data не найдены в БД — ошибка логики'
-            write_log_entry(log_id, msg, level='error')
-            raise RuntimeError(msg)
-        write_log_entry(log_id, fmt_id_msg("[publish] Батч {} — phase=video_source_selected, source=raw_data, bytes={}", batch_id, len(video_data)), level='silent')
-    else:
-        write_log_entry(log_id, fmt_id_msg("[publish] Батч {} — phase=video_source_selected, source=transcoded_data, bytes={}", batch_id, len(video_data)), level='silent')
+    write_log_entry(
+        log_id,
+        fmt_id_msg("[publish] Батч {} — phase=video_source_selected, source={}, bytes={}", batch_id, source, len(video_data)),
+        level='silent',
+    )
     return video_data
 
 

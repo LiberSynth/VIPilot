@@ -75,6 +75,7 @@ from .db_media import (
     db_get_batch_original_video,
     db_save_video_job_and_set_pending,
     db_save_transcoded_data,
+    db_get_batch_video_data_with_source,
     db_get_batch_video_data,
     db_get_movie_video_data,
     db_create_manual_movie,

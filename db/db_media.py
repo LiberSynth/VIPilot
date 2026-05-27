@@ -95,7 +95,7 @@ def db_save_transcoded_data(batch_id, video_data: bytes):
     _write_video_file(str(row[0]), _TRANSCODED_FIELD, video_data)
 
 
-def db_get_batch_video_data(batch_id) -> bytes | None:
+def db_get_batch_video_data_with_source(batch_id) -> tuple[bytes | None, str | None]:
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute("""
@@ -105,12 +105,20 @@ def db_get_batch_video_data(batch_id) -> bytes | None:
             """, (batch_id,))
             row = cur.fetchone()
     if not row:
-        return None
+        return None, None
     movie_id = str(row[0])
     transcoded = _read_video_file_or_none(movie_id, _TRANSCODED_FIELD)
     if transcoded is not None:
-        return transcoded
-    return _read_video_file_or_none(movie_id, _RAW_FIELD)
+        return transcoded, _TRANSCODED_FIELD
+    raw = _read_video_file_or_none(movie_id, _RAW_FIELD)
+    if raw is not None:
+        return raw, _RAW_FIELD
+    return None, None
+
+
+def db_get_batch_video_data(batch_id) -> bytes | None:
+    video_data, _source = db_get_batch_video_data_with_source(batch_id)
+    return video_data
 
 
 def db_get_movie_video_data(movie_id) -> bytes | None:
