@@ -69,9 +69,6 @@ class TestApiBlueprintAuth:
     def test_post_text_models_reorder(self, client):
         _assert_401(client.post("/api/text-models/reorder", json={"ids": ["a"]}))
 
-    def test_post_text_model_probe(self, client):
-        _assert_401(client.post("/api/text-models/some-model/probe"))
-
     def test_post_video_model_grade(self, client):
         _assert_401(client.post("/api/video-models/some-model/grade", json={"grade": "good"}))
 
@@ -80,9 +77,6 @@ class TestApiBlueprintAuth:
 
     def test_post_video_model_body(self, client):
         _assert_401(client.post("/api/video-models/some-model/body", json={"body": {}}))
-
-    def test_post_video_model_probe(self, client):
-        _assert_401(client.post("/api/video-models/some-model/probe"))
 
     def test_post_target_config(self, client):
         _assert_401(client.post("/api/targets/some-target/targets-config", json={"targets_config": {}}))

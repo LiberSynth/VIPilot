@@ -314,17 +314,6 @@
     });
   }
 
-  function bindProbeBtn(container, probeFn) {
-    container.addEventListener('click', function(e) {
-      var btn = e.target.closest('[data-role="probe-btn"]');
-      if (!btn) return;
-      e.stopPropagation();
-      var id = btn.getAttribute('data-model-id');
-      var name = btn.getAttribute('data-model-name');
-      probeFn(id, name, btn);
-    });
-  }
-
   /* ════════════════════════════════════════════
      VIDEO MODELS
   ════════════════════════════════════════════ */
@@ -392,8 +381,6 @@
         html += (dur || '');
         html += '<div class="model-radio-widget' + radioActive + '" data-role="activate-btn" data-model-id="' + item.id + '" title="Активировать/деактивировать">'
           + '<div class="model-radio-dot"></div></div>';
-        html += '<button class="model-probe-btn" data-role="probe-btn" data-model-id="' + item.id + '" data-model-name="' + escHtml(item.name || '') + '" title="Пробный запрос">'
-          + '<svg viewBox="0 0 16 16" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="4,2 13,8 4,14"/></svg></button>';
         html += '<div class="model-drag-handle" title="Перетащить">⠿</div>';
         return html;
       },
@@ -413,9 +400,6 @@
     var container = document.getElementById('model-list');
     bindExpandSave(container, _videoAccordion);
     bindActivateBtn(container, activateVideoModel, 'story-row--model-active');
-    bindProbeBtn(container, function(id, name, btn) {
-      if (typeof window.createProbeVideo === 'function') window.createProbeVideo(id, name, btn);
-    });
     makeDragHandler(container, saveVideoOrder, '.story-row');
   }
 
@@ -514,8 +498,6 @@
         var radioActive = item.active ? ' model-radio-widget--active' : '';
         var html = '<div class="model-radio-widget' + radioActive + '" data-role="activate-btn" data-model-id="' + item.id + '" title="Активировать/деактивировать">'
           + '<div class="model-radio-dot"></div></div>';
-        html += '<button class="model-probe-btn" data-role="probe-btn" data-model-id="' + item.id + '" data-model-name="' + escHtml(item.name || '') + '" title="Пробный запрос">'
-          + '<svg viewBox="0 0 16 16" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="4,2 13,8 4,14"/></svg></button>';
         html += '<div class="model-drag-handle" title="Перетащить">⠿</div>';
         return html;
       },
@@ -535,9 +517,6 @@
     var container = document.getElementById('text-model-list');
     bindExpandSave(container, _textAccordion);
     bindActivateBtn(container, activateTextModelFn, 'story-row--model-active');
-    bindProbeBtn(container, function(id, name, btn) {
-      if (typeof window.probeTextModel === 'function') window.probeTextModel(id, name, btn);
-    });
     makeDragHandler(container, saveTextOrder, '.story-row');
   }
 

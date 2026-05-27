@@ -26,8 +26,6 @@ from db import (
     db_get_story_export_data,
     db_get_batch_video_data,
     db_get_movie_video_data,
-    db_get_text_model_by_id,
-    db_get_video_model_by_id,
     db_create_video_batch,
     db_create_story_probe_batch,
     db_get_batch_logs,
@@ -444,25 +442,6 @@ def api_text_models_reorder():
     return jsonify({"ok": ok})
 
 
-@bp.route("/text-models/<model_id>/probe", methods=["POST"])
-def api_text_model_probe(model_id):
-    if not is_authenticated():
-        return jsonify({"error": "unauthorized"}), 401
-
-    m = db_get_text_model_by_id(model_id)
-    if not m:
-        return jsonify({"error": "Модель не найдена"}), 404
-
-    batch_id = db_create_story_probe_batch(model_id)
-    if not batch_id:
-        return jsonify({"error": "Не удалось создать батч"}), 500
-    log_batch_planned(
-        batch_id, "Пробный запуск текстовой модели", f"Модель: {m['name']}"
-    )
-    environment.wakeup_loop()
-    return jsonify({"batch_id": batch_id})
-
-
 @bp.route("/video-models/<model_id>/grade", methods=["POST"])
 def api_video_model_grade(model_id):
     if not is_authenticated():
@@ -518,28 +497,6 @@ def api_target_config_body(target_id):
         return jsonify({"error": "targets_config must be a JSON object"}), 400
     ok = db_set_target_config_body(target_id, body)
     return jsonify({"ok": ok})
-
-
-@bp.route("/video-models/<model_id>/probe", methods=["POST"])
-def api_video_model_probe(model_id):
-    if not is_authenticated():
-        return jsonify({"error": "unauthorized"}), 401
-
-    m = db_get_video_model_by_id(model_id)
-    if not m:
-        return jsonify({"error": "Модель не найдена"}), 404
-
-    body = request.get_json(silent=True) or {}
-    story_id = body.get("story_id") or None
-
-    batch_id = db_create_video_batch(
-        "movie_probe", movie_model_id=model_id, story_id=story_id
-    )
-    if not batch_id:
-        return jsonify({"error": "Не удалось создать батч"}), 500
-    log_batch_planned(batch_id, "Пробный запуск видеомодели", f"Модель: {m['name']}")
-    environment.wakeup_loop()
-    return jsonify({"batch_id": batch_id})
 
 
 @bp.route("/batch/<batch_id>/logs", methods=["GET"])
