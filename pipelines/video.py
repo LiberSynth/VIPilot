@@ -27,9 +27,6 @@ from db import (
     db_save_video_job_and_set_pending,
     db_set_batch_status,
     db_create_batch_movie,
-    db_copy_movie_for_emulation,
-    db_get_random_real_original_video,
-    db_link_batch_story_only,
     db_transfer_donor_movie,
 )
 from log import write_log, db_log_update, write_log_entry
@@ -182,34 +179,6 @@ def run(batch_id, log_id):
         # Проверка отмены: только для slot/adhoc.
         # Probe-батч запускается пользователем явно — отменять его нет смысла.
         if not is_probe and check_cancelled('video', batch_id, batch, log_id):
-            return
-
-        # Эмуляция: заимствуем оригинальное видео из случайного реального батча в пуле.
-        # Используется при разработке, когда дёргать реального провайдера нежелательно.
-        if snap.emulation_mode:
-            write_log_entry(log_id, 'Эмуляция: заимствую видео из пула.')
-            write_log_entry(log_id, fmt_id_msg("[video] Батч {} — эмуляция генерации видео", batch_id), level='silent')
-            db_log_update(log_id, 'Видео [эмуляция]', 'running')
-            result = db_get_random_real_original_video()
-            if result is None:
-                msg = '[эмуляция] Нет видео в пуле — невозможно скопировать оригинал'
-                db_log_update(log_id, msg, 'error')
-                write_log_entry(log_id, msg, level='error')
-                write_log_entry(log_id, f"[video] {msg}", level='silent')
-                raise AppException(batch_id, 'video', msg, log_id)
-            donor_movie_id, donor_batch_id, donor_story_id = result
-            write_log_entry(log_id, fmt_id_msg("Видео заимствовано из батча: {}", donor_batch_id), level='silent')
-            db_copy_movie_for_emulation(donor_movie_id, batch_id)
-            if donor_story_id:
-                db_link_batch_story_only(batch_id, donor_story_id)
-                write_log_entry(log_id, fmt_id_msg("story_id подменён: {} → {}", story_id, donor_story_id), level='silent')
-            db_set_batch_status(batch_id, 'video_ready')
-            write_log_entry(
-                log_id,
-                fmt_id_msg("[video] Батч {} — phase=emulation_done, status=video_ready", batch_id),
-                level='silent',
-            )
-            db_log_update(log_id, 'Видео [эмуляция]', 'ok')
             return
 
         if not client_is_configured('falai'):

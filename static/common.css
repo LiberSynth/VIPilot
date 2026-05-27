@@ -286,7 +286,6 @@
     transform: rotate(45deg);
   }
 
-  .card.emulation-active { border-color: rgba(245,166,35,.35); }
   .card.card--editing-new { border-color: rgba(245,166,35,.35); }
   .card.card--editing-existing { border-color: rgba(62,207,142,.35); }
   .card-header {
@@ -310,7 +309,7 @@
     padding: 1px 6px;
     vertical-align: middle;
   }
-  .emulation-badge {
+  .state-badge {
     display: inline-block; font-size: 10px; font-weight: 700;
     background: rgba(245,166,35,.18); color: #f5a623;
     border-radius: 5px; padding: 2px 7px; margin-left: 8px;

@@ -119,20 +119,6 @@ def db_get_movie_video_data(movie_id) -> bytes | None:
     return None
 
 
-def db_get_random_real_original_video() -> tuple[str, str, str | None] | None:
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT m.id::text, b.id::text, b.story_id::text FROM batches b
-                JOIN movies m ON m.id = b.movie_id
-                WHERE m.raw_data IS NOT NULL
-                ORDER BY (m.url NOT LIKE 'emulation://%') DESC, random()
-                LIMIT 1
-            """)
-            row = cur.fetchone()
-            return (row[0], row[1], row[2]) if row else None
-
-
 def db_create_manual_movie(title: str, video_data: bytes) -> str:
     """Создаёт сюжет, батч movie_probe и ролик из файла в одной транзакции.
 
@@ -174,19 +160,3 @@ def db_create_manual_movie(title: str, video_data: bytes) -> str:
     return batch_id
 
 
-def db_copy_movie_for_emulation(source_movie_id: str, target_batch_id: str):
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute("""
-                INSERT INTO movies (raw_data, url, model_id)
-                SELECT raw_data, 'emulation://skipped', model_id
-                FROM movies
-                WHERE id = %s
-                RETURNING id
-            """, (source_movie_id,))
-            new_movie_id = cur.fetchone()[0]
-            cur.execute(
-                "UPDATE batches SET movie_id = %s WHERE id = %s",
-                (new_movie_id, target_batch_id),
-            )
-        conn.commit()

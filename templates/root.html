@@ -130,7 +130,7 @@
   <!-- ══ СЛУЖЕБНЫЕ ══ -->
   <div id="panel-service" class="tab-panel">
 
-    <div class="card{% if emulation_mode %} emulation-active{% endif %}" style="margin-top:12px" id="wf-card">
+    <div class="card" style="margin-top:12px">
       <div class="card-title">Движок</div>
       <div class="wf-row">
         <span class="wf-dot {{ 'running' if workflow_state == 'running' else 'pause' }}" id="wf-dot"></span>
@@ -146,26 +146,10 @@
         <div style="flex:1">
           <div class="toggle-label">Глубокая отладка</div>
         </div>
-        <span id="deep-debugging-badge" class="emulation-badge" {% if not deep_debugging %}style="display:none"{% endif %}>ВКЛ</span>
+        <span id="deep-debugging-badge" class="state-badge" {% if not deep_debugging %}style="display:none"{% endif %}>ВКЛ</span>
         <label class="toggle-wrap" style="margin-left:8px">
           <input type="checkbox" id="deep_debugging_check" {% if deep_debugging %}checked{% endif %}
                  onchange="wfDeepDebugging(this.checked)">
-          <span class="toggle-track"></span>
-        </label>
-      </div>
-    </div>
-
-    <div class="card" style="margin-top:12px">
-      <div class="card-title">Режимы</div>
-      <div class="wf-row" style="margin-top:4px">
-        <div style="flex:1">
-          <div class="toggle-label">Эмуляция</div>
-          <div class="hint" style="margin-top:2px">Отладочный режим без генерации видео. Используется произвольное видео из прошлых батчей. Позволяет сэкономить при отладке.</div>
-        </div>
-        <span id="emulation-badge" class="emulation-badge" {% if not emulation_mode %}style="display:none"{% endif %}>ВКЛ</span>
-        <label class="toggle-wrap" style="margin-left:8px">
-          <input type="checkbox" id="emulation_check" {% if emulation_mode %}checked{% endif %}
-                 onchange="wfEmulation(this.checked)">
           <span class="toggle-track"></span>
         </label>
       </div>

@@ -182,7 +182,6 @@ def root_page():
     log_lifetime       = parse_long_lifetime(settings_get("log_lifetime", "365"))
     entries_lifetime   = parse_long_lifetime(settings_get("entries_lifetime", "30"), default=30)
     publication_counter = int(env_get("publication_counter", "0") or "0")
-    emulation_mode     = environment.emulation_mode
     use_donor          = environment.use_donor
     notify_email       = settings_get("notify_email", "")
     notify_phone       = settings_get("notify_phone", "")
@@ -278,7 +277,6 @@ def root_page():
         batch_lifetime=batch_lifetime,
         log_lifetime=log_lifetime,
         entries_lifetime=entries_lifetime,
-        emulation_mode=emulation_mode,
         use_donor=use_donor,
         notify_email=notify_email,
         notify_phone=notify_phone,

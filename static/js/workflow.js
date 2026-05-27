@@ -92,24 +92,6 @@ function wfUseDonor(checked) {
     .catch(function() { showToast('Ошибка соединения', 'error'); });
 }
 
-function wfEmulation(checked) {
-  fetch('/api/workflow/emulation', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ enabled: checked ? '1' : '0' }),
-  })
-    .then(function(r) { return r.json(); })
-    .then(function(d) {
-      var badge = document.getElementById('emulation-badge');
-      var card  = document.getElementById('wf-card');
-      var on    = d.emulation_mode === '1';
-      if (badge) badge.style.display = on ? '' : 'none';
-      if (card)  card.classList.toggle('emulation-active', on);
-      showToast(on ? 'Эмуляция включена' : 'Эмуляция выключена', on ? 'warn' : 'success');
-    })
-    .catch(function() { showToast('Ошибка соединения', 'error'); });
-}
-
 function openRestartDialog() {
   new ConfirmDialog({
     title: 'Перезапустить движок?',

@@ -732,18 +732,6 @@ def api_cycle_config_good_samples_count():
     return jsonify({"ok": True, "good_samples_count": value})
 
 
-@bp.route("/workflow/emulation", methods=["POST"])
-def api_workflow_emulation():
-    if not is_authenticated():
-        return jsonify({"error": "unauthorized"}), 401
-    body = request.get_json(silent=True) or {}
-    val = "1" if body.get("enabled") == "1" else "0"
-    env_set("emulation_mode", val)
-    label = "включена" if val == "1" else "выключена"
-    write_log_entry(None, f"[api] Эмуляция {label}", level='silent')
-    return jsonify({"ok": True, "emulation_mode": val})
-
-
 @bp.route("/monitor/batch/<batch_id>/entries")
 def api_monitor_batch_entries(batch_id):
     if not is_authenticated():

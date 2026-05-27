@@ -7,7 +7,7 @@
       <div class="toggle-label">Утверждать сюжеты</div>
       {{ approve_stories_hint() }}
     </div>
-    <span id="approve-stories-badge" class="emulation-badge" {% if not approve_stories %}style="display:none"{% endif %}>ВКЛ</span>
+    <span id="approve-stories-badge" class="state-badge" {% if not approve_stories %}style="display:none"{% endif %}>ВКЛ</span>
     <label class="toggle-wrap" style="margin-left:8px">
       <input type="checkbox" id="approve_stories_check" {% if approve_stories %}checked{% endif %}
              onchange="onApproveStoriesToggle(this)">
@@ -20,7 +20,7 @@
       <div class="toggle-label">Утверждать видео</div>
       <div class="hint" style="margin-top:2px">Если включено, пайплайн публикации берёт из пула только видео с оценкой «хорошо»; если пул пуст — батч завершается ошибкой. Если выключено — берётся любое неопубликованное видео; если пул пуст — запускается AI-генерация. Текущий пул: <span id="movie-pool-count" style="color:#f59e0b">…</span>.</div>
     </div>
-    <span id="approve-movies-badge" class="emulation-badge" {% if not approve_movies %}style="display:none"{% endif %}>ВКЛ</span>
+    <span id="approve-movies-badge" class="state-badge" {% if not approve_movies %}style="display:none"{% endif %}>ВКЛ</span>
     <label class="toggle-wrap" style="margin-left:8px">
       <input type="checkbox" id="approve_movies_check" {% if approve_movies %}checked{% endif %}
              onchange="wfApproveMovies(this.checked)">
@@ -32,7 +32,7 @@
       <div class="toggle-label">Подбирать видео из пула</div>
       <div class="hint" style="margin-top:2px">Прежде чем запускать генерацию видео, производится поиск готового среди отменённых или пробных пакетов. Текущий пул: <span id="donor-count" style="color:#f59e0b">…</span>.</div>
     </div>
-    <span id="use-donor-badge" class="emulation-badge" {% if not use_donor %}style="display:none"{% endif %}>ВКЛ</span>
+    <span id="use-donor-badge" class="state-badge" {% if not use_donor %}style="display:none"{% endif %}>ВКЛ</span>
     <label class="toggle-wrap" style="margin-left:8px">
       <input type="checkbox" id="use_donor_check" {% if use_donor %}checked{% endif %}
              onchange="wfUseDonor(this.checked)" {% if approve_movies %}disabled{% endif %}>

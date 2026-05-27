@@ -77,7 +77,6 @@ def get_active_batch_ids() -> set:
 
 class EnvSnapshot(NamedTuple):
     deep_debugging:   bool
-    emulation_mode:   bool
     use_donor:        bool
     loop_interval:    int
     max_threads:      int
@@ -86,7 +85,6 @@ class EnvSnapshot(NamedTuple):
 
 _current: EnvSnapshot = EnvSnapshot(
     deep_debugging=False,
-    emulation_mode=False,
     use_donor=True,
     loop_interval=15,
     max_threads=5,
@@ -94,7 +92,6 @@ _current: EnvSnapshot = EnvSnapshot(
 )
 
 deep_debugging:   bool = _current.deep_debugging
-emulation_mode:   bool = _current.emulation_mode
 use_donor:        bool = _current.use_donor
 loop_interval:    int  = _current.loop_interval
 max_threads:      int  = _current.max_threads
@@ -109,10 +106,9 @@ def snapshot() -> EnvSnapshot:
 
 def refresh_environment() -> EnvSnapshot:
     """Читает актуальные параметры окружения из БД и обновляет снимок."""
-    global deep_debugging, emulation_mode, use_donor, loop_interval, max_threads, max_model_passes, _current
+    global deep_debugging, use_donor, loop_interval, max_threads, max_model_passes, _current
     snap = EnvSnapshot(
         deep_debugging   = env_get('deep_debugging',    '0') == '1',
-        emulation_mode   = env_get('emulation_mode',   '0') == '1',
         use_donor        = env_get('use_donor',        '1') == '1',
         loop_interval    = max(1, min(3600, int(settings_get('loop_interval',     '15')))),
         max_threads      = max(1, min(32,   int(settings_get('max_batch_threads', '5')))),
@@ -120,7 +116,6 @@ def refresh_environment() -> EnvSnapshot:
     )
     _current         = snap
     deep_debugging   = snap.deep_debugging
-    emulation_mode   = snap.emulation_mode
     use_donor        = snap.use_donor
     loop_interval    = snap.loop_interval
     max_threads      = snap.max_threads

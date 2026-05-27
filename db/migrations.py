@@ -37,12 +37,18 @@ def _m108_drop_file_lifetime_setting(cur):
     cur.execute("DELETE FROM settings WHERE key = 'file_lifetime'")
 
 
+def _m109_drop_emulation_mode_environment_key(cur):
+    """Удаляет устаревший параметр environment.emulation_mode."""
+    cur.execute("DELETE FROM environment WHERE key = 'emulation_mode'")
+
+
 # ---------------------------------------------------------------------------
 # Реестр миграций — добавляйте только в конец, никогда не переиспользуйте номера
 # ---------------------------------------------------------------------------
 
 MIGRATIONS = [
     (108, _m108_drop_file_lifetime_setting),
+    (109, _m109_drop_emulation_mode_environment_key),
 ]
 
 

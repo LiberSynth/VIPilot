@@ -126,9 +126,6 @@ class TestApiBlueprintAuth:
     def test_post_cycle_config_good_samples_count(self, client):
         _assert_401(client.post("/api/cycle-config/good-samples-count"))
 
-    def test_post_workflow_emulation(self, client):
-        _assert_401(client.post("/api/workflow/emulation"))
-
     def test_get_monitor_batch_entries(self, client):
         _assert_401(client.get("/api/monitor/batch/some-batch/entries"))
 

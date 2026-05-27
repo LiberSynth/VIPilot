@@ -175,7 +175,7 @@ def _build_steps(active_targets):
 
 
 def run(batch_id, log_id):
-    snap = environment.snapshot()
+    environment.snapshot()
     batch = db_get_batch_by_id(batch_id)
     if not batch:
         db_log_update(log_id, "Батч не найден", "error")
@@ -186,8 +186,8 @@ def run(batch_id, log_id):
     write_log_entry(
         log_id,
         fmt_id_msg(
-            "[publish] Батч {} — phase=run_start, status={}, type={}, targets_count={}, emulation_mode={}",
-            batch_id, status, batch.get('type'), len(active_targets), snap.emulation_mode,
+            "[publish] Батч {} — phase=run_start, status={}, type={}, targets_count={}",
+            batch_id, status, batch.get('type'), len(active_targets),
         ),
         level='silent',
     )

@@ -94,7 +94,7 @@ def _ffmpeg(src, dst, log_id):
 
 
 def run(batch_id, log_id):
-    snap = environment.snapshot()
+    environment.snapshot()
     batch = db_get_batch_by_id(batch_id)
     if not batch:
         db_log_update(log_id, "Батч не найден", "error")
@@ -138,8 +138,8 @@ def run(batch_id, log_id):
     write_log_entry(
         log_id,
         fmt_id_msg(
-            "[transcode] Батч {} — phase=target_resolved, target={}, probe={}, do_transcode={}, emulation_mode={}",
-            batch_id, target, is_probe, do_transcode, snap.emulation_mode,
+            "[transcode] Батч {} — phase=target_resolved, target={}, probe={}, do_transcode={}",
+            batch_id, target, is_probe, do_transcode,
         ),
         level='silent',
     )

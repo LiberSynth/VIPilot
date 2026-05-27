@@ -103,8 +103,8 @@ def run(batch_id, log_id):
     if not is_probe and check_cancelled("story", batch_id, batch, log_id):
         return
 
-    # Режим пула (donor): только для slot/adhoc, только если эмуляция выключена,
-    # use_donor включён и story_id ещё не задан.
+    # Режим пула (donor): только для slot/adhoc, когда use_donor включён
+    # и story_id ещё не задан.
     # Находим батч-донор с готовым видео → записываем donor_batch_id в data
     # и переводим в story_ready. Видео-пайплайн потом перенесёт готовое видео,
     # минуя генерацию. Если подходящего донора нет — падаем в AI-генерацию.
@@ -113,7 +113,6 @@ def run(batch_id, log_id):
     approve_movies = cycle_config_get("approve_movies")
     if (
         not is_probe
-        and not snap.emulation_mode
         and snap.use_donor
         and batch.get("story_id") is None
     ):
