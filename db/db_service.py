@@ -6,6 +6,7 @@ import subprocess
 from urllib.parse import urlparse, unquote, parse_qsl
 
 from .connection import get_db
+from .db_media import db_delete_movie_video_files
 from common.statuses import FINAL_BATCH_STATUSES
 from log.log import write_log_entry
 from utils.utils import fmt_id_msg
@@ -694,6 +695,7 @@ def db_delete_bad_movies() -> dict:
         with conn.cursor() as cur:
             cur.execute("SELECT id FROM movies WHERE grade = 'bad'")
             movie_ids = [r[0] for r in cur.fetchall()]
+            deleted_movie_ids = [str(mid) for mid in movie_ids]
 
             if not movie_ids:
                 conn.commit()
@@ -730,6 +732,9 @@ def db_delete_bad_movies() -> dict:
 
         conn.commit()
 
+    for movie_id in deleted_movie_ids:
+        db_delete_movie_video_files(movie_id)
+
     write_log_entry(None, f"[DB] Удалены неудачные видео: movies={ml_count}, batches={bl_count}, log={ll_count}, log_entries={le_count}", level='silent')
     return {"movies": ml_count, "batches": bl_count, "logs": ll_count, "log_entries": le_count}
 
@@ -744,6 +749,7 @@ def db_get_batch_status(batch_id: str) -> str | None:
 
 
 def db_delete_batch(batch_id: str) -> bool:
+    deleted_movie_id = None
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -766,7 +772,11 @@ def db_delete_batch(batch_id: str) -> bool:
             deleted = cur.rowcount
             if movie_id:
                 cur.execute("DELETE FROM movies WHERE id = %s", (movie_id,))
+                if cur.rowcount:
+                    deleted_movie_id = str(movie_id)
         conn.commit()
+    if deleted_movie_id:
+        db_delete_movie_video_files(deleted_movie_id)
     return deleted > 0
 
 
@@ -806,6 +816,7 @@ def db_delete_story(story_id: str) -> dict:
 
 
 def db_delete_movie(movie_id: str) -> dict:
+    deleted_movie_id = None
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute("SELECT id FROM movies WHERE id = %s", (movie_id,))
@@ -837,8 +848,13 @@ def db_delete_movie(movie_id: str) -> dict:
 
             cur.execute("DELETE FROM movies WHERE id = %s", (movie_id,))
             ml_count = cur.rowcount
+            if ml_count:
+                deleted_movie_id = str(movie_id)
 
         conn.commit()
+
+    if deleted_movie_id:
+        db_delete_movie_video_files(deleted_movie_id)
 
     write_log_entry(None, fmt_id_msg("[DB] Удалено видео {}: batches=" + str(bl_count) + ", log=" + str(ll_count) + ", log_entries=" + str(le_count), movie_id), level='silent')
     return {"movies": ml_count, "batches": bl_count, "logs": ll_count, "log_entries": le_count}

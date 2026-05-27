@@ -1,45 +1,52 @@
 import json
-
-import psycopg2
+from pathlib import Path
 
 from .connection import get_db
 from .db_pipeline import db_set_batch_status
 
-# АРХИТЕКТУРНОЕ РЕШЕНИЕ: хранение видеофайлов в PostgreSQL (BYTEA)
-#
-# Видеофайлы намеренно хранятся непосредственно в базе данных в виде BYTEA-столбцов,
-# а не в файловой системе или внешнем объектном хранилище (S3 и т.п.).
-#
-# Обоснование:
-#   1. Транзакционная целостность — файл и его метаданные сохраняются или
-#      откатываются вместе в рамках одной транзакции; не возникает ситуаций,
-#      когда запись есть, а файл отсутствует (или наоборот).
-#   2. Единая точка резервного копирования — стандартный pg_dump захватывает
-#      и данные, и файлы одновременно; не нужно синхронизировать отдельные
-#      хранилища.
-#   3. Упрощённое развёртывание — приложение не зависит от внешних сервисов
-#      хранения объектов, что снижает операционную сложность для текущего
-#      масштаба проекта.
-#   4. Контроль доступа — разграничение прав на уровне БД распространяется
-#      автоматически; не нужна отдельная политика доступа к бакетам.
-#
-# Компромисс: такой подход увеличивает размер БД и нагрузку при потоковой
-# передаче больших файлов. Перенос в объектное хранилище следует рассмотреть
-# при значительном росте объёма видеоданных.
+_RAW_FIELD = "raw_data"
+_TRANSCODED_FIELD = "transcoded_data"
+_VIDEO_DIR = Path(__file__).resolve().parents[1] / "video"
+
+
+def _video_file_path(movie_id: str, field: str) -> Path:
+    return _VIDEO_DIR / f"{movie_id} - {field}.mp4"
+
+
+def _write_video_file(movie_id: str, field: str, video_data: bytes) -> None:
+    _VIDEO_DIR.mkdir(parents=True, exist_ok=True)
+    _video_file_path(movie_id, field).write_bytes(video_data)
+
+
+def _read_video_file_or_none(movie_id: str, field: str) -> bytes | None:
+    try:
+        return _video_file_path(movie_id, field).read_bytes()
+    except FileNotFoundError:
+        return None
+
+
+def db_delete_movie_video_files(movie_id: str) -> None:
+    movie_id = str(movie_id)
+    for field in (_RAW_FIELD, _TRANSCODED_FIELD):
+        try:
+            _video_file_path(movie_id, field).unlink()
+        except FileNotFoundError:
+            pass
 
 
 def db_create_batch_movie(batch_id, video_data: bytes, video_url: str, model_id=None):
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "INSERT INTO movies (raw_data, url, model_id) VALUES (%s, %s, %s) RETURNING id",
-                (psycopg2.Binary(video_data), video_url, model_id),
+                "INSERT INTO movies (url, model_id) VALUES (%s, %s) RETURNING id",
+                (video_url, model_id),
             )
-            movie_id = cur.fetchone()[0]
+            movie_id = str(cur.fetchone()[0])
             cur.execute(
                 "UPDATE batches SET movie_id = %s WHERE id = %s",
                 (movie_id, batch_id),
             )
+            _write_video_file(movie_id, _RAW_FIELD, video_data)
         conn.commit()
     return True
 
@@ -48,14 +55,14 @@ def db_get_batch_original_video(batch_id) -> bytes | None:
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT m.raw_data FROM batches b
+                SELECT m.id::text FROM batches b
                 JOIN movies m ON m.id = b.movie_id
                 WHERE b.id = %s
             """, (batch_id,))
             row = cur.fetchone()
-    if row and row[0] is not None:
-        return bytes(row[0])
-    return None
+    if not row:
+        return None
+    return _read_video_file_or_none(str(row[0]), _RAW_FIELD)
 
 
 def db_save_video_job_and_set_pending(batch_id, job_data):
@@ -74,30 +81,36 @@ def db_save_transcoded_data(batch_id, video_data: bytes):
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                """UPDATE movies m
-                      SET transcoded_data = %s
-                     FROM batches b
-                    WHERE b.id = %s AND b.movie_id = m.id""",
-                (psycopg2.Binary(video_data), batch_id),
+                """
+                SELECT m.id::text
+                FROM batches b
+                JOIN movies m ON m.id = b.movie_id
+                WHERE b.id = %s
+                """,
+                (batch_id,),
             )
-        conn.commit()
+            row = cur.fetchone()
+    if not row:
+        return
+    _write_video_file(str(row[0]), _TRANSCODED_FIELD, video_data)
 
 
 def db_get_batch_video_data(batch_id) -> bytes | None:
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT m.transcoded_data, m.raw_data FROM batches b
+                SELECT m.id::text FROM batches b
                 JOIN movies m ON m.id = b.movie_id
                 WHERE b.id = %s
             """, (batch_id,))
             row = cur.fetchone()
-    if row:
-        if row[0] is not None:
-            return bytes(row[0])
-        if row[1] is not None:
-            return bytes(row[1])
-    return None
+    if not row:
+        return None
+    movie_id = str(row[0])
+    transcoded = _read_video_file_or_none(movie_id, _TRANSCODED_FIELD)
+    if transcoded is not None:
+        return transcoded
+    return _read_video_file_or_none(movie_id, _RAW_FIELD)
 
 
 def db_get_movie_video_data(movie_id) -> bytes | None:
@@ -107,16 +120,17 @@ def db_get_movie_video_data(movie_id) -> bytes | None:
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT transcoded_data, raw_data FROM movies
+                SELECT id::text FROM movies
                 WHERE id = %s
             """, (movie_id,))
             row = cur.fetchone()
-    if row:
-        if row[0] is not None:
-            return bytes(row[0])
-        if row[1] is not None:
-            return bytes(row[1])
-    return None
+    if not row:
+        return None
+    movie_id = str(row[0])
+    transcoded = _read_video_file_or_none(movie_id, _TRANSCODED_FIELD)
+    if transcoded is not None:
+        return transcoded
+    return _read_video_file_or_none(movie_id, _RAW_FIELD)
 
 
 def db_create_manual_movie(title: str, video_data: bytes) -> str:
@@ -148,14 +162,14 @@ def db_create_manual_movie(title: str, video_data: bytes) -> str:
             )
             batch_id = str(cur.fetchone()[0])
             cur.execute(
-                "INSERT INTO movies (raw_data, url, grade) VALUES (%s, NULL, 'good') RETURNING id",
-                (psycopg2.Binary(video_data),),
+                "INSERT INTO movies (url, grade) VALUES (NULL, 'good') RETURNING id",
             )
-            movie_id = cur.fetchone()[0]
+            movie_id = str(cur.fetchone()[0])
             cur.execute(
                 "UPDATE batches SET movie_id = %s WHERE id = %s",
                 (movie_id, batch_id),
             )
+            _write_video_file(movie_id, _RAW_FIELD, video_data)
         db_set_batch_status(batch_id, 'video_ready', conn)
     return batch_id
 
