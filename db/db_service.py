@@ -88,7 +88,7 @@ def db_get_monitor():
                 FROM batches b
                 LEFT JOIN (
                     SELECT id, model_id,
-                           (transcoded_data IS NOT NULL OR raw_data IS NOT NULL) AS has_video_data
+                           TRUE AS has_video_data
                     FROM movies
                 ) m ON m.id = b.movie_id
                 LEFT JOIN log l ON l.batch_id = b.id
