@@ -64,6 +64,12 @@ def _m110_rename_legacy_batch_types_to_manual(cur):
     """)
 
 
+def _m111_drop_legacy_movie_bytea_columns(cur):
+    """Удаляет legacy BYTEA-колонки видеоданных из movies."""
+    cur.execute("ALTER TABLE movies DROP COLUMN IF EXISTS raw_data")
+    cur.execute("ALTER TABLE movies DROP COLUMN IF EXISTS transcoded_data")
+
+
 # ---------------------------------------------------------------------------
 # Реестр миграций — добавляйте только в конец, никогда не переиспользуйте номера
 # ---------------------------------------------------------------------------
@@ -72,6 +78,7 @@ MIGRATIONS = [
     (108, _m108_drop_file_lifetime_setting),
     (109, _m109_drop_emulation_mode_environment_key),
     (110, _m110_rename_legacy_batch_types_to_manual),
+    (111, _m111_drop_legacy_movie_bytea_columns),
 ]
 
 
