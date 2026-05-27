@@ -337,6 +337,22 @@
     min-height: 18px;
     line-height: 1.5;
   }
+  #story-generate-console,
+  #director-generate-console {
+    margin-top: 8px;
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 112px;
+    resize: none;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid #2e344d;
+    background: rgba(11, 14, 25, .72);
+    color: #b7c0d8;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 12px;
+    line-height: 1.35;
+  }
   input[type="number"].story-generate-count {
     flex: none; width: 52px; min-width: 0;
     padding: 12px 8px; box-sizing: border-box;

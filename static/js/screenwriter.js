@@ -604,137 +604,128 @@ var setDraftStoryFromRecord;
 
 /* ── Кнопка «Сгенерировать» в панели Сценариста ── */
 (function() {
-  var _DEFAULT_HINT = 'Вы можете сгенерировать сюжет при помощи AI-модели';
-  var _pollTimer    = null;
-  var _hintResetTimer = null;
-  var _batchQueue   = [];
-  var _batchTotal   = 0;
-  var _batchDone    = 0;
+  var _DEFAULT_HINT = 'Вы можете сгенерировать контент при помощи AI-модели.';
+  var _FINAL_STATUSES = [
+    'published', 'published_partially', 'movie_manual', 'story_manual',
+    'cancelled', 'error', 'fatal_error',
+    'video_error', 'transcode_error', 'publish_error', 'donated',
+  ];
+  var _controller = null;
+  var _isCreating = false;
 
-  function setHint(text) {
+  function _fallbackHint(text) {
     var el = document.getElementById('story-generate-hint');
     if (el) el.textContent = text || _DEFAULT_HINT;
   }
-  function resetHint() { setHint(_DEFAULT_HINT); }
-  function scheduleResetHint() {
-    if (_hintResetTimer) clearTimeout(_hintResetTimer);
-    _hintResetTimer = setTimeout(function() { _hintResetTimer = null; resetHint(); }, 2000);
+
+  function _refreshLists() {
+    if (typeof loadStoryList === 'function') loadStoryList();
+    if (typeof window.loadMovieList === 'function') window.loadMovieList();
   }
 
-  function pollNext() {
-    if (_pollTimer) { clearTimeout(_pollTimer); _pollTimer = null; }
-    if (_batchQueue.length === 0) {
-      var btn = document.getElementById('btn-story-generate');
-      if (btn) btn.disabled = false;
-      setHint(_batchTotal > 1
-        ? 'Готово: сгенерировано ' + _batchDone + ' из ' + _batchTotal
-        : 'Сюжет сгенерирован');
-      scheduleResetHint();
-      return;
-    }
-    var batchId = _batchQueue.shift();
-    var batchIndex = _batchTotal - _batchQueue.length;
-    function poll() {
-      fetch('/api/batch/' + batchId + '/logs')
-        .then(function(r) { return r.json(); })
-        .then(function(d) {
-          if (d.error) { _pollTimer = setTimeout(poll, 700); return; }
-          var prefix = _batchTotal > 1 ? '[' + batchIndex + '/' + _batchTotal + '] ' : '';
-          var entries = [];
-          if (d.logs && d.logs.length) {
-            var lastLog = d.logs[d.logs.length - 1];
-            if (lastLog.entries && lastLog.entries.length) entries = lastLog.entries;
-          }
-          if (entries.length) setHint(prefix + entries[entries.length - 1].message);
-          var status = d.batch_status;
-          if (status === 'story_manual') {
-            _batchDone++;
-            var storyId = d.story_id;
-            if (storyId) {
-              fetch('/api/story/' + encodeURIComponent(storyId))
-                .then(function(r) { return r.json(); })
-                .then(function(s) {
-                  if (typeof setDraftStoryFromRecord === 'function') {
-                    setDraftStoryFromRecord({ id: storyId, title: s.title || '', content: s.text || '' });
-                  }
-                  if (typeof window.setExpandedStoryId === 'function') window.setExpandedStoryId(storyId);
-                  if (typeof loadStoryList === 'function') loadStoryList();
-                  if (typeof window.loadMovieList === 'function') window.loadMovieList();
-                  pollNext();
-                })
-                .catch(function() {
-                  if (typeof loadStoryList === 'function') loadStoryList();
-                  if (typeof window.loadMovieList === 'function') window.loadMovieList();
-                  pollNext();
-                });
-            } else {
-              if (typeof loadStoryList === 'function') loadStoryList();
-              if (typeof window.loadMovieList === 'function') window.loadMovieList();
-              pollNext();
-            }
-          } else if (status === 'error' || status === 'cancelled' || status === 'fatal_error') {
-            _batchDone++;
-            if (typeof loadStoryList === 'function') loadStoryList();
-            if (typeof window.loadMovieList === 'function') window.loadMovieList();
-            pollNext();
-          } else {
-            _pollTimer = setTimeout(poll, 700);
-          }
-        })
-        .catch(function() { _pollTimer = setTimeout(poll, 700); });
-    }
-    poll();
+  function _controllerOrNull() {
+    if (_controller) return _controller;
+    if (typeof GenerationConsoleController !== 'function') return null;
+    _controller = new GenerationConsoleController({
+      hintId: 'story-generate-hint',
+      consoleId: 'story-generate-console',
+      defaultHint: _DEFAULT_HINT,
+      maxLines: 5,
+      pollIntervalMs: 700,
+      finalStatuses: _FINAL_STATUSES,
+      onBatchFinal: function(_batchId, data) {
+        var status = String((data && data.batch_status) || '');
+        var storyId = data ? data.story_id : null;
+        if (status === 'story_manual' && storyId) {
+          fetch('/api/story/' + encodeURIComponent(storyId))
+            .then(function(r) { return r.json(); })
+            .then(function(s) {
+              if (typeof setDraftStoryFromRecord === 'function') {
+                setDraftStoryFromRecord({ id: storyId, title: s.title || '', content: s.text || '' });
+              }
+              if (typeof window.setExpandedStoryId === 'function') window.setExpandedStoryId(storyId);
+              _refreshLists();
+            })
+            .catch(function() { _refreshLists(); });
+          return;
+        }
+        _refreshLists();
+      },
+    });
+    return _controller;
+  }
+
+  function _setCreatingState(btn, value) {
+    _isCreating = !!value;
+    if (btn) btn.disabled = _isCreating;
   }
 
   function initGenerateButton() {
     var btn = document.getElementById('btn-story-generate');
     if (!btn) return;
+    var status = _controllerOrNull();
+    if (status) status.setDefaultHint(_DEFAULT_HINT);
+    else _fallbackHint(_DEFAULT_HINT);
+
     btn.addEventListener('click', function() {
-      if (btn.disabled) return;
+      if (_isCreating) return;
       var countInput = document.getElementById('story-generate-count');
       var count = Math.max(1, Math.min(50, parseInt((countInput && countInput.value) || '1') || 1));
       var modelIdEl = document.getElementById('screenwriter-model-id');
       var modelId = modelIdEl ? (modelIdEl.value || '') : '';
-      btn.disabled = true;
-      _batchQueue = [];
-      _batchTotal = count;
-      _batchDone  = 0;
-      setHint(count > 1 ? 'Создаю ' + count + ' батчей…' : 'Запускаю генерацию…');
+      _setCreatingState(btn, true);
+      if (status) status.beginCreation(count > 1 ? ('Создаю ' + count + ' батчей…') : 'Запускаю генерацию…');
+      else _fallbackHint(count > 1 ? ('Создаю ' + count + ' батчей…') : 'Запускаю генерацию…');
       var body = modelId ? JSON.stringify({ model_id: modelId }) : null;
       var remaining = count;
+      var createdBatchIds = [];
+      var hadRequestError = false;
+
+      function finishRequest() {
+        remaining--;
+        if (remaining > 0) return;
+
+        _setCreatingState(btn, false);
+        if (status) status.endCreation();
+        else _fallbackHint(_DEFAULT_HINT);
+
+        if (createdBatchIds.length === 0) {
+          if (status) {
+            status.addLine(hadRequestError ? 'Ошибка запроса' : 'Не удалось создать батчи');
+            status.showTemporaryHint(hadRequestError ? 'Ошибка запроса' : 'Не удалось создать батчи', 3500);
+          } else {
+            _fallbackHint(hadRequestError ? 'Ошибка запроса' : 'Не удалось создать батчи');
+            setTimeout(function() { _fallbackHint(_DEFAULT_HINT); }, 3500);
+          }
+          return;
+        }
+
+        if (status) {
+          status.addLine('Создано батчей: ' + createdBatchIds.length);
+          if (hadRequestError) status.addLine('Часть запросов завершилась ошибкой');
+          status.trackBatches(createdBatchIds);
+        }
+      }
+
       for (var i = 0; i < count; i++) {
         fetch('/production/story/generate', {
           method: 'POST',
           headers: body ? { 'Content-Type': 'application/json' } : {},
           body: body,
         })
-          .then(function(r) { return r.json(); })
+          .then(function(r) {
+            return r.json()
+              .then(function(d) { return { ok: r.ok, data: d || {} }; })
+              .catch(function() { return { ok: r.ok, data: {} }; });
+          })
           .then(function(d) {
-            if (d.batch_id) _batchQueue.push(d.batch_id);
-            remaining--;
-            if (remaining === 0) {
-              _batchTotal = _batchQueue.length;
-              if (_batchQueue.length === 0) {
-                btn.disabled = false;
-                setHint('Не удалось создать батчи');
-                setTimeout(resetHint, 3000);
-              } else {
-                pollNext();
-              }
-            }
+            if (d.ok && d.data && d.data.batch_id) createdBatchIds.push(String(d.data.batch_id));
+            else hadRequestError = true;
+            finishRequest();
           })
           .catch(function() {
-            remaining--;
-            if (remaining === 0) {
-              _batchTotal = _batchQueue.length;
-              if (_batchQueue.length === 0) {
-                btn.disabled = false;
-                setHint('Ошибка запроса');
-                setTimeout(resetHint, 4000);
-              } else {
-                pollNext();
-              }
-            }
+            hadRequestError = true;
+            finishRequest();
           });
       }
     });

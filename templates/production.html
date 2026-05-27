@@ -68,7 +68,8 @@
         </div>
         <input type="hidden" id="screenwriter-model-id" value="">
       </div>
-      <div id="story-generate-hint" class="story-generate-hint">Вы можете сгенерировать сюжет при помощи AI-модели</div>
+      <div id="story-generate-hint" class="story-generate-hint">Вы можете сгенерировать контент при помощи AI-модели.</div>
+      <textarea id="story-generate-console" rows="5" readonly></textarea>
     </div>
     <div id="story-card-holder" hidden>
       <div id="card-story-draft" data-video-duration="{{ video_duration }}" data-words-per-second="{{ words_per_second | int }}">
@@ -175,7 +176,8 @@
         <input type="number" id="director-video-count" class="story-generate-count" value="1" min="1" max="50" autocomplete="off">
         <span class="story-generate-count-label">штук</span>
       </div>
-      <div id="director-generate-hint" class="story-generate-hint">Вы можете сгенерировать ролик при помощи AI-модели.</div>
+      <div id="director-generate-hint" class="story-generate-hint">Вы можете сгенерировать контент при помощи AI-модели.</div>
+      <textarea id="director-generate-console" rows="5" readonly></textarea>
     </div>
     <div id="director-player-holder" hidden>
       <div id="director-player-card">
@@ -257,6 +259,7 @@
 <script src="/static/js/controls/confirm-dialog.js"></script>
 <script src="/static/js/controls/export-movies-dialog.js"></script>
 <script src="/static/js/controls/delete-movies-dialog.js"></script>
+<script src="/static/js/controls/generation-console.js"></script>
 <script src="/static/js/controls/accordion-list.js"></script>
 <script src="/static/js/screenwriter.js"></script>
 <script src="/static/js/director.js"></script>
@@ -565,15 +568,33 @@
   (function() {
     var btn = document.getElementById('btn-director-generate');
     if (!btn) return;
-    var _hint_default = 'Вы можете сгенерировать ролик при помощи AI-модели.';
-
-    function setHint(text) {
-      var el = document.getElementById('director-generate-hint');
-      if (el) el.textContent = text;
+    function _directorStatusApi() {
+      return window._directorApi || null;
     }
 
-    function resetHint() {
-      setHint(_hint_default);
+    function _beginDirectorCreation(text) {
+      var api = _directorStatusApi();
+      if (api && api.beginGenerationCreation) api.beginGenerationCreation(text);
+    }
+
+    function _endDirectorCreation() {
+      var api = _directorStatusApi();
+      if (api && api.endGenerationCreation) api.endGenerationCreation();
+    }
+
+    function _appendDirectorLine(text) {
+      var api = _directorStatusApi();
+      if (api && api.appendGenerationLine) api.appendGenerationLine(text);
+    }
+
+    function _showDirectorHint(text, ttlMs) {
+      var api = _directorStatusApi();
+      if (api && api.showGenerationHint) api.showGenerationHint(text, ttlMs);
+    }
+
+    function _trackDirectorBatches(batchIds) {
+      var api = _directorStatusApi();
+      if (api && api.trackGenerationBatches) api.trackGenerationBatches(batchIds);
     }
 
     function _setGeneratingState(value) {
@@ -703,22 +724,23 @@
         return;
       }
       _setGeneratingState(true);
-      setHint(plan.length > 1 ? ('Создаю ' + plan.length + ' батчей…') : 'Запускаю генерацию…');
-      var pollingStarted = false;
+      _beginDirectorCreation(plan.length > 1 ? ('Создаю ' + plan.length + ' батчей…') : 'Запускаю генерацию…');
+      var createdBatchIds = [];
       _dispatchGeneratePlanSequentially(
         plan,
         storyId,
         function(batchId) {
-          if (!pollingStarted && window._directorApi) {
-            pollingStarted = true;
-            window._directorApi.startBatchPoll(batchId, null);
-          }
+          if (batchId) createdBatchIds.push(batchId);
         },
         function(created) {
           _setGeneratingState(false);
-          if (!pollingStarted) {
-            setHint(created > 0 ? 'Батчи созданы' : 'Не удалось создать батчи');
-            setTimeout(resetHint, 3000);
+          _endDirectorCreation();
+          if (created > 0) {
+            _appendDirectorLine('Создано батчей: ' + created);
+            _trackDirectorBatches(createdBatchIds);
+          } else {
+            _appendDirectorLine('Не удалось создать батчи');
+            _showDirectorHint('Не удалось создать батчи', 3000);
           }
         }
       );
@@ -737,8 +759,7 @@
         if (requestedModelId !== _DIRECTOR_ITERATE_SENTINEL) {
           var selectedModel = _findModelById(activeModels, requestedModelId);
           if (!selectedModel) {
-            setHint('Выбранная модель недоступна');
-            setTimeout(resetHint, 3000);
+            _showDirectorHint('Выбранная модель недоступна', 3000);
             return;
           }
           _startDirectorGeneration(_buildBatchPlan([selectedModel], count), storyId);

@@ -1,80 +1,38 @@
 (function() {
   var _expandedMovieId = null;
-  var _pollTimer       = null;
-  var _pollVersion     = 0;
   var _forceNoAutoplay = false;
+  var _generationStatus = null;
 
   var _FINAL_STATUSES = [
     'published', 'published_partially', 'movie_manual', 'story_manual',
     'cancelled', 'error', 'fatal_error',
     'video_error', 'transcode_error', 'publish_error', 'donated',
   ];
-  var _HINT_DEFAULT = 'Вы можете сгенерировать ролик при помощи AI-модели.';
+  var _HINT_DEFAULT = 'Вы можете сгенерировать контент при помощи AI-модели.';
 
-  function _setHint(text) {
-    var el = document.getElementById('director-generate-hint');
-    if (el) el.textContent = text;
-  }
-
-  function _stopActiveBatchPoll() {
-    if (_pollTimer !== null) {
-      clearTimeout(_pollTimer);
-      _pollTimer = null;
-    }
-    _pollVersion++;
-  }
-
-  function _startActiveBatchPoll(batchId, movieId) {
-    _stopActiveBatchPoll();
-    var myVersion = _pollVersion;
-    function poll() {
-      fetch('/api/batch/' + encodeURIComponent(batchId) + '/logs')
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-          if (_pollVersion !== myVersion) return;
-          if (!data || data.error) {
-            _pollTimer = setTimeout(poll, 2500);
-            return;
-          }
-          var logs = data.logs || [];
-          var lastLog = logs.length ? logs[logs.length - 1] : null;
-          var lastEntry = lastLog && lastLog.entries && lastLog.entries.length
-            ? lastLog.entries[lastLog.entries.length - 1]
-            : null;
-          if (lastEntry && lastEntry.message) {
-            _setHint(lastEntry.message);
-          }
-          var status = data.batch_status || '';
-          if (_FINAL_STATUSES.indexOf(status) !== -1) {
-            _stopActiveBatchPoll();
-            if (data.has_video_data && data.movie_id) {
-              if (typeof window.loadMovieList === 'function') {
-                window.loadMovieList(function() {
-                  var panel = document.getElementById('panel-director');
-                  var panelHidden = !panel || !panel.classList.contains('active');
-                  selectMovie(data.movie_id, panelHidden);
-                });
-              }
-            } else {
-              if (typeof window.loadMovieList === 'function') window.loadMovieList();
-              _setHint('Генерация завершилась без видео');
-              var resetVersion = _pollVersion;
-              setTimeout(function() {
-                if (_pollVersion === resetVersion) {
-                  _setHint(_HINT_DEFAULT);
-                }
-              }, 3000);
+  function _statusController() {
+    if (_generationStatus) return _generationStatus;
+    if (typeof GenerationConsoleController !== 'function') return null;
+    _generationStatus = new GenerationConsoleController({
+      hintId: 'director-generate-hint',
+      consoleId: 'director-generate-console',
+      defaultHint: _HINT_DEFAULT,
+      maxLines: 5,
+      pollIntervalMs: 2500,
+      finalStatuses: _FINAL_STATUSES,
+      onBatchFinal: function(_batchId, data, meta) {
+        if (typeof window.loadMovieList === 'function') {
+          window.loadMovieList(function() {
+            if (meta && meta.selectMovieOnReady && data && data.has_video_data && data.movie_id) {
+              var panel = document.getElementById('panel-director');
+              var panelHidden = !panel || !panel.classList.contains('active');
+              selectMovie(data.movie_id, panelHidden);
             }
-            return;
-          }
-          _pollTimer = setTimeout(poll, 2500);
-        })
-        .catch(function() {
-          if (_pollVersion !== myVersion) return;
-          _pollTimer = setTimeout(poll, 2500);
-        });
-    }
-    poll();
+          });
+        }
+      },
+    });
+    return _generationStatus;
   }
 
   /* ── фильтры ── */
@@ -164,19 +122,18 @@
       return _renderPublishedIcon(item) + _renderGoToStoryBtn(item) + _renderInfoBtn(item) + _renderMovieDeleteBtn(item);
     },
     onExpand: function(item) {
-      _stopActiveBatchPoll();
-      _setHint(_HINT_DEFAULT);
       _expandedMovieId = item ? String(item.id) : null;
       loadMovieInPlayer(_expandedMovieId, _forceNoAutoplay);
       _forceNoAutoplay = false;
       if (item && item.active_batch_id) {
-        _startActiveBatchPoll(item.active_batch_id, _expandedMovieId);
+        var status = _statusController();
+        if (status) {
+          status.trackBatch(item.active_batch_id, { selectMovieOnReady: true });
+        }
       }
     },
     onCollapse: function() {
       _expandedMovieId = null;
-      _stopActiveBatchPoll();
-      _setHint(_HINT_DEFAULT);
       var wrap = document.getElementById('director-video-wrap');
       if (wrap) { var vid = wrap.querySelector('video'); if (vid) vid.pause(); }
     },
@@ -405,6 +362,7 @@
   }
 
   function initDirector() {
+    _statusController();
     initFilters();
     initDeleteBadMoviesButton();
     initImportMovieButton();
@@ -414,7 +372,31 @@
   }
 
   window._directorApi = {
-    startBatchPoll:     _startActiveBatchPoll,
+    startBatchPoll: function(batchId, movieId) {
+      var status = _statusController();
+      if (!status) return;
+      status.trackBatch(batchId, { selectMovieOnReady: !!movieId });
+    },
+    beginGenerationCreation: function(hintText) {
+      var status = _statusController();
+      if (status) status.beginCreation(hintText);
+    },
+    endGenerationCreation: function() {
+      var status = _statusController();
+      if (status) status.endCreation();
+    },
+    appendGenerationLine: function(text) {
+      var status = _statusController();
+      if (status) status.addLine(text);
+    },
+    showGenerationHint: function(text, ttlMs) {
+      var status = _statusController();
+      if (status) status.showTemporaryHint(text, ttlMs);
+    },
+    trackGenerationBatches: function(batchIds) {
+      var status = _statusController();
+      if (status) status.trackBatches(batchIds);
+    },
     getSelectedMovieId: function() { return _expandedMovieId; },
   };
 
