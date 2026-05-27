@@ -192,29 +192,17 @@ function _schedulePubCounterSave() {
 })();
 
 async function downloadBackup(btn) {
-  var tables, movieList;
+  var tables;
   try {
-    var [rTables, rMovies] = await Promise.all([
-      fetch('/api/export-backup/tables'),
-      fetch('/api/export-backup-video/list'),
-    ]);
+    var rTables = await fetch('/api/export-backup/tables');
     if (!rTables.ok) throw new Error('tables: http ' + rTables.status);
-    if (!rMovies.ok) throw new Error('movies: http ' + rMovies.status);
-    tables    = await rTables.json();
-    movieList = await rMovies.json();
+    tables = await rTables.json();
   } catch (e) {
     if (typeof window.showToast === 'function') window.showToast('Ошибка получения списка файлов');
     return;
   }
 
-  var movieItems = [];
-  for (var m = 0; m < movieList.length; m++) {
-    for (var f = 0; f < movieList[m].fields.length; f++) {
-      movieItems.push({ id: movieList[m].id, field: movieList[m].fields[f] });
-    }
-  }
-
-  var total = tables.length + movieItems.length;
+  var total = tables.length;
   btn.disabled = true;
   var dlg = new ExportMoviesDialog({
     total: total,
@@ -251,33 +239,6 @@ async function downloadBackup(btn) {
     }
   }
 
-  for (var j = 0; j < movieItems.length; j++) {
-    if (dlg.isCancelled()) break;
-    var item = movieItems[j];
-    var mvFilename = item.id + ' - ' + item.field + '.mp4';
-    dlg.setCurrentFile(mvFilename);
-    try {
-      var mr = await fetch(
-        '/api/export-backup-video/' + encodeURIComponent(item.id) + '/' + encodeURIComponent(item.field)
-      );
-      if (!mr.ok) throw new Error('http ' + mr.status);
-      var mvBlob = await mr.blob();
-      var mvUrl = URL.createObjectURL(mvBlob);
-      var ma = document.createElement('a');
-      ma.href = mvUrl;
-      ma.download = mvFilename;
-      document.body.appendChild(ma);
-      ma.click();
-      document.body.removeChild(ma);
-      URL.revokeObjectURL(mvUrl);
-      done++;
-      dlg.setProgress(done, mvFilename);
-    } catch (e) {
-      if (dlg.isCancelled()) break;
-      failedItems.push({ filename: mvFilename, reason: 'ошибка скачивания' });
-    }
-  }
-
   btn.disabled = false;
   dlg.finish(done, dlg.isCancelled(), failedItems);
 }
@@ -291,17 +252,15 @@ function uploadBackup(btn) {
 
 async function _doUploadBackup(btn, files) {
   var yamlFiles = [];
-  var mp4Files = [];
-  var MP4_RE = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}) - (raw_data|transcoded_data)\.mp4$/;
   for (var i = 0; i < files.length; i++) {
     var f = files[i];
-    if (f.name.endsWith('.yaml')) yamlFiles.push(f);
-    else if (f.name.endsWith('.mp4') && MP4_RE.test(f.name)) mp4Files.push(f);
+    var lower = (f.name || '').toLowerCase();
+    if (lower.endsWith('.yaml') || lower.endsWith('.yml')) yamlFiles.push(f);
   }
 
-  var total = yamlFiles.length + mp4Files.length;
+  var total = yamlFiles.length;
   if (total === 0) {
-    if (typeof window.showToast === 'function') window.showToast('Нет подходящих файлов');
+    if (typeof window.showToast === 'function') window.showToast('Нет подходящих YAML-файлов');
     return;
   }
 
@@ -331,33 +290,11 @@ async function _doUploadBackup(btn, files) {
     }
   }
 
-  for (var j = 0; j < mp4Files.length; j++) {
-    if (dlg.isCancelled()) break;
-    var f = mp4Files[j];
-    var m = f.name.match(MP4_RE);
-    var movieId = m[1];
-    var field = m[2];
-    dlg.setCurrentFile(f.name);
-    try {
-      var r = await fetch(
-        '/api/import-backup-video/' + encodeURIComponent(movieId) + '/' + encodeURIComponent(field),
-        { method: 'POST', body: f, headers: { 'Content-Type': 'video/mp4' } }
-      );
-      if (!r.ok) throw new Error('http ' + r.status);
-      done++;
-      dlg.setProgress(done, f.name);
-    } catch (e) {
-      if (dlg.isCancelled()) break;
-      failedItems.push({ filename: f.name, reason: 'ошибка загрузки' });
-    }
-  }
-
   btn.disabled = false;
   dlg.finish(done, dlg.isCancelled(), failedItems);
 }
 
 async function _retryDownloadBackup(btn, failedItems) {
-  var MP4_RE = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}) - (raw_data|transcoded_data)\.mp4$/;
   btn.disabled = true;
   var dlg = new ExportMoviesDialog({
     total: failedItems.length,
@@ -374,22 +311,12 @@ async function _retryDownloadBackup(btn, failedItems) {
     var filename = failedItems[i].filename;
     dlg.setCurrentFile(filename);
     try {
-      var blob, url;
-      if (filename.endsWith('.yaml')) {
-        var table = filename.replace(/\.yaml$/, '');
-        var r = await fetch('/api/export-backup/' + encodeURIComponent(table));
-        if (!r.ok) throw new Error('http ' + r.status);
-        blob = await r.blob();
-      } else {
-        var m = filename.match(MP4_RE);
-        if (!m) throw new Error('bad filename');
-        var r = await fetch(
-          '/api/export-backup-video/' + encodeURIComponent(m[1]) + '/' + encodeURIComponent(m[2])
-        );
-        if (!r.ok) throw new Error('http ' + r.status);
-        blob = await r.blob();
-      }
-      url = URL.createObjectURL(blob);
+      var table = filename.replace(/\.(yaml|yml)$/i, '');
+      if (!table) throw new Error('bad filename');
+      var r = await fetch('/api/export-backup/' + encodeURIComponent(table));
+      if (!r.ok) throw new Error('http ' + r.status);
+      var blob = await r.blob();
+      var url = URL.createObjectURL(blob);
       var a = document.createElement('a');
       a.href = url;
       a.download = filename;
