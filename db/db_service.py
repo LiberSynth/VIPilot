@@ -634,26 +634,6 @@ def db_clear_all_history():
     return {"log_entries": le, "logs": ll, "batches": bl}
 
 
-def db_cleanup_video_data(file_lifetime_days: int) -> int:
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute("""
-                UPDATE movies
-                   SET transcoded_data = NULL,
-                       raw_data        = NULL
-                WHERE id IN (
-                    SELECT movie_id FROM batches
-                    WHERE status = ANY(%s)
-                      AND created_at < now() - make_interval(days => %s)
-                      AND movie_id IS NOT NULL
-                )
-                  AND COALESCE(transcoded_data, raw_data) IS NOT NULL
-            """, (list(FINAL_BATCH_STATUSES), file_lifetime_days))
-            count = cur.rowcount
-        conn.commit()
-    return count
-
-
 def db_purge_unused_stories() -> dict:
     with get_db() as conn:
         with conn.cursor() as cur:

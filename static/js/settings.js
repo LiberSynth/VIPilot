@@ -55,7 +55,6 @@ function collectAllSettings(activeTab) {
   setIfExists('entries_lifetime', 'entries_lifetime');
   setIfExists('log_lifetime',     'log_lifetime');
   setIfExists('batch_lifetime',   'batch_lifetime');
-  setIfExists('file_lifetime',    'file_lifetime');
   setIfExists('buffer_hours',     'buffer_hours');
   setIfExists('loop_interval',    'loop_interval');
   setIfExists('max_batch_threads', 'max_batch_threads');
@@ -149,7 +148,6 @@ function validateLifetimes() {
   const serviceFields = [
     document.getElementById('notify_email'),
     document.getElementById('notify_phone'),
-    document.getElementById('file_lifetime'),
     document.getElementById('buffer_hours'),
     document.getElementById('loop_interval'),
     document.getElementById('max_batch_threads'),

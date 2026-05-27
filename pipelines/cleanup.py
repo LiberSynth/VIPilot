@@ -1,10 +1,9 @@
 """
 Pipeline 6 — Сборщик мусора.
-Удаляет устаревшие данные согласно 4 настройкам времени жизни:
+Удаляет устаревшие данные согласно 3 настройкам времени жизни:
   entries_lifetime  — подробные записи log_entries
   log_lifetime      — краткие записи log (заголовки)
   batch_lifetime    — батчи (истории-задел не удаляются)
-  file_lifetime     — обнуляет raw_data/transcoded_data в movies для опубликованных батчей
 
 Если любой из параметров равен 0, соответствующая очистка полностью пропускается.
 Запускается каждые loop_interval секунд; делает всё за один проход.
@@ -17,10 +16,9 @@ from db import (
     db_cleanup_log_entries,
     db_cleanup_logs,
     db_cleanup_batches,
-    db_cleanup_video_data,
 )
 from log import write_log_entry
-from utils.utils import parse_long_lifetime, parse_batch_lifetime, parse_file_lifetime
+from utils.utils import parse_long_lifetime, parse_batch_lifetime
 
 _thread = None
 
@@ -38,10 +36,9 @@ def run():
         entries_lifetime    = parse_long_lifetime(settings_get("entries_lifetime", "30"), default=30)
         log_lifetime        = parse_long_lifetime(settings_get("log_lifetime", "365"))
         batch_lifetime      = parse_batch_lifetime(settings_get("batch_lifetime", "7"))
-        file_lifetime       = parse_file_lifetime(settings_get("file_lifetime", "7"))
         write_log_entry(
             None,
-            f"[cleanup] phase=run_start, entries_lifetime={entries_lifetime}, log_lifetime={log_lifetime}, batch_lifetime={batch_lifetime}, file_lifetime={file_lifetime}",
+            f"[cleanup] phase=run_start, entries_lifetime={entries_lifetime}, log_lifetime={log_lifetime}, batch_lifetime={batch_lifetime}",
             level='silent',
         )
 
@@ -67,13 +64,6 @@ def run():
             if n:
                 summary.append(f"batches: -{n}")
                 write_log_entry(None, f"[cleanup] Удалено батчей: {n}", level='silent')
-
-        if file_lifetime > 0:
-            n = db_cleanup_video_data(file_lifetime)
-            write_log_entry(None, f"[cleanup] phase=video_data_cleanup_done, affected={n}", level='silent')
-            if n:
-                summary.append(f"movies.video_data: -{n}")
-                write_log_entry(None, f"[cleanup] Обнулено movies.raw_data/transcoded_data: {n}", level='silent')
 
         if summary:
             write_log_entry(None, "[cleanup] Очистка: " + ", ".join(summary), level='silent')

@@ -33,14 +33,6 @@ def parse_long_lifetime(s, default=365):
         return default
 
 
-def parse_file_lifetime(s):
-    try:
-        v = int(s)
-        return 0 if v == 0 else max(1, min(365, v))
-    except Exception:
-        return 7
-
-
 def to_msk(h, m):
     total = (h * 60 + m + 180) % 1440
     return total // 60, total % 60

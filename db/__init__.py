@@ -100,7 +100,6 @@ from .db_service import (
     db_cleanup_log_entries,
     db_cleanup_logs,
     db_cleanup_batches,
-    db_cleanup_video_data,
     db_clear_all_history,
     db_vacuum_full,
     db_purge_unused_stories,

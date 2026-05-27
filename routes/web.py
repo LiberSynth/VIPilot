@@ -32,7 +32,6 @@ from utils.limiter import limiter
 from utils.utils import (
     parse_batch_lifetime,
     parse_long_lifetime,
-    parse_file_lifetime,
 )
 
 bp = Blueprint("web", __name__)
@@ -182,7 +181,6 @@ def root_page():
     batch_lifetime     = parse_batch_lifetime(settings_get("batch_lifetime", "7"))
     log_lifetime       = parse_long_lifetime(settings_get("log_lifetime", "365"))
     entries_lifetime   = parse_long_lifetime(settings_get("entries_lifetime", "30"), default=30)
-    file_lifetime      = parse_file_lifetime(settings_get("file_lifetime", "7"))
     publication_counter = int(env_get("publication_counter", "0") or "0")
     emulation_mode     = environment.emulation_mode
     use_donor          = environment.use_donor
@@ -280,7 +278,6 @@ def root_page():
         batch_lifetime=batch_lifetime,
         log_lifetime=log_lifetime,
         entries_lifetime=entries_lifetime,
-        file_lifetime=file_lifetime,
         emulation_mode=emulation_mode,
         use_donor=use_donor,
         notify_email=notify_email,
@@ -412,7 +409,6 @@ def save():
     entries_lifetime_raw = request.form.get("entries_lifetime", "").strip()
     log_lifetime_raw     = request.form.get("log_lifetime",     "").strip()
     batch_lifetime_raw   = request.form.get("batch_lifetime",   "").strip()
-    file_lifetime_raw    = request.form.get("file_lifetime",    "").strip()
 
     if entries_lifetime_raw or log_lifetime_raw or batch_lifetime_raw:
         el  = parse_long_lifetime(entries_lifetime_raw or settings_get("entries_lifetime", "30"), default=30)
@@ -424,9 +420,6 @@ def save():
             settings_set("batch_lifetime",   str(bl))
         else:
             flash("Сроки хранения нарушают иерархию: подробный ≤ краткий ≤ история батчей", "error")
-
-    if file_lifetime_raw:
-        settings_set("file_lifetime", str(parse_file_lifetime(file_lifetime_raw)))
 
     if "notify_email" in request.form:
         settings_set("notify_email", request.form.get("notify_email", "").strip())
