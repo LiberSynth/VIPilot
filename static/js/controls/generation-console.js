@@ -160,6 +160,7 @@ class GenerationConsoleController {
       return;
     }
     if (this._hadActiveBatches) {
+      this._recentLines = [];
       this._completionVisible = true;
     }
     if (!this._completionVisible) {
@@ -311,10 +312,9 @@ class GenerationConsoleController {
     ].join('|');
   }
 
-  _formatEntryLine(batchId, entry) {
+  _formatEntryLine(_batchId, entry) {
     var ts = this._formatTime(entry.created_at);
-    var shortId = String(batchId || '').slice(0, 8);
-    return '[' + ts + '] [' + shortId + '] ' + String(entry.message || '');
+    return '[' + ts + '] ' + String(entry.message || '');
   }
 
   _formatTime(iso) {

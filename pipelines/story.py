@@ -399,7 +399,7 @@ def run(batch_id, log_id):
         db_log_update(log_id, msg, "ok")
         write_log_entry(
             log_id,
-            fmt_id_msg("Сохранён как story {}, батч → story_manual", story_id),
+            f'Сюжет сохранен как "{title}".',
         )
         write_log_entry(
             log_id,
