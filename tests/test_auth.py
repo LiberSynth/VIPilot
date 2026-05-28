@@ -104,9 +104,6 @@ class TestApiBlueprintAuth:
     def test_get_donors_count(self, client):
         _assert_401(client.get("/api/donors/count"))
 
-    def test_post_workflow_approve_movies(self, client):
-        _assert_401(client.post("/api/workflow/approve_movies"))
-
     def test_post_publication_counter_set(self, client):
         _assert_401(client.post("/api/publication-counter/set"))
 

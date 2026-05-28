@@ -645,20 +645,6 @@ def api_donors_count():
     return jsonify({"count": db_get_donor_count(good_only=good_only)})
 
 
-@bp.route("/workflow/approve_movies", methods=["POST"])
-def api_workflow_approve_movies():
-    if not is_authenticated():
-        return jsonify({"error": "unauthorized"}), 401
-    body = request.get_json(silent=True) or {}
-    val = "1" if body.get("enabled") == "1" else "0"
-    cycle_config_set("approve_movies", val == "1")
-    if val == "1":
-        env_set("use_donor", "1")
-    label = "включено" if val == "1" else "выключено"
-    write_log_entry(None, f"[api] Утверждать видео: {label}", level='silent')
-    return jsonify({"ok": True, "approve_movies": val})
-
-
 @bp.route("/cycle-config/words-per-second", methods=["POST"])
 def api_cycle_config_words_per_second():
     if not is_authenticated():
@@ -931,13 +917,11 @@ def api_production_stories():
     only_pinned = request.args.get("only_pinned", "0") == "1"
     only_bad = request.args.get("only_bad", "0") == "1"
     pin_id = request.args.get("pin_id") or None
-    approve_movies = cycle_config_get("approve_movies")
     stories = db_get_stories_list(
         show_used=show_used,
         show_bad=show_bad,
         for_approval=for_approval,
         pin_id=pin_id,
-        approve_movies=approve_movies,
         only_pinned=only_pinned,
         only_bad=only_bad,
     )
@@ -969,14 +953,12 @@ def api_production_stories_filter_ids():
     for_approval = request.args.get("for_approval", "0") == "1"
     only_pinned = request.args.get("only_pinned", "0") == "1"
     only_bad = request.args.get("only_bad", "0") == "1"
-    approve_movies = cycle_config_get("approve_movies")
     ids = db_get_story_ids_by_filter(
         show_used=show_used,
         show_bad=show_bad,
         for_approval=for_approval,
         only_pinned=only_pinned,
         only_bad=only_bad,
-        approve_movies=approve_movies,
     )
     return jsonify({"ids": ids})
 
@@ -986,10 +968,7 @@ def api_production_stories_pool():
     err = _production_auth_check()
     if err:
         return err
-    approve_movies = cycle_config_get("approve_movies")
-    stories = db_get_stories_pool(
-        approve_movies=approve_movies
-    )
+    stories = db_get_stories_pool()
     return jsonify(stories)
 
 

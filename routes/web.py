@@ -200,7 +200,6 @@ def root_page():
     words_per_second    = float(cycle_config_get("words_per_second") or 8.0)
     good_samples_count  = max(1, int(cycle_config_get("good_samples_count") or 25))
     video_fails_to_next = max(1, int(settings_get("video_fails_to_next", "3")))
-    approve_movies      = cycle_config_get("approve_movies")
     deep_debugging      = environment.deep_debugging
 
     workflow_state = env_get("workflow_state", "running")
@@ -289,7 +288,6 @@ def root_page():
         words_per_second=words_per_second,
         good_samples_count=good_samples_count,
         video_fails_to_next=video_fails_to_next,
-        approve_movies=approve_movies,
         deep_debugging=deep_debugging,
         workflow_state=workflow_state,
         target_id=target_id,
@@ -340,7 +338,6 @@ def production_page():
     words_per_second    = cycle_config_get("words_per_second")
     good_samples_count  = max(1, int(cycle_config_get("good_samples_count") or 25))
     video_fails_to_next = max(1, int(settings_get("video_fails_to_next", "3")))
-    approve_movies_prod  = cycle_config_get("approve_movies")
     use_donor_prod       = environment.use_donor
     screenwriter_show_used = env_get("screenwriter_show_used", "0") == "1"
     screenwriter_only_good = env_get("screenwriter_only_good", "0") == "1"
@@ -362,7 +359,6 @@ def production_page():
         words_per_second=words_per_second,
         good_samples_count=good_samples_count,
         video_fails_to_next=video_fails_to_next,
-        approve_movies=approve_movies_prod,
         use_donor=use_donor_prod,
         app_version=APP_VERSION,
         nav_modules=_nav_modules("production"),

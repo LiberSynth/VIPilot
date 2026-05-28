@@ -40,8 +40,7 @@ def _get_bad_samples() -> str:
 
 
 def _get_used_plots() -> str:
-    approve_movies = cycle_config_get('approve_movies')
-    stories = db_get_used_stories(approve_movies)
+    stories = db_get_used_stories()
     parts = [
         wrap_block('Использованный сюжет', f'{story["title"]}\n\n{story["content"]}', i)
         for i, story in enumerate(stories, start=1)

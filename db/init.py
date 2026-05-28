@@ -173,6 +173,7 @@ def bootstrap():
             # Legacy cleanup
             # ------------------------------------------------------------------
             cur.execute("DELETE FROM cycle_config WHERE key = 'approve_stories'")
+            cur.execute("DELETE FROM cycle_config WHERE key = 'approve_movies'")
 
             # ------------------------------------------------------------------
             # Индексы

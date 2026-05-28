@@ -1,4 +1,4 @@
-{% macro modes_card(use_donor, approve_movies) %}
+{% macro modes_card(use_donor) %}
 {% from "common/macros.html" import story_pool_hint %}
 <div class="card" style="margin-top:12px">
   <div class="card-title">Режимы</div>
@@ -10,15 +10,9 @@
   </div>
   <div class="wf-row" style="margin-top:12px;padding-top:10px;border-top:1px solid #1e1e2e">
     <div style="flex:1">
-      <div class="toggle-label">Утверждать видео</div>
-      <div class="hint" style="margin-top:2px">Если включено, пайплайн публикации берёт из пула только видео с оценкой «хорошо»; если пул пуст — батч завершается ошибкой. Если выключено — берётся любое неопубликованное видео; если пул пуст — запускается AI-генерация. Текущий пул: <span id="movie-pool-count" style="color:#f59e0b">…</span>.</div>
+      <div class="toggle-label">Видео для публикации</div>
+      <div class="hint" style="margin-top:2px">Для публикации используются только видео с оценкой «хорошо». Если пул пуст, батч завершается ошибкой.<br>Текущий пул: <span id="movie-pool-count" style="color:#f59e0b">…</span>.</div>
     </div>
-    <span id="approve-movies-badge" class="state-badge" {% if not approve_movies %}style="display:none"{% endif %}>ВКЛ</span>
-    <label class="toggle-wrap" style="margin-left:8px">
-      <input type="checkbox" id="approve_movies_check" {% if approve_movies %}checked{% endif %}
-             onchange="wfApproveMovies(this.checked)">
-      <span class="toggle-track"></span>
-    </label>
   </div>
   <div class="wf-row" style="margin-top:12px;padding-top:10px;border-top:1px solid #1e1e2e">
     <div style="flex:1">
@@ -28,7 +22,7 @@
     <span id="use-donor-badge" class="state-badge" {% if not use_donor %}style="display:none"{% endif %}>ВКЛ</span>
     <label class="toggle-wrap" style="margin-left:8px">
       <input type="checkbox" id="use_donor_check" {% if use_donor %}checked{% endif %}
-             onchange="wfUseDonor(this.checked)" {% if approve_movies %}disabled{% endif %}>
+             onchange="wfUseDonor(this.checked)">
       <span class="toggle-track"></span>
     </label>
   </div>

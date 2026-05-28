@@ -5,7 +5,6 @@ _DEFAULTS = {
     "format_prompt":     "",
     "video_post_prompt": "",
     "video_duration":    6,
-    "approve_movies":    False,
     "words_per_second":    8.0,
     "good_samples_count": 25,
 }
@@ -21,8 +20,6 @@ def _coerce(key, raw):
             return int(raw)
         except (ValueError, TypeError):
             return _DEFAULTS[key]
-    if key == "approve_movies":
-        return raw in ("1", "true", "True")
     if key == "words_per_second":
         try:
             return float(raw)

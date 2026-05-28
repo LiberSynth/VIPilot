@@ -113,10 +113,8 @@ def run(batch_id, log_id):
     # и story_id ещё не задан.
     # Находим батч-донор с готовым видео → записываем donor_batch_id в data
     # и переводим в story_ready. Видео-пайплайн потом перенесёт готовое видео,
-    # минуя генерацию. Если подходящего донора нет — падаем в AI-генерацию.
-    # approve_movies: если включено, ищем только доноров с grade = good;
-    # если пул пуст — ошибка (AI-генерация запрещена).
-    approve_movies = cycle_config_get("approve_movies")
+    # минуя генерацию. Ищем только доноров с grade = good.
+    # Если пул пуст — ошибка (AI-генерация запрещена).
     if (
         not is_manual
         and snap.use_donor
@@ -130,7 +128,7 @@ def run(batch_id, log_id):
         )
 
         if donor_batch_id is None:
-            db_claim_donor_batch(batch_id, good_only=approve_movies)
+            db_claim_donor_batch(batch_id, good_only=True)
             batch = db_get_batch_by_id(batch_id)
             if not batch:
                 return
@@ -169,15 +167,13 @@ def run(batch_id, log_id):
                 level='silent',
             )
             return
-        else:
-            if approve_movies:
-                msg = "Пул видео пуст (grade = good) — AI-генерация запрещена (approve_movies включён)"
-                write_log_entry(log_id, msg, level="error")
-                db_log_update(log_id, msg, "error")
-                write_log_entry(
-                    log_id, fmt_id_msg("[story] Батч {} — {}", batch_id, msg), level='silent'
-                )
-                raise AppException(batch_id, "story", msg, log_id)
+        msg = "Пул видео пуст (grade = good) — AI-генерация запрещена"
+        write_log_entry(log_id, msg, level="error")
+        db_log_update(log_id, msg, "error")
+        write_log_entry(
+            log_id, fmt_id_msg("[story] Батч {} — {}", batch_id, msg), level='silent'
+        )
+        raise AppException(batch_id, "story", msg, log_id)
 
     # Поиск готового сюжета в пуле: только для slot/adhoc (не story_manual).
     # Разрешены только сюжеты с оценкой «good».
