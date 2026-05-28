@@ -613,9 +613,9 @@ var setDraftStoryFromRecord;
   var _controller = null;
   var _isCreating = false;
 
-  function _fallbackHint(text) {
-    var el = document.getElementById('story-generate-hint');
-    if (el) el.textContent = text || _DEFAULT_HINT;
+  function _fallbackMemo(text) {
+    var el = document.getElementById('story-generate-console');
+    if (el) el.value = text || _DEFAULT_HINT;
   }
 
   function _refreshLists() {
@@ -627,7 +627,6 @@ var setDraftStoryFromRecord;
     if (_controller) return _controller;
     if (typeof GenerationConsoleController !== 'function') return null;
     _controller = new GenerationConsoleController({
-      hintId: 'story-generate-hint',
       consoleId: 'story-generate-console',
       defaultHint: _DEFAULT_HINT,
       maxLines: 5,
@@ -665,7 +664,7 @@ var setDraftStoryFromRecord;
     if (!btn) return;
     var status = _controllerOrNull();
     if (status) status.setDefaultHint(_DEFAULT_HINT);
-    else _fallbackHint(_DEFAULT_HINT);
+    else _fallbackMemo(_DEFAULT_HINT);
 
     btn.addEventListener('click', function() {
       if (_isCreating) return;
@@ -675,7 +674,7 @@ var setDraftStoryFromRecord;
       var modelId = modelIdEl ? (modelIdEl.value || '') : '';
       _setCreatingState(btn, true);
       if (status) status.beginCreation(count > 1 ? ('Создаю ' + count + ' батчей…') : 'Запускаю генерацию…');
-      else _fallbackHint(count > 1 ? ('Создаю ' + count + ' батчей…') : 'Запускаю генерацию…');
+      else _fallbackMemo(count > 1 ? ('Создаю ' + count + ' батчей…') : 'Запускаю генерацию…');
       var body = modelId ? JSON.stringify({ model_id: modelId }) : null;
       var remaining = count;
       var createdBatchIds = [];
@@ -687,15 +686,14 @@ var setDraftStoryFromRecord;
 
         _setCreatingState(btn, false);
         if (status) status.endCreation();
-        else _fallbackHint(_DEFAULT_HINT);
+        else _fallbackMemo(_DEFAULT_HINT);
 
         if (createdBatchIds.length === 0) {
           if (status) {
-            status.addLine(hadRequestError ? 'Ошибка запроса' : 'Не удалось создать батчи');
             status.showTemporaryHint(hadRequestError ? 'Ошибка запроса' : 'Не удалось создать батчи', 3500);
           } else {
-            _fallbackHint(hadRequestError ? 'Ошибка запроса' : 'Не удалось создать батчи');
-            setTimeout(function() { _fallbackHint(_DEFAULT_HINT); }, 3500);
+            _fallbackMemo(hadRequestError ? 'Ошибка запроса' : 'Не удалось создать батчи');
+            setTimeout(function() { _fallbackMemo(_DEFAULT_HINT); }, 3500);
           }
           return;
         }

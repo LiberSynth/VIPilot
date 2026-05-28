@@ -1,7 +1,7 @@
 class GenerationConsoleController {
   constructor(opts) {
     opts = opts || {};
-    this._hintEl = document.getElementById(opts.hintId || '');
+    this._hintEl = opts.hintId ? document.getElementById(opts.hintId) : null;
     this._consoleEl = document.getElementById(opts.consoleId || '');
     this._defaultHint = opts.defaultHint || '';
     this._maxLines = Math.max(1, parseInt(opts.maxLines, 10) || 5);
@@ -18,6 +18,7 @@ class GenerationConsoleController {
     this._pollInFlight = false;
     this._hintTimer = null;
     this._hadActiveBatches = false;
+    this._statusText = this._defaultHint;
 
     this._refreshHint();
     this._renderConsole();
@@ -36,7 +37,6 @@ class GenerationConsoleController {
   }
 
   showTemporaryHint(text, ttlMs) {
-    if (!this._hintEl) return;
     if (this._hintTimer) clearTimeout(this._hintTimer);
     this._setHint(text || this._defaultHint);
     var self = this;
@@ -101,7 +101,9 @@ class GenerationConsoleController {
   }
 
   _setHint(text) {
-    if (this._hintEl) this._hintEl.textContent = String(text || '');
+    this._statusText = String(text || '');
+    if (this._hintEl) this._hintEl.textContent = this._statusText;
+    this._renderConsole();
   }
 
   _refreshHint() {
@@ -119,6 +121,9 @@ class GenerationConsoleController {
       this._setHint('Выполняется заказов: ' + active);
       return;
     }
+    if (this._hadActiveBatches) {
+      this._lines = [];
+    }
     this._setHint(this._defaultHint);
     if (this._hadActiveBatches) {
       this._hadActiveBatches = false;
@@ -128,7 +133,10 @@ class GenerationConsoleController {
 
   _renderConsole() {
     if (!this._consoleEl) return;
-    this._consoleEl.value = this._lines.join('\n');
+    var text = this._lines.length > 0
+      ? this._lines.join('\n')
+      : (this._statusText || this._defaultHint);
+    this._consoleEl.value = text;
   }
 
   _ensurePolling() {

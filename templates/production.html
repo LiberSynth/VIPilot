@@ -68,8 +68,9 @@
         </div>
         <input type="hidden" id="screenwriter-model-id" value="">
       </div>
-      <div id="story-generate-hint" class="story-generate-hint">Вы можете сгенерировать контент при помощи AI-модели.</div>
-      <textarea id="story-generate-console" rows="5" readonly></textarea>
+      <div style="margin-top:10px">
+        <textarea id="story-generate-console" rows="5" readonly data-memo-scroll>Вы можете сгенерировать контент при помощи AI-модели.</textarea>
+      </div>
     </div>
     <div id="story-card-holder" hidden>
       <div id="card-story-draft" data-video-duration="{{ video_duration }}" data-words-per-second="{{ words_per_second | int }}">
@@ -176,8 +177,9 @@
         <input type="number" id="director-video-count" class="story-generate-count" value="1" min="1" max="50" autocomplete="off">
         <span class="story-generate-count-label">штук</span>
       </div>
-      <div id="director-generate-hint" class="story-generate-hint">Вы можете сгенерировать контент при помощи AI-модели.</div>
-      <textarea id="director-generate-console" rows="5" readonly></textarea>
+      <div style="margin-top:10px">
+        <textarea id="director-generate-console" rows="5" readonly data-memo-scroll>Вы можете сгенерировать контент при помощи AI-модели.</textarea>
+      </div>
     </div>
     <div id="director-player-holder" hidden>
       <div id="director-player-card">
@@ -739,7 +741,6 @@
             _appendDirectorLine('Создано батчей: ' + created);
             _trackDirectorBatches(createdBatchIds);
           } else {
-            _appendDirectorLine('Не удалось создать батчи');
             _showDirectorHint('Не удалось создать батчи', 3000);
           }
         }

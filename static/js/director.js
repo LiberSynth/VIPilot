@@ -14,7 +14,6 @@
     if (_generationStatus) return _generationStatus;
     if (typeof GenerationConsoleController !== 'function') return null;
     _generationStatus = new GenerationConsoleController({
-      hintId: 'director-generate-hint',
       consoleId: 'director-generate-console',
       defaultHint: _HINT_DEFAULT,
       maxLines: 5,
