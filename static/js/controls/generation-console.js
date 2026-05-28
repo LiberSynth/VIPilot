@@ -9,8 +9,11 @@ class GenerationConsoleController {
     this._finalStatuses = new Set(opts.finalStatuses || []);
     this._onBatchFinal = typeof opts.onBatchFinal === 'function' ? opts.onBatchFinal : null;
     this._onAllIdle = typeof opts.onAllIdle === 'function' ? opts.onAllIdle : null;
+    this._completionMessage = opts.completionMessage || 'Генерация завершена.';
 
-    this._lines = [];
+    this._pinnedLines = [];
+    this._recentLines = [];
+    this._completionVisible = false;
     this._tracked = new Map();
     this._creating = 0;
     this._creationHint = '';
@@ -25,6 +28,7 @@ class GenerationConsoleController {
   }
 
   beginCreation(hintText) {
+    this._resetSession();
     this._creating += 1;
     if (hintText) this._creationHint = String(hintText);
     this._refreshHint();
@@ -51,18 +55,22 @@ class GenerationConsoleController {
     this._refreshHint();
   }
 
-  addLine(text) {
+  addLine(text, opts) {
+    opts = opts || {};
     var line = String(text || '').trim();
     if (!line) return;
-    this._lines.unshift(line);
-    if (this._lines.length > this._maxLines) {
-      this._lines.length = this._maxLines;
+    if (opts.pinned || this._isErrorLine(line)) {
+      this._addPinnedLine(line);
+    } else {
+      this._addRecentLine(line);
     }
     this._renderConsole();
   }
 
   clearLines() {
-    this._lines = [];
+    this._pinnedLines = [];
+    this._recentLines = [];
+    this._completionVisible = false;
     this._renderConsole();
   }
 
@@ -77,6 +85,7 @@ class GenerationConsoleController {
         initialized: false,
       });
       this._hadActiveBatches = true;
+      this._completionVisible = false;
     } else if (meta && typeof meta === 'object') {
       var existing = this._tracked.get(id);
       existing.meta = Object.assign({}, existing.meta || {}, meta);
@@ -98,6 +107,35 @@ class GenerationConsoleController {
 
   activeCount() {
     return this._tracked.size;
+  }
+
+  _resetSession() {
+    this._pinnedLines = [];
+    this._recentLines = [];
+    this._completionVisible = false;
+  }
+
+  _addPinnedLine(line) {
+    if (this._pinnedLines.indexOf(line) >= 0) return;
+    this._pinnedLines.push(line);
+  }
+
+  _addRecentLine(line) {
+    if (this._recentLines.indexOf(line) >= 0) return;
+    this._recentLines.unshift(line);
+    if (this._recentLines.length > this._maxLines) {
+      this._recentLines.length = this._maxLines;
+    }
+  }
+
+  _isErrorLevel(level) {
+    var value = String(level || '').toLowerCase();
+    return value === 'error' || value === 'fatal' || value === 'fatal_error';
+  }
+
+  _isErrorLine(text) {
+    var value = String(text || '').toLowerCase();
+    return value.indexOf('ошибк') >= 0 || value.indexOf('error') >= 0;
   }
 
   _setHint(text) {
@@ -122,9 +160,13 @@ class GenerationConsoleController {
       return;
     }
     if (this._hadActiveBatches) {
-      this._lines = [];
+      this._completionVisible = true;
     }
-    this._setHint(this._defaultHint);
+    if (!this._completionVisible) {
+      this._setHint(this._defaultHint);
+    } else {
+      this._renderConsole();
+    }
     if (this._hadActiveBatches) {
       this._hadActiveBatches = false;
       if (this._onAllIdle) this._onAllIdle();
@@ -133,10 +175,24 @@ class GenerationConsoleController {
 
   _renderConsole() {
     if (!this._consoleEl) return;
-    var text = this._lines.length > 0
-      ? this._lines.join('\n')
-      : (this._statusText || this._defaultHint);
-    this._consoleEl.value = text;
+    var parts = [];
+    var i;
+
+    for (i = 0; i < this._pinnedLines.length; i++) {
+      parts.push(this._pinnedLines[i]);
+    }
+    for (i = 0; i < this._recentLines.length; i++) {
+      parts.push(this._recentLines[i]);
+    }
+
+    if (this._completionVisible) {
+      parts.push(this._completionMessage);
+      parts.push(this._defaultHint);
+    } else if (parts.length === 0) {
+      parts.push(this._statusText || this._defaultHint);
+    }
+
+    this._consoleEl.value = parts.join('\n');
   }
 
   _ensurePolling() {
@@ -208,7 +264,7 @@ class GenerationConsoleController {
         this._rememberEntry(state, this._entryKey(entries[k]));
       }
       if (entries.length > 0) {
-        this.addLine(this._formatEntryLine(batchId, entries[entries.length - 1]));
+        this._appendEntryLine(batchId, entries[entries.length - 1]);
       }
     } else {
       for (var n = 0; n < entries.length; n++) {
@@ -216,7 +272,7 @@ class GenerationConsoleController {
         var key = this._entryKey(entry);
         if (state.seen.has(key)) continue;
         this._rememberEntry(state, key);
-        this.addLine(this._formatEntryLine(batchId, entry));
+        this._appendEntryLine(batchId, entry);
       }
     }
 
@@ -225,6 +281,16 @@ class GenerationConsoleController {
       this._tracked.delete(batchId);
       if (this._onBatchFinal) this._onBatchFinal(batchId, data, state.meta || {});
     }
+  }
+
+  _appendEntryLine(batchId, entry) {
+    var line = this._formatEntryLine(batchId, entry);
+    if (this._isErrorLevel(entry.level)) {
+      this._addPinnedLine(line);
+    } else {
+      this._addRecentLine(line);
+    }
+    this._renderConsole();
   }
 
   _rememberEntry(state, key) {
