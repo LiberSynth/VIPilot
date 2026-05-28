@@ -677,7 +677,7 @@ var setDraftStoryFromRecord;
       else _fallbackMemo(count > 1 ? ('Создаю ' + count + ' батчей…') : 'Запускаю генерацию…');
       var body = modelId ? JSON.stringify({ model_id: modelId }) : null;
       var remaining = count;
-      var createdBatchIds = [];
+      var createdBatches = [];
       var hadRequestError = false;
 
       function finishRequest() {
@@ -688,7 +688,7 @@ var setDraftStoryFromRecord;
         if (status) status.endCreation();
         else _fallbackMemo(_DEFAULT_HINT);
 
-        if (createdBatchIds.length === 0) {
+        if (createdBatches.length === 0) {
           if (status) {
             status.showTemporaryHint(hadRequestError ? 'Ошибка запроса' : 'Не удалось создать батчи', 3500);
           } else {
@@ -698,33 +698,42 @@ var setDraftStoryFromRecord;
           return;
         }
 
+        createdBatches.sort(function(a, b) { return a.requestIndex - b.requestIndex; });
+        var batchIds = createdBatches.map(function(item) { return item.id; });
+
         if (status) {
-          status.addLine('Создано батчей: ' + createdBatchIds.length);
+          status.addLine('Создано батчей: ' + batchIds.length);
           if (hadRequestError) status.addLine('Часть запросов завершилась ошибкой');
-          status.trackBatches(createdBatchIds);
+          status.trackBatches(batchIds);
         }
       }
 
       for (var i = 0; i < count; i++) {
-        fetch('/production/story/generate', {
-          method: 'POST',
-          headers: body ? { 'Content-Type': 'application/json' } : {},
-          body: body,
-        })
-          .then(function(r) {
-            return r.json()
-              .then(function(d) { return { ok: r.ok, data: d || {} }; })
-              .catch(function() { return { ok: r.ok, data: {} }; });
+        (function(requestIndex) {
+          fetch('/production/story/generate', {
+            method: 'POST',
+            headers: body ? { 'Content-Type': 'application/json' } : {},
+            body: body,
           })
-          .then(function(d) {
-            if (d.ok && d.data && d.data.batch_id) createdBatchIds.push(String(d.data.batch_id));
-            else hadRequestError = true;
-            finishRequest();
-          })
-          .catch(function() {
-            hadRequestError = true;
-            finishRequest();
-          });
+            .then(function(r) {
+              return r.json()
+                .then(function(d) { return { ok: r.ok, data: d || {} }; })
+                .catch(function() { return { ok: r.ok, data: {} }; });
+            })
+            .then(function(d) {
+              if (d.ok && d.data && d.data.batch_id) {
+                createdBatches.push({
+                  id: String(d.data.batch_id),
+                  requestIndex: requestIndex,
+                });
+              } else hadRequestError = true;
+              finishRequest();
+            })
+            .catch(function() {
+              hadRequestError = true;
+              finishRequest();
+            });
+        })(i);
       }
     });
   }

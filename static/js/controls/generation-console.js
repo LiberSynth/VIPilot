@@ -21,6 +21,7 @@ class GenerationConsoleController {
     this._pollInFlight = false;
     this._hintTimer = null;
     this._hadActiveBatches = false;
+    this._multiRequestMode = false;
     this._statusText = this._defaultHint;
 
     this._refreshHint();
@@ -95,12 +96,15 @@ class GenerationConsoleController {
   }
 
   trackBatches(batchIds, metaFactory) {
-    if (!Array.isArray(batchIds)) return;
+    if (!Array.isArray(batchIds) || batchIds.length === 0) return;
+    var multi = batchIds.length > 1;
+    if (multi) this._multiRequestMode = true;
     for (var i = 0; i < batchIds.length; i++) {
       var bid = batchIds[i];
       var meta = (typeof metaFactory === 'function')
         ? metaFactory(bid, i)
-        : (metaFactory || {});
+        : Object.assign({}, metaFactory || {});
+      if (multi && !meta.requestIndex) meta.requestIndex = i + 1;
       this.trackBatch(bid, meta);
     }
   }
@@ -113,6 +117,7 @@ class GenerationConsoleController {
     this._pinnedLines = [];
     this._recentLines = [];
     this._completionVisible = false;
+    this._multiRequestMode = false;
   }
 
   _addPinnedLine(line) {
@@ -285,7 +290,9 @@ class GenerationConsoleController {
   }
 
   _appendEntryLine(batchId, entry) {
-    var line = this._formatEntryLine(batchId, entry);
+    var state = this._tracked.get(batchId);
+    var requestIndex = state && state.meta ? state.meta.requestIndex : 0;
+    var line = this._formatEntryLine(entry, requestIndex);
     if (this._isErrorLevel(entry.level)) {
       this._addPinnedLine(line);
     } else {
@@ -312,9 +319,13 @@ class GenerationConsoleController {
     ].join('|');
   }
 
-  _formatEntryLine(_batchId, entry) {
+  _formatEntryLine(entry, requestIndex) {
     var ts = this._formatTime(entry.created_at);
-    return '[' + ts + '] ' + String(entry.message || '');
+    var prefix = '';
+    if (this._multiRequestMode && requestIndex) {
+      prefix = '[Запрос ' + requestIndex + '] ';
+    }
+    return prefix + '[' + ts + '] ' + String(entry.message || '');
   }
 
   _formatTime(iso) {
