@@ -5,7 +5,6 @@ set "GIT_TERMINAL_PROMPT=0"
 set "BRANCH=main"
 set "ATTEMPTS=3"
 set "RETRY_DELAY=5"
-set "SETTLE_SEC=8"
 
 cd /d "%~dp0.."
 if not exist ".git" (
@@ -15,9 +14,6 @@ if not exist ".git" (
 
 for /f "delims=" %%B in ('git rev-parse --abbrev-ref HEAD 2^>nul') do set "BRANCH=%%B"
 if "%BRANCH%"=="" set "BRANCH=main"
-
-echo Waiting %SETTLE_SEC%s for file handles to release...
-timeout /t %SETTLE_SEC% /nobreak >nul
 
 set "TRY=0"
 :PullRetry
