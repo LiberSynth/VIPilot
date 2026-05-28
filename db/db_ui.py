@@ -285,13 +285,9 @@ def db_get_movies_list(show_published=True, show_bad=True, for_approval=False, p
     ]
 
 
-def db_get_stories_pool(grade_required: bool = True, approve_movies: bool = True) -> list:
+def db_get_stories_pool(approve_movies: bool = True) -> list:
     with get_db() as conn:
         with conn.cursor() as cur:
-            if grade_required:
-                grade_clause = "grade = 'good'"
-            else:
-                grade_clause = "(grade IS NULL OR grade != 'bad')"
             if approve_movies:
                 busy_clause = "m.grade = 'good'"
             else:
@@ -299,7 +295,7 @@ def db_get_stories_pool(grade_required: bool = True, approve_movies: bool = True
             cur.execute(f"""
                 SELECT id::text, title, content
                 FROM stories
-                WHERE {grade_clause}
+                WHERE grade = 'good'
                   AND NOT EXISTS (
                       SELECT 1 FROM batches b
                       JOIN movies m ON m.id = b.movie_id
@@ -313,16 +309,13 @@ def db_get_stories_pool(grade_required: bool = True, approve_movies: bool = True
     return [{"id": row[0], "title": row[1] or "", "content": row[2] or ""} for row in rows]
 
 
-def db_count_good_pool(grade_required: bool = True) -> int:
+def db_count_good_pool() -> int:
     with get_db() as conn:
         with conn.cursor() as cur:
-            if grade_required:
-                grade_clause = "grade = 'good' AND"
-            else:
-                grade_clause = ""
             cur.execute(f"""
                 SELECT COUNT(*) FROM stories
-                WHERE {grade_clause}
+                WHERE grade = 'good'
+                  AND
                   NOT EXISTS (
                       SELECT 1 FROM batches b
                       WHERE b.story_id = stories.id

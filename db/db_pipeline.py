@@ -218,36 +218,22 @@ def db_cancel_orphaned_slot_batches():
     return batch_ids
 
 
-def db_claim_unused_story_for_batch(batch_id: str, grade_required: bool) -> dict | None:
+def db_claim_unused_story_for_batch(batch_id: str) -> dict | None:
     with get_db() as conn:
         with conn.cursor() as cur:
-            if grade_required:
-                cur.execute("""
-                    SELECT id::text, title, content
-                    FROM stories
-                    WHERE id NOT IN (
-                        SELECT story_id
-                        FROM batches
-                        WHERE story_id IS NOT NULL AND type != 'story_manual'
-                    )
-                      AND grade = 'good'
-                    ORDER BY created_at ASC, id ASC
-                    LIMIT 1
-                    FOR UPDATE SKIP LOCKED
-                """)
-            else:
-                cur.execute("""
-                    SELECT id::text, title, content
-                    FROM stories
-                    WHERE id NOT IN (
-                        SELECT story_id
-                        FROM batches
-                        WHERE story_id IS NOT NULL AND type != 'story_manual'
-                    )
-                    ORDER BY created_at ASC, id ASC
-                    LIMIT 1
-                    FOR UPDATE SKIP LOCKED
-                """)
+            cur.execute("""
+                SELECT id::text, title, content
+                FROM stories
+                WHERE id NOT IN (
+                    SELECT story_id
+                    FROM batches
+                    WHERE story_id IS NOT NULL AND type != 'story_manual'
+                )
+                  AND grade = 'good'
+                ORDER BY created_at ASC, id ASC
+                LIMIT 1
+                FOR UPDATE SKIP LOCKED
+            """)
             row = cur.fetchone()
             if not row:
                 return None

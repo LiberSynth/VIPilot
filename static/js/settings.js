@@ -43,12 +43,6 @@ function collectAllSettings(activeTab) {
   setIfExists('video_post_prompt',   'ta_postprompt');
   setIfExists('story_fails_to_next', 'story_fails_to_next');
   setIfExists('video_fails_to_next', 'video_fails_to_next');
-  const chkApproveStories = document.getElementById('approve_stories_check');
-  const hidApproveStories = document.getElementById('approve_stories_hidden');
-  if (chkApproveStories || hidApproveStories) {
-    const approveVal = chkApproveStories ? (chkApproveStories.checked ? '1' : '0') : (hidApproveStories ? hidApproveStories.value : '0');
-    data.set('approve_stories', approveVal);
-  }
   setIfExists('target_id',        'target_id');
   setIfExists('notify_email',     'notify_email');
   setIfExists('notify_phone',     'notify_phone');
@@ -60,14 +54,6 @@ function collectAllSettings(activeTab) {
   setIfExists('max_batch_threads', 'max_batch_threads');
   setIfExists('max_model_passes',  'max_model_passes');
   return data;
-}
-
-function onApproveStoriesToggle(chk) {
-  const hid   = document.getElementById('approve_stories_hidden');
-  const badge = document.getElementById('approve-stories-badge');
-  if (hid)   hid.value            = chk.checked ? '1' : '0';
-  if (badge) badge.style.display  = chk.checked ? ''  : 'none';
-  saveStorySettings();
 }
 
 var _requestSaveTimer = null;

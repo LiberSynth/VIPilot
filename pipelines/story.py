@@ -180,22 +180,15 @@ def run(batch_id, log_id):
                 raise AppException(batch_id, "story", msg, log_id)
 
     # Поиск готового сюжета в пуле: только для slot/adhoc (не story_manual).
-    # Если approve_stories включён — берём только grade=good (одобренные вручную).
-    # Нашли → story_ready без AI. Не нашли → идём в AI-генерацию.
-    # Если approve_stories включён и пул пуст — ошибка (AI-генерация запрещена).
+    # Разрешены только сюжеты с оценкой «good».
+    # Нашли → story_ready без AI. Не нашли → ошибка (AI-генерация запрещена).
     if batch["type"] != "story_manual":
-        approve_stories = cycle_config_get("approve_stories")
-        grade_required = approve_stories
-        condition_label = (
-            "grade = good" if grade_required else "любой grade (включая NULL)"
-        )
         db_log_update(log_id, "Поиск сюжета в пуле.", "running")
         write_log_entry(
             log_id,
-            f"Настройка «Утверждать сюжеты»: {'включена' if approve_stories else 'выключена'}. "
-            f"Условие выборки: {condition_label}.",
+            "Используются только сюжеты с оценкой «good».",
         )
-        pool_story = db_claim_unused_story_for_batch(batch_id, grade_required)
+        pool_story = db_claim_unused_story_for_batch(batch_id)
         if pool_story:
             pool_story_id = pool_story["id"]
             pool_story_title = pool_story["title"]
@@ -218,28 +211,13 @@ def run(batch_id, log_id):
                 level='silent',
             )
             return
-        else:
-            if approve_stories:
-                msg = "Пул сюжетов пуст (grade = good) — AI-генерация запрещена (approve_stories включён)"
-                write_log_entry(log_id, msg, level="error")
-                db_log_update(log_id, msg, "error")
-                write_log_entry(
-                    log_id, fmt_id_msg("[story] Батч {} — {}", batch_id, msg), level='silent'
-                )
-                raise AppException(batch_id, "story", msg, log_id)
-            reason = (
-                f"Подходящий сюжет в пуле не найден (условие: {condition_label}). "
-                f"Переход к AI-генерации."
-            )
-            write_log_entry(log_id, reason)
-            db_log_update(
-                log_id,
-                "Сюжет в пуле не найден — запускается AI-генерация",
-                "running",
-            )
-            write_log_entry(
-                log_id, fmt_id_msg("[story] Батч {} — {}", batch_id, reason), level='silent'
-            )
+        msg = "Пул сюжетов пуст (grade = good) — AI-генерация запрещена"
+        write_log_entry(log_id, msg, level="error")
+        db_log_update(log_id, msg, "error")
+        write_log_entry(
+            log_id, fmt_id_msg("[story] Батч {} — {}", batch_id, msg), level='silent'
+        )
+        raise AppException(batch_id, "story", msg, log_id)
 
     write_log_entry(log_id, 'Начало генерации сюжета.')
     write_log_entry(
