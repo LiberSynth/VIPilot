@@ -20,9 +20,10 @@ if not "%RC%"=="0" (
 )
 
 echo [2/3] Pulling latest sources...
-git pull
-if errorlevel 1 (
-  echo [ERROR] git pull failed. Attempting to start service back...
+call "%~dp0Pull.bat"
+set "RC=%ERRORLEVEL%"
+if not "%RC%"=="0" (
+  echo [ERROR] git update failed. Attempting to start service back...
   call "%~dp0Start.bat" >nul 2>&1
   set "RC=1"
   goto :FAIL
