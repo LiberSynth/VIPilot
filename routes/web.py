@@ -182,7 +182,6 @@ def root_page():
     log_lifetime       = parse_long_lifetime(settings_get("log_lifetime", "365"))
     entries_lifetime   = parse_long_lifetime(settings_get("entries_lifetime", "30"), default=30)
     publication_counter = int(env_get("publication_counter", "0") or "0")
-    use_donor          = environment.use_donor
     notify_email       = settings_get("notify_email", "")
     notify_phone       = settings_get("notify_phone", "")
     vk_target  = db_get_target_by_name("VKontakte")
@@ -275,7 +274,6 @@ def root_page():
         batch_lifetime=batch_lifetime,
         log_lifetime=log_lifetime,
         entries_lifetime=entries_lifetime,
-        use_donor=use_donor,
         notify_email=notify_email,
         notify_phone=notify_phone,
         video_duration=video_duration,
@@ -338,7 +336,6 @@ def production_page():
     words_per_second    = cycle_config_get("words_per_second")
     good_samples_count  = max(1, int(cycle_config_get("good_samples_count") or 25))
     video_fails_to_next = max(1, int(settings_get("video_fails_to_next", "3")))
-    use_donor_prod       = environment.use_donor
     screenwriter_show_used = env_get("screenwriter_show_used", "0") == "1"
     screenwriter_only_good = env_get("screenwriter_only_good", "0") == "1"
     screenwriter_for_approval = env_get("screenwriter_for_approval", "0") == "1"
@@ -359,7 +356,6 @@ def production_page():
         words_per_second=words_per_second,
         good_samples_count=good_samples_count,
         video_fails_to_next=video_fails_to_next,
-        use_donor=use_donor_prod,
         app_version=APP_VERSION,
         nav_modules=_nav_modules("production"),
         screenwriter_show_used=screenwriter_show_used,

@@ -56,7 +56,6 @@ function switchPanel(name) {
   }
   if (typeof refreshDbOpStatus === 'function') refreshDbOpStatus();
   if (name === 'director' || name === 'workflow') {
-    if (typeof refreshDonorCount === 'function') refreshDonorCount();
     if (typeof refreshMoviePoolCount === 'function') refreshMoviePoolCount();
   }
   if (name === 'request') {

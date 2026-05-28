@@ -623,18 +623,6 @@ def api_workflow_deep_debugging():
     return jsonify({"ok": True, "deep_debugging": val})
 
 
-@bp.route("/workflow/use_donor", methods=["POST"])
-def api_workflow_use_donor():
-    if not is_authenticated():
-        return jsonify({"error": "unauthorized"}), 401
-    body = request.get_json(silent=True) or {}
-    val = "1" if body.get("enabled") == "1" else "0"
-    env_set("use_donor", val)
-    label = "включен" if val == "1" else "выключен"
-    write_log_entry(None, f"[api] Подбирать видео из пула: {label}", level='silent')
-    return jsonify({"ok": True, "use_donor": val})
-
-
 @bp.route("/donors/count", methods=["GET"])
 def api_donors_count():
     if not is_authenticated():

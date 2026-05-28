@@ -109,15 +109,13 @@ def run(batch_id, log_id):
     if not is_manual and check_cancelled("story", batch_id, batch, log_id):
         return
 
-    # Режим пула (donor): только для slot/adhoc, когда use_donor включён
-    # и story_id ещё не задан.
+    # Режим пула (donor): только для slot/adhoc, когда story_id ещё не задан.
     # Находим батч-донор с готовым видео → записываем donor_batch_id в data
     # и переводим в story_ready. Видео-пайплайн потом перенесёт готовое видео,
     # минуя генерацию. Ищем только доноров с grade = good.
     # Если пул пуст — ошибка (AI-генерация запрещена).
     if (
         not is_manual
-        and snap.use_donor
         and batch.get("story_id") is None
     ):
         batch_data = batch.get("data") or {}

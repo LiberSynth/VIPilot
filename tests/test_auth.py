@@ -98,9 +98,6 @@ class TestApiBlueprintAuth:
     def test_post_workflow_deep_debugging(self, client):
         _assert_401(client.post("/api/workflow/deep_debugging"))
 
-    def test_post_workflow_use_donor(self, client):
-        _assert_401(client.post("/api/workflow/use_donor"))
-
     def test_get_donors_count(self, client):
         _assert_401(client.get("/api/donors/count"))
 

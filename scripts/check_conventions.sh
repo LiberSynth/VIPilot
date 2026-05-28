@@ -32,13 +32,6 @@ FOUND=$(grep -rn --include="*.py" \
     | grep -v "^common/environment\.py:")
 [ -n "$FOUND" ] && fail "Конвенция 3: прямое db_get() для ключей окружения вне environment.py" "$FOUND"
 
-FOUND=$(grep -rn --include="*.py" \
-    "env_get(['\"]use_donor" \
-    $PROJECT_DIRS \
-    | grep -v "^common/environment\.py:" \
-    | grep -v "^routes/api\.py:")
-[ -n "$FOUND" ] && fail "Конвенция 3: прямое env_get() для ключей окружения вне environment.py" "$FOUND"
-
 # ── Конвенция 6: UUID/GUID в логах — только через fmt_id_msg ─────────────────
 # Ищем строки в log/write_log-вызовах, где batch_id или story_id вставлены
 # напрямую в f-строку без fmt_id_msg.
@@ -52,7 +45,7 @@ FOUND=$(grep -rn --include="*.py" \
 # Только пайплайны-потоки (не planning.py — он в главном потоке)
 THREAD_PIPELINES="pipelines/story.py pipelines/video.py pipelines/transcode.py pipelines/publish.py"
 FOUND=$(grep -rn --include="*.py" \
-    "environment\.\(use_donor\|deep_logging\|loop_interval\|max_threads\)" \
+    "environment\.\(deep_logging\|loop_interval\|max_threads\)" \
     $THREAD_PIPELINES 2>/dev/null)
 [ -n "$FOUND" ] && fail "Конвенция 7: прямое environment.* в потоке (использовать snap.*)" "$FOUND"
 

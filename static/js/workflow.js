@@ -76,22 +76,6 @@ function wfDeepDebugging(checked) {
     .catch(function() { showToast('Ошибка соединения', 'error'); });
 }
 
-function wfUseDonor(checked) {
-  fetch('/api/workflow/use_donor', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ enabled: checked ? '1' : '0' }),
-  })
-    .then(function(r) { return r.json(); })
-    .then(function(d) {
-      var badge = document.getElementById('use-donor-badge');
-      var on    = d.use_donor === '1';
-      if (badge) badge.style.display = on ? '' : 'none';
-      showToast(on ? 'Подбирать видео из пула: включено' : 'Подбирать видео из пула: выключено', 'success');
-    })
-    .catch(function() { showToast('Ошибка соединения', 'error'); });
-}
-
 function openRestartDialog() {
   new ConfirmDialog({
     title: 'Перезапустить движок?',
@@ -114,26 +98,15 @@ function openRestartDialog() {
   }).open();
 }
 
-function _isDonorPanelActive() {
-  var el = document.getElementById('donor-count');
+function _isModesPanelActive() {
+  var el = document.getElementById('movie-pool-count');
   if (!el) return false;
   var panel = el.closest('.tab-panel');
   return panel ? panel.classList.contains('active') : false;
 }
 
-function refreshDonorCount() {
-  if (!_isDonorPanelActive()) return;
-  fetch('/api/donors/count')
-    .then(function(r) { return r.json(); })
-    .then(function(d) {
-      var el = document.getElementById('donor-count');
-      if (el) el.textContent = d.count;
-    })
-    .catch(function() {});
-}
-
 function refreshMoviePoolCount() {
-  if (!_isDonorPanelActive()) return;
+  if (!_isModesPanelActive()) return;
   fetch('/api/donors/count?good_only=1')
     .then(function(r) { return r.json(); })
     .then(function(d) {
@@ -144,9 +117,7 @@ function refreshMoviePoolCount() {
 }
 
 (function() {
-  refreshDonorCount();
   refreshMoviePoolCount();
-  setInterval(refreshDonorCount, 10000);
   setInterval(refreshMoviePoolCount, 10000);
 })();
 
