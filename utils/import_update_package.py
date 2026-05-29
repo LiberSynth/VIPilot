@@ -12,7 +12,7 @@ SECTIONS = [
     {"name": "ai_platforms",    "fields": ["id", "name", "url", "env_key_name"],                                     "pk": "id"},
     {"name": "ai_models",       "fields": ["id", "platform_id", "name", "url", "body", "type", "price"],            "pk": "id", "jsonb_fields": ["body"]},
     {"name": "model_durations", "fields": ["id", "model_id", "duration"],                                            "pk": "id"},
-    {"name": "targets",         "fields": ["id", "name", "aspect_ratio_x", "aspect_ratio_y", "active", "order", "transcode", "config", "slug"], "pk": "id", "jsonb_fields": ["config"]},
+    {"name": "targets",         "fields": ["id", "name", "active", "order", "config", "slug"], "pk": "id", "jsonb_fields": ["config"]},
     {"name": "users",           "fields": ["id", "name", "login", "password"],                                       "pk": "id"},
     {"name": "user_roles",      "fields": ["id", "name", "slug", "module"],                                          "pk": "id"},
     {"name": "user_role_links", "fields": ["id", "user_id", "role_id"],                                              "pk": "id"},

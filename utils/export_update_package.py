@@ -36,8 +36,7 @@ SECTIONS = [
     {
         "name": "targets",
         "fields": [
-            "id", "name", "aspect_ratio_x", "aspect_ratio_y",
-            "active", "order", "transcode", "config", "slug",
+            "id", "name", "active", "order", "config", "slug",
         ],
         "jsonb_fields": ["config"],
     },

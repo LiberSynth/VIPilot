@@ -21,22 +21,52 @@
 ══════════════════════════════════════════════════════════════════════════
 """
 
+from pathlib import Path
+
 from .connection import get_db
 from log.log import write_log_entry
+
+_VIDEO_DIR = Path(__file__).resolve().parents[1] / "video"
 
 
 # ---------------------------------------------------------------------------
 # Функции миграций
 # ---------------------------------------------------------------------------
 
-# Все миграции удалены.
+def _m1001_drop_targets_legacy_columns(cur):
+    """Drop legacy target columns no longer used by stage-batches."""
+    cur.execute("ALTER TABLE targets DROP COLUMN IF EXISTS aspect_ratio_x")
+    cur.execute("ALTER TABLE targets DROP COLUMN IF EXISTS aspect_ratio_y")
+    cur.execute("ALTER TABLE targets DROP COLUMN IF EXISTS transcode")
+
+
+def _m1002_add_movies_transcoded(cur):
+    """Add movies.transcoded with backfill based on transcoded_data files."""
+    cur.execute("ALTER TABLE movies ADD COLUMN IF NOT EXISTS transcoded BIT(1)")
+    cur.execute("SELECT id::text FROM movies WHERE transcoded IS NULL")
+    missing_rows = [str(r[0]) for r in cur.fetchall()]
+    for movie_id in missing_rows:
+        has_transcoded_file = (_VIDEO_DIR / f"{movie_id} - transcoded_data.mp4").exists()
+        cur.execute(
+            "UPDATE movies SET transcoded = %s::bit(1) WHERE id = %s::uuid",
+            ("1" if has_transcoded_file else "0", movie_id),
+        )
+    cur.execute("ALTER TABLE movies ALTER COLUMN transcoded SET DEFAULT B'0'")
+    cur.execute("ALTER TABLE movies ALTER COLUMN transcoded SET NOT NULL")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_movies_transcoded ON movies (transcoded)")
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_movies_transcode_pick ON movies (used, transcoded, created_at, id)"
+    )
 
 
 # ---------------------------------------------------------------------------
 # Реестр миграций — добавляйте только в конец, никогда не переиспользуйте номера
 # ---------------------------------------------------------------------------
 
-MIGRATIONS = []
+MIGRATIONS = [
+    (2026052901, _m1001_drop_targets_legacy_columns),
+    (2026052902, _m1002_add_movies_transcoded),
+]
 
 
 # ---------------------------------------------------------------------------

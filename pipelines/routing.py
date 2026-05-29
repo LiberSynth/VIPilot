@@ -8,13 +8,13 @@ _TYPE_STATUS_TO_PIPELINE = {
     ('movie', 'pending'):    video,
     ('movie', 'generating'): video,
     ('movie', 'generated'):  video,
+    ('transcode', 'pending'): transcode,
+    ('transcode', 'processing'): transcode,
 }
 
 _LEGACY_STATUS_TO_PIPELINE = {
     'video_generating': video,
     'video_pending':    video,
-    'video_ready':      transcode,
-    'transcoding':      transcode,
     'transcode_ready':  publish,
 }
 

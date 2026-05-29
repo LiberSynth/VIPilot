@@ -139,31 +139,22 @@ def db_get_active_targets():
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                'SELECT id, name, aspect_ratio_x, aspect_ratio_y, transcode, config, slug FROM targets WHERE active = TRUE ORDER BY "order", name'
+                'SELECT id, name, config, slug FROM targets WHERE active = TRUE ORDER BY "order", name'
             )
             rows = cur.fetchall()
     return [
         {
             "id": str(row[0]),
             "name": row[1],
-            "aspect_ratio_x": row[2],
-            "aspect_ratio_y": row[3],
-            "transcode": bool(row[4]),
-            "config": row[5] or {},
-            "slug": row[6] or "",
+            "config": row[2] or {},
+            "slug": row[3] or "",
         }
         for row in rows
     ]
 
 
 def db_update_target_aspect_ratio(target_id, x, y):
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "UPDATE targets SET aspect_ratio_x = %s, aspect_ratio_y = %s WHERE id = %s",
-                (x, y, target_id),
-            )
-        conn.commit()
+    # Поля удалены из schema v2. Функция оставлена для совместимости интерфейса.
     return True
 
 
@@ -184,7 +175,7 @@ def db_get_target_by_name(name: str) -> dict | None:
     with get_db() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
-                "SELECT id::text, name, active, aspect_ratio_x, aspect_ratio_y, transcode, config "
+                "SELECT id::text, name, active, config, slug "
                 "FROM targets WHERE name = %s LIMIT 1",
                 (name,),
             )

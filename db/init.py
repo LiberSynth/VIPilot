@@ -106,6 +106,7 @@ def bootstrap():
                     url             TEXT,
                     grade           TEXT,
                     used            BIT(1) NOT NULL DEFAULT B'0',
+                    transcoded      BIT(1) NOT NULL DEFAULT B'0',
                     created_at      TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
                 )
             """)
@@ -138,13 +139,10 @@ def bootstrap():
                 CREATE TABLE IF NOT EXISTS targets (
                     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                     name            TEXT NOT NULL,
-                    aspect_ratio_x  SMALLINT,
-                    aspect_ratio_y  SMALLINT,
                     config          JSONB NOT NULL DEFAULT '{}',
                     session_context JSONB,
                     slug            TEXT,
                     active          BOOLEAN NOT NULL DEFAULT TRUE,
-                    transcode       BOOLEAN NOT NULL DEFAULT FALSE,
                     "order"         INTEGER NOT NULL DEFAULT 0
                 )
             """)

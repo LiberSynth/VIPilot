@@ -306,6 +306,41 @@ def db_get_movie_pool_count(good_only: bool = False) -> int:
             return cur.fetchone()[0]
 
 
+def db_create_transcode_batches() -> list[str]:
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO batches (type, movie_id, batch_id_source, status)
+                SELECT
+                    'transcode',
+                    m.id,
+                    bs.id,
+                    'pending'
+                FROM movies m
+                LEFT JOIN batches bt
+                    ON bt.movie_id = m.id
+                   AND bt.type = 'transcode'
+                   AND bt.status IN ('pending', 'processing')
+                LEFT JOIN LATERAL (
+                    SELECT b.id
+                    FROM batches b
+                    WHERE b.movie_id = m.id
+                      AND b.type = 'planning'
+                    ORDER BY b.created_at DESC, b.id DESC
+                    LIMIT 1
+                ) bs ON TRUE
+                WHERE m.used = B'1'
+                  AND m.transcoded = B'0'
+                  AND bt.id IS NULL
+                RETURNING id::text
+                """
+            )
+            rows = cur.fetchall()
+        conn.commit()
+    return [str(row[0]) for row in rows]
+
+
 def db_get_actionable_batches():
     with get_db() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
@@ -313,9 +348,8 @@ def db_get_actionable_batches():
                 SELECT id, type, status, created_at, scheduled_at
                 FROM batches
                 WHERE status IN (
-                    'pending', 'generating', 'generated',
+                    'pending', 'processing', 'generating', 'generated',
                     'video_generating', 'video_pending',
-                    'video_ready', 'transcoding',
                     'transcode_ready'
                 )
                 OR status LIKE '%.pending'
@@ -366,6 +400,7 @@ def db_is_batch_scheduled(scheduled_at, batch_type="planning"):
 def db_reset_stalled_batches() -> list[dict]:
     typed_resets = [
         ("story", "generating", "pending"),
+        ("transcode", "processing", "pending"),
     ]
     affected = []
     with get_db() as conn:

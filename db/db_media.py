@@ -138,9 +138,24 @@ def db_save_transcoded_data(batch_id, video_data: bytes):
                 (batch_id,),
             )
             row = cur.fetchone()
-    if not row:
+        if not row:
+            return
+        movie_id = str(row[0])
+        _write_video_file(movie_id, _TRANSCODED_FIELD, video_data)
+        db_set_movie_transcoded(movie_id, conn)
+
+
+def db_set_movie_transcoded(movie_id: str, conn=None):
+    if conn is None:
+        with get_db() as _conn:
+            db_set_movie_transcoded(movie_id, _conn)
         return
-    _write_video_file(str(row[0]), _TRANSCODED_FIELD, video_data)
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE movies SET transcoded = B'1' WHERE id = %s::uuid",
+            (movie_id,),
+        )
+    conn.commit()
 
 
 def db_get_batch_video_data_with_source(batch_id) -> tuple[bytes | None, str | None]:

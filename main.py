@@ -17,6 +17,7 @@ os.environ.setdefault('PLAYWRIGHT_BROWSERS_PATH', PLAYWRIGHT_BROWSERS_PATH)
 
 from db import (
     db_get_actionable_batches,
+    db_create_transcode_batches,
     db_set_batch_status,
     db_interrupt_stale_logs,
 )
@@ -42,6 +43,7 @@ def main_loop():
             environment.refresh_environment()
 
             planning.tick()
+            db_create_transcode_batches()
 
             if environment.get_active_threads() < environment.max_threads:
                 batches = db_get_actionable_batches()
