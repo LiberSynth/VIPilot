@@ -63,9 +63,25 @@ def _m1002_add_movies_transcoded(cur):
 # Реестр миграций — добавляйте только в конец, никогда не переиспользуйте номера
 # ---------------------------------------------------------------------------
 
+def _m1003_backfill_transcode_schedule_from_planning(cur):
+    """Copy scheduled_at and story_id from planning source into transcode batches."""
+    cur.execute(
+        """
+        UPDATE batches tc
+        SET scheduled_at = pl.scheduled_at,
+            story_id = COALESCE(tc.story_id, pl.story_id)
+        FROM batches pl
+        WHERE tc.type = 'transcode'
+          AND pl.id = tc.batch_id_source
+          AND pl.type = 'planning'
+        """
+    )
+
+
 MIGRATIONS = [
     (2026052901, _m1001_drop_targets_legacy_columns),
     (2026052902, _m1002_add_movies_transcoded),
+    (2026052903, _m1003_backfill_transcode_schedule_from_planning),
 ]
 
 

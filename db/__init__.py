@@ -52,6 +52,7 @@ from .db_pipeline import (
     db_claim_unused_story_for_batch,
     db_claim_unused_movie_for_batch,
     db_create_transcode_batches,
+    db_create_publish_batches,
     db_get_movie_pool_count,
     db_get_actionable_batches,
     db_get_batch_by_id,

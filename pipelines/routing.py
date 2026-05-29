@@ -10,12 +10,12 @@ _TYPE_STATUS_TO_PIPELINE = {
     ('movie', 'generated'):  video,
     ('transcode', 'pending'): transcode,
     ('transcode', 'processing'): transcode,
+    ('publish', 'pending'): publish,
 }
 
 _LEGACY_STATUS_TO_PIPELINE = {
     'video_generating': video,
     'video_pending':    video,
-    'transcode_ready':  publish,
 }
 
 def get_pipeline(batch_type: str, status: str):

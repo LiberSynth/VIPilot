@@ -2,7 +2,6 @@ KNOWN_BATCH_STATUSES = frozenset({
     'pending', 'processing', 'generating', 'generated', 'ready',
     'video_generating', 'video_pending',
     'video_ready', 'transcoding',
-    'transcode_ready',
     'cancelled', 'error', 'movie_manual', 'donated', 'reserved',
     'video_error', 'transcode_error', 'publish_error', 'published',
     'published_partially', 'fatal_error',
@@ -19,7 +18,7 @@ PIPELINE_RESET_STATUS = {
     'story':     'pending',
     'video':     'pending',
     'transcode': 'pending',
-    'publish':   'transcode_ready',
+    'publish':   'pending',
 }
 
 COMPOSITE_BATCH_STATUS_SUFFIXES = frozenset({'.posting', '.published', '.pending', '.failed'})

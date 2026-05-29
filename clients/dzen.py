@@ -359,6 +359,49 @@ def _find_primary_publish_control(page):
     return None
 
 
+def _click_primary_publish_control(page, log_id, batch_id=None) -> bool:
+    """Закрывает попапы и нажимает основную кнопку «Опубликовать». Возвращает True если кликнули."""
+    _handle_popups(page, log_id, batch_id)
+    pub_btn = _find_primary_publish_control(page)
+    if pub_btn is None:
+        return False
+    write_log_entry(log_id, "Дзен: Элемент публикации найден, нажимаю.")
+    try:
+        pub_btn.click(timeout=3_000)
+    except Exception as _click_err:
+        write_log_entry(log_id, "[dzen] Обычный клик не прошёл — пробую JS-клик.", level='silent')
+        write_log_entry(log_id, f"[dzen] Причина: {_click_err}", level='silent')
+        try:
+            page.evaluate(
+                """() => {
+                    const byTestId = document.querySelector('[data-testid="publish-btn"]');
+                    if (byTestId) { byTestId.click(); return; }
+                    for (const el of document.querySelectorAll('button, [role="button"], a')) {
+                        const t = (el.textContent || '').trim();
+                        if (/^Опубликовать(?: после обработки)?$/i.test(t)) {
+                            el.click();
+                            return;
+                        }
+                    }
+                }"""
+            )
+        except Exception as _js_err:
+            write_log_entry(log_id, f"[dzen] JS-клик тоже не прошёл: {_js_err}", level='silent')
+            return False
+    _snap(page, batch_id)
+    return True
+
+
+def _retry_publish_if_button_visible(page, log_id, batch_id, url_step7_start, reason: str) -> bool:
+    """Повторный клик, если публикация ещё не ушла, а CTA всё ещё на экране."""
+    if _dzen_step7_success_without_click(page, url_step7_start):
+        return False
+    if _find_primary_publish_control(page) is None:
+        return False
+    write_log_entry(log_id, f"Дзен: {reason}")
+    return _click_primary_publish_control(page, log_id, batch_id)
+
+
 _EXPECTED_ELEMENTS = [
     ("captcha", _detect_captcha,        _handle_captcha_element),
     ("confirm", _detect_confirm_dialog, _handle_confirm_element),
@@ -784,7 +827,6 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
             break
         pub_btn = _find_primary_publish_control(page)
         if pub_btn is not None:
-            write_log_entry(log_id, "Дзен: Элемент публикации найден, нажимаю.")
             break
         _handle_popups(page, log_id, batch_id)
         page.wait_for_timeout(1_500)
@@ -794,27 +836,8 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
             "Не дождались кнопки публикации и не обнаружили успешный редирект за 3 минуты."
         )
 
-    # Перед кликом — проверяем на капчу и закрываем всё лишнее.
-    # Капча от VK блокирует pointer events на всей странице, поэтому
-    # она должна быть обработана ДО попытки клика.
-    _handle_popups(page, log_id, batch_id)
-
     if pub_btn is not None:
-        try:
-            # Таймаут 3 сек: если confirm-диалог уже был обработан в _handle_popups
-            # выше, главная кнопка дизейблится и ждать её enable бессмысленно —
-            # публикация уже отправлена. JS-клик ниже останется как страховка.
-            pub_btn.click(timeout=3_000)
-        except Exception as _click_err:
-            write_log_entry(log_id, "[dzen] Обычный клик не прошёл — пробую JS-клик.", level='silent')
-            write_log_entry(log_id, f"[dzen] Причина: {_click_err}", level='silent')
-            try:
-                page.evaluate(
-                    "() => { const b = document.querySelector('[data-testid=\"publish-btn\"]') "
-                    "|| document.querySelector('button[type=\"submit\"]'); if(b) b.click(); }"
-                )
-            except Exception as _js_err:
-                write_log_entry(log_id, f"[dzen] JS-клик тоже не прошёл: {_js_err}", level='silent')
+        _click_primary_publish_control(page, log_id, batch_id)
 
     # Ждём появления диалога подтверждения или капчи до 12 секунд.
     # Если за 12 сек ничего не появилось — продолжаем в шаг 8.
@@ -890,8 +913,16 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
 
     write_log_entry(log_id, "Дзен: Шаг 8 завершён, жду подтверждения публикации.")
 
-    # Перед шагом 9: закрываем любой неожиданный попап/хинт.
+    # Перед шагом 9: закрываем хинты и повторяем клик, если CTA всё ещё на экране.
     _dismiss_unknown(page, log_id)
+    if not _step8_done:
+        _retry_publish_if_button_visible(
+            page,
+            log_id,
+            batch_id,
+            url_step7_start,
+            "Кнопка «Опубликовать» всё ещё видна — повторяю клик после закрытия хинтов.",
+        )
 
     # ── Шаг 9: Ожидаем подтверждения публикации ──────────────────────────
     _PUBLISH_CONFIRM_TIMEOUT = 60_000  # ms — полный таймаут ожидания
@@ -935,6 +966,8 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
     _confirm_deadline = _time.monotonic() + _PUBLISH_CONFIRM_TIMEOUT / 1000
     _snap_every = 3   # опросный снимок каждые N итераций (каждые 6 сек при POLL=2s)
     _iter = 0
+    _publish_retries = 0
+    _PUBLISH_RETRY_MAX = 3
     while _time.monotonic() < _confirm_deadline and not confirmed:
         _iter += 1
         if _iter % _snap_every == 1:   # первый снимок сразу, потом каждые 6 сек
@@ -970,6 +1003,19 @@ def _publish_ui(page, publisher_id: str, video_path: str, log_id, batch_id=None)
 
         # 2c. Обрабатываем попапы/диалоги/хинты (капча может появиться и здесь)
         _handle_popups(page, log_id, batch_id)
+
+        if (
+            not confirmed
+            and _publish_retries < _PUBLISH_RETRY_MAX
+            and _retry_publish_if_button_visible(
+                page,
+                log_id,
+                batch_id,
+                url_step7_start,
+                "Повторный клик «Опубликовать» (ожидание подтверждения).",
+            )
+        ):
+            _publish_retries += 1
 
         # 3. Проверка URL
         url_now = page.url

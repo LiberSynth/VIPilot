@@ -18,13 +18,14 @@ os.environ.setdefault('PLAYWRIGHT_BROWSERS_PATH', PLAYWRIGHT_BROWSERS_PATH)
 from db import (
     db_get_actionable_batches,
     db_create_transcode_batches,
+    db_create_publish_batches,
     db_set_batch_status,
     db_interrupt_stale_logs,
 )
 from common.exceptions import AppException
 from common.startup import init_app, create_app
 from log import log_app_started, log_app_stopped, write_log_entry
-from pipelines import publish, cleanup
+from pipelines import cleanup
 import pipelines.planning as planning
 from pipelines.routing import get_pipeline
 from pipelines.runner import start_batch_thread
@@ -44,6 +45,7 @@ def main_loop():
 
             planning.tick()
             db_create_transcode_batches()
+            db_create_publish_batches()
 
             if environment.get_active_threads() < environment.max_threads:
                 batches = db_get_actionable_batches()
@@ -55,8 +57,6 @@ def main_loop():
                     status = b['status']
                     pipeline_module = get_pipeline(btype, status)
                     if pipeline_module is None:
-                        continue
-                    if pipeline_module is publish and publish.is_scheduled(b):
                         continue
                     if not environment.claim_batch(bid):
                         continue

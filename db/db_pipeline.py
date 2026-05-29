@@ -175,13 +175,7 @@ def db_cancel_orphaned_planning_batches():
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT id FROM batches
-                WHERE (
-                    status = 'pending'
-                    OR
-                    status = 'transcode_ready'
-                    OR status LIKE '%.published'
-                    OR status LIKE '%.pending'
-                )
+                WHERE status = 'pending'
                   AND type = 'planning'
                   AND scheduled_at IS NOT NULL
                   AND NOT EXISTS (
@@ -311,19 +305,20 @@ def db_create_transcode_batches() -> list[str]:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO batches (type, movie_id, batch_id_source, status)
+                INSERT INTO batches (type, movie_id, batch_id_source, scheduled_at, story_id)
                 SELECT
                     'transcode',
                     m.id,
                     bs.id,
-                    'pending'
+                    bs.scheduled_at,
+                    bs.story_id
                 FROM movies m
                 LEFT JOIN batches bt
                     ON bt.movie_id = m.id
                    AND bt.type = 'transcode'
                    AND bt.status IN ('pending', 'processing')
                 LEFT JOIN LATERAL (
-                    SELECT b.id
+                    SELECT b.id, b.scheduled_at, b.story_id
                     FROM batches b
                     WHERE b.movie_id = m.id
                       AND b.type = 'planning'
@@ -337,6 +332,43 @@ def db_create_transcode_batches() -> list[str]:
                 """
             )
             rows = cur.fetchall()
+        for row in rows:
+            db_set_batch_status(str(row[0]), 'pending', conn)
+        conn.commit()
+    return [str(row[0]) for row in rows]
+
+
+def db_create_publish_batches() -> list[str]:
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO batches (type, movie_id, story_id, batch_id_source, scheduled_at)
+                SELECT
+                    'publish',
+                    tc.movie_id,
+                    tc.story_id,
+                    tc.id,
+                    tc.scheduled_at
+                FROM batches tc
+                WHERE tc.type = 'transcode'
+                  AND tc.status IN ('ready', 'error')
+                  AND (
+                      tc.scheduled_at IS NULL
+                      OR tc.scheduled_at <= clock_timestamp()
+                  )
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM batches pb
+                      WHERE pb.type = 'publish'
+                        AND pb.batch_id_source = tc.id
+                  )
+                RETURNING id::text
+                """
+            )
+            rows = cur.fetchall()
+        for row in rows:
+            db_set_batch_status(str(row[0]), 'pending', conn)
         conn.commit()
     return [str(row[0]) for row in rows]
 
@@ -349,8 +381,7 @@ def db_get_actionable_batches():
                 FROM batches
                 WHERE status IN (
                     'pending', 'processing', 'generating', 'generated',
-                    'video_generating', 'video_pending',
-                    'transcode_ready'
+                    'video_generating', 'video_pending'
                 )
                 OR status LIKE '%.pending'
                 OR status LIKE '%.published'
@@ -380,7 +411,9 @@ def db_get_batch_by_id(batch_id):
 
 
 def db_is_batch_scheduled(scheduled_at, batch_type="planning"):
-    if batch_type != "planning" or scheduled_at is None:
+    if scheduled_at is None:
+        return True
+    if batch_type not in ("planning", "publish"):
         return True
     with get_db() as conn:
         with conn.cursor() as cur:

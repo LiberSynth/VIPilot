@@ -3,8 +3,6 @@ Pipeline 6 — Публикация.
 Принимает batch_id, публикует видео на все активные платформы.
 """
 
-from datetime import datetime, timezone
-
 import common.environment as environment
 from utils.notify import notify_failure
 from db import (
@@ -28,16 +26,6 @@ from clients import rutube as rutube_client
 from clients.rutube import RutubeCsrfExpired, RutubeSessionMissing
 from clients import vkvideo as vkvideo_client
 from clients.vkvideo import VkVideoCsrfExpired, VkVideoSessionMissing
-
-
-def is_scheduled(batch) -> bool:
-    """Возвращает True если батч ещё не наступило время публиковать."""
-    sched = batch.get('scheduled_at')
-    if sched is None:
-        return False
-    if sched.tzinfo is None:
-        sched = sched.replace(tzinfo=timezone.utc)
-    return datetime.now(timezone.utc) < sched
 
 
 def _get_video(batch_id, log_id):
@@ -184,9 +172,18 @@ def run(batch_id, log_id):
         db_log_update(log_id, "Публикация для movie-батча отключена на текущем этапе", "ok")
         write_log_entry(log_id, fmt_id_msg("[publish] Батч {} type=movie — шаг пропущен", batch_id), level='silent')
         return
+    if batch.get('type') != 'publish':
+        db_log_update(log_id, "Пайплайн уже выполнен — пропуск", "ok")
+        write_log_entry(
+            log_id,
+            fmt_id_msg("[publish] Батч {} type={} — шаг пропущен", batch_id, batch.get('type')),
+            level='silent',
+        )
+        return
 
     status = batch['status']
     active_targets = db_get_active_targets()
+    source_label = batch.get('batch_id_source') or 'NULL'
     write_log_entry(
         log_id,
         fmt_id_msg(
@@ -195,30 +192,16 @@ def run(batch_id, log_id):
         ),
         level='silent',
     )
+    write_log_entry(log_id, fmt_id_msg("Передающий батч: {}", source_label))
 
     parsed = _parse_composite_status(status)
 
-    if parsed is None and status != 'transcode_ready':
+    if parsed is None and status != 'pending':
         db_log_update(log_id, "Пайплайн уже выполнен — пропуск", "ok")
         return
 
     if parsed is None:
-        if batch['type'] == 'movie_manual':
-            db_log_update(log_id, 'Публикация (ручной).', 'running')
-            write_log_entry(log_id, 'Ручной батч — публикация на платформу не выполняется')
-            write_log_entry(log_id, fmt_id_msg("[publish] Батч {} ручной — публикация пропущена", batch_id), level='silent')
-            db_set_batch_status(batch_id, 'movie_manual')
-            db_log_update(log_id, 'Без публикации (ручной батч)', 'ok')
-            return
-
         if check_cancelled('publish', batch_id, batch, log_id):
-            return
-
-        now = datetime.now(timezone.utc)
-        if batch['scheduled_at'] is not None and now < batch['scheduled_at']:
-            remaining = int((batch['scheduled_at'] - now).total_seconds() / 60)
-            write_log_entry(log_id, fmt_id_msg("Ещё {} мин до публикации", remaining))
-            write_log_entry(log_id, fmt_id_msg("[publish] Батч {} ещё не время ({} мин до публикации)", batch_id, remaining), level='silent')
             return
 
     if not active_targets:

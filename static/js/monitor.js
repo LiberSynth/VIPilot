@@ -24,7 +24,6 @@
     video_pending:    'видео: ожидание',
     video_ready:      'видео готово',
     video_error:      'видео: ошибка',
-    transcode_ready:  'транскод готов',
     transcode_error:  'транскод: ошибка',
     published:            'опубликовано',
     published_partially:  'частично опубликовано',
@@ -223,7 +222,7 @@
 
     const doneStatuses    = ['published', 'movie_manual', 'story_manual'];
     const partialStatuses = ['published_partially'];
-    const waitStatuses    = ['story_ready', 'video_pending', 'video_ready', 'transcode_ready'];
+    const waitStatuses    = ['story_ready', 'video_pending', 'video_ready', 'pending'];
     const errorStatuses   = ['error', 'video_error', 'transcode_error', 'publish_error', 'fatal_error'];
     const finalStatuses   = doneStatuses.concat(partialStatuses).concat(errorStatuses).concat(['cancelled', 'donated', 'reserved']);
     const isFinal         = finalStatuses.indexOf(bs) >= 0;
