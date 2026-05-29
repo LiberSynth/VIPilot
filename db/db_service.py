@@ -868,6 +868,7 @@ def db_cleanup_batches(batch_lifetime_days: int) -> int:
                     status IN ('published', 'cancelled')
                     OR (type = 'movie_manual' AND status = 'movie_manual')
                     OR (type = 'movie' AND status = 'ready')
+                    OR (type = 'planning' AND status = 'ready')
                     OR (type = 'story' AND status = 'ready')
                 )
                   AND created_at < now() - make_interval(days => %s)

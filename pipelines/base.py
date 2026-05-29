@@ -74,7 +74,7 @@ def check_cancelled(pipeline_name: str, batch_id: str, batch: dict, log_id=None)
     Вызывать только для не-ручных батчей (is_manual проверяет сам вызывающий).
     log_id — идентификатор текущей записи лога (для обновления статуса).
     """
-    if not db_is_batch_scheduled(batch['scheduled_at'], batch.get('type', 'slot')):
+    if not db_is_batch_scheduled(batch['scheduled_at'], batch.get('type', 'planning')):
         db_set_batch_status(batch_id, 'cancelled')
         msg = 'Батч отменён — слот удалён из расписания'
         if log_id:

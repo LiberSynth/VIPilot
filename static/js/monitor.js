@@ -194,9 +194,10 @@
   function renderBatch(batch) {
     const bs   = batch.batch_status || 'pending';
     const logs = groupLogsByPipeline(batch.logs || []);
+    const isScheduledPlanning = batch.type === 'planning' && !!batch.scheduled_at;
 
     const headTime = batch.created_at;
-    const schedStr = batch.type === 'slot'
+    const schedStr = isScheduledPlanning
       ? 'Публикация: ' + fmtMskShort(batch.scheduled_at)
       : batch.type === 'movie_manual'
         ? 'Ручное видео'
@@ -266,7 +267,7 @@
       '</div>';
 
     return '<div class="monitor-batch bs-' + esc(bs) + '" data-bid="' + esc(batch.batch_id) +
-      '" data-scheduled="'  + esc(batch.type !== 'slot' ? 'сейчас' : fmtMsk(batch.scheduled_at)) +
+      '" data-scheduled="'  + esc(isScheduledPlanning ? fmtMsk(batch.scheduled_at) : 'сейчас') +
       '" data-bstatus="'    + esc(bs) +
       '" data-text-model="' + esc(batch.text_model_name || '') +
       '" data-video-model="'+ esc(batch.video_model_name|| '') +

@@ -477,13 +477,25 @@ def db_get_distinct_batch_statuses():
     return {row[0] for row in rows}
 
 
-def db_get_last_pipeline_run(pipeline):
+def db_get_last_pipeline_run(pipeline, scheduled_only: bool = False):
     with get_db() as conn:
         with conn.cursor() as cur:
-            cur.execute(
-                "SELECT MAX(created_at) FROM log WHERE pipeline = %s",
-                (pipeline,),
-            )
+            if scheduled_only:
+                cur.execute(
+                    """
+                    SELECT MAX(l.created_at)
+                    FROM log l
+                    JOIN batches b ON b.id = l.batch_id
+                    WHERE l.pipeline = %s
+                      AND b.scheduled_at IS NOT NULL
+                    """,
+                    (pipeline,),
+                )
+            else:
+                cur.execute(
+                    "SELECT MAX(created_at) FROM log WHERE pipeline = %s",
+                    (pipeline,),
+                )
             row = cur.fetchone()
     return row[0] if row and row[0] is not None else None
 

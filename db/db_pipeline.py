@@ -1,18 +1,9 @@
 import json
-from pathlib import Path
 import psycopg2
 import psycopg2.extras
 
 from .connection import get_db
 from common.statuses import _assert_known_status, PIPELINE_RESET_STATUS
-
-_RAW_FIELD = "raw_data"
-_TRANSCODED_FIELD = "transcoded_data"
-_VIDEO_DIR = Path(__file__).resolve().parents[1] / "video"
-
-
-def _movie_video_file_exists(movie_id: str, field: str) -> bool:
-    return (_VIDEO_DIR / f"{movie_id} - {field}.mp4").exists()
 
 
 def _claim_story_from_pool(cur) -> str | None:
@@ -47,46 +38,38 @@ def _get_story_source_batch_id(cur, story_id: str | None) -> str | None:
     return row[0] if row else None
 
 
+def db_create_planning_batch(scheduled_at):
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            if scheduled_at is not None:
+                cur.execute(
+                    """
+                    SELECT id FROM batches
+                    WHERE scheduled_at = %s
+                      AND type        = 'planning'
+                      AND status      != 'cancelled'
+                    LIMIT 1
+                    """,
+                    (scheduled_at,),
+                )
+                if cur.fetchone():
+                    return None
+            cur.execute(
+                """
+                INSERT INTO batches (scheduled_at, type)
+                VALUES (%s, 'planning')
+                RETURNING id
+                """,
+                (scheduled_at,),
+            )
+            row = cur.fetchone()
+        batch_id = str(row[0])
+        db_set_batch_status(batch_id, 'pending', conn)
+    return batch_id
+
+
 def db_ensure_batch(scheduled_at):
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT id FROM batches
-                WHERE scheduled_at = %s
-                  AND status      != 'cancelled'
-                LIMIT 1
-                """,
-                (scheduled_at,),
-            )
-            if cur.fetchone():
-                return None
-            cur.execute(
-                """
-                INSERT INTO batches (scheduled_at, type)
-                VALUES (%s, 'slot')
-                RETURNING id
-                """,
-                (scheduled_at,),
-            )
-            row = cur.fetchone()
-        batch_id = str(row[0])
-        db_set_batch_status(batch_id, 'pending', conn)
-    return batch_id
-
-
-def db_create_adhoc_batch():
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute("""
-                INSERT INTO batches (scheduled_at, type)
-                VALUES (NULL, 'adhoc')
-                RETURNING id
-            """)
-            row = cur.fetchone()
-        batch_id = str(row[0])
-        db_set_batch_status(batch_id, 'pending', conn)
-    return batch_id
+    return db_create_planning_batch(scheduled_at)
 
 
 def db_create_video_batch(batch_type, model_id=None, story_id=None):
@@ -187,17 +170,19 @@ def db_claim_batch_status(batch_id: str, from_status: str, to_status: str) -> bo
     return True
 
 
-def db_cancel_orphaned_slot_batches():
+def db_cancel_orphaned_planning_batches():
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT id FROM batches
                 WHERE (
+                    status = 'pending'
+                    OR
                     status = 'transcode_ready'
                     OR status LIKE '%.published'
                     OR status LIKE '%.pending'
                 )
-                  AND type = 'slot'
+                  AND type = 'planning'
                   AND scheduled_at IS NOT NULL
                   AND NOT EXISTS (
                       SELECT 1 FROM schedule
@@ -236,56 +221,88 @@ def db_claim_unused_story_for_batch(batch_id: str) -> dict | None:
     return {"id": story_id, "title": row[1] or "", "content": row[2] or ""}
 
 
-def db_claim_donor_batch(batch_id: str, good_only: bool = False) -> None:
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT claim_donor_batch(%s::uuid, %s)", (batch_id, good_only))
-        conn.commit()
-
-
-def db_transfer_donor_movie(donor_batch_id: str, batch_id: str) -> str | None:
-    """Переносит movie_id из батча-донора в целевой батч.
-
-    Побочный эффект: обнуляет movie_id у батча-донора и переводит целевой
-    батч в статус video_ready или transcode_ready.
-
-    Возвращает donor_batch_id: str если перенос выполнен, None если донор не найден.
-    """
+def db_claim_unused_movie_for_batch(batch_id: str) -> dict | None:
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT b.id, b.movie_id
-                FROM batches b
-                WHERE b.id = %s::uuid
-                  AND b.movie_id IS NOT NULL
-            """,
-                (donor_batch_id,),
+                SELECT id
+                FROM batches
+                WHERE id = %s::uuid
+                  AND type = 'planning'
+                  AND status = 'pending'
+                FOR UPDATE
+                """,
+                (batch_id,),
             )
-            donor = cur.fetchone()
-            if not donor:
+            if cur.fetchone() is None:
                 return None
 
-            donor_id, donor_movie_id = donor
-            has_transcoded = _movie_video_file_exists(str(donor_movie_id), _TRANSCODED_FIELD)
-
-            new_status = "transcode_ready" if has_transcoded else "video_ready"
             cur.execute(
-                "UPDATE batches SET movie_id = %s WHERE id = %s::uuid",
-                (donor_movie_id, batch_id),
+                """
+                SELECT m.id::text, m.story_id::text
+                FROM movies m
+                WHERE m.grade = 'good'
+                  AND m.used = B'0'
+                ORDER BY m.created_at ASC, m.id ASC
+                LIMIT 1
+                FOR UPDATE SKIP LOCKED
+                """
+            )
+            movie_row = cur.fetchone()
+            if movie_row is None:
+                return None
+            movie_id, story_id = movie_row
+
+            cur.execute(
+                """
+                SELECT b.id::text
+                FROM batches b
+                WHERE b.type = 'movie'
+                  AND b.movie_id = %s::uuid
+                ORDER BY b.created_at DESC, b.id DESC
+                LIMIT 1
+                """,
+                (movie_id,),
+            )
+            source_row = cur.fetchone()
+            source_batch_id = source_row[0] if source_row else None
+
+            cur.execute(
+                "UPDATE movies SET used = B'1' WHERE id = %s::uuid",
+                (movie_id,),
             )
             cur.execute(
-                "UPDATE batches SET movie_id = NULL WHERE id = %s::uuid",
-                (donor_batch_id,),
+                """
+                UPDATE batches
+                SET movie_id = %s::uuid,
+                    story_id = %s::uuid,
+                    batch_id_source = %s::uuid,
+                    status = 'ready'
+                WHERE id = %s::uuid
+                """,
+                (movie_id, story_id, source_batch_id, batch_id),
             )
-        db_set_batch_status(batch_id, new_status, conn)
-    return str(donor_id)
+        conn.commit()
+    return {
+        "movie_id": movie_id,
+        "story_id": story_id,
+        "batch_id_source": source_batch_id,
+    }
 
 
-def db_get_donor_count(good_only: bool = False) -> int:
+def db_get_movie_pool_count(good_only: bool = False) -> int:
     with get_db() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT get_donor_count(%s)", (good_only,))
+            cur.execute(
+                """
+                SELECT COUNT(*)
+                FROM movies
+                WHERE used = B'0'
+                  AND (%s::boolean = FALSE OR grade = 'good')
+                """,
+                (good_only,),
+            )
             return cur.fetchone()[0]
 
 
@@ -328,8 +345,8 @@ def db_get_batch_by_id(batch_id):
     return dict(row) if row else None
 
 
-def db_is_batch_scheduled(scheduled_at, batch_type="slot"):
-    if batch_type != "slot" or scheduled_at is None:
+def db_is_batch_scheduled(scheduled_at, batch_type="planning"):
+    if batch_type != "planning" or scheduled_at is None:
         return True
     with get_db() as conn:
         with conn.cursor() as cur:

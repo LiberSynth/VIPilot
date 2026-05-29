@@ -105,6 +105,7 @@ def bootstrap():
                     model_id        UUID,
                     url             TEXT,
                     grade           TEXT,
+                    used            BIT(1) NOT NULL DEFAULT B'0',
                     created_at      TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
                 )
             """)
@@ -182,6 +183,35 @@ def bootstrap():
                 ALTER TABLE movies
                 ADD COLUMN IF NOT EXISTS story_id UUID
             """)
+            cur.execute("""
+                ALTER TABLE movies
+                ADD COLUMN IF NOT EXISTS used BIT(1)
+            """)
+            cur.execute("""
+                UPDATE movies m
+                SET used = CASE
+                    WHEN EXISTS (
+                        SELECT 1
+                        FROM batches b2
+                        WHERE b2.movie_id = m.id
+                          AND (
+                              b2.status IN ('published', 'published_partially')
+                              OR b2.status LIKE '%.published'
+                          )
+                    )
+                    THEN B'1'
+                    ELSE B'0'
+                END
+                WHERE m.used IS NULL
+            """)
+            cur.execute("""
+                ALTER TABLE movies
+                ALTER COLUMN used SET DEFAULT B'0'
+            """)
+            cur.execute("""
+                ALTER TABLE movies
+                ALTER COLUMN used SET NOT NULL
+            """)
 
             # ------------------------------------------------------------------
             # Legacy cleanup
@@ -189,6 +219,8 @@ def bootstrap():
             cur.execute("DELETE FROM cycle_config WHERE key = 'approve_stories'")
             cur.execute("DELETE FROM cycle_config WHERE key = 'approve_movies'")
             cur.execute("DELETE FROM environment WHERE key = 'use_donor'")
+            cur.execute("DROP FUNCTION IF EXISTS get_donor_count(boolean)")
+            cur.execute("DROP FUNCTION IF EXISTS claim_donor_batch(uuid, boolean)")
 
             # ------------------------------------------------------------------
             # Индексы
@@ -302,6 +334,14 @@ def bootstrap():
                     ON movies (created_at)
             """)
             cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_movies_used
+                    ON movies (used)
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_movies_pool_pick
+                    ON movies (used, grade, created_at, id)
+            """)
+            cur.execute("""
                 CREATE INDEX IF NOT EXISTS idx_schedule_time_utc
                     ON schedule (time_utc)
             """)
@@ -360,52 +400,6 @@ def bootstrap():
             cur.execute("""
                 CREATE INDEX IF NOT EXISTS idx_users_login
                     ON users (login)
-            """)
-
-            # ------------------------------------------------------------------
-            # Хранимые функции
-            # ------------------------------------------------------------------
-            cur.execute("""
-                CREATE OR REPLACE FUNCTION get_donor_count(p_good_only boolean)
-                RETURNS bigint LANGUAGE plpgsql AS $$
-                DECLARE
-                    v_count bigint;
-                BEGIN
-                    PERFORM pg_advisory_xact_lock(hashtext('donor_claim'));
-                    SELECT COUNT(*) INTO v_count
-                    FROM batches b
-                    JOIN movies m ON m.id = b.movie_id
-                    WHERE b.movie_id IS NOT NULL
-                      AND b.status IN ('cancelled', 'movie_manual')
-                      AND (NOT p_good_only OR m.grade = 'good');
-                    RETURN v_count;
-                END;
-                $$
-            """)
-            cur.execute("""
-                CREATE OR REPLACE FUNCTION claim_donor_batch(p_batch_id uuid, p_good_only boolean)
-                RETURNS void LANGUAGE plpgsql AS $$
-                DECLARE
-                    v_donor_id uuid;
-                    v_donated_status text := 'donated';
-                BEGIN
-                    PERFORM pg_advisory_xact_lock(hashtext('donor_claim'));
-                    SELECT b.id INTO v_donor_id
-                    FROM batches b
-                    JOIN movies m ON m.id = b.movie_id
-                    WHERE b.movie_id IS NOT NULL
-                      AND b.status IN ('cancelled', 'movie_manual')
-                      AND (NOT p_good_only OR m.grade = 'good')
-                    ORDER BY b.created_at ASC
-                    LIMIT 1 FOR UPDATE OF b;
-                    IF v_donor_id IS NULL THEN RETURN; END IF;
-                    UPDATE batches SET status = v_donated_status WHERE id = v_donor_id;
-                    UPDATE batches
-                    SET data = COALESCE(data, '{}'::jsonb)
-                            || jsonb_build_object('donor_batch_id', v_donor_id::text)
-                    WHERE id = p_batch_id;
-                END;
-                $$
             """)
 
         conn.commit()

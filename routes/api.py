@@ -21,7 +21,7 @@ from db import (
 from db import (
     env_get,
     env_set,
-    db_create_adhoc_batch,
+    db_create_planning_batch,
     db_reset_batch_pipeline,
     db_get_story_export_data,
     db_get_batch_video_data,
@@ -53,6 +53,7 @@ from db import (
     db_get_batch_status,
     db_delete_story,
     db_delete_movie,
+    db_get_movie_pool_count,
 )
 from log import (
     db_get_monitor,
@@ -294,7 +295,7 @@ def api_time():
 def api_run_now():
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
-    batch_id = db_create_adhoc_batch()
+    batch_id = db_create_planning_batch(None)
     if not batch_id:
         return jsonify({"error": "Не удалось создать батч"}), 500
     log_batch_planned(
@@ -626,7 +627,9 @@ def api_workflow_deep_debugging():
 def api_donors_count():
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
-    return jsonify({"count": 0})
+    flag = (request.args.get("good_only") or "").strip().lower()
+    good_only = flag in ("1", "true", "yes")
+    return jsonify({"count": int(db_get_movie_pool_count(good_only=good_only))})
 
 
 @bp.route("/cycle-config/words-per-second", methods=["POST"])

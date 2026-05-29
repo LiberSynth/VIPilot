@@ -41,7 +41,7 @@ def main_loop():
             environment.wait_if_paused()
             environment.refresh_environment()
 
-            planning.run()
+            planning.tick()
 
             if environment.get_active_threads() < environment.max_threads:
                 batches = db_get_actionable_batches()
