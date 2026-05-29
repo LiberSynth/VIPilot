@@ -27,7 +27,7 @@ from db import (
     db_get_batch_video_data,
     db_get_movie_video_data,
     db_create_video_batch,
-    db_create_story_manual_batch,
+    db_create_story_batch,
     db_get_batch_logs,
     cycle_config_get,
     cycle_config_set,
@@ -42,7 +42,6 @@ from db import (
     db_set_movie_grade,
     db_upsert_story_draft,
     db_update_story_content,
-    db_create_story_autogenerate_batch,
     db_purge_unused_stories,
     db_delete_bad_movies,
     db_set_model_grade,
@@ -627,10 +626,7 @@ def api_workflow_deep_debugging():
 def api_donors_count():
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
-    from db import db_get_donor_count
-
-    good_only = request.args.get("good_only") == "1"
-    return jsonify({"count": db_get_donor_count(good_only=good_only)})
+    return jsonify({"count": 0})
 
 
 @bp.route("/cycle-config/words-per-second", methods=["POST"])
@@ -1206,14 +1202,12 @@ def api_production_video_generate():
     data = request.get_json(silent=True) or {}
     model_id = data.get("model_id") or None
     story_id = data.get("story_id") or None
-    if not story_id:
-        return jsonify({"error": "story_id_required"}), 400
     if model_id:
         batch_id = db_create_video_batch(
-            "movie_manual", movie_model_id=model_id, story_id=story_id
+            "movie", movie_model_id=model_id, story_id=story_id
         )
     else:
-        batch_id = db_create_video_batch("movie_manual", story_id=story_id)
+        batch_id = db_create_video_batch("movie", story_id=story_id)
     if not batch_id:
         return jsonify({"error": "db_error"}), 500
     environment.wakeup_loop()
@@ -1230,10 +1224,7 @@ def api_production_story_generate():
         return err
     data = request.get_json(silent=True) or {}
     model_id = data.get("model_id") or None
-    if model_id:
-        batch_id = db_create_story_manual_batch(model_id)
-    else:
-        batch_id = db_create_story_autogenerate_batch()
+    batch_id = db_create_story_batch(model_id)
     if not batch_id:
         return jsonify({"error": "db_error"}), 500
     environment.wakeup_loop()

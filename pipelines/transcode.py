@@ -99,6 +99,10 @@ def run(batch_id, log_id):
     if not batch:
         db_log_update(log_id, "Батч не найден", "error")
         return
+    if batch.get('type') == 'movie':
+        db_log_update(log_id, "Транскодирование для movie-батча отключено на текущем этапе", "ok")
+        write_log_entry(log_id, fmt_id_msg("[transcode] Батч {} type=movie — шаг пропущен", batch_id), level='silent')
+        return
     write_log_entry(
         log_id,
         fmt_id_msg(

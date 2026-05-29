@@ -50,6 +50,7 @@ def bootstrap():
                 CREATE TABLE IF NOT EXISTS batches (
                     id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                     type         TEXT,
+                    batch_id_source UUID,
                     story_id     UUID,
                     movie_id     UUID,
                     status       TEXT,
@@ -100,6 +101,7 @@ def bootstrap():
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS movies (
                     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    story_id        UUID,
                     model_id        UUID,
                     url             TEXT,
                     grade           TEXT,
@@ -170,6 +172,18 @@ def bootstrap():
             """)
 
             # ------------------------------------------------------------------
+            # Additive migrations (idempotent, no FK)
+            # ------------------------------------------------------------------
+            cur.execute("""
+                ALTER TABLE batches
+                ADD COLUMN IF NOT EXISTS batch_id_source UUID
+            """)
+            cur.execute("""
+                ALTER TABLE movies
+                ADD COLUMN IF NOT EXISTS story_id UUID
+            """)
+
+            # ------------------------------------------------------------------
             # Legacy cleanup
             # ------------------------------------------------------------------
             cur.execute("DELETE FROM cycle_config WHERE key = 'approve_stories'")
@@ -218,6 +232,10 @@ def bootstrap():
             cur.execute("""
                 CREATE INDEX IF NOT EXISTS idx_batches_story_id
                     ON batches (story_id)
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_batches_batch_id_source
+                    ON batches (batch_id_source)
             """)
             cur.execute("""
                 CREATE INDEX IF NOT EXISTS idx_batches_movie_id
@@ -270,6 +288,10 @@ def bootstrap():
             cur.execute("""
                 CREATE INDEX IF NOT EXISTS idx_movies_model_id
                     ON movies (model_id)
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_movies_story_id
+                    ON movies (story_id)
             """)
             cur.execute("""
                 CREATE INDEX IF NOT EXISTS idx_movies_grade

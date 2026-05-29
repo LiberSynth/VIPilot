@@ -4,7 +4,7 @@
   var _generationStatus = null;
 
   var _FINAL_STATUSES = [
-    'published', 'published_partially', 'movie_manual', 'story_manual',
+    'published', 'published_partially', 'movie_manual', 'ready',
     'cancelled', 'error', 'fatal_error',
     'video_error', 'transcode_error', 'publish_error', 'donated',
   ];

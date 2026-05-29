@@ -49,8 +49,9 @@ def main_loop():
                     if environment.get_active_threads() >= environment.max_threads:
                         break
                     bid    = str(b['id'])
+                    btype  = b['type']
                     status = b['status']
-                    pipeline_module = get_pipeline(status)
+                    pipeline_module = get_pipeline(btype, status)
                     if pipeline_module is None:
                         continue
                     if pipeline_module is publish and publish.is_scheduled(b):

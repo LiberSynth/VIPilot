@@ -606,7 +606,7 @@ var setDraftStoryFromRecord;
 (function() {
   var _DEFAULT_HINT = 'Вы можете сгенерировать контент при помощи AI-модели.';
   var _FINAL_STATUSES = [
-    'published', 'published_partially', 'movie_manual', 'story_manual',
+    'published', 'published_partially', 'movie_manual', 'ready',
     'cancelled', 'error', 'fatal_error',
     'video_error', 'transcode_error', 'publish_error', 'donated',
   ];
@@ -635,7 +635,7 @@ var setDraftStoryFromRecord;
       onBatchFinal: function(_batchId, data) {
         var status = String((data && data.batch_status) || '');
         var storyId = data ? data.story_id : null;
-        if (status === 'story_manual' && storyId) {
+        if (status === 'ready' && storyId) {
           fetch('/api/story/' + encodeURIComponent(storyId))
             .then(function(r) { return r.json(); })
             .then(function(s) {

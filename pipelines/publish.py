@@ -180,6 +180,10 @@ def run(batch_id, log_id):
     if not batch:
         db_log_update(log_id, "Батч не найден", "error")
         return
+    if batch.get('type') == 'movie':
+        db_log_update(log_id, "Публикация для movie-батча отключена на текущем этапе", "ok")
+        write_log_entry(log_id, fmt_id_msg("[publish] Батч {} type=movie — шаг пропущен", batch_id), level='silent')
+        return
 
     status = batch['status']
     active_targets = db_get_active_targets()

@@ -503,9 +503,8 @@ def db_get_graded_stories():
 def db_get_used_stories() -> list:
     used_cond = (
         "EXISTS ("
-        "SELECT 1 FROM batches b"
-        " JOIN movies m ON m.id = b.movie_id"
-        " WHERE b.story_id = s.id AND b.movie_id IS NOT NULL"
+        "SELECT 1 FROM movies m"
+        " WHERE m.story_id = s.id"
         " AND m.grade = 'good')"
     )
     with get_db() as conn:

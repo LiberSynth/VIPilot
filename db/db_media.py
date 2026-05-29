@@ -38,8 +38,14 @@ def db_create_batch_movie(batch_id, video_data: bytes, video_url: str, model_id=
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "INSERT INTO movies (url, model_id) VALUES (%s, %s) RETURNING id",
-                (video_url, model_id),
+                "SELECT story_id FROM batches WHERE id = %s",
+                (batch_id,),
+            )
+            row = cur.fetchone()
+            story_id = row[0] if row else None
+            cur.execute(
+                "INSERT INTO movies (story_id, url, model_id) VALUES (%s, %s, %s) RETURNING id",
+                (story_id, video_url, model_id),
             )
             movie_id = str(cur.fetchone()[0])
             cur.execute(
@@ -74,7 +80,7 @@ def db_save_video_job_and_set_pending(batch_id, job_data):
                    WHERE id = %s""",
                 (json.dumps(job_data), batch_id),
             )
-        db_set_batch_status(batch_id, 'video_pending', conn)
+        db_set_batch_status(batch_id, 'pending', conn)
 
 
 def db_save_transcoded_data(batch_id, video_data: bytes):

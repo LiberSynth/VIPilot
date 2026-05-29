@@ -1,16 +1,15 @@
 KNOWN_BATCH_STATUSES = frozenset({
-    'pending', 'story_generating',
-    'story_ready', 'video_generating', 'video_pending',
+    'pending', 'generating', 'ready',
+    'video_generating', 'video_pending',
     'video_ready', 'transcoding',
     'transcode_ready',
-    'story_manual',
     'cancelled', 'error', 'movie_manual', 'donated', 'reserved',
     'video_error', 'transcode_error', 'publish_error', 'published',
     'published_partially', 'fatal_error',
 })
 
 FINAL_BATCH_STATUSES = (
-    'published', 'published_partially', 'movie_manual', 'story_manual',
+    'published', 'published_partially', 'movie_manual', 'ready',
     'cancelled', 'error', 'fatal_error',
     'video_error', 'transcode_error', 'publish_error',
     'donated', 'reserved',
@@ -18,7 +17,7 @@ FINAL_BATCH_STATUSES = (
 
 PIPELINE_RESET_STATUS = {
     'story':     'pending',
-    'video':     'story_ready',
+    'video':     'ready',
     'transcode': 'video_ready',
     'publish':   'transcode_ready',
 }

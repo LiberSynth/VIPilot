@@ -1,13 +1,12 @@
 """
 Pipeline 3 — Генерация видео.
 
-Принимает batch_id, определяет нужно ли возобновление (video_pending)
-или новая генерация (story_ready), отправляет промпт в fal.ai,
+Принимает batch_id, определяет нужно ли возобновление (pending+request_id)
+или новая генерация (pending/generating), отправляет промпт в fal.ai,
 поллит статус и сохраняет video_url в batches.
 
 Статусы батча:
-  story_ready → video_generating → video_pending → video_ready
-                                                  → video_error
+  pending → generating → pending → ready
 """
 
 
@@ -17,7 +16,6 @@ from db import (
     settings_get,
     cycle_config_get,
     db_get_batch_by_id,
-    db_get_active_targets,
     db_update_batch_current_movie_model_id,
     db_claim_batch_status,
     db_get_story_text,
@@ -27,9 +25,8 @@ from db import (
     db_save_video_job_and_set_pending,
     db_set_batch_status,
     db_create_batch_movie,
-    db_transfer_donor_movie,
 )
-from log import write_log, db_log_update, write_log_entry
+from log import db_log_update, write_log_entry
 from pipelines.base import check_cancelled, iterate_models
 from common.exceptions import AppException
 from clients import falai, grok, skyreels
@@ -45,11 +42,6 @@ def _video_client(platform_name: str):
     if platform_name == 'SkyReels':
         return skyreels
     return falai
-
-
-class AspectRatioConflictError(Exception):
-    """Raised when active targets have different aspect ratios."""
-
 
 def _is_content_moderation_error(err_text: str) -> bool:
     low = (err_text or '').lower()
@@ -71,22 +63,25 @@ def run(batch_id, log_id):
             level='silent',
         )
 
-        # Три допустимых входных статуса:
-        # - video_pending:    handshake с провайдером уже существует — это подхват
-        #                     прерванного поллинга. Генерацию не перезапускаем.
-        # - story_ready:      сюжет готов, видео ещё не стартовало. CAS-переход
-        #                     story_ready → video_generating защищает от двойного подхвата:
-        #                     если другой воркер успел раньше, возвращаем 0 строк → выходим.
-        # - video_generating: пайплайн был прерван после CAS, но до первого submit.
-        #                     Подхватываем без повторного CAS (статус уже выставлен).
-        if status == 'video_pending':
-            resumed = True
-        elif status in ('story_ready', 'video_generating'):
-            resumed = False
-            if status == 'story_ready':
-                if not db_claim_batch_status(batch_id, 'story_ready', 'video_generating'):
+        # Два допустимых входных статуса:
+        # - pending:
+        #   a) pending + request_id в data  -> resume поллинга
+        #   b) pending + no request_id      -> CAS pending -> generating
+        # - generating: прерывание до первого submit, продолжаем без CAS.
+        batch_data = batch.get('data') or {}
+        saved_request_id = (
+            batch_data.get('request_id') if isinstance(batch_data, dict) else None
+        )
+        if status == 'pending':
+            if saved_request_id:
+                resumed = True
+            else:
+                resumed = False
+                if not db_claim_batch_status(batch_id, 'pending', 'generating'):
                     db_log_update(log_id, "Захват батча не удался — пропуск", "cancelled")
                     return
+        elif status == 'generating':
+            resumed = False
         else:
             db_log_update(log_id, "Пайплайн уже выполнен — пропуск", "ok")
             return
@@ -96,82 +91,27 @@ def run(batch_id, log_id):
             level='silent',
         )
 
-        # is_manual: батч создан вручную для генерации конкретной модели (movie_manual).
-        # Для ручного батча aspect ratio жёстко 9:16 — результат идёт на просмотр, а не в эфир.
-        # Для slot/adhoc aspect ratio берётся из конфигурации активного таргета.
-        # Конфликт соотношений у нескольких таргетов — фатальная ошибка конфигурации.
-        is_manual       = batch['type'] == 'movie_manual'
-        if is_manual:
-            target = 'ручной'
-            ar_x   = 9
-            ar_y   = 16
-        else:
-            active_targets = db_get_active_targets()
-            if len(active_targets) > 1:
-                ratios = {
-                    (t.get('aspect_ratio_x') or 9, t.get('aspect_ratio_y') or 16)
-                    for t in active_targets
-                }
-                if len(ratios) > 1:
-                    details = ', '.join(
-                        f"{t.get('name','?')} → {t.get('aspect_ratio_x') or 9}:{t.get('aspect_ratio_y') or 16}"
-                        for t in active_targets
-                    )
-                    raise AspectRatioConflictError(
-                        f"Конфликт соотношений сторон у активных таргетов: {details}"
-                    )
-            tgt    = active_targets[0] if active_targets else {}
-            target = tgt.get('name') or 'adhoc'
-            ar_x   = tgt.get('aspect_ratio_x') or 9
-            ar_y   = tgt.get('aspect_ratio_y') or 16
+        if batch.get('type') != 'movie':
+            msg = f"Неподдерживаемый тип батча для video-пайплайна: {batch.get('type')}"
+            db_log_update(log_id, msg, 'error')
+            write_log_entry(log_id, msg, level='error')
+            raise AppException(batch_id, 'video', msg, log_id)
+
+        # movie stage всегда запускается как ручная генерация из режиссёра.
+        is_manual = True
+        target = 'ручной'
+        ar_x = 9
+        ar_y = 16
         write_log_entry(
             log_id,
             fmt_id_msg("[video] Батч {} — phase=target_resolved, target={}, manual={}, ar={}:{}", batch_id, target, is_manual, ar_x, ar_y),
             level='silent',
         )
 
-        # Режим пула (donor): только для slot/adhoc и только при первом запуске (not resumed).
-        # Story-пайплайн уже записал donor_batch_id в batches.data; здесь переносим
-        # готовое видео из донорского батча, минуя генерацию полностью.
-        # Для manual-батча пул не используется — нам важен результат конкретной модели.
-        if not resumed and not is_manual:
-            batch_data = batch.get('data') or {}
-            donor_batch_id = batch_data.get('donor_batch_id') if isinstance(batch_data, dict) else None
-            if donor_batch_id:
-                if not check_cancelled('video', batch_id, batch, log_id):
-                    write_log_entry(log_id, "Режим пула — переносим видео.")
-                    write_log_entry(log_id, fmt_id_msg("[video] Батч {} — режим пула, переносим видео из пула {}", batch_id, donor_batch_id), level='silent')
-                    db_log_update(log_id, 'Видео получено из пула', 'running')
-                    result_donor_id = db_transfer_donor_movie(donor_batch_id, batch_id)
-                    if result_donor_id:
-                        updated = db_get_batch_by_id(batch_id)
-                        new_status = updated['status'] if updated else None
-                        detail = fmt_id_msg("Видео подобрано из пула {}", donor_batch_id)
-                        db_log_update(log_id, detail, 'ok')
-                        write_log_entry(log_id, "Видео подобрано из пула.")
-                        if new_status == 'transcode_ready':
-                            # Обоснованное исключение: транскод-пайплайн не будет запущен,
-                            # т.к. статус уже transcode_ready; запись создаётся здесь,
-                            # чтобы в мониторе отображался лог для пропущенного шага.
-                            tr_log_id = write_log(
-                                'transcode', 'Транскодирование пропущено — видео получено из пула',
-                                status='ok', batch_id=batch_id,
-                            )
-                            write_log_entry(tr_log_id, detail)
-                        write_log_entry(log_id, fmt_id_msg("[video] Батч {} — видео из пула, новый статус: {}", batch_id, new_status), level='silent')
-                    else:
-                        msg = fmt_id_msg("Не удалось получить видео из пула {}", donor_batch_id)
-                        db_log_update(log_id, msg, 'error')
-                        write_log_entry(log_id, msg, level='error')
-                        write_log_entry(log_id, f"[video] {msg}", level='silent')
-                        raise AppException(batch_id, 'video', msg, log_id)
-                    return
-
         story_id        = batch.get('story_id')
         if story_id is None:
-            raise RuntimeError('story_id отсутствует у батча в статусе story_ready/video_generating — ошибка логики')
+            raise RuntimeError('story_id отсутствует у батча movie в статусе pending/generating — ошибка логики')
         story_id        = str(story_id)
-        batch_data      = batch.get('data') or {}
         pinned_model_id = batch_data.get('movie_model_id') if isinstance(batch_data, dict) else None
 
         video_duration = max(1, min(60, cycle_config_get('video_duration')))
@@ -324,7 +264,6 @@ def run(batch_id, log_id):
                         db_log_update(log_id, msg, 'error')
                         write_log_entry(log_id, msg, level='error')
                         write_log_entry(log_id, f"[video] {msg}", level='silent')
-                        db_set_batch_status(batch_id, 'video_error')
                         raise AppException(batch_id, 'video', msg, log_id)
                 else:
                     write_log_entry(
@@ -429,7 +368,6 @@ def run(batch_id, log_id):
                     db_log_update(log_id, msg, 'error')
                     write_log_entry(log_id, msg, level='error')
                     write_log_entry(log_id, f"[video] {msg}", level='silent')
-                    db_set_batch_status(batch_id, 'video_error')
                     raise AppException(batch_id, 'video', msg, log_id)
             else:
                 write_log_entry(
@@ -504,10 +442,10 @@ def run(batch_id, log_id):
                 write_log_entry(log_id, f"[video] {msg}", level='silent')
                 write_log_entry(
                     log_id,
-                    fmt_id_msg("[video] Батч {} — phase=models_exhausted, action=story_ready", batch_id),
+                    fmt_id_msg("[video] Батч {} — phase=models_exhausted, action=ready", batch_id),
                     level='silent',
                 )
-                db_set_batch_status(batch_id, 'story_ready')
+                db_set_batch_status(batch_id, 'ready')
                 return
 
         write_log_entry(log_id, 'Скачиваю оригинал от провайдера.')
@@ -525,23 +463,17 @@ def run(batch_id, log_id):
             write_log_entry(log_id, f"[video] {msg}", level='silent')
             raise AppException(batch_id, 'video', msg, log_id)
 
-        db_set_batch_status(batch_id, 'video_ready')
+        db_set_batch_status(batch_id, 'ready')
         msg = f'Видео сгенерировано ({used_model})' if used_model else 'Видео сгенерировано'
         db_log_update(log_id, msg, 'ok')
-        write_log_entry(log_id, 'Готово: batch → video_ready')
+        write_log_entry(log_id, 'Готово: batch → ready')
         write_log_entry(log_id, f"[video] URL: {video_url}", level='silent')
         write_log_entry(
             log_id,
-            fmt_id_msg("[video] Батч {} — phase=run_done, status=video_ready, model_id={}", batch_id, used_model_id),
+            fmt_id_msg("[video] Батч {} — phase=run_done, status=ready, model_id={}", batch_id, used_model_id),
             level='silent',
         )
 
-    except AspectRatioConflictError as e:
-        msg = str(e)
-        db_log_update(log_id, msg, 'error')
-        write_log_entry(log_id, msg, level='error')
-        write_log_entry(log_id, f"[video] {msg}", level='silent')
-        raise AppException(batch_id, 'video', msg, log_id)
     except ProviderFatalError as e:
         msg = f"Фатальная ошибка провайдера: {e}"
         db_log_update(log_id, msg, 'error')

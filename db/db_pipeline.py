@@ -15,6 +15,38 @@ def _movie_video_file_exists(movie_id: str, field: str) -> bool:
     return (_VIDEO_DIR / f"{movie_id} - {field}.mp4").exists()
 
 
+def _claim_story_from_pool(cur) -> str | None:
+    cur.execute(
+        """
+        SELECT id::text
+        FROM stories
+        WHERE grade = 'good'
+        ORDER BY created_at DESC, id DESC
+        LIMIT 1
+        FOR UPDATE SKIP LOCKED
+        """
+    )
+    row = cur.fetchone()
+    return row[0] if row else None
+
+
+def _get_story_source_batch_id(cur, story_id: str | None) -> str | None:
+    if not story_id:
+        return None
+    cur.execute(
+        """
+        SELECT id::text
+        FROM batches
+        WHERE type = 'story' AND story_id = %s::uuid
+        ORDER BY created_at DESC, id DESC
+        LIMIT 1
+        """,
+        (story_id,),
+    )
+    row = cur.fetchone()
+    return row[0] if row else None
+
+
 def db_ensure_batch(scheduled_at):
     with get_db() as conn:
         with conn.cursor() as cur:
@@ -63,40 +95,19 @@ def db_create_video_batch(batch_type, movie_model_id=None, story_id=None):
     )
     with get_db() as conn:
         with conn.cursor() as cur:
-            if story_id:
-                cur.execute(
-                    """
-                    INSERT INTO batches (type, story_id, data)
-                    VALUES (%s, %s, %s)
-                    RETURNING id
-                    """,
-                    (batch_type, story_id, data),
-                )
-            else:
-                cur.execute(
-                    """
-                    INSERT INTO batches (type, data)
-                    VALUES (%s, %s)
-                    RETURNING id
-                    """,
-                    (batch_type, data),
-                )
-            row = cur.fetchone()
-        batch_id = str(row[0])
-        db_set_batch_status(batch_id, 'pending', conn)
-    return batch_id
-
-
-def db_create_story_manual_batch(text_model_id):
-    with get_db() as conn:
-        with conn.cursor() as cur:
+            resolved_story_id = str(story_id) if story_id else None
+            if batch_type == "movie" and not resolved_story_id:
+                resolved_story_id = _claim_story_from_pool(cur)
+            if batch_type == "movie" and not resolved_story_id:
+                return None
+            batch_id_source = _get_story_source_batch_id(cur, resolved_story_id)
             cur.execute(
                 """
-                INSERT INTO batches (type, data)
-                VALUES ('story_manual', %s)
+                INSERT INTO batches (type, story_id, batch_id_source, data)
+                VALUES (%s, %s, %s, %s)
                 RETURNING id
                 """,
-                (json.dumps({"story_model_id": str(text_model_id)}),),
+                (batch_type, resolved_story_id, batch_id_source, data),
             )
             row = cur.fetchone()
         batch_id = str(row[0])
@@ -104,14 +115,22 @@ def db_create_story_manual_batch(text_model_id):
     return batch_id
 
 
-def db_create_story_autogenerate_batch():
+def db_create_story_batch(text_model_id: str | None = None):
+    data = (
+        json.dumps({"story_model_id": str(text_model_id)})
+        if text_model_id
+        else None
+    )
     with get_db() as conn:
         with conn.cursor() as cur:
-            cur.execute("""
-                INSERT INTO batches (type)
-                VALUES ('story_manual')
+            cur.execute(
+                """
+                INSERT INTO batches (type, data)
+                VALUES ('story', %s)
                 RETURNING id
-            """)
+                """,
+                (data,),
+            )
             row = cur.fetchone()
         batch_id = str(row[0])
         db_set_batch_status(batch_id, 'pending', conn)
@@ -133,16 +152,6 @@ def db_update_batch_current_movie_model_id(batch_id, model_id):
         conn.commit()
 
 
-def db_finalize_story_manual(batch_id, story_id):
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "UPDATE batches SET story_id = %s WHERE id = %s",
-                (story_id, batch_id),
-            )
-        db_set_batch_status(batch_id, "story_manual", conn)
-
-
 def db_set_batch_story(batch_id, story_id):
     with get_db() as conn:
         with conn.cursor() as cur:
@@ -150,7 +159,8 @@ def db_set_batch_story(batch_id, story_id):
                 "UPDATE batches SET story_id = %s WHERE id = %s",
                 (story_id, batch_id),
             )
-        db_set_batch_status(batch_id, "story_ready", conn)
+        db_set_batch_status(batch_id, "ready", conn)
+    return True
 
 
 def db_link_batch_story_only(batch_id, story_id):
@@ -224,13 +234,8 @@ def db_claim_unused_story_for_batch(batch_id: str) -> dict | None:
             cur.execute("""
                 SELECT id::text, title, content
                 FROM stories
-                WHERE id NOT IN (
-                    SELECT story_id
-                    FROM batches
-                    WHERE story_id IS NOT NULL AND type != 'story_manual'
-                )
-                  AND grade = 'good'
-                ORDER BY created_at ASC, id ASC
+                WHERE grade = 'good'
+                ORDER BY created_at DESC, id DESC
                 LIMIT 1
                 FOR UPDATE SKIP LOCKED
             """)
@@ -242,7 +247,7 @@ def db_claim_unused_story_for_batch(batch_id: str) -> dict | None:
                 "UPDATE batches SET story_id = %s::uuid WHERE id = %s::uuid",
                 (story_id, batch_id),
             )
-        db_set_batch_status(batch_id, 'story_ready', conn)
+        db_set_batch_status(batch_id, 'ready', conn)
     return {"id": story_id, "title": row[1] or "", "content": row[2] or ""}
 
 
@@ -251,35 +256,6 @@ def db_claim_donor_batch(batch_id: str, good_only: bool = False) -> None:
         with conn.cursor() as cur:
             cur.execute("SELECT claim_donor_batch(%s::uuid, %s)", (batch_id, good_only))
         conn.commit()
-
-
-def db_set_batch_story_ready_from_donor(
-    batch_id: str, donor_batch_id: str, donor_story_id: str | None
-):
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                UPDATE batches
-                SET story_id = COALESCE(story_id, %s),
-                    data     = COALESCE(data, '{}'::jsonb) || jsonb_build_object('donor_batch_id', %s)
-                WHERE id = %s
-                RETURNING story_id
-                """,
-                (donor_story_id, donor_batch_id, batch_id),
-            )
-            row = cur.fetchone()
-            used_story_id = row[0] if row else None
-            if (
-                donor_story_id
-                and used_story_id
-                and str(used_story_id) == str(donor_story_id)
-            ):
-                cur.execute(
-                    "UPDATE batches SET story_id = NULL WHERE id = %s::uuid",
-                    (donor_batch_id,),
-                )
-        db_set_batch_status(batch_id, 'story_ready', conn)
 
 
 def db_transfer_donor_movie(donor_batch_id: str, batch_id: str) -> str | None:
@@ -332,11 +308,11 @@ def db_get_actionable_batches():
     with get_db() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("""
-                SELECT id, status, created_at, scheduled_at
+                SELECT id, type, status, created_at, scheduled_at
                 FROM batches
                 WHERE status IN (
-                    'pending', 'story_generating',
-                    'story_ready', 'video_generating', 'video_pending',
+                    'pending', 'generating',
+                    'video_generating', 'video_pending',
                     'video_ready', 'transcoding',
                     'transcode_ready'
                 )
@@ -353,7 +329,7 @@ def db_get_batch_by_id(batch_id):
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
                 """
-                SELECT b.id, b.scheduled_at, b.type, b.story_id,
+                SELECT b.id, b.scheduled_at, b.type, b.batch_id_source, b.story_id,
                        m.url AS video_url, b.status, b.data,
                        m.model_id AS video_model_id,
                        b.movie_id, b.title
@@ -387,8 +363,7 @@ def db_is_batch_scheduled(scheduled_at, batch_type="slot"):
 
 def db_reset_stalled_batches() -> list[dict]:
     static_resets = [
-        ("story_generating", "pending"),
-        ("video_generating", "story_ready"),
+        ("generating", "pending"),
     ]
     affected = []
     with get_db() as conn:

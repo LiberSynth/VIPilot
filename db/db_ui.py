@@ -79,9 +79,8 @@ def db_get_batch_logs(batch_id):
 
 def _build_stories_used_expr() -> str:
     return """EXISTS (
-                    SELECT 1 FROM batches b
-                    JOIN movies m ON m.id = b.movie_id
-                    WHERE b.story_id = s.id AND b.movie_id IS NOT NULL
+                    SELECT 1 FROM movies m
+                    WHERE m.story_id = s.id
                       AND m.grade = 'good'
                 )"""
 
@@ -150,9 +149,8 @@ def db_get_stories_list(show_used=True, show_bad=True, for_approval=False, pin_i
                           AND b.status NOT IN ({final_statuses_sql})
                     ) AS has_active_batch,
                     EXISTS (
-                        SELECT 1 FROM batches b
-                        WHERE b.story_id = s.id
-                          AND b.movie_id IS NOT NULL
+                        SELECT 1 FROM movies m
+                        WHERE m.story_id = s.id
                     ) AS has_movie
                 FROM stories s
                 LEFT JOIN ai_models am ON am.id = s.model_id
@@ -235,14 +233,7 @@ def db_get_movies_list(show_published=True, show_bad=True, for_approval=False, p
                     s.id::text AS story_id
                 FROM movies m
                 LEFT JOIN ai_models vm ON vm.id = m.model_id
-                LEFT JOIN LATERAL (
-                    SELECT b.story_id
-                    FROM batches b
-                    WHERE b.movie_id = m.id AND b.story_id IS NOT NULL
-                    ORDER BY b.created_at DESC, b.id DESC
-                    LIMIT 1
-                ) lb ON TRUE
-                LEFT JOIN stories s ON s.id = lb.story_id
+                LEFT JOIN stories s ON s.id = m.story_id
                 LEFT JOIN LATERAL (
                     SELECT bp.movie_id
                     FROM batches bp
@@ -252,11 +243,10 @@ def db_get_movies_list(show_published=True, show_bad=True, for_approval=False, p
                 LEFT JOIN LATERAL (
                     SELECT b2.id
                     FROM batches b2
-                    WHERE b2.story_id = lb.story_id
-                      AND b2.type != 'story_manual'
+                    WHERE b2.story_id = m.story_id
+                      AND b2.type = 'movie'
                       AND b2.status IN (
-                          'pending', 'story_generating', 'story_ready',
-                          'video_generating', 'video_pending'
+                          'pending', 'generating'
                       )
                     ORDER BY b2.created_at DESC, b2.id DESC
                     LIMIT 1
@@ -288,10 +278,8 @@ def db_get_stories_pool() -> list:
                 FROM stories
                 WHERE grade = 'good'
                   AND NOT EXISTS (
-                      SELECT 1 FROM batches b
-                      JOIN movies m ON m.id = b.movie_id
-                      WHERE b.story_id = stories.id
-                        AND b.movie_id IS NOT NULL
+                      SELECT 1 FROM movies m
+                      WHERE m.story_id = stories.id
                         AND m.grade = 'good'
                   )
                 ORDER BY created_at DESC, id DESC
@@ -308,9 +296,9 @@ def db_count_good_pool() -> int:
                 WHERE grade = 'good'
                   AND
                   NOT EXISTS (
-                      SELECT 1 FROM batches b
-                      WHERE b.story_id = stories.id
-                        AND b.type != 'story_manual'
+                      SELECT 1 FROM movies m
+                      WHERE m.story_id = stories.id
+                        AND m.grade = 'good'
                   )
             """)
             row = cur.fetchone()
