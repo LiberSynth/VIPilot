@@ -3,6 +3,7 @@
 """
 
 _ALLOWED_PIPELINES = {
+    "api",
     "planning",
     "story",
     "video",
@@ -79,16 +80,19 @@ def write_log_entry(log_id, message, level="info"):
         notify_failure(f"log#{log_id}: {message}")
 
 
-def log_batch_planned(batch_id, message, *entries):
-    """Создаёт запись pipeline='planning' в log и добавляет субзаписи в log_entries.
+def log_batch_planned(batch_id, message, *entries, pipeline='planning'):
+    """Создаёт запись log для события создания/постановки батча.
 
-    Используется при любом создании батча пользователем или планировщиком.
+    pipeline:
+    - 'planning' — событие от планировщика
+    - 'api'      — событие от HTTP API
+
     batch_id — идентификатор батча.
     message  — короткий заголовок (будет записан в log.message).
     entries  — список строк, каждая добавляется как отдельная субзапись.
     Возвращает log_id или None.
     """
-    log_id = write_log('planning', message, status='ok', batch_id=batch_id)
+    log_id = write_log(pipeline, message, status='ok', batch_id=batch_id)
     if log_id:
         for entry_msg in entries:
             write_log_entry(log_id, entry_msg)

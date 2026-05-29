@@ -246,7 +246,7 @@ def db_get_movies_list(show_published=True, show_bad=True, for_approval=False, p
                     WHERE b2.story_id = m.story_id
                       AND b2.type = 'movie'
                       AND b2.status IN (
-                          'pending', 'generating'
+                          'pending', 'generating', 'generated'
                       )
                     ORDER BY b2.created_at DESC, b2.id DESC
                     LIMIT 1

@@ -6,6 +6,7 @@ _TYPE_STATUS_TO_PIPELINE = {
     ('story', 'generating'): story,
     ('movie', 'pending'):    video,
     ('movie', 'generating'): video,
+    ('movie', 'generated'):  video,
 }
 
 _LEGACY_STATUS_TO_PIPELINE = {

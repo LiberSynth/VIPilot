@@ -2,6 +2,7 @@
   const PIPELINE_LABELS = {
     root:        'Система',
     system:      'Система',
+    api:         'API',
     planning:    'Планирование',
     story:       'Сюжет',
     video:       'Видео',

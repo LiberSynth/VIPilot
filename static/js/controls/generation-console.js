@@ -321,11 +321,11 @@ class GenerationConsoleController {
 
   _formatEntryLine(entry, requestIndex) {
     var ts = this._formatTime(entry.created_at);
-    var prefix = '';
+    var requestTag = '';
     if (this._multiRequestMode && requestIndex) {
-      prefix = '[Запрос ' + requestIndex + '] ';
+      requestTag = '[Запрос ' + requestIndex + '] ';
     }
-    return prefix + '[' + ts + '] ' + String(entry.message || '');
+    return '[' + ts + '] ' + requestTag + String(entry.message || '');
   }
 
   _formatTime(iso) {

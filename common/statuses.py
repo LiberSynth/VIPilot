@@ -1,5 +1,5 @@
 KNOWN_BATCH_STATUSES = frozenset({
-    'pending', 'generating', 'ready',
+    'pending', 'generating', 'generated', 'ready',
     'video_generating', 'video_pending',
     'video_ready', 'transcoding',
     'transcode_ready',
@@ -17,7 +17,7 @@ FINAL_BATCH_STATUSES = (
 
 PIPELINE_RESET_STATUS = {
     'story':     'pending',
-    'video':     'ready',
+    'video':     'pending',
     'transcode': 'video_ready',
     'publish':   'transcode_ready',
 }

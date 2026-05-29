@@ -298,7 +298,7 @@ def api_run_now():
     if not batch_id:
         return jsonify({"error": "Не удалось создать батч"}), 500
     log_batch_planned(
-        batch_id, "Оперативный запуск", "Запуск по запросу пользователя (внеплановый)"
+        batch_id, "Оперативный запуск", "Запуск по запросу пользователя (внеплановый)", pipeline='api'
     )
     environment.wakeup_loop()
     return jsonify({"ok": True, "batch_id": batch_id})
@@ -1202,17 +1202,16 @@ def api_production_video_generate():
     data = request.get_json(silent=True) or {}
     model_id = data.get("model_id") or None
     story_id = data.get("story_id") or None
-    if model_id:
-        batch_id = db_create_video_batch(
-            "movie", movie_model_id=model_id, story_id=story_id
-        )
-    else:
-        batch_id = db_create_video_batch("movie", story_id=story_id)
+    if not model_id:
+        return jsonify({"error": "model_id_required"}), 400
+    batch_id = db_create_video_batch(
+        "movie", model_id=model_id, story_id=story_id
+    )
     if not batch_id:
         return jsonify({"error": "db_error"}), 500
     environment.wakeup_loop()
     log_batch_planned(
-        batch_id, "Генерация видео вручную", "Запуск по запросу пользователя"
+        batch_id, "Генерация видео вручную", "Запуск по запросу пользователя", pipeline='api'
     )
     return jsonify({"batch_id": batch_id})
 
@@ -1229,7 +1228,7 @@ def api_production_story_generate():
         return jsonify({"error": "db_error"}), 500
     environment.wakeup_loop()
     log_batch_planned(
-        batch_id, "Генерация сюжета вручную", "Запуск по запросу пользователя"
+        batch_id, "Генерация сюжета вручную", "Запуск по запросу пользователя", pipeline='api'
     )
     return jsonify({"batch_id": batch_id})
 

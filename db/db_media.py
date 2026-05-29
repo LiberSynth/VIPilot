@@ -38,16 +38,33 @@ def db_create_batch_movie(batch_id, video_data: bytes, video_url: str, model_id=
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT story_id FROM batches WHERE id = %s",
+                "SELECT story_id, movie_id::text FROM batches WHERE id = %s FOR UPDATE",
                 (batch_id,),
             )
             row = cur.fetchone()
             story_id = row[0] if row else None
-            cur.execute(
-                "INSERT INTO movies (story_id, url, model_id) VALUES (%s, %s, %s) RETURNING id",
-                (story_id, video_url, model_id),
-            )
-            movie_id = str(cur.fetchone()[0])
+            existing_movie_id = row[1] if row else None
+
+            movie_id = None
+            if existing_movie_id:
+                cur.execute(
+                    """
+                    UPDATE movies
+                    SET story_id = %s, url = %s, model_id = %s
+                    WHERE id = %s::uuid
+                    """,
+                    (story_id, video_url, model_id, existing_movie_id),
+                )
+                if cur.rowcount:
+                    movie_id = str(existing_movie_id)
+
+            if not movie_id:
+                cur.execute(
+                    "INSERT INTO movies (story_id, url, model_id) VALUES (%s, %s, %s) RETURNING id",
+                    (story_id, video_url, model_id),
+                )
+                movie_id = str(cur.fetchone()[0])
+
             cur.execute(
                 "UPDATE batches SET movie_id = %s WHERE id = %s",
                 (movie_id, batch_id),
@@ -81,6 +98,31 @@ def db_save_video_job_and_set_pending(batch_id, job_data):
                 (json.dumps(job_data), batch_id),
             )
         db_set_batch_status(batch_id, 'pending', conn)
+
+
+def db_save_video_job_and_set_generating(batch_id, job_data):
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """UPDATE batches
+                   SET data = COALESCE(data::jsonb, '{}'::jsonb) || %s::jsonb
+                   WHERE id = %s""",
+                (json.dumps(job_data), batch_id),
+            )
+        db_set_batch_status(batch_id, 'generating', conn)
+
+
+def db_save_generated_video_url(batch_id, video_url: str):
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """UPDATE batches
+                   SET data = COALESCE(data::jsonb, '{}'::jsonb)
+                              || %s::jsonb
+                   WHERE id = %s""",
+                (json.dumps({"generated_video_url": video_url}), batch_id),
+            )
+        db_set_batch_status(batch_id, 'generated', conn)
 
 
 def db_save_transcoded_data(batch_id, video_data: bytes):
@@ -176,7 +218,8 @@ def db_create_manual_movie(title: str, video_data: bytes) -> str:
             )
             batch_id = str(cur.fetchone()[0])
             cur.execute(
-                "INSERT INTO movies (url, grade) VALUES (NULL, 'good') RETURNING id",
+                "INSERT INTO movies (story_id, url, grade) VALUES (%s, NULL, 'good') RETURNING id",
+                (story_id,),
             )
             movie_id = str(cur.fetchone()[0])
             cur.execute(

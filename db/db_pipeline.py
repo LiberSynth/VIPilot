@@ -89,9 +89,9 @@ def db_create_adhoc_batch():
     return batch_id
 
 
-def db_create_video_batch(batch_type, movie_model_id=None, story_id=None):
+def db_create_video_batch(batch_type, model_id=None, story_id=None):
     data = (
-        json.dumps({"movie_model_id": str(movie_model_id)}) if movie_model_id else None
+        json.dumps({"model_id": str(model_id)}) if model_id else None
     )
     with get_db() as conn:
         with conn.cursor() as cur:
@@ -135,21 +135,6 @@ def db_create_story_batch(text_model_id: str | None = None):
         batch_id = str(row[0])
         db_set_batch_status(batch_id, 'pending', conn)
     return batch_id
-
-
-def db_update_batch_current_movie_model_id(batch_id, model_id):
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                UPDATE batches
-                   SET data = COALESCE(data::jsonb, '{}'::jsonb)
-                           || jsonb_build_object('current_movie_model_id', %s::text)
-                 WHERE id = %s
-                """,
-                (str(model_id), batch_id),
-            )
-        conn.commit()
 
 
 def db_set_batch_story(batch_id, story_id):
@@ -311,7 +296,7 @@ def db_get_actionable_batches():
                 SELECT id, type, status, created_at, scheduled_at
                 FROM batches
                 WHERE status IN (
-                    'pending', 'generating',
+                    'pending', 'generating', 'generated',
                     'video_generating', 'video_pending',
                     'video_ready', 'transcoding',
                     'transcode_ready'
@@ -362,16 +347,16 @@ def db_is_batch_scheduled(scheduled_at, batch_type="slot"):
 
 
 def db_reset_stalled_batches() -> list[dict]:
-    static_resets = [
-        ("generating", "pending"),
+    typed_resets = [
+        ("story", "generating", "pending"),
     ]
     affected = []
     with get_db() as conn:
-        for old_status, new_status in static_resets:
+        for batch_type, old_status, new_status in typed_resets:
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT id FROM batches WHERE status = %s FOR UPDATE",
-                    (old_status,),
+                    "SELECT id FROM batches WHERE type = %s AND status = %s FOR UPDATE",
+                    (batch_type, old_status),
                 )
                 ids = [str(r[0]) for r in cur.fetchall()]
             for batch_id in ids:
