@@ -17,6 +17,9 @@ _FAL_KEY = os.environ.get('FAL_API_KEY', '')
 _POLL_INTERVAL = 30
 _POLL_MAX      = 240
 
+_DOWNLOAD_MAX_ATTEMPTS = 3
+_DOWNLOAD_RETRY_DELAY  = 5
+
 
 class ProviderFatalError(Exception):
     """Raised when a provider returns a permanent, non-retryable billing/account error."""
@@ -245,6 +248,25 @@ def download_video(log_id, video_url: str) -> bytes:
 
     :param log_id: идентификатор записи лога
     """
-    r = requests.get(video_url, timeout=120, stream=True)
-    r.raise_for_status()
-    return b''.join(r.iter_content(chunk_size=256 * 1024))
+    last_err = None
+    for attempt in range(1, _DOWNLOAD_MAX_ATTEMPTS + 1):
+        try:
+            r = requests.get(video_url, timeout=120, stream=True)
+            r.raise_for_status()
+            return b''.join(r.iter_content(chunk_size=256 * 1024))
+        except (requests.exceptions.RequestException, OSError) as e:
+            last_err = e
+            if attempt < _DOWNLOAD_MAX_ATTEMPTS:
+                write_log_entry(
+                    log_id,
+                    f"Ошибка скачивания (попытка {attempt}/{_DOWNLOAD_MAX_ATTEMPTS}): {e}",
+                    level='warn',
+                )
+                time.sleep(_DOWNLOAD_RETRY_DELAY)
+            else:
+                write_log_entry(
+                    log_id,
+                    f"Ошибка скачивания после {_DOWNLOAD_MAX_ATTEMPTS} попыток: {e}",
+                    level='error',
+                )
+    raise last_err

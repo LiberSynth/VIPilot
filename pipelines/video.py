@@ -55,6 +55,21 @@ def _clear_handshake_payload() -> dict:
     }
 
 
+def _video_pending_resume_target(batch_data) -> str | None:
+    """Если pending, но в data есть прогресс — куда подхватить без нового submit."""
+    if not isinstance(batch_data, dict):
+        return None
+    if batch_data.get('generated_video_url'):
+        return 'generated'
+    if (
+        batch_data.get('request_id')
+        and batch_data.get('status_url')
+        and batch_data.get('response_url')
+    ):
+        return 'generating'
+    return None
+
+
 def _download_and_finalize(batch_id, batch, log_id, batch_data, used_model, used_model_id):
     # Подхват после падения между сохранением файла и выставлением ready:
     # если movie_id уже есть и raw-файл доступен, просто доводим статус.
@@ -132,6 +147,17 @@ def run(batch_id, log_id):
             return
 
         batch_data = batch.get('data') or {}
+        if status == 'pending':
+            resume_target = _video_pending_resume_target(batch_data)
+            if resume_target:
+                if resume_target == 'generated':
+                    write_log_entry(log_id, 'Подхват: готовый URL — загрузка без нового запроса.')
+                else:
+                    write_log_entry(log_id, 'Подхват: возобновление опроса предыдущего запроса.')
+                db_set_batch_status(batch_id, resume_target)
+                status = resume_target
+                batch = db_get_batch_by_id(batch_id)
+                batch_data = (batch.get('data') or {}) if batch else batch_data
         model_id = batch_data.get('model_id') if isinstance(batch_data, dict) else None
         if not model_id:
             msg = "Для movie-батча не задан data.model_id"

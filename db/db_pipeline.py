@@ -477,10 +477,31 @@ def db_reset_stalled_batches() -> list[dict]:
     return affected
 
 
+def _video_reset_status(batch_data) -> str:
+    """Статус для перезапуска video: подхват URL/handshake вместо нового submit."""
+    if not isinstance(batch_data, dict):
+        return PIPELINE_RESET_STATUS['video']
+    if batch_data.get('generated_video_url'):
+        return 'generated'
+    if (
+        batch_data.get('request_id')
+        and batch_data.get('status_url')
+        and batch_data.get('response_url')
+    ):
+        return 'generating'
+    return PIPELINE_RESET_STATUS['video']
+
+
 def db_reset_batch_pipeline(batch_id: str, pipeline: str) -> bool:
-    target_status = PIPELINE_RESET_STATUS.get(pipeline)
-    if not target_status:
+    if pipeline not in PIPELINE_RESET_STATUS:
         return False
+    batch = db_get_batch_by_id(batch_id)
+    if not batch:
+        return False
+    if pipeline == 'video':
+        target_status = _video_reset_status(batch.get('data') or {})
+    else:
+        target_status = PIPELINE_RESET_STATUS[pipeline]
     db_set_batch_status(batch_id, target_status)
     return True
 
