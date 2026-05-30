@@ -100,11 +100,32 @@ def _m1004_backfill_movies_story_id(cur):
 
 
 def _m1005_mark_published_movies_used(cur):
-    """Mark movies used when they were published at least partially."""
+    """Mark published movies used and transcoded (already published — no re-transcode)."""
     cur.execute(
         """
         UPDATE movies m
-        SET used = B'1'
+        SET used = B'1',
+            transcoded = B'1'
+        WHERE EXISTS (
+            SELECT 1
+            FROM batches b
+            WHERE b.movie_id = m.id
+              AND (
+                  b.status IN ('published', 'published_partially')
+                  OR b.status LIKE '%.published'
+              )
+        )
+        """
+    )
+
+
+def _m1006_fix_published_movies_transcoded(cur):
+    """Backfill transcoded=1 for published movies (fix after _m1005 without transcoded)."""
+    cur.execute(
+        """
+        UPDATE movies m
+        SET used = B'1',
+            transcoded = B'1'
         WHERE EXISTS (
             SELECT 1
             FROM batches b
@@ -124,6 +145,7 @@ MIGRATIONS = [
     (2026052903, _m1003_backfill_transcode_schedule_from_planning),
     (2026052904, _m1004_backfill_movies_story_id),
     (2026052905, _m1005_mark_published_movies_used),
+    (2026052906, _m1006_fix_published_movies_transcoded),
 ]
 
 

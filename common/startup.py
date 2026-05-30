@@ -4,10 +4,9 @@ from flask import Flask
 
 from db import (
     db_reset_stalled_batches,
-    db_get_distinct_batch_statuses,
 )
 from db.connection import get_db
-from common.statuses import FINAL_BATCH_STATUSES, _assert_known_status
+from common.statuses import FINAL_BATCH_STATUSES
 from log.log import write_log, write_log_entry
 from utils.consts import FLASK_SECRET
 from utils.limiter import limiter
@@ -35,7 +34,6 @@ def init_app(app: Flask):
     _reset_stalled_batches()
     _interrupt_running_pipelines()
     _fix_orphaned_running()
-    _validate_batch_statuses()
 
 
 def _reset_stalled_batches():
@@ -106,9 +104,3 @@ def _fix_orphaned_running():
                     write_log_entry(None, f"[startup] {len(ids)} зависших 'running' записей → cancelled", level='silent')
     except Exception as e:
         write_log_entry(None, f"[DB] Ошибка _fix_orphaned_running: {e}", level='silent')
-
-
-def _validate_batch_statuses():
-    for status in db_get_distinct_batch_statuses():
-        _assert_known_status(status)
-    write_log_entry(None, "[startup] Все статусы батчей известны.", level='silent')

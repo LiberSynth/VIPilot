@@ -240,10 +240,56 @@ async function downloadBackup(btn) {
 }
 
 function uploadBackup(btn) {
+  new ConfirmDialog({
+    title: 'Загрузить все данные?',
+    text:
+      'База будет синхронизирована с YAML-файлами из выбранной папки: ' +
+      'записи обновятся, отсутствующие в папке — удалятся.<br><br>' +
+      'Перед загрузкой рекомендуется остановить движок.',
+    confirmLabel: 'Выбрать папку',
+    triggerBtn: btn,
+    onConfirm: function(_confirmBtn, dlg) {
+      dlg.close();
+      _openBackupUploadPicker(btn);
+    },
+  }).open();
+}
+
+function _openBackupUploadPicker(btn) {
+  if (typeof window.showDirectoryPicker === 'function') {
+    window.showDirectoryPicker({ mode: 'read' })
+      .then(function(dirHandle) {
+        var yamlFiles = [];
+        return _collectYamlFromDirHandle(dirHandle, yamlFiles).then(function() {
+          return _doUploadBackup(btn, yamlFiles);
+        });
+      })
+      .catch(function(e) {
+        if (e && e.name === 'AbortError') return;
+        if (typeof window.showToast === 'function') {
+          window.showToast('Не удалось прочитать папку: ' + ((e && e.message) || e), 'error');
+        }
+      });
+    return;
+  }
+
   var input = document.getElementById('_backup-upload-input');
+  if (!input) return;
   input.value = '';
   input.onchange = function() { _doUploadBackup(btn, input.files); };
   input.click();
+}
+
+async function _collectYamlFromDirHandle(dirHandle, out) {
+  for await (var entry of dirHandle.values()) {
+    if (entry.kind === 'file') {
+      if (/\.(yaml|yml)$/i.test(entry.name)) {
+        out.push(await entry.getFile());
+      }
+    } else if (entry.kind === 'directory') {
+      await _collectYamlFromDirHandle(entry, out);
+    }
+  }
 }
 
 async function _doUploadBackup(btn, files) {

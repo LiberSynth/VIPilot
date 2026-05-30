@@ -460,14 +460,6 @@ def db_set_target_active(target_id: str, active: bool) -> bool:
     return True
 
 
-def db_get_distinct_batch_statuses():
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT DISTINCT status FROM batches")
-            rows = cur.fetchall()
-    return {row[0] for row in rows}
-
-
 def db_get_last_pipeline_run(pipeline, scheduled_only: bool = False):
     with get_db() as conn:
         with conn.cursor() as cur:
