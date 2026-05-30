@@ -366,11 +366,42 @@ def db_create_publish_batches() -> list[str]:
                 RETURNING id::text
                 """
             )
-            rows = cur.fetchall()
-        for row in rows:
-            db_set_batch_status(str(row[0]), 'pending', conn)
+            rows = [str(r[0]) for r in cur.fetchall()]
+
+            cur.execute(
+                """
+                INSERT INTO batches (type, movie_id, story_id, batch_id_source, scheduled_at)
+                SELECT
+                    'publish',
+                    pl.movie_id,
+                    pl.story_id,
+                    pl.id,
+                    pl.scheduled_at
+                FROM batches pl
+                JOIN movies m ON m.id = pl.movie_id
+                WHERE pl.type = 'planning'
+                  AND pl.status = 'ready'
+                  AND pl.movie_id IS NOT NULL
+                  AND m.transcoded = B'1'
+                  AND (
+                      pl.scheduled_at IS NULL
+                      OR pl.scheduled_at <= clock_timestamp()
+                  )
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM batches pb
+                      WHERE pb.type = 'publish'
+                        AND pb.batch_id_source = pl.id
+                  )
+                RETURNING id::text
+                """
+            )
+            rows.extend(str(r[0]) for r in cur.fetchall())
+
+        for batch_id in rows:
+            db_set_batch_status(batch_id, 'pending', conn)
         conn.commit()
-    return [str(row[0]) for row in rows]
+    return rows
 
 
 def db_get_actionable_batches():
