@@ -177,6 +177,16 @@ function _schedulePubCounterSave() {
   el.addEventListener('change', _schedulePubCounterSave);
 })();
 
+function _backupYamlBasename(file) {
+  var raw = (file && (file.webkitRelativePath || file.name)) || '';
+  var parts = raw.split(/[/\\]/);
+  return parts[parts.length - 1] || raw;
+}
+
+function _backupTableFromFile(file) {
+  return _backupYamlBasename(file).replace(/\.(yaml|yml)$/i, '');
+}
+
 async function downloadBackup(btn) {
   var tables;
   try {
@@ -204,7 +214,7 @@ async function downloadBackup(btn) {
     if (dlg.isCancelled()) break;
     var table = tables[i];
     var filename = table + '.yaml';
-    dlg.setCurrentFile(filename);
+    dlg.setProgress(done, filename, i + 1);
     try {
       var tr = await fetch('/api/export-backup/' + encodeURIComponent(table));
       if (!tr.ok) throw new Error('http ' + tr.status);
@@ -257,22 +267,37 @@ async function _doUploadBackup(btn, files) {
   var done = 0;
   var failedItems = [];
 
+  yamlFiles.sort(function(a, b) {
+    return _backupTableFromFile(a).localeCompare(_backupTableFromFile(b));
+  });
+
   for (var i = 0; i < yamlFiles.length; i++) {
     if (dlg.isCancelled()) break;
     var f = yamlFiles[i];
-    var table = f.name.replace(/\.yaml$/, '');
-    dlg.setCurrentFile(f.name);
+    var basename = _backupYamlBasename(f);
+    var table = _backupTableFromFile(f);
+    dlg.setProgress(done, basename, i + 1);
     try {
       var fd = new FormData();
       fd.append('table', table);
       fd.append('file', f);
       var r = await fetch('/api/import-backup/table', { method: 'POST', body: fd });
-      if (!r.ok) throw new Error('http ' + r.status);
+      if (!r.ok) {
+        var errMsg = 'http ' + r.status;
+        try {
+          var errBody = await r.json();
+          if (errBody && errBody.error) errMsg = errBody.error;
+        } catch (ignore) {}
+        throw new Error(errMsg);
+      }
       done++;
-      dlg.setProgress(done, f.name);
+      dlg.setProgress(done, basename);
     } catch (e) {
       if (dlg.isCancelled()) break;
-      failedItems.push({ filename: f.name, reason: 'ошибка загрузки' });
+      failedItems.push({
+        filename: basename,
+        reason: (e && e.message) ? e.message : 'ошибка загрузки',
+      });
     }
   }
 
@@ -295,7 +320,7 @@ async function _retryDownloadBackup(btn, failedItems) {
   for (var i = 0; i < failedItems.length; i++) {
     if (dlg.isCancelled()) break;
     var filename = failedItems[i].filename;
-    dlg.setCurrentFile(filename);
+    dlg.setProgress(done, filename, i + 1);
     try {
       var table = filename.replace(/\.(yaml|yml)$/i, '');
       if (!table) throw new Error('bad filename');

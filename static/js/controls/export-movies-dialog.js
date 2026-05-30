@@ -38,7 +38,10 @@ class ExportMoviesDialog extends Dialog {
 
   onOpen() {
     var self = this;
-    var cancelBtn = document.getElementById('_emd-cancel');
+    this._barEl = this._el ? this._el.querySelector('#_emd-bar') : null;
+    this._counterEl = this._el ? this._el.querySelector('#_emd-counter') : null;
+    this._filenameEl = this._el ? this._el.querySelector('#_emd-filename') : null;
+    var cancelBtn = this._el ? this._el.querySelector('#_emd-cancel') : null;
     if (cancelBtn) {
       cancelBtn.addEventListener('click', function() {
         self._cancelled = true;
@@ -51,7 +54,8 @@ class ExportMoviesDialog extends Dialog {
   _handleKeyDown(e) {
     if (e.key === 'Tab') {
       e.preventDefault();
-      var btn = document.getElementById('_emd-cancel') || document.getElementById('_emd-close');
+      var btn = (this._el && this._el.querySelector('#_emd-cancel'))
+        || (this._el && this._el.querySelector('#_emd-close'));
       if (btn) btn.focus();
     }
   }
@@ -61,41 +65,46 @@ class ExportMoviesDialog extends Dialog {
   }
 
   setCurrentFile(filename) {
-    var fnEl = document.getElementById('_emd-filename');
-    if (fnEl) fnEl.textContent = filename || '';
+    if (this._filenameEl) this._filenameEl.textContent = filename || '';
   }
 
-  setProgress(done, filename) {
-    var bar     = document.getElementById('_emd-bar');
-    var counter = document.getElementById('_emd-counter');
-    var fnEl    = document.getElementById('_emd-filename');
-    var pct = this._total > 0 ? Math.round(done / this._total * 100) : 0;
-    if (bar)     bar.style.width = pct + '%';
-    if (counter) counter.textContent = done + ' из ' + this._total;
-    if (fnEl)    fnEl.textContent = filename || '';
+  setProgress(done, filename, activeIndex) {
+    var completed = Math.max(0, Math.min(done, this._total));
+    var active = (activeIndex != null && activeIndex > 0)
+      ? Math.min(activeIndex, this._total)
+      : null;
+    var barPct = this._total > 0
+      ? Math.round((active != null ? active : completed) / this._total * 100)
+      : 0;
+    if (this._barEl) this._barEl.style.width = barPct + '%';
+    if (this._counterEl) {
+      this._counterEl.textContent = completed + ' из ' + this._total;
+    }
+    if (filename != null && this._filenameEl) {
+      this._filenameEl.textContent = filename || '';
+    }
   }
 
   finish(done, cancelled, failedItems) {
     failedItems = failedItems || [];
     var failed = failedItems.length;
 
-    var cancelBtn = document.getElementById('_emd-cancel');
+    var cancelBtn = this._el ? this._el.querySelector('#_emd-cancel') : null;
     if (cancelBtn) cancelBtn.remove();
 
-    var bar = document.getElementById('_emd-bar');
-    if (bar) bar.style.width = (this._total > 0 ? Math.round(done / this._total * 100) : 100) + '%';
+    if (this._barEl) {
+      this._barEl.style.width = (this._total > 0 ? Math.round(done / this._total * 100) : 100) + '%';
+    }
 
-    var counter = document.getElementById('_emd-counter');
-    if (counter) {
+    if (this._counterEl) {
       var msg = cancelled
         ? 'Отменено. Выгружено ' + done + ' из ' + this._total
         : 'Готово. Выгружено ' + done + ' из ' + this._total;
       if (failed) msg += ', ошибок: ' + failed;
-      counter.textContent = msg;
+      this._counterEl.textContent = msg;
     }
 
-    var fnEl = document.getElementById('_emd-filename');
-    if (fnEl) {
+    if (this._filenameEl) {
       if (failed > 0) {
         var html = '<div style="margin-top:8px;font-size:12px;color:#f87171;font-weight:600">Не удалось выгрузить:</div>' +
           '<ul style="margin:4px 0 0;padding:0 0 0 16px;max-height:120px;overflow-y:auto;font-size:12px;color:#f87171">';
@@ -106,9 +115,9 @@ class ExportMoviesDialog extends Dialog {
             ' — ' + _emdEscapeHtml(item.reason) + '</li>';
         }
         html += '</ul>';
-        fnEl.innerHTML = html;
+        this._filenameEl.innerHTML = html;
       } else {
-        fnEl.textContent = '';
+        this._filenameEl.textContent = '';
       }
     }
 

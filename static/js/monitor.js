@@ -31,7 +31,7 @@
     movie_manual:     'ручной',
     story_manual:     'ручной (сюжет)',
     cancelled:        'отменён',
-    donated:          'из пула',
+    donated:          'использовано',
   };
 
   const COMPOSITE_PHASE_LABELS = {

@@ -623,8 +623,8 @@ def api_workflow_deep_debugging():
     return jsonify({"ok": True, "deep_debugging": val})
 
 
-@bp.route("/donors/count", methods=["GET"])
-def api_donors_count():
+@bp.route("/movie-pool/count", methods=["GET"])
+def api_movie_pool_count():
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
     flag = (request.args.get("good_only") or "").strip().lower()

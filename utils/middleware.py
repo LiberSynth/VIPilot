@@ -4,7 +4,7 @@ from log.log import write_log_entry
 _SILENT_GET_PATHS = {
     '/api/monitor',
     '/api/workflow/state',
-    '/api/donors/count',
+    '/api/movie-pool/count',
     '/favicon.ico',
 }
 

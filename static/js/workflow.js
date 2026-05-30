@@ -107,7 +107,7 @@ function _isModesPanelActive() {
 
 function refreshMoviePoolCount() {
   if (!_isModesPanelActive()) return;
-  fetch('/api/donors/count?good_only=1')
+  fetch('/api/movie-pool/count?good_only=1')
     .then(function(r) { return r.json(); })
     .then(function(d) {
       var el = document.getElementById('movie-pool-count');

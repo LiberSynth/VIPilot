@@ -208,7 +208,7 @@ def db_create_manual_movie(title: str, video_data: bytes) -> str:
     """Создаёт сюжет, батч movie_manual и ролик из файла в одной транзакции.
 
     Если в stories уже есть запись с таким же title — переиспользует её.
-    Батч сразу переводится в статус video_ready, минуя pending.
+    Ролик попадает в пул (used=0); батч завершается как movie_manual.
     Возвращает batch_id.
     """
     with get_db() as conn:
@@ -242,7 +242,7 @@ def db_create_manual_movie(title: str, video_data: bytes) -> str:
                 (movie_id, batch_id),
             )
             _write_video_file(movie_id, _RAW_FIELD, video_data)
-        db_set_batch_status(batch_id, 'video_ready', conn)
+        db_set_batch_status(batch_id, 'movie_manual', conn)
     return batch_id
 
 

@@ -78,10 +78,52 @@ def _m1003_backfill_transcode_schedule_from_planning(cur):
     )
 
 
+def _m1004_backfill_movies_story_id(cur):
+    """Fill movies.story_id from the latest linked batch."""
+    cur.execute(
+        """
+        UPDATE movies m
+        SET story_id = src.story_id
+        FROM (
+            SELECT DISTINCT ON (b.movie_id)
+                   b.movie_id,
+                   b.story_id
+            FROM batches b
+            WHERE b.movie_id IS NOT NULL
+              AND b.story_id IS NOT NULL
+            ORDER BY b.movie_id, b.created_at DESC, b.id DESC
+        ) AS src
+        WHERE m.id = src.movie_id
+          AND m.story_id IS NULL
+        """
+    )
+
+
+def _m1005_mark_published_movies_used(cur):
+    """Mark movies used when they were published at least partially."""
+    cur.execute(
+        """
+        UPDATE movies m
+        SET used = B'1'
+        WHERE EXISTS (
+            SELECT 1
+            FROM batches b
+            WHERE b.movie_id = m.id
+              AND (
+                  b.status IN ('published', 'published_partially')
+                  OR b.status LIKE '%.published'
+              )
+        )
+        """
+    )
+
+
 MIGRATIONS = [
     (2026052901, _m1001_drop_targets_legacy_columns),
     (2026052902, _m1002_add_movies_transcoded),
     (2026052903, _m1003_backfill_transcode_schedule_from_planning),
+    (2026052904, _m1004_backfill_movies_story_id),
+    (2026052905, _m1005_mark_published_movies_used),
 ]
 
 
