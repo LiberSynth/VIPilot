@@ -12,6 +12,8 @@ class ExportMoviesDialog extends Dialog {
     opts = opts || {};
     this._total    = opts.total    || 0;
     this._title    = opts.title    || 'Выгрузка роликов';
+    this._doneVerb = opts.doneVerb || 'Выгружено';
+    this._failedVerb = opts.failedVerb || 'выгрузить';
     this._cancelled = false;
     this._onCancel  = opts.onCancel || null;
     this._onRetry   = opts.onRetry  || null;
@@ -98,15 +100,15 @@ class ExportMoviesDialog extends Dialog {
 
     if (this._counterEl) {
       var msg = cancelled
-        ? 'Отменено. Выгружено ' + done + ' из ' + this._total
-        : 'Готово. Выгружено ' + done + ' из ' + this._total;
+        ? 'Отменено. ' + this._doneVerb + ' ' + done + ' из ' + this._total
+        : 'Готово. ' + this._doneVerb + ' ' + done + ' из ' + this._total;
       if (failed) msg += ', ошибок: ' + failed;
       this._counterEl.textContent = msg;
     }
 
     if (this._filenameEl) {
       if (failed > 0) {
-        var html = '<div style="margin-top:8px;font-size:12px;color:#f87171;font-weight:600">Не удалось выгрузить:</div>' +
+        var html = '<div style="margin-top:8px;font-size:12px;color:#f87171;font-weight:600">Не удалось ' + _emdEscapeHtml(this._failedVerb) + ':</div>' +
           '<ul style="margin:4px 0 0;padding:0 0 0 16px;max-height:120px;overflow-y:auto;font-size:12px;color:#f87171">';
         for (var i = 0; i < failedItems.length; i++) {
           var item = failedItems[i];

@@ -261,7 +261,12 @@ async function _doUploadBackup(btn, files) {
   }
 
   btn.disabled = true;
-  var dlg = new ExportMoviesDialog({ total: total, title: 'Загрузка данных' });
+  var dlg = new ExportMoviesDialog({
+    total: total,
+    title: 'Загрузка данных',
+    doneVerb: 'Загружено',
+    failedVerb: 'загрузить',
+  });
   dlg.open();
 
   var done = 0;
