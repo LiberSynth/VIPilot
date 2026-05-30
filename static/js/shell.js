@@ -57,6 +57,7 @@ function switchPanel(name) {
   if (typeof refreshDbOpStatus === 'function') refreshDbOpStatus();
   if (name === 'director' || name === 'workflow') {
     if (typeof refreshMoviePoolCount === 'function') refreshMoviePoolCount();
+    refreshGoodPoolCount();
   }
   if (name === 'request') {
     if (typeof loadModels === 'function') loadModels();
@@ -122,6 +123,18 @@ function loadGoodPoolCount() {
     .catch(function() {});
 }
 
+function _isStoryPoolPanelActive() {
+  var el = document.querySelector('.pool-count-value');
+  if (!el) return false;
+  var panel = el.closest('.tab-panel');
+  return panel ? panel.classList.contains('active') : false;
+}
+
+function refreshGoodPoolCount() {
+  if (!_isStoryPoolPanelActive()) return;
+  loadGoodPoolCount();
+}
+
 (function() {
   monitorClockStart();
   const tab = new URLSearchParams(window.location.search).get('tab');
@@ -139,6 +152,7 @@ function loadGoodPoolCount() {
     }
   }
   loadGoodPoolCount();
+  setInterval(refreshGoodPoolCount, 10000);
   var btnHamburger = document.getElementById('btn-hamburger');
   if (btnHamburger) btnHamburger.addEventListener('click', openSidebar);
 })();
