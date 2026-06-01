@@ -129,6 +129,11 @@
     return 'md-warn';
   }
 
+  function capitalizeFirst(s) {
+    if (!s) return s;
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  }
+
   function renderBatch(batch) {
     const bs = batch.batch_status || 'pending';
     const btype = batch.type || '';
@@ -139,7 +144,9 @@
       : 'Публикация: сейчас';
     const subParts = [schedStr, translateStatus(bs)];
     if (batch.title) subParts.push(batch.title);
-    const sub = subParts.filter(Boolean).join(' · ');
+    const subDefault = subParts.filter(Boolean).join(' · ');
+    const headTitle = btype === 'story' ? 'Генерация сюжета' : fmtMsk(headTime);
+    const sub = btype === 'story' ? capitalizeFirst(translateStatus(bs)) : subDefault;
     const md = _batchDotClass(bs, batch.batch_id);
     const isActive = md === 'md-active';
 
@@ -192,7 +199,7 @@
       '<div class="monitor-batch-header">' +
         '<span class="monitor-dot ' + md + '"></span>' +
         '<div class="monitor-batch-meta">' +
-          '<div class="monitor-batch-title">' + fmtMsk(headTime) + '</div>' +
+          '<div class="monitor-batch-title">' + esc(headTitle) + '</div>' +
           '<div class="monitor-batch-sub">'   + esc(sub)         + '</div>' +
         '</div>' +
         hdrActions +
