@@ -618,13 +618,24 @@
   window.monitorSystemCopy = function(btn) {
     var block = btn.closest('.monitor-system-block');
     if (!block) return;
-    var lines = [];
-    block.querySelectorAll('.monitor-entry-row').forEach(function(row) {
-      var ts  = row.querySelector('.monitor-entry-ts')  ? row.querySelector('.monitor-entry-ts').textContent.trim()  : '';
-      var msg = row.querySelector('.monitor-entry-msg') ? row.querySelector('.monitor-entry-msg').textContent.trim() : '';
-      lines.push('[' + ts + '] ' + msg);
-    });
-    _monitorCopyText(lines.join('\n'), btn);
+    var infoText = _systemInfoLines(block).join('\n');
+    var logId = block.dataset.lid || '';
+
+    function finish(entryLines) {
+      var text = infoText;
+      if (entryLines.length) text += '\n\n' + entryLines.join('\n');
+      _monitorCopyText(text, btn);
+    }
+
+    if (!logId) {
+      finish([]);
+      return;
+    }
+
+    fetch('/api/monitor/log/' + encodeURIComponent(logId) + '/entries')
+      .then(function(r) { return r.json(); })
+      .then(function(data) { finish(_formatMonitorEntryLines(data.entries || [])); })
+      .catch(function() { finish([]); });
   };
 
   window.monitorCopy = function(btn) {
