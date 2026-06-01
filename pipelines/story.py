@@ -211,11 +211,7 @@ def run(batch_id, category):
         raise AppException(batch_id, "story", msg)
 
     db_set_story_model(story_id, used_model_id)
-    msg = f"Сюжет сгенерирован ({used_model_name})"
-    write_log_entry(
-        batch_id, category,
-        fmt_id_msg("Сохранён как story {}, батч → ready", story_id),
-    )
+    write_log_entry(batch_id, category, f"Сюжет «{title}» успешно сохранён.")
     write_log_entry(
         batch_id, category,
         fmt_id_msg(
