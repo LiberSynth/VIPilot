@@ -1,6 +1,6 @@
 """
 Pipeline story — генерация сюжета.
-Принимает batch_id, атомарно переводит батч в generating,
+Принимает batch_id в статусе generating (CAS при dispatch в main_loop),
 перебирает активные text-модели по порядку (с retry на каждую),
 генерирует текст через OpenRouter и сохраняет результат.
 """
@@ -12,7 +12,6 @@ from db import (
     settings_get,
     cycle_config_get,
     db_get_batch_by_id,
-    db_claim_batch_status,
     db_get_active_text_models,
     db_get_text_model_by_id,
     db_create_story,
@@ -40,15 +39,8 @@ def run(batch_id, category):
         level='silent',
     )
 
-    # Два допустимых входных статуса:
-    # - pending:    батч только что создан. CAS-переход pending -> generating
-    # - generating: пайплайн был прерван после CAS. Подхватываем без повторного CAS.
-    if batch["status"] not in ("pending", "generating"):
+    if batch["status"] != "generating":
         return
-
-    if batch["status"] == "pending":
-        if not db_claim_batch_status(batch_id, 'pending', 'generating'):
-            return
 
     if batch.get("type") != "story":
         msg = f"Неподдерживаемый тип батча для story-пайплайна: {batch.get('type')}"

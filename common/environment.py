@@ -66,9 +66,10 @@ def release_batch(batch_id: str):
     """Освобождает batch_id из активных."""
     global _active_threads
     with _threads_lock:
+        if batch_id not in _active_batch_ids:
+            return
         _active_batch_ids.discard(batch_id)
-        if _active_threads > 0:
-            _active_threads -= 1
+        _active_threads -= 1
 
 
 def get_active_batch_ids() -> set:

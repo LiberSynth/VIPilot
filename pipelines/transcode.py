@@ -76,16 +76,8 @@ def run(batch_id, category):
         )
         return
 
-    if batch['status'] not in ('pending', 'processing'):
+    if batch['status'] != 'processing':
         return
-
-    if batch['status'] == 'pending':
-        db_set_batch_status(batch_id, 'processing')
-        write_log_entry(
-            batch_id, category,
-            fmt_id_msg("[transcode] Батч {} — phase=status_set, from=pending, to=processing", batch_id),
-            level='silent',
-        )
 
     movie_id = batch.get('movie_id')
     if not movie_id:

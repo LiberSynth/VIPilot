@@ -4,7 +4,6 @@ from common.statuses import PUBLISH_ROUTING_SUFFIXES
 _TYPE_STATUS_TO_PIPELINE = {
     ('planning', 'pending'): planning,
     ('story', 'pending'):    story,
-    ('story', 'generating'): story,
     ('movie', 'pending'):    video,
     ('movie', 'generating'): video,
     ('movie', 'generated'):  video,

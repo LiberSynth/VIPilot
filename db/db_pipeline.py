@@ -356,12 +356,12 @@ def db_get_actionable_batches():
             cur.execute("""
                 SELECT id, type, status, created_at, scheduled_at
                 FROM batches
-                WHERE status IN (
-                    'pending', 'processing', 'generating', 'generated',
-                    'video_generating', 'video_pending'
-                )
-                OR status LIKE '%.pending'
-                OR status LIKE '%.published'
+                WHERE status = 'pending'
+                   OR status = 'generated'
+                   OR (type = 'movie' AND status = 'generating')
+                   OR status IN ('video_generating', 'video_pending')
+                   OR status LIKE '%.pending'
+                   OR status LIKE '%.published'
                 ORDER BY created_at ASC, id ASC
             """)
             rows = cur.fetchall()

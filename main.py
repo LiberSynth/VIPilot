@@ -27,6 +27,7 @@ from common.startup import init_app, create_app
 from log import log_app_started, log_app_stopped, write_log_entry
 from pipelines import cleanup
 import pipelines.planning as planning
+from pipelines.dispatch import prepare_batch_dispatch
 from pipelines.routing import get_pipeline
 from pipelines.runner import start_batch_thread
 import common.environment as environment
@@ -59,6 +60,9 @@ def main_loop():
                     if pipeline_module is None:
                         continue
                     if not environment.claim_batch(bid):
+                        continue
+                    if not prepare_batch_dispatch(bid, btype, status):
+                        environment.release_batch(bid)
                         continue
                     pipeline_name = getattr(pipeline_module, '__name__', str(pipeline_module)).split('.')[-1]
                     start_batch_thread(bid, pipeline_module, pipeline_name)
