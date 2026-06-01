@@ -1,6 +1,6 @@
 (function() {
   const CATEGORY_LABELS = {
-    system:      'Система',
+    system:      'Приложение',
     api:         'API',
     planning:    'Планирование',
     story:       'Сюжет',
@@ -203,7 +203,6 @@
   }
 
   function renderSystemBlock(sys) {
-    const catLabel = CATEGORY_LABELS[sys.category] || sys.category || 'Система';
     const sysActions =
       '<div class="monitor-hdr-actions-always" onclick="event.stopPropagation()">' +
         '<button class="cycle-float-btn" title="Скопировать логи" onclick="monitorSystemCopy(this)">' + MON_SVG_COPY + '</button>' +
@@ -215,8 +214,7 @@
       '<div class="monitor-sysgroup-header">' +
         '<span class="monitor-sysgroup-dot"></span>' +
         '<div class="monitor-sysgroup-meta">' +
-          '<div class="monitor-sysgroup-title">' + fmtMsk(sys.created_at) + '</div>' +
-          '<div class="monitor-sysgroup-sub">'   + esc(catLabel)         + '</div>' +
+          '<div class="monitor-sysgroup-title">Приложение</div>' +
         '</div>' +
         sysActions +
         '<span class="monitor-sysgroup-arrow">▼</span>' +
