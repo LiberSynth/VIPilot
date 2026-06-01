@@ -59,7 +59,7 @@ def write_log_entry(batch_id, category, message, level="info"):
         f"Допустимые: {_ALLOWED_LOG_LEVELS}."
     )
 
-    print(message)
+    print(message.encode("cp1251", errors="replace").decode("cp1251"))
     if level == "silent" and not environment.deep_debugging:
         return None
 
