@@ -184,6 +184,7 @@
       : '';
 
     return '<div class="monitor-batch bs-' + esc(bs) + '" data-bid="' + esc(batch.batch_id) +
+      '" data-log-id="'   + esc(batch.log_id || '') +
       '" data-type="'       + esc(btype) +
       '" data-scheduled="'  + esc(isScheduledPlanning ? fmtMsk(batch.scheduled_at) : 'сейчас') +
       '" data-bstatus="'    + esc(bs) +
@@ -205,10 +206,12 @@
     const catLabel = CATEGORY_LABELS[sys.category] || sys.category || 'Система';
     const sysActions =
       '<div class="monitor-hdr-actions-always" onclick="event.stopPropagation()">' +
-        '<button class="cycle-float-btn" title="Скопировать" onclick="monitorSystemCopy(this)">' + MON_SVG_COPY + '</button>' +
+        '<button class="cycle-float-btn" title="Скопировать логи" onclick="monitorSystemCopy(this)">' + MON_SVG_COPY + '</button>' +
+        '<button class="cycle-float-btn" title="Скопировать инфо" onclick="monitorSystemCopyInfo(this)">' + MON_SVG_INFO + '</button>' +
       '</div>';
 
-    return '<div class="monitor-sysgroup monitor-system-block" data-lid="' + esc(sys.id) + '" onclick="monitorToggleSystemBlock(event,this)">' +
+    return '<div class="monitor-sysgroup monitor-system-block" data-lid="' + esc(sys.id) +
+      '" data-category="' + esc(sys.category || '') + '" onclick="monitorToggleSystemBlock(event,this)">' +
       '<div class="monitor-sysgroup-header">' +
         '<span class="monitor-sysgroup-dot"></span>' +
         '<div class="monitor-sysgroup-meta">' +
@@ -537,13 +540,20 @@
 
   function _batchInfoLines(batchEl) {
     if (!batchEl) return [];
-    var lines = [
-      'batch_id: '  + (batchEl.dataset.bid      || ''),
-      'type: '      + (batchEl.dataset.type     || ''),
-      'scheduled: ' + (batchEl.dataset.scheduled || ''),
-      'status: '    + (batchEl.dataset.bstatus   || ''),
+    return [
+      'batch_id: ' + (batchEl.dataset.bid    || ''),
+      'log_id: '   + (batchEl.dataset.logId  || ''),
+      'type: '     + (batchEl.dataset.type   || ''),
+      'status: '   + (batchEl.dataset.bstatus || ''),
     ];
-    return lines;
+  }
+
+  function _systemInfoLines(sysEl) {
+    if (!sysEl) return [];
+    return [
+      'log_id: ' + (sysEl.dataset.lid      || ''),
+      'type: '   + (sysEl.dataset.category || ''),
+    ];
   }
 
   window.monitorToggleBatch = function(e, el) {
@@ -588,6 +598,10 @@
         _fetchSystemEntries(_openSysLid);
       }
     }
+  };
+
+  window.monitorSystemCopyInfo = function(btn) {
+    _monitorCopyText(_systemInfoLines(btn.closest('.monitor-system-block')).join('\n'), btn);
   };
 
   window.monitorSystemCopy = function(btn) {

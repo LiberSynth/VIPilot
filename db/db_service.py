@@ -48,7 +48,16 @@ def db_get_monitor():
                     b.created_at,
                     b.story_id,
                     b.movie_id,
-                    b.title
+                    b.title,
+                    (
+                        SELECT l.id::text
+                        FROM log l
+                        WHERE l.batch_id = b.id
+                        ORDER BY
+                            CASE WHEN l.category = b.type THEN 0 ELSE 1 END,
+                            l.created_at ASC
+                        LIMIT 1
+                    ) AS log_id
                 FROM batches b
                 ORDER BY b.created_at DESC, b.id DESC
                 """
@@ -75,6 +84,7 @@ def db_get_monitor():
             "story_id":       str(r[5]) if r[5] else None,
             "movie_id":       str(r[6]) if r[6] else None,
             "title":          r[7],
+            "log_id":         r[8] if r[8] else None,
         }
         for r in batch_rows
     ]
