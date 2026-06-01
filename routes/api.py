@@ -59,7 +59,6 @@ from log import (
     db_get_monitor,
     db_get_batch_log_entries,
     db_get_system_log_entries,
-    db_get_system_window_orphans,
     log_batch_planned,
     write_log_entry,
 )
@@ -678,16 +677,6 @@ def api_monitor_log_entries(log_id):
     return jsonify({"entries": entries})
 
 
-@bp.route("/monitor/system-window-orphans")
-def api_monitor_system_window_orphans():
-    if not is_authenticated():
-        return jsonify({"error": "unauthorized"}), 401
-    before = request.args.get("before") or None
-    after  = request.args.get("after")  or None
-    entries = db_get_system_window_orphans(before_iso=before, after_iso=after)
-    return jsonify({"entries": entries})
-
-
 @bp.route("/monitor/batch/<batch_id>/delete", methods=["POST"])
 def api_delete_batch(batch_id):
     if not is_authenticated():
@@ -1207,6 +1196,8 @@ def api_production_video_generate():
     story_id = data.get("story_id") or None
     if not model_id:
         return jsonify({"error": "model_id_required"}), 400
+    if not story_id:
+        return jsonify({"error": "story_id_required"}), 400
     batch_id = db_create_video_batch(
         "movie", model_id=model_id, story_id=story_id
     )

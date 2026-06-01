@@ -153,11 +153,6 @@ def db_get_active_targets():
     ]
 
 
-def db_update_target_aspect_ratio(target_id, x, y):
-    # Поля удалены из schema v2. Функция оставлена для совместимости интерфейса.
-    return True
-
-
 def db_get_all_targets():
     with get_db() as conn:
         with conn.cursor() as cur:

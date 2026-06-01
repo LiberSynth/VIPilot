@@ -11,7 +11,6 @@ from .db_simple import (
     db_delete_schedule_slot,
     db_get_active_targets,
     db_get_all_targets,
-    db_update_target_aspect_ratio,
     db_get_target_by_name,
     db_update_target_publish_method_by_slug,
     db_get_target_session_context,
@@ -40,15 +39,12 @@ from .db_simple import (
 )
 from .db_pipeline import (
     db_create_planning_batch,
-    db_ensure_batch,
     db_create_video_batch,
     db_create_story_batch,
     db_set_batch_story,
-    db_link_batch_story_only,
     db_set_batch_status,
     db_claim_batch_status,
     db_cancel_orphaned_planning_batches,
-    db_claim_unused_story_for_batch,
     db_claim_unused_movie_for_batch,
     db_create_transcode_batches,
     db_create_publish_batches,

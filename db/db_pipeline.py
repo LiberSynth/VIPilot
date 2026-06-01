@@ -6,21 +6,6 @@ from .connection import get_db
 from common.statuses import _assert_known_status, PIPELINE_RESET_STATUS
 
 
-def _claim_story_from_pool(cur) -> str | None:
-    cur.execute(
-        """
-        SELECT id::text
-        FROM stories
-        WHERE grade = 'good'
-        ORDER BY created_at DESC, id DESC
-        LIMIT 1
-        FOR UPDATE SKIP LOCKED
-        """
-    )
-    row = cur.fetchone()
-    return row[0] if row else None
-
-
 def _get_story_source_batch_id(cur, story_id: str | None) -> str | None:
     if not story_id:
         return None
@@ -68,10 +53,6 @@ def db_create_planning_batch(scheduled_at):
     return batch_id
 
 
-def db_ensure_batch(scheduled_at):
-    return db_create_planning_batch(scheduled_at)
-
-
 def db_create_video_batch(batch_type, model_id=None, story_id=None):
     data = (
         json.dumps({"model_id": str(model_id)}) if model_id else None
@@ -79,8 +60,6 @@ def db_create_video_batch(batch_type, model_id=None, story_id=None):
     with get_db() as conn:
         with conn.cursor() as cur:
             resolved_story_id = str(story_id) if story_id else None
-            if batch_type == "movie" and not resolved_story_id:
-                resolved_story_id = _claim_story_from_pool(cur)
             if batch_type == "movie" and not resolved_story_id:
                 return None
             batch_id_source = _get_story_source_batch_id(cur, resolved_story_id)
@@ -129,16 +108,6 @@ def db_set_batch_story(batch_id, story_id):
             )
         db_set_batch_status(batch_id, "ready", conn)
     return True
-
-
-def db_link_batch_story_only(batch_id, story_id):
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "UPDATE batches SET story_id = %s WHERE id = %s",
-                (story_id, batch_id),
-            )
-        conn.commit()
 
 
 def db_set_batch_status(batch_id: str, status: str, conn=None):
@@ -190,29 +159,6 @@ def db_cancel_orphaned_planning_batches():
         for batch_id in batch_ids:
             db_set_batch_status(batch_id, "cancelled", conn)
     return batch_ids
-
-
-def db_claim_unused_story_for_batch(batch_id: str) -> dict | None:
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT id::text, title, content
-                FROM stories
-                WHERE grade = 'good'
-                ORDER BY created_at DESC, id DESC
-                LIMIT 1
-                FOR UPDATE SKIP LOCKED
-            """)
-            row = cur.fetchone()
-            if not row:
-                return None
-            story_id = row[0]
-            cur.execute(
-                "UPDATE batches SET story_id = %s::uuid WHERE id = %s::uuid",
-                (story_id, batch_id),
-            )
-        db_set_batch_status(batch_id, 'ready', conn)
-    return {"id": story_id, "title": row[1] or "", "content": row[2] or ""}
 
 
 def db_claim_unused_movie_for_batch(batch_id: str) -> dict | None:

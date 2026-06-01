@@ -116,9 +116,6 @@ class TestApiBlueprintAuth:
     def test_get_monitor_log_entries(self, client):
         _assert_401(client.get("/api/monitor/log/some-log/entries"))
 
-    def test_get_monitor_orphan_entries(self, client):
-        _assert_401(client.get("/api/monitor/orphan-entries"))
-
     def test_post_monitor_batch_delete(self, client):
         _assert_401(client.post("/api/monitor/batch/some-batch/delete"))
 

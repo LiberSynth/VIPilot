@@ -251,61 +251,6 @@ def db_get_system_log_entries(log_id: str) -> list:
     ]
 
 
-def db_get_system_window_orphans(
-    before_iso: str | None = None,
-    after_iso:  str | None = None,
-) -> list:
-    """Orphan log_entries (log_id IS NULL, level != 'silent') в заданном временном окне.
-
-    before_iso — верхняя граница (исключительная), after_iso — нижняя (включительная).
-    Если граница не указана — окно открыто с этой стороны.
-    """
-    if not before_iso and not after_iso:
-        return []
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            if before_iso and after_iso:
-                cur.execute(
-                    """
-                    SELECT message, level, created_at FROM log_entries
-                    WHERE log_id IS NULL
-                      AND created_at <  %s::timestamptz
-                      AND created_at >= %s::timestamptz
-                    ORDER BY created_at DESC, id DESC
-                    """,
-                    (before_iso, after_iso),
-                )
-            elif before_iso:
-                cur.execute(
-                    """
-                    SELECT message, level, created_at FROM log_entries
-                    WHERE log_id IS NULL
-                      AND created_at < %s::timestamptz
-                    ORDER BY created_at DESC, id DESC
-                    """,
-                    (before_iso,),
-                )
-            else:
-                cur.execute(
-                    """
-                    SELECT message, level, created_at FROM log_entries
-                    WHERE log_id IS NULL
-                      AND created_at >= %s::timestamptz
-                    ORDER BY created_at DESC, id DESC
-                    """,
-                    (after_iso,),
-                )
-            rows = cur.fetchall()
-    return [
-        {
-            "message":    r[0],
-            "level":      r[1],
-            "created_at": r[2].isoformat() if r[2] else None,
-        }
-        for r in rows
-    ]
-
-
 def db_get_batch_log_entries(batch_id: str) -> list:
     with get_db() as conn:
         with conn.cursor() as cur:
