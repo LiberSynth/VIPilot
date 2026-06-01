@@ -38,6 +38,7 @@ def run():
         batch_lifetime      = parse_batch_lifetime(settings_get("batch_lifetime", "7"))
         write_log_entry(
             None,
+            "system",
             f"[cleanup] phase=run_start, entries_lifetime={entries_lifetime}, log_lifetime={log_lifetime}, batch_lifetime={batch_lifetime}",
             level='silent',
         )

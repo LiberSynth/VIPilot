@@ -162,6 +162,7 @@ class PlatformBrowser:
                         context.add_cookies(saved["cookies"])
                         write_log_entry(
                             None,
+                            "system",
                             f"{tag} Загружено {len(saved['cookies'])} куков из БД",
                             level='silent',
                         )
@@ -201,11 +202,13 @@ class PlatformBrowser:
                                 self._save_result = {"ok": True, "error": None}
                                 write_log_entry(
                                     None,
+                                    "system",
                                     f"{tag} Сессия сохранена.",
                                     level='info',
                                 )
                                 write_log_entry(
                                     None,
+                                    "system",
                                     fmt_id_msg(
                                         f"{tag} Сессия сохранена в БД: {len(cookies)} куков, target={{}}",
                                         self._current_target_id,
@@ -216,6 +219,7 @@ class PlatformBrowser:
                                 self._save_result = {"ok": False, "error": "Ошибка записи в БД"}
                                 write_log_entry(
                                     None,
+                                    "system",
                                     f"{tag} Ошибка сохранения сессии: запись в БД не удалась.",
                                     level='info',
                                 )
@@ -223,6 +227,7 @@ class PlatformBrowser:
                             self._save_result = {"ok": False, "error": str(e)}
                             write_log_entry(
                                 None,
+                                "system",
                                 f"{tag} Ошибка сохранения сессии: {e}",
                                 level='info',
                             )
@@ -287,6 +292,7 @@ class PlatformBrowser:
             write_log_entry(None, "system", f"{tag} Запуск браузера.", level='info')
             write_log_entry(
                 None,
+                "system",
                 fmt_id_msg(f"{tag} Запуск браузера для target={{}}", target_id),
                 level='silent',
             )

@@ -140,7 +140,16 @@ def _m1006_fix_published_movies_transcoded(cur):
 
 
 def _m1007_log_category_and_drop_message_status(cur):
-    cur.execute("ALTER TABLE log RENAME COLUMN pipeline TO category")
+    cur.execute("""
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = current_schema()
+          AND table_name = 'log'
+          AND column_name IN ('pipeline', 'category')
+    """)
+    cols = {r[0] for r in cur.fetchall()}
+    if 'pipeline' in cols and 'category' not in cols:
+        cur.execute("ALTER TABLE log RENAME COLUMN pipeline TO category")
     cur.execute("ALTER TABLE log DROP COLUMN IF EXISTS message")
     cur.execute("ALTER TABLE log DROP COLUMN IF EXISTS status")
     cur.execute("DROP INDEX IF EXISTS idx_log_pipeline")

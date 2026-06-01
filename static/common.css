@@ -567,62 +567,6 @@
   @keyframes btn-pending-pulse { 0%,100% { opacity:1; } 50% { opacity:.4; } }
   @keyframes bar-indeterminate { 0%{left:-40%;width:40%} 60%{left:60%;width:40%} 100%{left:100%;width:0} }
 
-  .monitor-log-list {
-    border-top: 1px solid #111118;
-    font-family: 'SF Mono', 'Fira Code', monospace;
-    font-size: 12px;
-  }
-  .monitor-log-item {
-    border-bottom: 1px solid #111118;
-  }
-  .monitor-log-item:last-child { border-bottom: none; }
-
-  .monitor-log-header {
-    display: flex; flex-direction: column; gap: 2px;
-    padding: 7px 14px 7px 30px; cursor: pointer;
-    user-select: none; -webkit-user-select: none;
-  }
-  .monitor-log-header:hover { background: rgba(255,255,255,.02); }
-  .monitor-log-header-top { display: flex; align-items: center; gap: 8px; }
-  .monitor-pip-actions { display: flex; align-items: center; gap: 1px; margin-left: auto; }
-
-  .monitor-log-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; align-self: center; background: #444; position: relative; }
-  .monitor-log-dot.ls-ok,
-  .monitor-log-dot.ls-info      { background: #3ecf8e; }
-  .monitor-log-dot.ls-error     { background: #ff6060; }
-  .monitor-log-dot.ls-fatal_error { background: #ff6060; }
-  .monitor-log-dot.ls-video_error,
-  .monitor-log-dot.ls-transcode_error,
-  .monitor-log-dot.ls-publish_error { background: #ff6060; }
-  .monitor-log-dot.ls-warn,
-  .monitor-log-dot.ls-warning   { background: #f5a623; }
-  .monitor-log-dot.ls-cancelled    { background: #555; }
-  .monitor-log-dot.ls-interrupted  { background: #555; }
-  .monitor-log-dot.ls-running   { background: #4a7cf7; }
-  .monitor-log-dot.ls-partial   {
-    background: radial-gradient(circle, #ff2020 32%, #3ecf8e 33%);
-  }
-  .monitor-log-dot.ls-running::before {
-    content: ''; position: absolute; inset: -2px; border-radius: 50%;
-    background: #4a7cf7; opacity: .75;
-    animation: mon-ping 1.4s ease-out infinite;
-  }
-
-  .monitor-log-ts       { color: #8080a8; flex-shrink: 0; font-variant-numeric: tabular-nums; }
-  .monitor-log-pipeline { color: #d0d0ec; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
-  .monitor-log-model { color: #888; font-size: 10px; font-weight: 400; margin-left: 5px; }
-  .monitor-log-comment  { color: #9090b8; font-size: 12px; padding-left: 39px; word-break: break-word; white-space: pre-wrap; line-height: 1.4; }
-  .monitor-log-item[data-status="warn"] .monitor-log-comment,
-  .monitor-log-item[data-status="warning"] .monitor-log-comment { color: #f5a623; }
-  .monitor-log-item[data-status="error"] .monitor-log-comment,
-  .monitor-log-item[data-status="fatal_error"] .monitor-log-comment,
-  .monitor-log-item[data-status="video_error"] .monitor-log-comment,
-  .monitor-log-item[data-status="transcode_error"] .monitor-log-comment,
-  .monitor-log-item[data-status="publish_error"] .monitor-log-comment,
-  .monitor-log-item[data-status$=".failed"] .monitor-log-comment { color: #ff7070; }
-  .monitor-log-chevron  { font-size: 10px; color: #7070a0; flex-shrink: 0; transition: transform .15s; }
-  .monitor-log-item.open .monitor-log-chevron { transform: rotate(180deg); }
-
   .monitor-pub-frame {
     display: none;
     margin: 0 8px 6px;
@@ -632,7 +576,7 @@
     line-height: 0;
     aspect-ratio: 1280 / 720;
   }
-  .monitor-log-item.open .monitor-pub-frame { display: block; }
+  .monitor-batch.open .monitor-pub-frame { display: block; }
   .monitor-pub-frame img {
     width: 100%;
     height: auto;
@@ -645,7 +589,7 @@
     border-top: 1px solid #0e0e16;
     padding: 4px 14px 4px 52px;
   }
-  .monitor-log-item.open .monitor-entries { display: block; }
+  .monitor-batch.open .monitor-entries { display: block; }
   .monitor-entry-row {
     display: flex; gap: 8px; padding: 2px 0;
     border-bottom: 1px solid #0e0e18; font-size: 11px;

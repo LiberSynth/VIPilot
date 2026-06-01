@@ -1,25 +1,23 @@
 (function() {
   const CATEGORY_LABELS = {
-    root:        'Система',
     system:      'Система',
     api:         'API',
     planning:    'Планирование',
     story:       'Сюжет',
     video:       'Видео',
     transcode:   'Транскодирование',
-    transcoding: 'Транскодирование',
     publish:     'Публикация',
-    publishing:  'Публикация',
     cleanup:     'Очистка',
   };
 
   const STATUS_LABELS = {
     pending:          'ожидание',
+    generating:       'генерация',
     story_generating: 'генерация сюжета',
     running:          'выполняется',
     ok:               'готово',
     error:            'ошибка',
-    info:             'инфо',
+    ready:            'готово',
     story_ready:      'сюжет готов',
     video_pending:    'видео: ожидание',
     video_ready:      'видео готово',
@@ -28,8 +26,6 @@
     published:            'опубликовано',
     published_partially:  'частично опубликовано',
     publish_error:        'публикация: ошибка',
-    movie_manual:     'ручной',
-    story_manual:     'ручной (сюжет)',
     cancelled:        'отменён',
     donated:          'использовано',
   };
@@ -48,20 +44,23 @@
     vkvideo: 'VK Видео',
   };
 
-  const CATEGORY_RESTARTABLE = ['story', 'video', 'transcode', 'publish'];
-  const CATEGORY_ERROR_STATUSES = ['error', 'video_error', 'transcode_error', 'publish_error', 'fatal_error'];
-  const FINAL_BATCH_STATUSES = ['published', 'published_partially', 'movie_manual', 'story_manual', 'cancelled', 'error', 'fatal_error', 'video_error', 'transcode_error', 'publish_error', 'donated'];
+  const TYPE_RESTARTABLE = ['story', 'movie', 'transcode', 'publish'];
+  const TYPE_TO_RESET_PIPELINE = {
+    story:     'story',
+    movie:     'video',
+    transcode: 'transcode',
+    publish:   'publish',
+  };
+  const TYPE_ERROR_STATUSES = ['error', 'video_error', 'transcode_error', 'publish_error', 'fatal_error'];
+  const FINAL_BATCH_STATUSES = ['published', 'published_partially', 'ready', 'cancelled', 'error', 'fatal_error', 'video_error', 'transcode_error', 'publish_error', 'donated'];
   const PUBLISH_FRAME_POLL_MS = 700;
 
-  const MON_SVG_EXPAND   = `<svg viewBox="0 0 16 16"><polyline points="2,6 2,2 6,2"/><polyline points="10,2 14,2 14,6"/><polyline points="14,10 14,14 10,14"/><polyline points="6,14 2,14 2,10"/></svg>`;
-  const MON_SVG_COLLAPSE = `<svg viewBox="0 0 16 16"><polyline points="6,2 6,6 2,6"/><polyline points="10,2 10,6 14,6"/><polyline points="14,10 10,10 10,14"/><polyline points="2,10 6,10 6,14"/></svg>`;
   const MON_SVG_COPY     = `<svg viewBox="0 0 16 16"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11V3a1 1 0 0 1 1-1h8"/></svg>`;
   const MON_SVG_RESTART  = `<svg viewBox="0 0 16 16" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="15.3,2.7 15.3,6.7 11.3,6.7"/><path d="M13.66 10a6 6 0 1 1-.08-5"/></svg>`;
   const MON_SVG_EYE      = `<svg viewBox="0 0 16 16"><rect x="3" y="2" width="10" height="12" rx="1.5"/><line x1="5.5" y1="5.5" x2="10.5" y2="5.5"/><line x1="5.5" y1="8" x2="10.5" y2="8"/><line x1="5.5" y1="10.5" x2="8.5" y2="10.5"/></svg>`;
   const MON_SVG_PLAY     = `<svg viewBox="0 0 16 16"><polygon points="4,2 13,8 4,14"/></svg>`;
   const MON_SVG_INFO     = `<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.2"/><line x1="8" y1="5.5" x2="8" y2="5.5"/><line x1="8" y1="7.5" x2="8" y2="11"/></svg>`;
   const MON_SVG_DELETE   = `<svg viewBox="0 0 16 16"><polyline points="2,4 14,4"/><path d="M5 4V2h6v2"/><rect x="3" y="4" width="10" height="10" rx="1.5"/><line x1="6" y1="7" x2="6" y2="11"/><line x1="10" y1="7" x2="10" y2="11"/></svg>`;
-  const MON_SVG_EXPORT   = `<svg viewBox="0 0 16 16"><path d="M8 2v7M5 6l3 3 3-3"/><path d="M3 11v2a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-2"/></svg>`;
 
   function translateStatus(s) {
     if (STATUS_LABELS[s]) return STATUS_LABELS[s];
@@ -113,9 +112,9 @@
   }
 
   function _batchDotClass(bs, batchId) {
-    const doneStatuses    = ['published', 'movie_manual', 'story_manual'];
+    const doneStatuses    = ['published', 'ready'];
     const partialStatuses = ['published_partially'];
-    const waitStatuses    = ['story_ready', 'video_pending', 'video_ready', 'pending'];
+    const waitStatuses    = ['story_ready', 'video_pending', 'video_ready', 'pending', 'generating'];
     const errorStatuses   = ['error', 'video_error', 'transcode_error', 'publish_error', 'fatal_error'];
     const finalStatuses   = doneStatuses.concat(partialStatuses).concat(errorStatuses).concat(['cancelled', 'donated', 'reserved']);
     const isFinal         = finalStatuses.indexOf(bs) >= 0;
@@ -130,60 +129,45 @@
     return 'md-warn';
   }
 
-  function _modelTag(category, textModelName, videoModelName) {
-    var modelName = (category === 'video' && videoModelName) ? videoModelName
-      : (category === 'story' && textModelName) ? textModelName
-      : (category === 'transcode' || category === 'transcoding') ? 'H.264'
-      : null;
-    return modelName ? '<span class="monitor-log-model">' + esc(modelName) + '</span>' : '';
-  }
-
   function renderBatch(batch) {
     const bs = batch.batch_status || 'pending';
-    const category = batch.category || '';
-    const catLabel = category ? (CATEGORY_LABELS[category] || category) : '';
-    const headTime = batch.log_created_at || batch.created_at;
-    const isScheduledPlanning = batch.type === 'planning' && !!batch.scheduled_at;
+    const btype = batch.type || '';
+    const headTime = batch.created_at;
+    const isScheduledPlanning = btype === 'planning' && !!batch.scheduled_at;
     const schedStr = isScheduledPlanning
       ? 'Публикация: ' + fmtMskShort(batch.scheduled_at)
-      : batch.type === 'movie_manual'
-        ? 'Ручное видео'
-        : batch.type === 'story_manual'
-          ? 'Ручной сюжет'
-          : 'Публикация: сейчас';
-    const statusLabel = (bs === 'movie_manual' || bs === 'story_manual') ? 'выполнен' : translateStatus(bs);
-    const subParts = [schedStr, statusLabel];
-    if (catLabel) subParts.push(catLabel);
+      : 'Публикация: сейчас';
+    const subParts = [schedStr, translateStatus(bs)];
     if (batch.title) subParts.push(batch.title);
     const sub = subParts.filter(Boolean).join(' · ');
     const md = _batchDotClass(bs, batch.batch_id);
     const isActive = md === 'md-active';
 
+    const resetPipeline = TYPE_TO_RESET_PIPELINE[btype];
     const canRestart = batch.batch_id
-      && category
-      && CATEGORY_RESTARTABLE.indexOf(category) >= 0
-      && CATEGORY_ERROR_STATUSES.indexOf(bs) >= 0;
+      && resetPipeline
+      && TYPE_RESTARTABLE.indexOf(btype) >= 0
+      && TYPE_ERROR_STATUSES.indexOf(bs) >= 0;
     const restartBtn = canRestart
-      ? '<button class="cycle-float-btn" title="Перезапустить" data-bid="' + esc(batch.batch_id) + '" data-pip="' + esc(category) + '" onclick="monitorPipelineRestart(this)">' + MON_SVG_RESTART + '</button>'
+      ? '<button class="cycle-float-btn" title="Перезапустить" data-bid="' + esc(batch.batch_id) + '" data-pip="' + esc(resetPipeline) + '" onclick="monitorPipelineRestart(this)">' + MON_SVG_RESTART + '</button>'
       : '';
-    const storyExportBtn = (category === 'story' && batch.story_id)
-      ? '<button class="cycle-float-btn" title="Выгрузка" onclick="exportStory(\'' + esc(batch.story_id) + '\',this)">' + MON_SVG_EXPORT + '</button>'
+
+    const isReady = bs === 'ready';
+    const batchStoryBtn = (btype === 'story' && batch.story_id)
+      ? '<button class="cycle-float-btn story-view-btn" title="Посмотреть сюжет"' +
+        (isReady ? '' : ' disabled') +
+        ' onclick="openStoryModal(\'' + esc(batch.story_id) + '\',\'\')">' + MON_SVG_EYE + '</button>'
       : '';
-    const batchStoryBtn = batch.story_id
-      ? '<button class="cycle-float-btn story-view-btn" title="Посмотреть сюжет" onclick="openStoryModal(\'' + esc(batch.story_id) + '\',\'' + esc(batch.text_model_name || '') + '\')">' + MON_SVG_EYE + '</button>'
-      : '';
-    const batchVideoBtn = batch.has_video_data
-      ? '<button class="cycle-float-btn" title="Просмотр видео" onclick="openVideoModal(\'' + esc(batch.batch_id) + '\',\'' + esc(batch.video_model_name || '') + '\')">' + MON_SVG_PLAY + '</button>'
+
+    const batchVideoBtn = (btype === 'movie' && batch.movie_id)
+      ? '<button class="cycle-float-btn" title="Просмотр видео"' +
+        (isReady ? '' : ' disabled') +
+        ' onclick="openVideoModal(\'' + esc(batch.batch_id) + '\',\'\')">' + MON_SVG_PLAY + '</button>'
       : '';
 
     const hdrActions =
-      '<div class="monitor-hdr-actions" onclick="event.stopPropagation()">' +
-        '<button class="cycle-float-btn" title="Развернуть записи" onclick="monitorExpandBatch(this)">'   + MON_SVG_EXPAND   + '</button>' +
-        '<button class="cycle-float-btn" title="Свернуть записи"   onclick="monitorCollapseBatch(this)">' + MON_SVG_COLLAPSE + '</button>' +
-      '</div>' +
       '<div class="monitor-hdr-actions-always" onclick="event.stopPropagation()">' +
         restartBtn +
-        storyExportBtn +
         batchStoryBtn +
         batchVideoBtn +
         '<button class="cycle-float-btn" title="Скопировать логи" onclick="monitorCopy(this)">'          + MON_SVG_COPY + '</button>' +
@@ -193,22 +177,16 @@
           : '<button class="cycle-float-btn" title="Удалить батч" onclick="monitorDeleteBatch(\'' + esc(batch.batch_id) + '\',this)">' + MON_SVG_DELETE + '</button>') +
       '</div>';
 
-    const frameHtml = (category === 'publish' && batch.batch_id)
+    const frameHtml = (btype === 'publish' && batch.batch_id)
       ? '<div class="monitor-pub-frame">' +
           '<img data-bid="' + esc(batch.batch_id) + '" style="width:100%;height:auto;display:block">' +
         '</div>'
       : '';
 
-    const catLine = catLabel
-      ? '<div class="monitor-batch-category">' + esc(catLabel) + _modelTag(category, batch.text_model_name, batch.video_model_name) + '</div>'
-      : '';
-
     return '<div class="monitor-batch bs-' + esc(bs) + '" data-bid="' + esc(batch.batch_id) +
-      '" data-category="' + esc(category) +
+      '" data-type="'       + esc(btype) +
       '" data-scheduled="'  + esc(isScheduledPlanning ? fmtMsk(batch.scheduled_at) : 'сейчас') +
       '" data-bstatus="'    + esc(bs) +
-      '" data-text-model="' + esc(batch.text_model_name || '') +
-      '" data-video-model="'+ esc(batch.video_model_name|| '') +
       '" onclick="monitorToggleBatch(event,this)">' +
       '<div class="monitor-batch-header">' +
         '<span class="monitor-dot ' + md + '"></span>' +
@@ -219,7 +197,7 @@
         hdrActions +
         '<span class="monitor-batch-arrow">▼</span>' +
       '</div>' +
-      '<div class="monitor-batch-body">' + catLine + frameHtml + '</div>' +
+      '<div class="monitor-batch-body">' + frameHtml + '</div>' +
     '</div>';
   }
 
@@ -247,7 +225,7 @@
   function buildTimeline(batches, system) {
     var items = [];
     (batches || []).forEach(function(b) {
-      items.push({ type: 'batch', time: b.log_created_at || b.created_at, data: b });
+      items.push({ type: 'batch', time: b.created_at, data: b });
     });
     (system || []).forEach(function(s) {
       items.push({ type: 'system', time: s.created_at, data: s });
@@ -386,7 +364,7 @@
   function _evictPubFrameCache() {
     var alive = {};
     document.querySelectorAll(
-      '.monitor-batch.open[data-category="publish"] .monitor-pub-frame img[data-bid]'
+      '.monitor-batch.open[data-type="publish"] .monitor-pub-frame img[data-bid]'
     ).forEach(function(img) {
       if (img.dataset.bid) alive[img.dataset.bid] = true;
     });
@@ -409,11 +387,11 @@
   function refreshPublishFrames() {
     _evictPubFrameCache();
     if (!document.querySelector(
-      '.monitor-batch.open[data-category="publish"] .monitor-pub-frame img[data-bid]'
+      '.monitor-batch.open[data-type="publish"] .monitor-pub-frame img[data-bid]'
     )) return;
 
     document.querySelectorAll(
-      '.monitor-batch.open[data-category="publish"] .monitor-pub-frame img[data-bid]'
+      '.monitor-batch.open[data-type="publish"] .monitor-pub-frame img[data-bid]'
     ).forEach(function(img) {
       var bid = img.dataset.bid;
       if (!bid) return;
@@ -432,7 +410,7 @@
           if (!blob) return;
           if (_pubFrameVer[bid] !== ver) return;
           if (!document.querySelector(
-            '.monitor-batch.open[data-category="publish"] .monitor-pub-frame img[data-bid="' + bid + '"]'
+            '.monitor-batch.open[data-type="publish"] .monitor-pub-frame img[data-bid="' + bid + '"]'
           )) return;
           if (_pubFrameCache[bid]) URL.revokeObjectURL(_pubFrameCache[bid]);
           var url = URL.createObjectURL(blob);
@@ -504,7 +482,6 @@
           if (isOpen) {
             newNode.classList.add('open');
             if (item.type === 'batch') {
-              var bid = item.data.batch_id;
               var oldEntries = existing.querySelector('.monitor-entries');
               if (oldEntries) {
                 var body = newNode.querySelector('.monitor-batch-body');
@@ -564,15 +541,10 @@
     if (!batchEl) return [];
     var lines = [
       'batch_id: '  + (batchEl.dataset.bid      || ''),
+      'type: '      + (batchEl.dataset.type     || ''),
       'scheduled: ' + (batchEl.dataset.scheduled || ''),
       'status: '    + (batchEl.dataset.bstatus   || ''),
     ];
-    var tm = batchEl.dataset.textModel  || '';
-    var vm = batchEl.dataset.videoModel || '';
-    var cat = batchEl.dataset.category || '';
-    if (cat) lines.push('category: ' + cat);
-    if (tm) lines.push('text_model: '  + tm);
-    if (vm) lines.push('video_model: ' + vm);
     return lines;
   }
 
@@ -619,28 +591,6 @@
         }
       }
     }
-  };
-
-  window.monitorExpandBatch = function(btn) {
-    var batch = btn.closest('.monitor-batch');
-    if (!batch) return;
-    batch.classList.add('open');
-    _openBid = batch.dataset.bid || null;
-    if (_openBid) {
-      if (_batchEntriesCache[_openBid]) {
-        _applyBatchEntries(batch, _batchEntriesCache[_openBid]);
-      } else {
-        _fetchAndInjectEntries(_openBid);
-      }
-    }
-  };
-
-  window.monitorCollapseBatch = function(btn) {
-    var batch = btn.closest('.monitor-batch');
-    if (!batch) return;
-    batch.classList.remove('open');
-    if (_openBid === batch.dataset.bid) _openBid = null;
-    _evictPubFrameCache();
   };
 
   window.monitorSystemCopy = function(btn) {

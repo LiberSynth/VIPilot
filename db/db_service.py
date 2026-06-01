@@ -33,8 +33,8 @@ def db_get_log_entries(log_id):
 
 def db_get_monitor():
     """
-    Лёгкий список для монитора без log_entries.
-    batches — все stage-батчи; system — log-окна между батчами (batch_id IS NULL).
+    Лёгкий список для монитора без log_entries и без join log/stories/movies.
+    batches — поля batches; system — log-окна (batch_id IS NULL).
     """
     with get_db() as conn:
         with conn.cursor() as cur:
@@ -46,30 +46,11 @@ def db_get_monitor():
                     b.type,
                     b.status,
                     b.created_at,
-                    l.id::text,
-                    l.category,
-                    l.created_at AS log_created_at,
                     b.story_id,
-                    m.has_video_data,
-                    tm.name AS text_model_name,
-                    vm.name AS video_model_name,
+                    b.movie_id,
                     b.title
                 FROM batches b
-                LEFT JOIN LATERAL (
-                    SELECT id, category, created_at
-                    FROM log
-                    WHERE batch_id = b.id
-                    ORDER BY created_at DESC, id DESC
-                    LIMIT 1
-                ) l ON TRUE
-                LEFT JOIN (
-                    SELECT id, model_id, TRUE AS has_video_data
-                    FROM movies
-                ) m ON m.id = b.movie_id
-                LEFT JOIN stories s ON s.id = b.story_id
-                LEFT JOIN ai_models tm ON tm.id = s.model_id
-                LEFT JOIN ai_models vm ON vm.id = m.model_id
-                ORDER BY COALESCE(l.created_at, b.created_at) DESC, b.id DESC
+                ORDER BY b.created_at DESC, b.id DESC
                 """
             )
             batch_rows = cur.fetchall()
@@ -86,19 +67,14 @@ def db_get_monitor():
 
     batches = [
         {
-            "batch_id":         str(r[0]),
-            "scheduled_at":     r[1].isoformat() if r[1] else None,
-            "type":             r[2],
-            "batch_status":     r[3],
-            "created_at":       r[4].isoformat() if r[4] else None,
-            "log_id":           r[5],
-            "category":         r[6],
-            "log_created_at":   r[7].isoformat() if r[7] else None,
-            "story_id":         str(r[8]) if r[8] else None,
-            "has_video_data":   bool(r[9]),
-            "text_model_name":  r[10],
-            "video_model_name": r[11],
-            "title":            r[12],
+            "batch_id":       str(r[0]),
+            "scheduled_at":   r[1].isoformat() if r[1] else None,
+            "type":           r[2],
+            "batch_status":   r[3],
+            "created_at":     r[4].isoformat() if r[4] else None,
+            "story_id":       str(r[5]) if r[5] else None,
+            "movie_id":       str(r[6]) if r[6] else None,
+            "title":          r[7],
         }
         for r in batch_rows
     ]
@@ -696,7 +672,6 @@ def db_cleanup_batches(batch_lifetime_days: int) -> int:
                 SELECT id FROM batches
                 WHERE (
                     status IN ('published', 'cancelled')
-                    OR (type = 'movie_manual' AND status = 'movie_manual')
                     OR (type = 'movie' AND status = 'ready')
                     OR (type = 'planning' AND status = 'ready')
                     OR (type = 'transcode' AND status = 'ready')

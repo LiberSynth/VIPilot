@@ -12,6 +12,28 @@ from .migrations import run_migrations
 from log.log import write_log_entry
 
 
+def _ensure_log_indexes(cur) -> None:
+    """Индексы log по фактическим колонкам: category (новая схема) или pipeline (до m1007)."""
+    cur.execute("""
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = current_schema()
+          AND table_name = 'log'
+          AND column_name IN ('category', 'pipeline')
+    """)
+    cols = {r[0] for r in cur.fetchall()}
+    if 'category' in cols:
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_log_category
+                ON log (category)
+        """)
+    if 'pipeline' in cols:
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_log_pipeline
+                ON log (pipeline)
+        """)
+
+
 def bootstrap():
     """
     Создаёт/дополняет полную схему БД. Idempotent: безопасно вызывать при каждом старте.
@@ -281,10 +303,7 @@ def bootstrap():
                 CREATE INDEX IF NOT EXISTS idx_log_batch_id
                     ON log (batch_id)
             """)
-            cur.execute("""
-                CREATE INDEX IF NOT EXISTS idx_log_category
-                    ON log (category)
-            """)
+            _ensure_log_indexes(cur)
             cur.execute("""
                 CREATE INDEX IF NOT EXISTS idx_log_created_at
                     ON log (created_at)
