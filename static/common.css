@@ -589,7 +589,8 @@
     border-top: 1px solid #0e0e16;
     padding: 4px 14px 4px 52px;
   }
-  .monitor-batch.open .monitor-entries { display: block; }
+  .monitor-batch.open .monitor-entries,
+  .monitor-sysgroup.open .monitor-entries { display: block; }
   .monitor-entry-row {
     display: flex; gap: 8px; padding: 2px 0;
     border-bottom: 1px solid #0e0e18; font-size: 11px;

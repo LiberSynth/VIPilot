@@ -25,6 +25,9 @@ _system_log_id: str | None = None
 
 
 def log_app_started():
+    global _lifecycle_stop_logged, _system_log_id
+    _lifecycle_stop_logged = False
+    _system_log_id = None
     write_log_entry(None, "system", "[main] Приложение запущено", level="info")
 
 

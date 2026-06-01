@@ -351,12 +351,10 @@
         delete _sysLogFetching[lid];
         var entries = data.entries || [];
         _sysLogEntriesCache[lid] = entries;
+        if (_openSysLid !== lid) return;
         var el = document.querySelector('.monitor-system-block[data-lid="' + lid + '"]');
         if (!el) return;
-        if (entries.length) {
-          _applySystemEntries(el, entries);
-          if (_openSysLid === lid) el.classList.add('open');
-        }
+        _applySystemEntries(el, entries);
       })
       .catch(function() { delete _sysLogFetching[lid]; });
   }
@@ -586,9 +584,8 @@
       if (_openSysLid) {
         if (_sysLogEntriesCache[_openSysLid]) {
           _applySystemEntries(el, _sysLogEntriesCache[_openSysLid]);
-        } else {
-          _fetchSystemEntries(_openSysLid);
         }
+        _fetchSystemEntries(_openSysLid);
       }
     }
   };
@@ -693,30 +690,38 @@
     if (_openBid) _fetchAndInjectEntries(_openBid);
   }
 
-  var _timerMonitor          = null;
-  var _timerPublishFrames    = null;
-  var _timerOpenBatchEntries = null;
+  function refreshOpenSystemEntries() {
+    if (_openSysLid) _fetchSystemEntries(_openSysLid);
+  }
+
+  var _timerMonitor           = null;
+  var _timerPublishFrames     = null;
+  var _timerOpenBatchEntries  = null;
+  var _timerOpenSystemEntries = null;
 
   if (!document.hidden) {
     refreshMonitor();
-    _timerMonitor          = setInterval(refreshMonitor, 5000);
-    _timerPublishFrames    = setInterval(refreshPublishFrames, PUBLISH_FRAME_POLL_MS);
-    _timerOpenBatchEntries = setInterval(refreshOpenBatchEntries, 5000);
+    _timerMonitor           = setInterval(refreshMonitor, 5000);
+    _timerPublishFrames     = setInterval(refreshPublishFrames, PUBLISH_FRAME_POLL_MS);
+    _timerOpenBatchEntries  = setInterval(refreshOpenBatchEntries, 5000);
+    _timerOpenSystemEntries = setInterval(refreshOpenSystemEntries, 5000);
   }
 
   function _pauseMonitorPolling() {
     clearInterval(_timerMonitor);
     clearInterval(_timerPublishFrames);
     clearInterval(_timerOpenBatchEntries);
-    _timerMonitor = _timerPublishFrames = _timerOpenBatchEntries = null;
+    clearInterval(_timerOpenSystemEntries);
+    _timerMonitor = _timerPublishFrames = _timerOpenBatchEntries = _timerOpenSystemEntries = null;
   }
 
   function _resumeMonitorPolling() {
     if (_timerMonitor) return;
     refreshMonitor();
-    _timerMonitor          = setInterval(refreshMonitor, 5000);
-    _timerPublishFrames    = setInterval(refreshPublishFrames, PUBLISH_FRAME_POLL_MS);
-    _timerOpenBatchEntries = setInterval(refreshOpenBatchEntries, 5000);
+    _timerMonitor           = setInterval(refreshMonitor, 5000);
+    _timerPublishFrames     = setInterval(refreshPublishFrames, PUBLISH_FRAME_POLL_MS);
+    _timerOpenBatchEntries  = setInterval(refreshOpenBatchEntries, 5000);
+    _timerOpenSystemEntries = setInterval(refreshOpenSystemEntries, 5000);
   }
 
   document.addEventListener('visibilitychange', function() {
