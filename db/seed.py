@@ -42,7 +42,7 @@ def seed_db():
                 """)
 
             conn.commit()
-        write_log_entry(None, "[DB] Данные инициализированы", level='silent')
+        write_log_entry(None, "system", "[DB] Данные инициализированы", level='silent')
     except Exception as e:
-        write_log_entry(None, f"[DB] Ошибка seed_db: {e}", level='silent')
+        write_log_entry(None, "system", f"[DB] Ошибка seed_db: {e}", level='silent')
         raise

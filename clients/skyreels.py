@@ -34,7 +34,7 @@ def _compact_json(value, limit: int = 1200) -> str:
     return text[:limit] + '...'
 
 
-def submit(log_id, model_name: str, submit_url: str, platform_url: str,
+def submit(batch_id, category, model_name: str, submit_url: str, platform_url: str,
            body_tpl: dict, prompt: str, ar_x: int, ar_y: int,
            video_duration: int):
     """
@@ -43,35 +43,35 @@ def submit(log_id, model_name: str, submit_url: str, platform_url: str,
     Возвращает словарь {'request_id', 'status_url', 'response_url'} при успехе или None.
     Бросает ProviderFatalError при фатальной ошибке провайдера.
     """
-    body = build_body(body_tpl, prompt, ar_x, ar_y, video_duration, log_id)
+    body = build_body(body_tpl, prompt, ar_x, ar_y, video_duration, batch_id, category)
     body['api_key'] = _SKYREELS_KEY
 
     try:
         resp = requests.post(submit_url, headers=_headers(), json=body, timeout=30)
     except requests.exceptions.Timeout:
-        write_log_entry(log_id, f"[{model_name}] таймаут (30 с)", level='warn')
+        write_log_entry(batch_id, category, f"[{model_name}] таймаут (30 с)", level='warn')
         return None
     except requests.exceptions.RequestException as e:
-        write_log_entry(log_id, f"[{model_name}] ошибка соединения: {e}", level='warn')
+        write_log_entry(batch_id, category, f"[{model_name}] ошибка соединения: {e}", level='warn')
         return None
 
     try:
         data = resp.json()
     except ValueError:
-        write_log_entry(log_id, f"[{model_name}] не-JSON (HTTP {resp.status_code}): {resp.text}", level='warn')
+        write_log_entry(batch_id, category, f"[{model_name}] не-JSON (HTTP {resp.status_code}): {resp.text}", level='warn')
         return None
 
     if resp.status_code >= 400:
         if resp.status_code in (401, 403):
             msg = f"[{model_name}] Фатальная ошибка провайдера (HTTP {resp.status_code}): {data}"
-            write_log_entry(log_id, msg, level='error')
+            write_log_entry(batch_id, category, msg, level='error')
             raise ProviderFatalError(msg)
-        write_log_entry(log_id, f"[{model_name}] HTTP {resp.status_code}: {data}", level='warn')
+        write_log_entry(batch_id, category, f"[{model_name}] HTTP {resp.status_code}: {data}", level='warn')
         return None
 
     task_id = data.get('task_id') or data.get('request_id') or data.get('id')
     if not task_id:
-        write_log_entry(log_id, f"[{model_name}] нет task_id в ответе: {str(data)}", level='warn')
+        write_log_entry(batch_id, category, f"[{model_name}] нет task_id в ответе: {str(data)}", level='warn')
         return None
 
     base = platform_url.rstrip('/')
@@ -85,7 +85,7 @@ def submit(log_id, model_name: str, submit_url: str, platform_url: str,
     }
 
 
-def poll(log_id, status_url: str, response_url: str):
+def poll(batch_id, category, status_url: str, response_url: str):
     """
     Поллит SkyReels до завершения генерации.
     Возвращает (video_url, None) при успехе или (None, error_msg) при сбоке.
@@ -99,19 +99,19 @@ def poll(log_id, status_url: str, response_url: str):
             try:
                 data = resp.json()
             except ValueError:
-                write_log_entry(log_id, f"SkyReels poll [{attempt + 1}] не-JSON (HTTP {resp.status_code})", level='warn')
+                write_log_entry(batch_id, category, f"SkyReels poll [{attempt + 1}] не-JSON (HTTP {resp.status_code})", level='warn')
                 write_log_entry(
-                    log_id,
+                    batch_id, category,
                     f"[video] SkyReels poll [{attempt + 1}] http={resp.status_code}, body={_compact_json(resp.text)}",
                     level='silent',
                 )
-                write_log_entry(log_id, f"Статус [{attempt + 1}]: None")
+                write_log_entry(batch_id, category, f"Статус [{attempt + 1}]: None")
                 continue
 
             status = (data.get('status') or '').upper()
-            write_log_entry(log_id, f"Статус [{attempt + 1}]: {status}")
+            write_log_entry(batch_id, category, f"Статус [{attempt + 1}]: {status}")
             write_log_entry(
-                log_id,
+                batch_id, category,
                 f"[video] SkyReels poll [{attempt + 1}] http={resp.status_code}, status={status}, keys={list(data.keys()) if isinstance(data, dict) else []}",
                 level='silent',
             )
@@ -124,25 +124,25 @@ def poll(log_id, status_url: str, response_url: str):
                 )
                 if not video_url:
                     msg = f"SkyReels: нет video_url в ответе: {str(data)}"
-                    write_log_entry(log_id, msg, level='error')
+                    write_log_entry(batch_id, category, msg, level='error')
                     return None, msg
                 return video_url, None
 
             if status in ('FAILED', 'ERROR'):
                 msg = f"SkyReels: генерация провалилась: {str(data)}"
-                write_log_entry(log_id, msg, level='error')
+                write_log_entry(batch_id, category, msg, level='error')
                 return None, msg
 
         except Exception as e:
-            write_log_entry(log_id, f"Ошибка опроса статуса: {e}", level='warn')
-            write_log_entry(log_id, f"[video] SkyReels poll [{attempt + 1}] exception={type(e).__name__}: {e}", level='silent')
+            write_log_entry(batch_id, category, f"Ошибка опроса статуса: {e}", level='warn')
+            write_log_entry(batch_id, category, f"[video] SkyReels poll [{attempt + 1}] exception={type(e).__name__}: {e}", level='silent')
 
     msg = 'Таймаут генерации видео SkyReels (2 часа)'
-    write_log_entry(log_id, msg, level='error')
+    write_log_entry(batch_id, category, msg, level='error')
     return None, msg
 
 
-def download_video(log_id, video_url: str) -> bytes:
+def download_video(batch_id, category, video_url: str) -> bytes:
     """Скачивает видео по URL."""
     r = requests.get(video_url, timeout=120, stream=True)
     r.raise_for_status()

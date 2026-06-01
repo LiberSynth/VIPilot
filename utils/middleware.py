@@ -25,7 +25,7 @@ def log_request():
     full_path = request.full_path if request.query_string else path
     remote = request.remote_addr
     msg = f"[HTTP] {method} {full_path} | IP: {remote}"
-    write_log_entry(None, msg, level='silent')
+    write_log_entry(None, "system", msg, level='silent')
 
 
 def register_middleware(app):

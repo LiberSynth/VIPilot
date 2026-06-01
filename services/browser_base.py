@@ -126,7 +126,7 @@ class PlatformBrowser:
                 if url:
                     page.goto(url, wait_until="domcontentloaded", timeout=30_000)
         except Exception as e:
-            write_log_entry(None, f"{tag} Ошибка события {ev_type!r}: {e}", level='silent')
+            write_log_entry(None, "system", f"{tag} Ошибка события {ev_type!r}: {e}", level='silent')
 
     # ------------------------------------------------------------------
     # Browser loop (background thread)
@@ -166,7 +166,7 @@ class PlatformBrowser:
                             level='silent',
                         )
                 except Exception as _e:
-                    write_log_entry(None, f"{tag} Не удалось загрузить куки из БД: {_e}", level='silent')
+                    write_log_entry(None, "system", f"{tag} Не удалось загрузить куки из БД: {_e}", level='silent')
 
                 page = context.new_page()
 
@@ -176,17 +176,17 @@ class PlatformBrowser:
 
                 def _on_new_page(new_page):
                     active_page[0] = new_page
-                    write_log_entry(None, f"{tag} Новая вкладка: {new_page.url}", level='silent')
+                    write_log_entry(None, "system", f"{tag} Новая вкладка: {new_page.url}", level='silent')
 
                 context.on("page", _on_new_page)
 
                 try:
                     page.goto(self._start_url, wait_until="domcontentloaded", timeout=30_000)
                 except Exception as e:
-                    write_log_entry(None, f"{tag} Ошибка навигации: {e}", level='silent')
+                    write_log_entry(None, "system", f"{tag} Ошибка навигации: {e}", level='silent')
 
                 self._set_status("running")
-                write_log_entry(None, f"{tag} Браузер запущен.", level='info')
+                write_log_entry(None, "system", f"{tag} Браузер запущен.", level='info')
 
                 while self._running:
                     if self._save_request_event.is_set():
@@ -246,7 +246,7 @@ class PlatformBrowser:
                             self._frame_counter += 1
                         self._new_frame_event.set()
                     except Exception as e:
-                        write_log_entry(None, f"{tag} Ошибка скриншота: {e}", level='info')
+                        write_log_entry(None, "system", f"{tag} Ошибка скриншота: {e}", level='info')
 
                     time.sleep(0.2)
 
@@ -255,11 +255,11 @@ class PlatformBrowser:
 
         except Exception as e:
             self._set_status("error", str(e))
-            write_log_entry(None, f"{tag} Критическая ошибка: {e}", level='info')
+            write_log_entry(None, "system", f"{tag} Критическая ошибка: {e}", level='info')
             return
 
         self._set_status("stopped")
-        write_log_entry(None, f"{tag} Браузер остановлен.", level='info')
+        write_log_entry(None, "system", f"{tag} Браузер остановлен.", level='info')
 
     # ------------------------------------------------------------------
     # Public API
@@ -269,7 +269,7 @@ class PlatformBrowser:
         tag = f"[{self._platform}_browser]"
         with self._lock:
             if self._running:
-                write_log_entry(None, f"{tag} Старт запрошен — браузер уже запущен.", level='info')
+                write_log_entry(None, "system", f"{tag} Старт запрошен — браузер уже запущен.", level='info')
                 return {"ok": True, "already": True}
 
             self._running           = True
@@ -284,7 +284,7 @@ class PlatformBrowser:
                 except queue.Empty:
                     break
 
-            write_log_entry(None, f"{tag} Запуск браузера.", level='info')
+            write_log_entry(None, "system", f"{tag} Запуск браузера.", level='info')
             write_log_entry(
                 None,
                 fmt_id_msg(f"{tag} Запуск браузера для target={{}}", target_id),
@@ -301,11 +301,11 @@ class PlatformBrowser:
 
         return {"ok": True, "already": False}
 
-    def stop(self, log_id=None) -> dict:
+    def stop(self, batch_id=None, category=None) -> dict:
         tag = f"[{self._platform}_browser]"
         with self._lock:
             self._running = False
-        write_log_entry(log_id, f"{tag} Остановка запрошена.", level='info')
+        write_log_entry(batch_id, category, f"{tag} Остановка запрошена.", level='info')
         return {"ok": True}
 
     def send_event(self, ev: dict) -> bool:
@@ -319,7 +319,7 @@ class PlatformBrowser:
         tag = f"[{self._platform}_browser]"
         info = self.get_status()
         if info["status"] != "running":
-            write_log_entry(None, f"{tag} Сохранение сессии невозможно: браузер не запущен.", level='info')
+            write_log_entry(None, "system", f"{tag} Сохранение сессии невозможно: браузер не запущен.", level='info')
             return {"ok": False, "error": "Браузер не запущен"}
 
         self._save_result = None
@@ -327,7 +327,7 @@ class PlatformBrowser:
         self._save_request_event.set()
 
         if not self._save_done_event.wait(timeout=10):
-            write_log_entry(None, f"{tag} Таймаут сохранения сессии.", level='info')
+            write_log_entry(None, "system", f"{tag} Таймаут сохранения сессии.", level='info')
             return {"ok": False, "error": "Таймаут сохранения сессии"}
 
         return self._save_result or {"ok": False, "error": "Неизвестная ошибка"}
@@ -352,7 +352,7 @@ class PlatformBrowser:
         with self._batch_frames_lock:
             return self._batch_frames.get(batch_id)
 
-    def run_pipeline_browser(self, fn, cookies: list, log_id=None) -> dict:
+    def run_pipeline_browser(self, fn, cookies: list, batch_id=None, category=None) -> dict:
         """
         Запускает fn(page, context) в новом браузере с куками из cookies.
         БЛОКИРУЕТ вызывающий поток — вызывать из фонового потока пайплайна.
@@ -380,9 +380,9 @@ class PlatformBrowser:
                 if cookies:
                     try:
                         ctx.add_cookies(cookies)
-                        write_log_entry(log_id, f"{tag} Загружено {len(cookies)} куков", level='silent')
+                        write_log_entry(batch_id, category, f"{tag} Загружено {len(cookies)} куков", level='silent')
                     except Exception as e:
-                        write_log_entry(log_id, f"{tag} Ошибка куков: {e}", level='silent')
+                        write_log_entry(batch_id, category, f"{tag} Ошибка куков: {e}", level='silent')
 
                 page = ctx.new_page()
 
@@ -394,7 +394,7 @@ class PlatformBrowser:
                 finally:
                     try:
                         browser.close()
-                        write_log_entry(log_id, f"{tag} Браузер пайплайна закрыт.", level='silent')
+                        write_log_entry(batch_id, category, f"{tag} Браузер пайплайна закрыт.", level='silent')
                     except Exception:
                         pass
 

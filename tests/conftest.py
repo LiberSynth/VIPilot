@@ -20,7 +20,6 @@ def app():
     with (
         patch("utils.limiter.limiter.init_app", noop),
         patch("log.log.write_log_entry", noop),
-        patch("log.log.write_log", noop),
     ):
         from routes.api import bp, production_bp
 

@@ -6,26 +6,45 @@ from .connection import get_db
 from common.exceptions import FatalError
 
 
-def db_insert_log(pipeline, message, status="info", batch_id=None):
-    """INSERT если записи для (batch_id, pipeline) нет, иначе UPDATE. Возвращает log_id (str)."""
+def _assert_log_modification():
+    import common.environment as environment
+    if not environment.asserted_log_modification.get():
+        raise FatalError("Нарушение конвенции: модификация log вне log.py")
+
+
+def db_get_or_create_log(batch_id, category):
+    """Возвращает log_id для пары (batch_id, category), создаёт строку при отсутствии."""
+    _assert_log_modification()
     with get_db() as conn:
         with conn.cursor() as cur:
-            if batch_id is not None:
-                cur.execute(
-                    "SELECT id FROM log WHERE batch_id = %s AND pipeline = %s ORDER BY id DESC LIMIT 1",
-                    (batch_id, pipeline),
-                )
-                row = cur.fetchone()
-                if row:
-                    cur.execute(
-                        "UPDATE log SET message = %s, status = %s WHERE id = %s",
-                        (message, status, row[0]),
-                    )
-                    conn.commit()
-                    return str(row[0])
             cur.execute(
-                "INSERT INTO log (batch_id, pipeline, message, status) VALUES (%s, %s, %s, %s) RETURNING id",
-                (batch_id, pipeline, message, status),
+                """
+                SELECT id FROM log
+                WHERE batch_id = %s::uuid AND category = %s
+                ORDER BY id DESC LIMIT 1
+                """,
+                (batch_id, category),
+            )
+            row = cur.fetchone()
+            if row:
+                return str(row[0])
+            cur.execute(
+                "INSERT INTO log (batch_id, category) VALUES (%s::uuid, %s) RETURNING id",
+                (batch_id, category),
+            )
+            log_id = cur.fetchone()[0]
+        conn.commit()
+    return str(log_id)
+
+
+def db_insert_log(batch_id, category):
+    """INSERT новой строки log (batch_id может быть NULL для системного окна)."""
+    _assert_log_modification()
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO log (batch_id, category) VALUES (%s, %s) RETURNING id",
+                (batch_id, category),
             )
             log_id = cur.fetchone()[0]
         conn.commit()
@@ -464,14 +483,14 @@ def db_get_last_pipeline_run(pipeline, scheduled_only: bool = False):
                     SELECT MAX(l.created_at)
                     FROM log l
                     JOIN batches b ON b.id = l.batch_id
-                    WHERE l.pipeline = %s
+                    WHERE l.category = %s
                       AND b.scheduled_at IS NOT NULL
                     """,
                     (pipeline,),
                 )
             else:
                 cur.execute(
-                    "SELECT MAX(created_at) FROM log WHERE pipeline = %s",
+                    "SELECT MAX(created_at) FROM log WHERE category = %s",
                     (pipeline,),
                 )
             row = cur.fetchone()

@@ -7,6 +7,7 @@ from db import env_get, settings_get
 _running_event = threading.Event()
 
 asserted_log_entry: ContextVar[bool] = ContextVar('asserted_log_entry', default=False)
+asserted_log_modification: ContextVar[bool] = ContextVar('asserted_log_modification', default=False)
 
 _running_event.set()
 

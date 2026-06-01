@@ -245,20 +245,10 @@ class GenerationConsoleController {
     var state = this._tracked.get(batchId);
     if (!state || !data || data.error) return;
 
-    var logs = Array.isArray(data.logs) ? data.logs : [];
-    var entries = [];
-    for (var i = 0; i < logs.length; i++) {
-      var log = logs[i] || {};
-      var logEntries = Array.isArray(log.entries) ? log.entries : [];
-      for (var j = 0; j < logEntries.length; j++) {
-        var e = logEntries[j] || {};
-        entries.push({
-          created_at: e.created_at || '',
-          message: e.message || '',
-          level: e.level || '',
-          pipeline: log.pipeline || '',
-        });
-      }
+    var entries = Array.isArray(data.entries) ? data.entries : [];
+    var category = data.category || '';
+    for (var i = 0; i < entries.length; i++) {
+      if (!entries[i].pipeline && category) entries[i].pipeline = category;
     }
     entries.sort(function(a, b) {
       return String(a.created_at || '').localeCompare(String(b.created_at || ''));

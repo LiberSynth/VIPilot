@@ -68,9 +68,14 @@ def main_loop():
         except AppException as e:
             if e.batch_id:
                 db_set_batch_status(e.batch_id, 'error')
-            write_log_entry(e.log_id, f"[main_loop] AppException ({e.pipeline}): {e.message}", level='error')
+            write_log_entry(
+                e.batch_id,
+                e.pipeline,
+                f"[main_loop] AppException ({e.pipeline}): {e.message}",
+                level='error',
+            )
         except Exception as e:
-            write_log_entry(None, f"[main_loop] Ошибка: {e}", level='error')
+            write_log_entry(None, "system", f"[main_loop] Ошибка: {e}", level='error')
 
         environment.wait_for_wakeup(environment.loop_interval)
 

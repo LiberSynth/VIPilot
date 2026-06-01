@@ -5,9 +5,7 @@ from flask import Flask
 from db import (
     db_reset_stalled_batches,
 )
-from db.connection import get_db
-from common.statuses import FINAL_BATCH_STATUSES
-from log.log import write_log, write_log_entry
+from log.log import write_log_entry
 from utils.consts import FLASK_SECRET
 from utils.limiter import limiter
 from utils.utils import fmt_id_msg
@@ -32,75 +30,17 @@ def init_app(app: Flask):
     app.register_blueprint(browser_widget_bp)
 
     _reset_stalled_batches()
-    _interrupt_running_pipelines()
-    _fix_orphaned_running()
 
 
 def _reset_stalled_batches():
     affected = db_reset_stalled_batches()
     if not affected:
-        write_log_entry(None, "[startup] Незавершённых батчей не обнаружено.", level='silent')
+        write_log_entry(None, "system", "[startup] Незавершённых батчей не обнаружено.", level='silent')
         return
     for item in affected:
         bid = item["id"]
         old = item["old_status"]
         new = item["new_status"]
         msg = f"Батч сброшен при рестарте: {old} → {new}"
-        write_log('planning', msg, status='warn', batch_id=bid)
-        write_log_entry(None, fmt_id_msg("[startup] Батч {} сброшен: {} → {}", bid, old, new), level='silent')
-
-
-def _interrupt_running_pipelines():
-    for pipeline in ('story', 'video', 'transcode', 'publish'):
-        try:
-            with get_db() as conn:
-                with conn.cursor() as cur:
-                    cur.execute(
-                        "UPDATE log SET status = 'cancelled' WHERE pipeline = %s AND status = 'running'",
-                        (pipeline,),
-                    )
-                    count = cur.rowcount
-                conn.commit()
-            if count:
-                write_log_entry(None, f"[startup] {pipeline}: {count} незавершённых записей → cancelled", level='silent')
-        except Exception as e:
-            write_log_entry(None, f"[DB] Ошибка прерывания running для {pipeline}: {e}", level='silent')
-
-
-def _fix_orphaned_running():
-    try:
-        placeholders = ', '.join(['%s'] * len(FINAL_BATCH_STATUSES))
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    f"""
-                    SELECT l.id, l.pipeline, l.batch_id, b.status
-                    FROM log l
-                    JOIN batches b ON b.id = l.batch_id
-                    WHERE l.status = 'running'
-                      AND b.status IN ({placeholders})
-                    """,
-                    FINAL_BATCH_STATUSES,
-                )
-                rows = cur.fetchall()
-                if rows:
-                    for row in rows:
-                        log_id, pipeline, batch_id, batch_status = row
-                        write_log_entry(
-                            log_id,
-                            fmt_id_msg(
-                                "[startup] WARN: лог #{} (pipeline={}, batch={}) завис в 'running', "
-                                "батч уже в статусе '{}'",
-                                log_id, pipeline, batch_id, batch_status
-                            ),
-                            level='silent',
-                        )
-                    ids = [r[0] for r in rows]
-                    cur.execute(
-                        "UPDATE log SET status = 'cancelled' WHERE id = ANY(%s)",
-                        (ids,),
-                    )
-                    conn.commit()
-                    write_log_entry(None, f"[startup] {len(ids)} зависших 'running' записей → cancelled", level='silent')
-    except Exception as e:
-        write_log_entry(None, f"[DB] Ошибка _fix_orphaned_running: {e}", level='silent')
+        write_log_entry(bid, "planning", msg, level='warn')
+        write_log_entry(None, "system", fmt_id_msg("[startup] Батч {} сброшен: {} → {}", bid, old, new), level='silent')

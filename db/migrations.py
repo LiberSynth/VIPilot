@@ -139,6 +139,15 @@ def _m1006_fix_published_movies_transcoded(cur):
     )
 
 
+def _m1007_log_category_and_drop_message_status(cur):
+    cur.execute("ALTER TABLE log RENAME COLUMN pipeline TO category")
+    cur.execute("ALTER TABLE log DROP COLUMN IF EXISTS message")
+    cur.execute("ALTER TABLE log DROP COLUMN IF EXISTS status")
+    cur.execute("DROP INDEX IF EXISTS idx_log_pipeline")
+    cur.execute("DROP INDEX IF EXISTS idx_log_status")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_log_category ON log (category)")
+
+
 MIGRATIONS = [
     (2026052901, _m1001_drop_targets_legacy_columns),
     (2026052902, _m1002_add_movies_transcoded),
@@ -146,6 +155,7 @@ MIGRATIONS = [
     (2026052904, _m1004_backfill_movies_story_id),
     (2026052905, _m1005_mark_published_movies_used),
     (2026052906, _m1006_fix_published_movies_transcoded),
+    (2026052907, _m1007_log_category_and_drop_message_status),
 ]
 
 
@@ -173,7 +183,7 @@ def run_migrations():
                         " ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
                         (str(version),),
                     )
-            write_log_entry(None, f"[DB] Миграция {version} применена", level='silent')
+            write_log_entry(None, "system", f"[DB] Миграция {version} применена", level='silent')
         except Exception as e:
-            write_log_entry(None, f"[DB] Ошибка миграции {version}: {e}", level='silent')
+            write_log_entry(None, "system", f"[DB] Ошибка миграции {version}: {e}", level='silent')
             raise

@@ -31,25 +31,13 @@ def db_get_batch_logs(batch_id):
                 return None
 
             cur.execute("""
-                SELECT l.id::text, l.pipeline, l.message, l.status,
-                       l.created_at,
-                       COALESCE(
-                           json_agg(
-                               json_build_object(
-                                   'message',    le.message,
-                                   'level',      le.level,
-                                   'created_at', le.created_at
-                               ) ORDER BY le.created_at
-                           ) FILTER (WHERE le.id IS NOT NULL),
-                           '[]'::json
-                       ) AS entries
-                FROM log l
-                LEFT JOIN log_entries le ON le.log_id = l.id
-                WHERE l.batch_id = %s
-                GROUP BY l.id
-                ORDER BY l.created_at
+                SELECT le.message, le.level, le.created_at
+                FROM log_entries le
+                JOIN log l ON l.id = le.log_id
+                WHERE l.batch_id = %s::uuid
+                ORDER BY le.created_at, le.id
             """, (batch_id,))
-            logs = cur.fetchall()
+            entries = cur.fetchall()
 
     return {
         'batch_id':         row['batch_id'],
@@ -63,16 +51,13 @@ def db_get_batch_logs(batch_id):
         'text_model_name':  row['text_model_name'],
         'video_model_name': row['video_model_name'],
         'title':            row['title'],
-        'logs': [
+        'entries': [
             {
-                'id':         r['id'],
-                'pipeline':   r['pipeline'],
-                'message':    r['message'],
-                'status':     r['status'],
-                'created_at': r['created_at'].isoformat() if r['created_at'] else None,
-                'entries':    r['entries'],
+                'message':    r[0],
+                'level':      r[1],
+                'created_at': r[2].isoformat() if r[2] else None,
             }
-            for r in logs
+            for r in entries
         ],
     }
 

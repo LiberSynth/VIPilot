@@ -1,5 +1,5 @@
 (function() {
-  const PIPELINE_LABELS = {
+  const CATEGORY_LABELS = {
     root:        'Система',
     system:      'Система',
     api:         'API',
@@ -47,6 +47,21 @@
     rutube:  'Rutube',
     vkvideo: 'VK Видео',
   };
+
+  const CATEGORY_RESTARTABLE = ['story', 'video', 'transcode', 'publish'];
+  const CATEGORY_ERROR_STATUSES = ['error', 'video_error', 'transcode_error', 'publish_error', 'fatal_error'];
+  const FINAL_BATCH_STATUSES = ['published', 'published_partially', 'movie_manual', 'story_manual', 'cancelled', 'error', 'fatal_error', 'video_error', 'transcode_error', 'publish_error', 'donated'];
+  const PUBLISH_FRAME_POLL_MS = 700;
+
+  const MON_SVG_EXPAND   = `<svg viewBox="0 0 16 16"><polyline points="2,6 2,2 6,2"/><polyline points="10,2 14,2 14,6"/><polyline points="14,10 14,14 10,14"/><polyline points="6,14 2,14 2,10"/></svg>`;
+  const MON_SVG_COLLAPSE = `<svg viewBox="0 0 16 16"><polyline points="6,2 6,6 2,6"/><polyline points="10,2 10,6 14,6"/><polyline points="14,10 10,10 10,14"/><polyline points="2,10 6,10 6,14"/></svg>`;
+  const MON_SVG_COPY     = `<svg viewBox="0 0 16 16"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11V3a1 1 0 0 1 1-1h8"/></svg>`;
+  const MON_SVG_RESTART  = `<svg viewBox="0 0 16 16" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="15.3,2.7 15.3,6.7 11.3,6.7"/><path d="M13.66 10a6 6 0 1 1-.08-5"/></svg>`;
+  const MON_SVG_EYE      = `<svg viewBox="0 0 16 16"><rect x="3" y="2" width="10" height="12" rx="1.5"/><line x1="5.5" y1="5.5" x2="10.5" y2="5.5"/><line x1="5.5" y1="8" x2="10.5" y2="8"/><line x1="5.5" y1="10.5" x2="8.5" y2="10.5"/></svg>`;
+  const MON_SVG_PLAY     = `<svg viewBox="0 0 16 16"><polygon points="4,2 13,8 4,14"/></svg>`;
+  const MON_SVG_INFO     = `<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.2"/><line x1="8" y1="5.5" x2="8" y2="5.5"/><line x1="8" y1="7.5" x2="8" y2="11"/></svg>`;
+  const MON_SVG_DELETE   = `<svg viewBox="0 0 16 16"><polyline points="2,4 14,4"/><path d="M5 4V2h6v2"/><rect x="3" y="4" width="10" height="10" rx="1.5"/><line x1="6" y1="7" x2="6" y2="11"/><line x1="10" y1="7" x2="10" y2="11"/></svg>`;
+  const MON_SVG_EXPORT   = `<svg viewBox="0 0 16 16"><path d="M8 2v7M5 6l3 3 3-3"/><path d="M3 11v2a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-2"/></svg>`;
 
   function translateStatus(s) {
     if (STATUS_LABELS[s]) return STATUS_LABELS[s];
@@ -97,105 +112,38 @@
     '</div>';
   }
 
-  const PIPELINE_RESTARTABLE    = ['story', 'video', 'transcode', 'publish'];
-  const PIPELINE_ERROR_STATUSES = ['error', 'video_error', 'transcode_error', 'publish_error', 'fatal_error'];
-  const FINAL_BATCH_STATUSES    = ['published', 'published_partially', 'movie_manual', 'story_manual', 'cancelled', 'error', 'fatal_error', 'video_error', 'transcode_error', 'publish_error', 'donated'];
-  const PUBLISH_FRAME_POLL_MS   = 700;
-
-  const MON_SVG_EXPAND   = `<svg viewBox="0 0 16 16"><polyline points="2,6 2,2 6,2"/><polyline points="10,2 14,2 14,6"/><polyline points="14,10 14,14 10,14"/><polyline points="6,14 2,14 2,10"/></svg>`;
-  const MON_SVG_COLLAPSE = `<svg viewBox="0 0 16 16"><polyline points="6,2 6,6 2,6"/><polyline points="10,2 10,6 14,6"/><polyline points="14,10 10,10 10,14"/><polyline points="2,10 6,10 6,14"/></svg>`;
-  const MON_SVG_COPY     = `<svg viewBox="0 0 16 16"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11V3a1 1 0 0 1 1-1h8"/></svg>`;
-  const MON_SVG_RESTART  = `<svg viewBox="0 0 16 16" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="15.3,2.7 15.3,6.7 11.3,6.7"/><path d="M13.66 10a6 6 0 1 1-.08-5"/></svg>`;
-  const MON_SVG_EYE      = `<svg viewBox="0 0 16 16"><rect x="3" y="2" width="10" height="12" rx="1.5"/><line x1="5.5" y1="5.5" x2="10.5" y2="5.5"/><line x1="5.5" y1="8" x2="10.5" y2="8"/><line x1="5.5" y1="10.5" x2="8.5" y2="10.5"/></svg>`;
-  const MON_SVG_PLAY     = `<svg viewBox="0 0 16 16"><polygon points="4,2 13,8 4,14"/></svg>`;
-  const MON_SVG_INFO     = `<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.2"/><line x1="8" y1="5.5" x2="8" y2="5.5"/><line x1="8" y1="7.5" x2="8" y2="11"/></svg>`;
-  const MON_SVG_DELETE   = `<svg viewBox="0 0 16 16"><polyline points="2,4 14,4"/><path d="M5 4V2h6v2"/><rect x="3" y="4" width="10" height="10" rx="1.5"/><line x1="6" y1="7" x2="6" y2="11"/><line x1="10" y1="7" x2="10" y2="11"/></svg>`;
-  const MON_SVG_EXPORT   = `<svg viewBox="0 0 16 16"><path d="M8 2v7M5 6l3 3 3-3"/><path d="M3 11v2a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-2"/></svg>`;
-
-  function renderLogItem(log, batchId, storyId, hasVideoData, textModelName, videoModelName, batchStatus) {
-    const isPublish = (log.pipeline === 'publish');
-    const rawSt = log.status || 'info';
-    const st = (isPublish && rawSt === 'ok' && batchStatus === 'published_partially') ? 'partial' : rawSt;
-    const pip = PIPELINE_LABELS[log.pipeline] || log.pipeline;
-    const modelName = (log.pipeline === 'video' && videoModelName) ? videoModelName
-      : (log.pipeline === 'story' && textModelName) ? textModelName
-      : (log.pipeline === 'transcode' || log.pipeline === 'transcoding') ? 'H.264'
-      : null;
-    const modelTag   = modelName ? '<span class="monitor-log-model">' + esc(modelName) + '</span>' : '';
-    const chevron = '<span class="monitor-log-chevron">▼</span>';
-    const comment    = log.message ? '<div class="monitor-log-comment">' + esc(log.message) + '</div>' : '';
-
-    const canRestart = batchId
-      && PIPELINE_RESTARTABLE.indexOf(log.pipeline) >= 0
-      && PIPELINE_ERROR_STATUSES.indexOf(st) >= 0;
-    const restartBtn = canRestart
-      ? '<button class="cycle-float-btn" title="Перезапустить" data-bid="' + esc(batchId) + '" data-pip="' + esc(log.pipeline) + '" onclick="monitorPipelineRestart(this)">' + MON_SVG_RESTART + '</button>'
-      : '';
-    const storyExportBtn = (log.pipeline === 'story' && storyId)
-      ? '<button class="cycle-float-btn" title="Выгрузка" onclick="exportStory(\'' + esc(storyId) + '\',this)">' + MON_SVG_EXPORT + '</button>'
-      : '';
-    const pipActions = '<div class="monitor-pip-actions" onclick="event.stopPropagation()">' +
-      restartBtn +
-      storyExportBtn +
-      '<button class="cycle-float-btn" title="Скопировать логи" onclick="monitorPipelineCopy(this)">'     + MON_SVG_COPY + '</button>' +
-      '<button class="cycle-float-btn" title="Скопировать инфо" onclick="monitorPipelineCopyInfo(this)">' + MON_SVG_INFO + '</button>' +
-    '</div>';
-
-    const frameHtml = (isPublish && batchId)
-      ? '<div class="monitor-pub-frame">' +
-          '<img data-bid="' + esc(batchId) + '" style="width:100%;height:auto;display:block">' +
-        '</div>'
-      : '';
-
-    return '<div class="monitor-log-item" data-lid="' + esc(log.id) + '" data-status="' + esc(st) + '" onclick="monitorToggleLog(event,this)">' +
-      '<div class="monitor-log-header">' +
-        '<div class="monitor-log-header-top">' +
-          '<span class="monitor-log-dot ls-' + esc(st) + '"></span>' +
-          '<span class="monitor-log-ts">'       + fmtMsk(log.created_at) + '</span>' +
-          '<span class="monitor-log-pipeline">' + esc(pip) + modelTag    + '</span>' +
-          pipActions + chevron +
-        '</div>' +
-        comment +
-      '</div>' +
-      frameHtml +
-      renderEntries(log.entries) +
-    '</div>';
+  function _batchDotClass(bs, batchId) {
+    const doneStatuses    = ['published', 'movie_manual', 'story_manual'];
+    const partialStatuses = ['published_partially'];
+    const waitStatuses    = ['story_ready', 'video_pending', 'video_ready', 'pending'];
+    const errorStatuses   = ['error', 'video_error', 'transcode_error', 'publish_error', 'fatal_error'];
+    const finalStatuses   = doneStatuses.concat(partialStatuses).concat(errorStatuses).concat(['cancelled', 'donated', 'reserved']);
+    const isFinal         = finalStatuses.indexOf(bs) >= 0;
+    const isActive        = !isFinal && _activeBatchIds.indexOf(batchId) >= 0;
+    if (isActive) return 'md-active';
+    if (bs === 'cancelled') return 'md-skip';
+    if (doneStatuses.indexOf(bs) >= 0) return 'md-ok';
+    if (partialStatuses.indexOf(bs) >= 0) return 'md-partial';
+    if (errorStatuses.indexOf(bs) >= 0) return 'md-error';
+    if (waitStatuses.indexOf(bs) >= 0) return 'md-wait';
+    if (bs === 'donated') return 'md-white';
+    return 'md-warn';
   }
 
-  function groupLogsByPipeline(logs) {
-    const order = [];
-    const map   = {};
-    logs.forEach(function(log) {
-      if (!map[log.pipeline]) {
-        map[log.pipeline] = {
-          id:         log.id,
-          pipeline:   log.pipeline,
-          created_at: log.created_at,
-          status:     log.status,
-          message:    log.message,
-          entries:    []
-        };
-        order.push(log.pipeline);
-      }
-      const g = map[log.pipeline];
-      g.status = log.status;
-      if (log.message) g.message = log.message;
-      if (log.entries) log.entries.forEach(function(e) { g.entries.push(e); });
-    });
-    order.forEach(function(pip) {
-      map[pip].entries.sort(function(a, b) {
-        return (b.created_at || '').localeCompare(a.created_at || '');
-      });
-    });
-    return order.map(function(pip) { return map[pip]; });
+  function _modelTag(category, textModelName, videoModelName) {
+    var modelName = (category === 'video' && videoModelName) ? videoModelName
+      : (category === 'story' && textModelName) ? textModelName
+      : (category === 'transcode' || category === 'transcoding') ? 'H.264'
+      : null;
+    return modelName ? '<span class="monitor-log-model">' + esc(modelName) + '</span>' : '';
   }
 
   function renderBatch(batch) {
-    const bs   = batch.batch_status || 'pending';
-    const logs = groupLogsByPipeline(batch.logs || []);
+    const bs = batch.batch_status || 'pending';
+    const category = batch.category || '';
+    const catLabel = category ? (CATEGORY_LABELS[category] || category) : '';
+    const headTime = batch.log_created_at || batch.created_at;
     const isScheduledPlanning = batch.type === 'planning' && !!batch.scheduled_at;
-
-    const headTime = batch.created_at;
     const schedStr = isScheduledPlanning
       ? 'Публикация: ' + fmtMskShort(batch.scheduled_at)
       : batch.type === 'movie_manual'
@@ -204,45 +152,23 @@
           ? 'Ручной сюжет'
           : 'Публикация: сейчас';
     const statusLabel = (bs === 'movie_manual' || bs === 'story_manual') ? 'выполнен' : translateStatus(bs);
-    const sub = [schedStr, statusLabel, batch.title || '']
-      .filter(Boolean).join(' · ');
+    const subParts = [schedStr, statusLabel];
+    if (catLabel) subParts.push(catLabel);
+    if (batch.title) subParts.push(batch.title);
+    const sub = subParts.filter(Boolean).join(' · ');
+    const md = _batchDotClass(bs, batch.batch_id);
+    const isActive = md === 'md-active';
 
-    if (logs.length === 0) {
-      const noLogDot = _activeBatchIds.indexOf(batch.batch_id) >= 0 ? 'md-active' : 'md-warn';
-      return '<div class="monitor-batch bs-' + esc(bs) + '" data-bid="' + esc(batch.batch_id) + '">' +
-        '<div class="monitor-batch-header" style="cursor:default">' +
-          '<span class="monitor-dot ' + noLogDot + '"></span>' +
-          '<div class="monitor-batch-meta">' +
-            '<div class="monitor-batch-title">' + fmtMskShort(headTime) + '</div>' +
-            '<div class="monitor-batch-sub">'   + esc(sub) + '</div>' +
-          '</div>' +
-        '</div>' +
-      '</div>';
-    }
-
-    const doneStatuses    = ['published', 'movie_manual', 'story_manual'];
-    const partialStatuses = ['published_partially'];
-    const waitStatuses    = ['story_ready', 'video_pending', 'video_ready', 'pending'];
-    const errorStatuses   = ['error', 'video_error', 'transcode_error', 'publish_error', 'fatal_error'];
-    const finalStatuses   = doneStatuses.concat(partialStatuses).concat(errorStatuses).concat(['cancelled', 'donated', 'reserved']);
-    const isFinal         = finalStatuses.indexOf(bs) >= 0;
-    const isActive        = !isFinal && (
-                              logs.some(function(l) { return l.status === 'running'; })
-                           || _activeBatchIds.indexOf(batch.batch_id) >= 0
-                           );
-    const md = isActive ? 'md-active'
-             : bs === 'cancelled'                    ? 'md-skip'
-             : doneStatuses.indexOf(bs)    >= 0      ? 'md-ok'
-             : partialStatuses.indexOf(bs) >= 0      ? 'md-partial'
-             : errorStatuses.indexOf(bs)   >= 0      ? 'md-error'
-             : waitStatuses.indexOf(bs)    >= 0      ? 'md-wait'
-             : bs === 'donated'                      ? 'md-white'
-             : 'md-warn';
-
-    const logHtml = '<div class="monitor-log-list">' + logs.map(function(log) {
-      return renderLogItem(log, batch.batch_id, batch.story_id, batch.has_video_data, batch.text_model_name, batch.video_model_name, bs);
-    }).join('') + '</div>';
-
+    const canRestart = batch.batch_id
+      && category
+      && CATEGORY_RESTARTABLE.indexOf(category) >= 0
+      && CATEGORY_ERROR_STATUSES.indexOf(bs) >= 0;
+    const restartBtn = canRestart
+      ? '<button class="cycle-float-btn" title="Перезапустить" data-bid="' + esc(batch.batch_id) + '" data-pip="' + esc(category) + '" onclick="monitorPipelineRestart(this)">' + MON_SVG_RESTART + '</button>'
+      : '';
+    const storyExportBtn = (category === 'story' && batch.story_id)
+      ? '<button class="cycle-float-btn" title="Выгрузка" onclick="exportStory(\'' + esc(batch.story_id) + '\',this)">' + MON_SVG_EXPORT + '</button>'
+      : '';
     const batchStoryBtn = batch.story_id
       ? '<button class="cycle-float-btn story-view-btn" title="Посмотреть сюжет" onclick="openStoryModal(\'' + esc(batch.story_id) + '\',\'' + esc(batch.text_model_name || '') + '\')">' + MON_SVG_EYE + '</button>'
       : '';
@@ -252,10 +178,12 @@
 
     const hdrActions =
       '<div class="monitor-hdr-actions" onclick="event.stopPropagation()">' +
-        '<button class="cycle-float-btn" title="Развернуть все"   onclick="monitorExpandAll(this)">'   + MON_SVG_EXPAND   + '</button>' +
-        '<button class="cycle-float-btn" title="Свернуть все"     onclick="monitorCollapseAll(this)">' + MON_SVG_COLLAPSE + '</button>' +
+        '<button class="cycle-float-btn" title="Развернуть записи" onclick="monitorExpandBatch(this)">'   + MON_SVG_EXPAND   + '</button>' +
+        '<button class="cycle-float-btn" title="Свернуть записи"   onclick="monitorCollapseBatch(this)">' + MON_SVG_COLLAPSE + '</button>' +
       '</div>' +
       '<div class="monitor-hdr-actions-always" onclick="event.stopPropagation()">' +
+        restartBtn +
+        storyExportBtn +
         batchStoryBtn +
         batchVideoBtn +
         '<button class="cycle-float-btn" title="Скопировать логи" onclick="monitorCopy(this)">'          + MON_SVG_COPY + '</button>' +
@@ -265,7 +193,18 @@
           : '<button class="cycle-float-btn" title="Удалить батч" onclick="monitorDeleteBatch(\'' + esc(batch.batch_id) + '\',this)">' + MON_SVG_DELETE + '</button>') +
       '</div>';
 
+    const frameHtml = (category === 'publish' && batch.batch_id)
+      ? '<div class="monitor-pub-frame">' +
+          '<img data-bid="' + esc(batch.batch_id) + '" style="width:100%;height:auto;display:block">' +
+        '</div>'
+      : '';
+
+    const catLine = catLabel
+      ? '<div class="monitor-batch-category">' + esc(catLabel) + _modelTag(category, batch.text_model_name, batch.video_model_name) + '</div>'
+      : '';
+
     return '<div class="monitor-batch bs-' + esc(bs) + '" data-bid="' + esc(batch.batch_id) +
+      '" data-category="' + esc(category) +
       '" data-scheduled="'  + esc(isScheduledPlanning ? fmtMsk(batch.scheduled_at) : 'сейчас') +
       '" data-bstatus="'    + esc(bs) +
       '" data-text-model="' + esc(batch.text_model_name || '') +
@@ -280,229 +219,71 @@
         hdrActions +
         '<span class="monitor-batch-arrow">▼</span>' +
       '</div>' +
-      '<div class="monitor-batch-body">' + logHtml + '</div>' +
+      '<div class="monitor-batch-body">' + catLine + frameHtml + '</div>' +
     '</div>';
   }
 
-  function _sysgroupEventCount(items, orphList, orphanCount) {
-    const rowCount = (items ? items.length : 0) + (orphList ? orphList.length : 0);
-    if (rowCount > 0) return rowCount;
-    return orphanCount != null ? orphanCount : 0;
-  }
-
-  function _tsMs(iso) {
-    const ts = Date.parse(iso || '');
-    return Number.isNaN(ts) ? 0 : ts;
-  }
-
-  function _sysgroupHeadTime(items, orphList, fallbackIso) {
-    const merged = [];
-    (items || []).forEach(function(e) {
-      if (e && e.created_at) merged.push(e.created_at);
-    });
-    (orphList || []).forEach(function(e) {
-      if (e && e.created_at) merged.push(e.created_at);
-    });
-    if (!merged.length) return fallbackIso || null;
-    merged.sort(function(a, b) { return _tsMs(b) - _tsMs(a); });
-    return merged[0];
-  }
-
-  function _renderSysRows(items, orphList) {
-    const merged = [];
-    (items || []).forEach(function(e) {
-      merged.push({ kind: 'log', created_at: e.created_at, data: e });
-    });
-    (orphList || []).forEach(function(e) {
-      merged.push({ kind: 'orphan', created_at: e.created_at, data: e });
-    });
-    merged.sort(function(a, b) { return _tsMs(b.created_at) - _tsMs(a.created_at); });
-    return merged.map(function(row) {
-      if (row.kind === 'log') {
-        const e = row.data || {};
-        const st = e.status || 'info';
-        const expandable = e.pipeline !== 'system';
-        const clickAttr  = expandable ? ' onclick="monitorToggleSysLog(event,this)"' : '';
-        const chevron    = expandable ? '<span class="monitor-syslog-chevron">\u25bc</span>' : '';
-        return '<div class="monitor-sysgroup-item monitor-sysgroup-log-item" data-lid="' + esc(e.id) + '"' + clickAttr + '>' +
-          '<div class="monitor-sysgroup-log-row">' +
-            '<span class="monitor-sysgroup-ts">'  + fmtMsk(e.created_at)                            + '</span>' +
-            '<span class="monitor-sysgroup-pip">' + esc(PIPELINE_LABELS[e.pipeline] || e.pipeline) + '</span>' +
-            '<span class="monitor-sysgroup-msg '  + esc(st) + '">' + esc(e.message || '')           + '</span>' +
-            chevron +
-          '</div>' +
-        '</div>';
-      }
-      const e = row.data || {};
-      const lvl = e.level || 'info';
-      return '<div class="monitor-sysgroup-item monitor-sysgroup-orphan-item">' +
-        '<span class="monitor-sysgroup-ts">'  + fmtMsk(e.created_at)                   + '</span>' +
-        '<span class="monitor-sysgroup-pip orphan-pip">—</span>'                        +
-        '<span class="monitor-sysgroup-msg ' + esc(lvl) + '">' + esc(e.message || '')  + '</span>' +
-      '</div>';
-    }).join('');
-  }
-
-  function renderSysGroup(items, posKey, dateBefore, dateAfter, orphanCount, orphanMinAt, orphans) {
-    const key      = posKey || '';
-    const orphList = orphans || [];
-    const n        = _sysgroupEventCount(items, orphList, orphanCount);
-    const headTime = _sysgroupHeadTime(items, orphList, orphanMinAt || null);
-    const sub      = n > 0 ? ('Событий ' + n) : '…';
-    const rows = _renderSysRows(items, orphList);
-
+  function renderSystemBlock(sys) {
+    const catLabel = CATEGORY_LABELS[sys.category] || sys.category || 'Система';
     const sysActions =
       '<div class="monitor-hdr-actions-always" onclick="event.stopPropagation()">' +
-        '<button class="cycle-float-btn" title="Скопировать" onclick="monitorSysCopy(this)">' + MON_SVG_COPY + '</button>' +
+        '<button class="cycle-float-btn" title="Скопировать" onclick="monitorSystemCopy(this)">' + MON_SVG_COPY + '</button>' +
       '</div>';
 
-    return '<div class="monitor-sysgroup" data-sg-key="' + esc(key) + '"' +
-      (dateBefore ? ' data-sg-before="' + esc(dateBefore) + '"' : '') +
-      (dateAfter  ? ' data-sg-after="'  + esc(dateAfter)  + '"' : '') +
-      ' onclick="monitorToggleSys(event,this)">' +
+    return '<div class="monitor-sysgroup monitor-system-block" data-lid="' + esc(sys.id) + '" onclick="monitorToggleSystemBlock(event,this)">' +
       '<div class="monitor-sysgroup-header">' +
         '<span class="monitor-sysgroup-dot"></span>' +
         '<div class="monitor-sysgroup-meta">' +
-          '<div class="monitor-sysgroup-title">' + fmtMsk(headTime) + '</div>' +
-          '<div class="monitor-sysgroup-sub">'   + esc(sub)         + '</div>' +
+          '<div class="monitor-sysgroup-title">' + fmtMsk(sys.created_at) + '</div>' +
+          '<div class="monitor-sysgroup-sub">'   + esc(catLabel)         + '</div>' +
         '</div>' +
         sysActions +
         '<span class="monitor-sysgroup-arrow">▼</span>' +
       '</div>' +
-      '<div class="monitor-sysgroup-body"><div class="monitor-sysgroup-items">' + rows + '</div></div>' +
+      '<div class="monitor-sysgroup-body"></div>' +
     '</div>';
   }
 
-  function buildTimeline(batches, system, hasSystemMap, hasSystemTop) {
+  function buildTimeline(batches, system) {
     var items = [];
-    (batches || []).forEach(function(b) { items.push({ type: 'batch', time: b.created_at, data: b }); });
-    (system  || []).forEach(function(s) { items.push({ type: 'sys',   time: s.created_at, data: s }); });
-    items.sort(function(a, b) { return new Date(b.time) - new Date(a.time); });
-
-    var groups = [], sysAccum = null;
-    items.forEach(function(item) {
-      if (item.type === 'sys') {
-        if (!sysAccum) { sysAccum = []; groups.push({ type: 'sysgroup', items: sysAccum }); }
-        sysAccum.push(item.data);
-      } else {
-        sysAccum = null;
-        groups.push({ type: 'batch', data: item.data });
-      }
+    (batches || []).forEach(function(b) {
+      items.push({ type: 'batch', time: b.log_created_at || b.created_at, data: b });
     });
-
-    // Вычисляем posKey, dateBefore, dateAfter, _orphanCount, _orphanMinAt для sysgroup из system-логов
-    for (var i = 0; i < groups.length; i++) {
-      if (groups[i].type !== 'sysgroup') continue;
-      var prevBatch = null, nextBatch = null;
-      for (var j = i - 1; j >= 0; j--) {
-        if (groups[j].type === 'batch') { prevBatch = groups[j].data; break; }
-      }
-      for (var k = i + 1; k < groups.length; k++) {
-        if (groups[k].type === 'batch') { nextBatch = groups[k].data; break; }
-      }
-      var posKey = (prevBatch ? prevBatch.batch_id : 'top') + ':' + (nextBatch ? nextBatch.batch_id : 'bottom');
-      groups[i]._posKey       = posKey;
-      groups[i]._dateBefore   = prevBatch ? prevBatch.created_at  : null;
-      groups[i]._dateAfter    = nextBatch ? nextBatch.created_at  : null;
-      groups[i]._orphanCount  = prevBatch ? (prevBatch.orphan_count  || 0)    : 0;
-      groups[i]._orphanMinAt  = prevBatch ? (prevBatch.orphan_min_at || null) : null;
-      groups[i]._orphans      = prevBatch ? (prevBatch.orphan_entries || []) : [];
-    }
-
-    // Вставляем placeholder-sysgroup там, где has_system_before=true, но sysgroup из system-логов нет
-    var insertions = [];
-    for (var i = 0; i < groups.length; i++) {
-      if (groups[i].type !== 'batch') continue;
-      var bid = groups[i].data.batch_id;
-      if (!(hasSystemMap && hasSystemMap[bid])) continue;
-      if (i + 1 < groups.length && groups[i + 1].type === 'sysgroup') continue;
-      var nextBatch2 = null;
-      for (var k = i + 1; k < groups.length; k++) {
-        if (groups[k].type === 'batch') { nextBatch2 = groups[k].data; break; }
-      }
-      var posKey2 = bid + ':' + (nextBatch2 ? nextBatch2.batch_id : 'bottom');
-      insertions.push({
-        index: i + 1,
-        group: {
-          type:          'sysgroup',
-          items:         [],
-          _posKey:       posKey2,
-          _dateBefore:   groups[i].data.created_at,
-          _dateAfter:    nextBatch2 ? nextBatch2.created_at  : null,
-          _orphanCount:  groups[i].data.orphan_count  || 0,
-          _orphanMinAt:  groups[i].data.orphan_min_at || null,
-          _orphans:      groups[i].data.orphan_entries || [],
-        },
-      });
-    }
-    insertions.reverse().forEach(function(ins) { groups.splice(ins.index, 0, ins.group); });
-
-    // Верхний sysgroup (записи новее самого нового батча)
-    if (hasSystemTop) {
-      var firstBatch = null;
-      for (var i = 0; i < groups.length; i++) {
-        if (groups[i].type === 'batch') { firstBatch = groups[i].data; break; }
-      }
-      if (groups.length > 0 && groups[0].type === 'sysgroup') {
-        // Если верхний sysgroup уже есть (например, из pipeline=system),
-        // подмешиваем в него orphan-записи из log_entries с log_id IS NULL.
-        var topOrphans = hasSystemTop.orphan_entries || [];
-        groups[0]._orphans = (groups[0]._orphans || []).concat(topOrphans);
-        groups[0]._orphanCount = (groups[0]._orphanCount || 0) + (hasSystemTop.orphan_count || topOrphans.length);
-        if (hasSystemTop.orphan_min_at && (!groups[0]._orphanMinAt || new Date(hasSystemTop.orphan_min_at) < new Date(groups[0]._orphanMinAt))) {
-          groups[0]._orphanMinAt = hasSystemTop.orphan_min_at;
-        }
-      } else {
-        var topKey = 'top:' + (firstBatch ? firstBatch.batch_id : 'bottom');
-        groups.unshift({
-          type:         'sysgroup',
-          items:        [],
-          _posKey:      topKey,
-          _dateBefore:  null,
-          _dateAfter:   firstBatch ? firstBatch.created_at  : null,
-          _orphanCount: hasSystemTop.orphan_count  || 0,
-          _orphanMinAt: hasSystemTop.orphan_min_at || null,
-          _orphans:     hasSystemTop.orphan_entries || [],
-        });
-      }
-    }
-
-    return groups;
+    (system || []).forEach(function(s) {
+      items.push({ type: 'system', time: s.created_at, data: s });
+    });
+    items.sort(function(a, b) { return new Date(b.time) - new Date(a.time); });
+    return items;
   }
 
-  var _openBid          = null;
-  var _collapsedSgKeys  = {};
-  var _collapsedLids    = {};
-  var _activeBatchIds   = [];
-  var _seenLids      = {};
-  var _seenBids      = {};
-  var _firstRender   = true;
-  var _pubFrameCache        = {};   // batchId → blob URL
-  var _pubFrameFetching     = {};   // batchId → true (in-flight guard)
-  var _pubFrameVer          = {};   // batchId → version counter (для отбрасывания устаревших ответов)
-  var _lastRenderedHtml     = {};   // key → last rendered HTML string
-  var _lastMonitorData      = null; // last full response from /api/monitor
-  var _sysLogEntriesCache   = {};   // log_id → entries array (lazy)
-  var _sysLogFetching       = {};   // log_id → true (in-flight guard)
+  var _openBid              = null;
+  var _openSysLid           = null;
+  var _activeBatchIds       = [];
+  var _batchEntriesCache    = {};
+  var _batchEntriesFetching = {};
+  var _sysLogEntriesCache   = {};
+  var _sysLogFetching       = {};
+  var _pubFrameCache        = {};
+  var _pubFrameFetching     = {};
+  var _pubFrameVer          = {};
+  var _lastRenderedHtml     = {};
+  var _lastMonitorData      = null;
+
+  function _groupKey(item) {
+    if (item.type === 'batch') return 'batch:' + item.data.batch_id;
+    return 'sys:' + item.data.id;
+  }
 
   function getOpenState() {
-    var sgkeys = {}, lids = {}, syslids = {};
-    document.querySelectorAll('.monitor-sysgroup.open').forEach(function(el) {
-      if (el.dataset.sgKey) sgkeys[el.dataset.sgKey] = true;
+    var openBids = {};
+    document.querySelectorAll('.monitor-batch.open').forEach(function(el) {
+      if (el.dataset.bid) openBids[el.dataset.bid] = true;
     });
-    document.querySelectorAll('.monitor-log-item.open').forEach(function(el) {
-      if (el.dataset.lid) lids[el.dataset.lid] = true;
+    var openSys = {};
+    document.querySelectorAll('.monitor-system-block.open').forEach(function(el) {
+      if (el.dataset.lid) openSys[el.dataset.lid] = true;
     });
-    document.querySelectorAll('.monitor-sysgroup-log-item.open').forEach(function(el) {
-      if (el.dataset.lid) syslids[el.dataset.lid] = true;
-    });
-    document.querySelectorAll('.monitor-log-item').forEach(function(el) {
-      if (el.dataset.lid) _seenLids[el.dataset.lid] = true;
-    });
-    document.querySelectorAll('.monitor-batch').forEach(function(el) {
-      if (el.dataset.bid) _seenBids[el.dataset.bid] = true;
-    });
-    return { sgkeys: sgkeys, lids: lids, syslids: syslids };
+    return { openBids: openBids, openSys: openSys };
   }
 
   function restoreOpenState(state) {
@@ -510,38 +291,105 @@
       var batchEl = document.querySelector('.monitor-batch[data-bid="' + _openBid + '"]');
       if (batchEl) {
         batchEl.classList.add('open');
+        if (_batchEntriesCache[_openBid]) {
+          _applyBatchEntries(batchEl, _batchEntriesCache[_openBid]);
+        }
       } else {
         _openBid = null;
       }
     }
-    document.querySelectorAll('.monitor-sysgroup').forEach(function(el) {
-      if (state.sgkeys[el.dataset.sgKey] && !_collapsedSgKeys[el.dataset.sgKey]) {
-        el.classList.add('open');
-      }
-    });
-    document.querySelectorAll('.monitor-log-item').forEach(function(el) {
-      if (state.lids && state.lids[el.dataset.lid] && !_collapsedLids[el.dataset.lid]) el.classList.add('open');
-    });
-    document.querySelectorAll('.monitor-sysgroup-log-item').forEach(function(el) {
+    document.querySelectorAll('.monitor-system-block').forEach(function(el) {
       var lid = el.dataset.lid;
-      if (lid && state.syslids && state.syslids[lid] && _sysLogEntriesCache[lid]) {
-        _applySysLogEntries(el, lid, _sysLogEntriesCache[lid]);
+      if (lid && state.openSys[lid]) {
         el.classList.add('open');
+        if (_sysLogEntriesCache[lid]) _applySystemEntries(el, _sysLogEntriesCache[lid]);
       }
     });
   }
 
+  function _buildEntryRow(en) {
+    var lvl = en.level || 'info';
+    return '<div class="monitor-entry-row">' +
+      '<span class="monitor-entry-ts">'                      + fmtMsk(en.created_at)   + '</span>' +
+      '<span class="monitor-entry-msg ' + esc(lvl) + '">' + esc(en.message || '') + '</span>' +
+    '</div>';
+  }
+
+  function _applyBatchEntries(batchEl, entries) {
+    var body = batchEl.querySelector('.monitor-batch-body');
+    if (!body) return;
+    var existing = body.querySelector('.monitor-entries');
+    if (existing) existing.remove();
+    if (!entries || !entries.length) return;
+    body.insertAdjacentHTML('beforeend', renderEntries(entries));
+  }
+
+  function _applySystemEntries(sysEl, entries) {
+    var body = sysEl.querySelector('.monitor-sysgroup-body');
+    if (!body) return;
+    body.innerHTML = renderEntries(entries);
+  }
+
+  function _injectBatchEntries(batchEl, entries) {
+    var body = batchEl.querySelector('.monitor-batch-body');
+    if (!body) return;
+    var existingDiv = body.querySelector('.monitor-entries');
+    if (!existingDiv) {
+      body.insertAdjacentHTML('beforeend', renderEntries(entries));
+      return;
+    }
+    var existingCount = existingDiv.querySelectorAll('.monitor-entry-row').length;
+    var totalNew = entries.length - existingCount;
+    if (totalNew > 0) {
+      var newEntries = entries.slice(0, totalNew);
+      existingDiv.insertAdjacentHTML('afterbegin', newEntries.map(_buildEntryRow).join(''));
+    }
+  }
+
+  function _fetchAndInjectEntries(bid) {
+    var batchEl = document.querySelector('.monitor-batch[data-bid="' + bid + '"]');
+    if (!batchEl) return;
+    if (_batchEntriesFetching[bid]) return;
+    _batchEntriesFetching[bid] = true;
+    fetch('/api/monitor/batch/' + encodeURIComponent(bid) + '/entries')
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        delete _batchEntriesFetching[bid];
+        if (_openBid !== bid) return;
+        var entries = data.entries || [];
+        _batchEntriesCache[bid] = entries;
+        var batchEl2 = document.querySelector('.monitor-batch[data-bid="' + bid + '"]');
+        if (batchEl2) _injectBatchEntries(batchEl2, entries);
+      })
+      .catch(function() { delete _batchEntriesFetching[bid]; });
+  }
+
+  function _fetchSystemEntries(lid) {
+    if (_sysLogFetching[lid]) return;
+    _sysLogFetching[lid] = true;
+    fetch('/api/monitor/log/' + encodeURIComponent(lid) + '/entries')
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        delete _sysLogFetching[lid];
+        var entries = data.entries || [];
+        _sysLogEntriesCache[lid] = entries;
+        var el = document.querySelector('.monitor-system-block[data-lid="' + lid + '"]');
+        if (!el) return;
+        if (entries.length) {
+          _applySystemEntries(el, entries);
+          if (_openSysLid === lid) el.classList.add('open');
+        }
+      })
+      .catch(function() { delete _sysLogFetching[lid]; });
+  }
+
   function _evictPubFrameCache() {
-    // Кадр считается «живым», только когда раздел Публикация и сам батч развёрнуты.
-    // Свёрнутый блок -> освобождаем blob и зачищаем src, чтобы не висел поллинг и память.
     var alive = {};
     document.querySelectorAll(
-      '.monitor-batch.open .monitor-log-item.open .monitor-pub-frame img[data-bid]'
+      '.monitor-batch.open[data-category="publish"] .monitor-pub-frame img[data-bid]'
     ).forEach(function(img) {
       if (img.dataset.bid) alive[img.dataset.bid] = true;
     });
-    // Бампим версии для ВСЕХ известных bid'ов, не входящих в alive: даже если кэша нет,
-    // но висит in-flight запрос — его ответ будет отброшен по ver-mismatch.
     var seen = {};
     Object.keys(_pubFrameCache).forEach(function(b) { seen[b] = true; });
     Object.keys(_pubFrameFetching).forEach(function(b) { seen[b] = true; });
@@ -560,33 +408,20 @@
 
   function refreshPublishFrames() {
     _evictPubFrameCache();
-
     if (!document.querySelector(
-      '.monitor-batch.open .monitor-log-item.open[data-status="running"] .monitor-pub-frame img[data-bid]'
+      '.monitor-batch.open[data-category="publish"] .monitor-pub-frame img[data-bid]'
     )) return;
 
     document.querySelectorAll(
-      '.monitor-batch.open .monitor-log-item.open .monitor-pub-frame img[data-bid]'
+      '.monitor-batch.open[data-category="publish"] .monitor-pub-frame img[data-bid]'
     ).forEach(function(img) {
       var bid = img.dataset.bid;
       if (!bid) return;
-
-      // Мгновенно восстанавливаем кадр из кэша (без мигания после перерисовки DOM)
-      if (_pubFrameCache[bid] && !img.src) {
-        img.src = _pubFrameCache[bid];
-      }
-
-      // Новый кадр получаем только для активной публикации
-      var logItem = img.closest('.monitor-log-item');
-      if (!logItem || logItem.dataset.status !== 'running') return;
-
-      // Защита от дублирующих запросов при медленной сети
+      if (_pubFrameCache[bid] && !img.src) img.src = _pubFrameCache[bid];
+      if (_activeBatchIds.indexOf(bid) < 0) return;
       if (_pubFrameFetching[bid]) return;
       _pubFrameFetching[bid] = true;
-      // Версия запроса: если к моменту ответа батч/лог свернули — ответ выкидываем
       var ver = (_pubFrameVer[bid] = (_pubFrameVer[bid] || 0) + 1);
-
-      // Preload-swap: старый кадр виден до тех пор, пока новый не загружен полностью
       fetch('/api/batch/' + bid + '/publish-frame?t=' + Date.now())
         .then(function(r) {
           if (!r.ok || r.status === 204) return null;
@@ -595,18 +430,15 @@
         .then(function(blob) {
           _pubFrameFetching[bid] = false;
           if (!blob) return;
-          // Stale-check: устарел или контейнер уже невидим — отбрасываем
           if (_pubFrameVer[bid] !== ver) return;
           if (!document.querySelector(
-            '.monitor-batch.open .monitor-log-item.open .monitor-pub-frame img[data-bid="' + bid + '"]'
+            '.monitor-batch.open[data-category="publish"] .monitor-pub-frame img[data-bid="' + bid + '"]'
           )) return;
           if (_pubFrameCache[bid]) URL.revokeObjectURL(_pubFrameCache[bid]);
           var url = URL.createObjectURL(blob);
           _pubFrameCache[bid] = url;
           document.querySelectorAll('.monitor-pub-frame img[data-bid="' + bid + '"]')
-            .forEach(function(el) {
-              el.src = url;
-            });
+            .forEach(function(el) { el.src = url; });
         })
         .catch(function() { _pubFrameFetching[bid] = false; });
     });
@@ -618,51 +450,37 @@
     });
   });
 
-  function _groupKey(g) {
-    if (g.type === 'batch') return 'batch:' + g.data.batch_id;
-    return 'sys:' + (g._posKey || '');
-  }
-
   function renderTimeline(data) {
     var el = document.getElementById('monitor-timeline');
     if (!el) return;
     _lastMonitorData = data;
     _activeBatchIds = Array.isArray(data.active_batch_ids) ? data.active_batch_ids : [];
     var prev = getOpenState();
-    var hasSystemMap = {};
-    (data.batches || []).forEach(function(b) {
-      if (b.has_system_before) hasSystemMap[b.batch_id] = true;
-    });
-    var groups = buildTimeline(data.batches, data.system, hasSystemMap, data.has_system_top);
-    if (groups.length === 0) {
+    var items = buildTimeline(data.batches, data.system);
+    if (items.length === 0) {
       el.innerHTML = '<div style="font-size:12px;color:#444;padding:4px 0">Нет данных</div>';
-      _firstRender = false;
       return;
     }
 
     var newHtmlMap = {};
-    var newGroupMap = {};
-    var newKeys    = [];
-    groups.forEach(function(g) {
-      var key = _groupKey(g);
+    var newItemMap = {};
+    var newKeys = [];
+    items.forEach(function(item) {
+      var key = _groupKey(item);
       newKeys.push(key);
-      newGroupMap[key] = g;
-      newHtmlMap[key] = g.type === 'batch'
-        ? renderBatch(g.data)
-        : renderSysGroup(g.items, g._posKey, g._dateBefore, g._dateAfter, g._orphanCount, g._orphanMinAt, g._orphans);
+      newItemMap[key] = item;
+      newHtmlMap[key] = item.type === 'batch'
+        ? renderBatch(item.data)
+        : renderSystemBlock(item.data);
     });
 
     var oldEls = {};
-    var unkeyed = [];
     Array.prototype.slice.call(el.children).forEach(function(child) {
-      var bid   = child.dataset.bid;
-      var sgKey = child.dataset.sgKey;
-      var key   = bid ? ('batch:' + bid) : sgKey ? ('sys:' + sgKey) : null;
+      var bid = child.dataset.bid;
+      var lid = child.dataset.lid;
+      var key = bid ? ('batch:' + bid) : lid ? ('sys:' + lid) : null;
       if (key) oldEls[key] = child;
-      else unkeyed.push(child);
     });
-
-    unkeyed.forEach(function(child) { el.removeChild(child); });
 
     var keysSet = {};
     newKeys.forEach(function(k) { keysSet[k] = true; });
@@ -675,15 +493,9 @@
 
     var resolvedNodes = newKeys.map(function(key) {
       var existing = oldEls[key];
-      var newHtml  = newHtmlMap[key];
-      var g        = newGroupMap[key];
+      var newHtml = newHtmlMap[key];
+      var item = newItemMap[key];
       if (existing) {
-        if (g.type === 'sysgroup') {
-          _updateSgInPlace(existing, g);
-          _injectOrphansIntoSg(existing, g);
-          _lastRenderedHtml[key] = newHtml;
-          return existing;
-        }
         if (_lastRenderedHtml[key] !== newHtml) {
           var isOpen = existing.classList.contains('open');
           var tmp = document.createElement('div');
@@ -691,23 +503,20 @@
           var newNode = tmp.firstChild;
           if (isOpen) {
             newNode.classList.add('open');
-            newNode.querySelectorAll('.monitor-log-item').forEach(function(li) {
-              if (prev.lids && prev.lids[li.dataset.lid]) li.classList.add('open');
-            });
-            existing.querySelectorAll('.monitor-log-item').forEach(function(oldLi) {
-              var lid = oldLi.dataset.lid;
-              if (!lid) return;
-              var oldEntries = oldLi.querySelector('.monitor-entries');
-              if (!oldEntries) return;
-              var newLi = newNode.querySelector('.monitor-log-item[data-lid="' + lid + '"]');
-              if (!newLi) return;
-              var headerTop = newLi.querySelector('.monitor-log-header-top');
-              if (headerTop && !headerTop.querySelector('.monitor-log-chevron')) {
-                headerTop.insertAdjacentHTML('beforeend', '<span class="monitor-log-chevron">▼</span>');
+            if (item.type === 'batch') {
+              var bid = item.data.batch_id;
+              var oldEntries = existing.querySelector('.monitor-entries');
+              if (oldEntries) {
+                var body = newNode.querySelector('.monitor-batch-body');
+                if (body) body.appendChild(oldEntries);
               }
-              newLi.appendChild(oldEntries);
-              if (oldLi.classList.contains('open')) newLi.classList.add('open');
-            });
+            } else {
+              var oldBody = existing.querySelector('.monitor-sysgroup-body');
+              var newBody = newNode.querySelector('.monitor-sysgroup-body');
+              if (oldBody && newBody && oldBody.innerHTML.trim()) {
+                newBody.innerHTML = oldBody.innerHTML;
+              }
+            }
           }
           el.replaceChild(newNode, existing);
           _lastRenderedHtml[key] = newHtml;
@@ -731,7 +540,6 @@
     }
 
     restoreOpenState(prev);
-    _firstRender = false;
   }
 
   function refreshMonitor() {
@@ -761,90 +569,11 @@
     ];
     var tm = batchEl.dataset.textModel  || '';
     var vm = batchEl.dataset.videoModel || '';
+    var cat = batchEl.dataset.category || '';
+    if (cat) lines.push('category: ' + cat);
     if (tm) lines.push('text_model: '  + tm);
     if (vm) lines.push('video_model: ' + vm);
     return lines;
-  }
-
-  function _buildEntryRow(en) {
-    var lvl = en.level || 'info';
-    return '<div class="monitor-entry-row">' +
-      '<span class="monitor-entry-ts">'                      + fmtMsk(en.created_at)   + '</span>' +
-      '<span class="monitor-entry-msg ' + esc(lvl) + '">' + esc(en.message || '') + '</span>' +
-    '</div>';
-  }
-
-  function _injectEntriesIntoDOM(batchEl, logsData, openLids) {
-    var lidsToOpen = openLids || {};
-    logsData.forEach(function(logInfo) {
-      var li = batchEl.querySelector('.monitor-log-item[data-lid="' + logInfo.id + '"]');
-      if (!li) return;
-      if (!logInfo.entries || !logInfo.entries.length) return;
-      var existingDiv   = li.querySelector('.monitor-entries');
-      var existingCount = existingDiv ? existingDiv.querySelectorAll('.monitor-entry-row').length : 0;
-      var headerTop = li.querySelector('.monitor-log-header-top');
-      if (headerTop && !headerTop.querySelector('.monitor-log-chevron')) {
-        headerTop.insertAdjacentHTML('beforeend', '<span class="monitor-log-chevron">▼</span>');
-      }
-      if (!existingDiv) {
-        var html = logInfo.entries.map(_buildEntryRow).join('');
-        li.insertAdjacentHTML('beforeend', '<div class="monitor-entries">' + html + '</div>');
-      } else {
-        var totalNew = logInfo.entries.length - existingCount;
-        if (totalNew > 0) {
-          var newEntries = logInfo.entries.slice(0, totalNew);
-          existingDiv.insertAdjacentHTML('afterbegin', newEntries.map(_buildEntryRow).join(''));
-        }
-      }
-      if (lidsToOpen[logInfo.id]) li.classList.add('open');
-    });
-  }
-
-  function _fetchAndInjectEntries(bid, openLids) {
-    var batchEl = document.querySelector('.monitor-batch[data-bid="' + bid + '"]');
-    if (!batchEl) return;
-    fetch('/api/monitor/batch/' + encodeURIComponent(bid) + '/entries')
-      .then(function(r) { return r.json(); })
-      .then(function(data) {
-        if (_openBid !== bid) return;
-        var batchEl2 = document.querySelector('.monitor-batch[data-bid="' + bid + '"]');
-        if (batchEl2) _injectEntriesIntoDOM(batchEl2, data.logs || [], openLids);
-      });
-  }
-
-  function _injectOrphansIntoSg(sgEl, g) {
-    var itemsEl = sgEl.querySelector('.monitor-sysgroup-items');
-    if (!itemsEl) return;
-    itemsEl.innerHTML = _renderSysRows(g.items || [], g._orphans || []);
-  }
-
-  function _updateSgInPlace(sgEl, g) {
-    var n = _sysgroupEventCount(g.items || [], g._orphans || [], g._orphanCount);
-    var headTime = _sysgroupHeadTime(g.items || [], g._orphans || [], g._orphanMinAt || null);
-    var titleEl = sgEl.querySelector('.monitor-sysgroup-title');
-    var subEl   = sgEl.querySelector('.monitor-sysgroup-sub');
-    var newTitle = headTime ? fmtMsk(headTime) : '';
-    var newSub   = n > 0 ? ('Событий ' + n) : '…';
-    if (titleEl && titleEl.textContent !== newTitle) titleEl.textContent = newTitle;
-    if (subEl   && subEl.textContent   !== newSub)   subEl.textContent   = newSub;
-    if (g._dateBefore) sgEl.dataset.sgBefore = g._dateBefore; else delete sgEl.dataset.sgBefore;
-    if (g._dateAfter)  sgEl.dataset.sgAfter  = g._dateAfter;  else delete sgEl.dataset.sgAfter;
-  }
-
-  function _applySysLogEntries(itemEl, lid, entries) {
-    var existing = itemEl.querySelector('.monitor-entries');
-    if (existing) existing.remove();
-    if (!entries.length) return;
-    var html = '<div class="monitor-entries">';
-    entries.forEach(function(en) {
-      var lvl = en.level || 'info';
-      html += '<div class="monitor-entry-row">' +
-        '<span class="monitor-entry-ts">'                      + fmtMsk(en.created_at)   + '</span>' +
-        '<span class="monitor-entry-msg ' + esc(lvl) + '">' + esc(en.message || '') + '</span>' +
-      '</div>';
-    });
-    html += '</div>';
-    itemEl.insertAdjacentHTML('beforeend', html);
   }
 
   window.monitorToggleBatch = function(e, el) {
@@ -859,162 +588,93 @@
     } else {
       el.classList.add('open');
       _openBid = bid || null;
-      if (_openBid) _fetchAndInjectEntries(_openBid);
-    }
-    _evictPubFrameCache();
-  };
-
-  window.monitorExpandAll = function(btn) {
-    const batch = btn.closest('.monitor-batch');
-    if (!batch) return;
-    batch.querySelectorAll('.monitor-log-item').forEach(function(item) {
-      if (item.querySelector('.monitor-entries')) {
-        item.classList.add('open');
-        if (item.dataset.lid) delete _collapsedLids[item.dataset.lid];
-      }
-    });
-  };
-
-  window.monitorCollapseAll = function(btn) {
-    const batch = btn.closest('.monitor-batch');
-    if (!batch) return;
-    batch.querySelectorAll('.monitor-log-item').forEach(function(item) {
-      item.classList.remove('open');
-      if (item.dataset.lid) _collapsedLids[item.dataset.lid] = true;
-    });
-    _evictPubFrameCache();
-  };
-
-  window.monitorToggleSys = function(e, el) {
-    if (e.target.closest('.monitor-sysgroup-body')) return;
-    el.classList.toggle('open');
-    var key = el.dataset.sgKey;
-    if (key) {
-      if (el.classList.contains('open')) delete _collapsedSgKeys[key];
-      else _collapsedSgKeys[key] = true;
-    }
-  };
-
-  window.monitorToggleSysLog = function(e, el) {
-    e.stopPropagation();
-    if (e.target.closest('.monitor-entries')) return;
-    var lid = el.dataset.lid;
-    if (!lid) return;
-
-    if (_sysLogEntriesCache.hasOwnProperty(lid)) {
-      var cached = _sysLogEntriesCache[lid];
-      if (!cached.length) return;
-      if (!el.querySelector('.monitor-entries')) _applySysLogEntries(el, lid, cached);
-      el.classList.toggle('open');
-      return;
-    }
-
-    if (_sysLogFetching[lid]) return;
-    _sysLogFetching[lid] = true;
-    fetch('/api/monitor/log/' + encodeURIComponent(lid) + '/entries')
-      .then(function(r) { return r.json(); })
-      .then(function(data) {
-        delete _sysLogFetching[lid];
-        var entries = data.entries || [];
-        _sysLogEntriesCache[lid] = entries;
-        var el2 = document.querySelector('.monitor-sysgroup-log-item[data-lid="' + lid + '"]');
-        if (!el2) return;
-        if (entries.length) {
-          _applySysLogEntries(el2, lid, entries);
-          el2.classList.add('open');
+      if (_openBid) {
+        if (_batchEntriesCache[_openBid]) {
+          _applyBatchEntries(el, _batchEntriesCache[_openBid]);
         } else {
-          var ch = el2.querySelector('.monitor-syslog-chevron');
-          if (ch) ch.style.visibility = 'hidden';
+          _fetchAndInjectEntries(_openBid);
         }
-      })
-      .catch(function() { delete _sysLogFetching[lid]; });
+      }
+    }
+    _evictPubFrameCache();
   };
 
-  window.monitorSysCopy = function(btn) {
-    const sg = btn.closest('.monitor-sysgroup');
-    if (!sg) return;
+  window.monitorToggleSystemBlock = function(e, el) {
+    if (e.target.closest('.monitor-sysgroup-body')) return;
+    var lid = el.dataset.lid;
+    var isOpen = el.classList.contains('open');
+    document.querySelectorAll('.monitor-system-block.open').forEach(function(b) {
+      b.classList.remove('open');
+    });
+    if (isOpen) {
+      _openSysLid = null;
+    } else {
+      el.classList.add('open');
+      _openSysLid = lid || null;
+      if (_openSysLid) {
+        if (_sysLogEntriesCache[_openSysLid]) {
+          _applySystemEntries(el, _sysLogEntriesCache[_openSysLid]);
+        } else {
+          _fetchSystemEntries(_openSysLid);
+        }
+      }
+    }
+  };
+
+  window.monitorExpandBatch = function(btn) {
+    var batch = btn.closest('.monitor-batch');
+    if (!batch) return;
+    batch.classList.add('open');
+    _openBid = batch.dataset.bid || null;
+    if (_openBid) {
+      if (_batchEntriesCache[_openBid]) {
+        _applyBatchEntries(batch, _batchEntriesCache[_openBid]);
+      } else {
+        _fetchAndInjectEntries(_openBid);
+      }
+    }
+  };
+
+  window.monitorCollapseBatch = function(btn) {
+    var batch = btn.closest('.monitor-batch');
+    if (!batch) return;
+    batch.classList.remove('open');
+    if (_openBid === batch.dataset.bid) _openBid = null;
+    _evictPubFrameCache();
+  };
+
+  window.monitorSystemCopy = function(btn) {
+    var block = btn.closest('.monitor-system-block');
+    if (!block) return;
     var lines = [];
-    sg.querySelectorAll('.monitor-sysgroup-orphan-item').forEach(function(row) {
-      const ts  = row.querySelector('.monitor-sysgroup-ts')  ? row.querySelector('.monitor-sysgroup-ts').textContent.trim()  : '';
-      const msg = row.querySelector('.monitor-sysgroup-msg') ? row.querySelector('.monitor-sysgroup-msg').textContent.trim() : '';
+    block.querySelectorAll('.monitor-entry-row').forEach(function(row) {
+      var ts  = row.querySelector('.monitor-entry-ts')  ? row.querySelector('.monitor-entry-ts').textContent.trim()  : '';
+      var msg = row.querySelector('.monitor-entry-msg') ? row.querySelector('.monitor-entry-msg').textContent.trim() : '';
       lines.push('[' + ts + '] ' + msg);
     });
     _monitorCopyText(lines.join('\n'), btn);
   };
 
   window.monitorCopy = function(btn) {
-    const batchEl = btn.closest('.monitor-batch');
-    const body    = batchEl ? batchEl.querySelector('.monitor-batch-body') : null;
+    var batchEl = btn.closest('.monitor-batch');
+    var body = batchEl ? batchEl.querySelector('.monitor-batch-body') : null;
     if (!body) return;
     var lines = _batchInfoLines(batchEl);
-    body.querySelectorAll('.monitor-log-item').forEach(function(item) {
-      lines.push('');
-      const ts  = item.querySelector('.monitor-log-ts')       ? item.querySelector('.monitor-log-ts').textContent.trim()       : '';
-      const pip = item.querySelector('.monitor-log-pipeline') ? item.querySelector('.monitor-log-pipeline').textContent.trim() : '';
-      const msg = item.querySelector('.monitor-log-comment')  ? item.querySelector('.monitor-log-comment').textContent.trim()  : '';
-      const st  = item.dataset.status || '';
-      lines.push('pipeline: ' + pip);
-      lines.push('status: '   + st);
-      lines.push('time: '     + ts);
-      if (msg) lines.push('message: ' + msg);
-      var entries = [];
-      item.querySelectorAll('.monitor-entry-row').forEach(function(row) {
-        const ets  = row.querySelector('.monitor-entry-ts')  ? row.querySelector('.monitor-entry-ts').textContent.trim()  : '';
-        const emsg = row.querySelector('.monitor-entry-msg') ? row.querySelector('.monitor-entry-msg').textContent.trim() : '';
-        entries.push('  [' + ets + '] ' + emsg);
-      });
-      if (entries.length) { lines.push(''); entries.forEach(function(e) { lines.push(e); }); }
+    body.querySelectorAll('.monitor-entry-row').forEach(function(row) {
+      var ts  = row.querySelector('.monitor-entry-ts')  ? row.querySelector('.monitor-entry-ts').textContent.trim()  : '';
+      var msg = row.querySelector('.monitor-entry-msg') ? row.querySelector('.monitor-entry-msg').textContent.trim() : '';
+      lines.push('[' + ts + '] ' + msg);
     });
-    _monitorCopyText(lines.join('\n'), btn);
-  };
-
-  window.monitorPipelineCopy = function(btn) {
-    const item = btn.closest('.monitor-log-item');
-    if (!item) return;
-    var lines = [];
-    const ts  = item.querySelector('.monitor-log-ts')       ? item.querySelector('.monitor-log-ts').textContent.trim()       : '';
-    const pip = item.querySelector('.monitor-log-pipeline') ? item.querySelector('.monitor-log-pipeline').textContent.trim() : '';
-    const msg = item.querySelector('.monitor-log-comment')  ? item.querySelector('.monitor-log-comment').textContent.trim()  : '';
-    const st  = item.dataset.status || '';
-    lines.push('pipeline: ' + pip);
-    lines.push('status: '   + st);
-    lines.push('time: '     + ts);
-    if (msg) lines.push('message: ' + msg);
-    var entries = [];
-    item.querySelectorAll('.monitor-entry-row').forEach(function(row) {
-      const ets  = row.querySelector('.monitor-entry-ts')  ? row.querySelector('.monitor-entry-ts').textContent.trim()  : '';
-      const emsg = row.querySelector('.monitor-entry-msg') ? row.querySelector('.monitor-entry-msg').textContent.trim() : '';
-      entries.push('  [' + ets + '] ' + emsg);
-    });
-    if (entries.length) { lines.push(''); entries.forEach(function(e) { lines.push(e); }); }
     _monitorCopyText(lines.join('\n'), btn);
   };
 
   window.monitorBatchCopyInfo = function(btn) {
-    const batchEl = btn.closest('.monitor-batch');
-    _monitorCopyText(_batchInfoLines(batchEl).join('\n'), btn);
-  };
-
-  window.monitorPipelineCopyInfo = function(btn) {
-    const item    = btn.closest('.monitor-log-item');
-    if (!item) return;
-    const batchEl = item.closest('.monitor-batch');
-    var lines = _batchInfoLines(batchEl);
-    lines.push('');
-    const ts  = item.querySelector('.monitor-log-ts')       ? item.querySelector('.monitor-log-ts').textContent.trim()       : '';
-    const pip = item.querySelector('.monitor-log-pipeline') ? item.querySelector('.monitor-log-pipeline').textContent.trim() : '';
-    const msg = item.querySelector('.monitor-log-comment')  ? item.querySelector('.monitor-log-comment').textContent.trim()  : '';
-    const st  = item.dataset.status || '';
-    lines.push('pipeline: ' + pip);
-    lines.push('status: '   + st);
-    lines.push('time: '     + ts);
-    if (msg) lines.push('message: ' + msg);
-    _monitorCopyText(lines.join('\n'), btn);
+    _monitorCopyText(_batchInfoLines(btn.closest('.monitor-batch')).join('\n'), btn);
   };
 
   window.monitorPipelineRestart = function(btn) {
-    const batchId  = btn.dataset.bid;
-    const pipeline = btn.dataset.pip;
+    var batchId  = btn.dataset.bid;
+    var pipeline = btn.dataset.pip;
     if (!batchId || !pipeline) return;
     btn.disabled = true;
     btn.classList.add('pending');
@@ -1038,23 +698,6 @@
         btn.disabled = false;
       });
   };
-
-  window.monitorToggleLog = function(e, el) {
-    e.stopPropagation();
-    if (e.target.closest('.monitor-entries')) return;
-    if (el.querySelector('.monitor-entries')) {
-      el.classList.toggle('open');
-      var lid = el.dataset.lid;
-      if (lid) {
-        if (el.classList.contains('open')) delete _collapsedLids[lid];
-        else _collapsedLids[lid] = true;
-      }
-      _evictPubFrameCache();
-    }
-  };
-
-  window.groupLogsByPipeline = groupLogsByPipeline;
-  window.renderLogItem       = renderLogItem;
 
   window.monitorDeleteBatch = function(batchId, btn) {
     var isBlocked = !!(btn && btn.dataset && btn.dataset.warn);
@@ -1081,8 +724,10 @@
             .then(function(data) {
               dlg.close();
               if (data.ok) {
+                delete _batchEntriesCache[batchId];
                 var batchEl = document.querySelector('.monitor-batch[data-bid="' + batchId + '"]');
                 if (batchEl) batchEl.remove();
+                if (_openBid === batchId) _openBid = null;
                 showToast('Батч удалён', 'success');
               } else {
                 showToast('Ошибка: ' + (data.error || 'неизвестная ошибка'), 'error');
@@ -1098,9 +743,9 @@
     if (_openBid) _fetchAndInjectEntries(_openBid);
   }
 
-  var _timerMonitor           = null;
-  var _timerPublishFrames     = null;
-  var _timerOpenBatchEntries  = null;
+  var _timerMonitor          = null;
+  var _timerPublishFrames    = null;
+  var _timerOpenBatchEntries = null;
 
   if (!document.hidden) {
     refreshMonitor();

@@ -2,7 +2,7 @@
 Все функции логирования приложения.
 """
 
-_ALLOWED_PIPELINES = {
+_ALLOWED_CATEGORIES = {
     "api",
     "planning",
     "story",
@@ -21,15 +21,11 @@ _ALLOWED_LOG_LEVELS = {
 }
 
 _lifecycle_stop_logged = False
-
-
-def log_system_event(message: str, status: str = "ok"):
-    """Системное событие без батча — строка в log, видна в мониторе как «Система»."""
-    return write_log("system", message, status=status, batch_id=None)
+_system_log_id: str | None = None
 
 
 def log_app_started():
-    log_system_event("[main] Приложение запущено", status="ok")
+    write_log_entry(None, "system", "[main] Приложение запущено", level="info")
 
 
 def log_app_stopped():
@@ -37,63 +33,58 @@ def log_app_stopped():
     if _lifecycle_stop_logged:
         return
     _lifecycle_stop_logged = True
-    log_system_event("[main] Приложение остановлено", status="info")
+    write_log_entry(None, "system", "[main] Приложение остановлено", level="info")
 
 
-def write_log(pipeline, message, status="info", batch_id=None):
-    """Записывает событие пайплайна в таблицу log. Возвращает log_id или None."""
-    assert pipeline in _ALLOWED_PIPELINES, (
-        f"write_log: недопустимое имя пайплайна {pipeline!r}. "
-        f"Допустимые: {_ALLOWED_PIPELINES}."
-    )
-    from db.db_simple import db_insert_log
-    return db_insert_log(pipeline, message, status=status, batch_id=batch_id)
+def write_log_entry(batch_id, category, message, level="info"):
+    """Единая точка записи в log и log_entries.
 
-
-def write_log_entry(log_id, message, level="info"):
-    """Добавляет субзапись к существующей записи лога.
-
-    Всегда выводит сообщение в консоль.
-    Если level == 'silent' — запись в БД не производится.
-    Если log_id равен None — запись в log_entries вставляется с log_id=NULL.
-    При уровнях 'error' и 'fatal_error' вызывает notify_failure.
+    batch_id=None — системное окно между батчами (system_log_id).
+    batch_id задан — сбрасывает system_log_id и пишет в log (batch_id, category).
     """
     import common.environment as environment
-    from db.db_simple import db_insert_log_entry
+    from db.db_simple import db_get_or_create_log, db_insert_log, db_insert_log_entry
 
+    global _system_log_id
+
+    assert category in _ALLOWED_CATEGORIES, (
+        f"write_log_entry: недопустимая category {category!r}. "
+        f"Допустимые: {_ALLOWED_CATEGORIES}."
+    )
     assert level in _ALLOWED_LOG_LEVELS, (
         f"write_log_entry: недопустимый уровень {level!r}. "
         f"Допустимые: {_ALLOWED_LOG_LEVELS}."
     )
+
     print(message)
     if level == "silent" and not environment.deep_debugging:
-        return
-    token = environment.asserted_log_entry.set(True)
-    try:
-        db_insert_log_entry(log_id, message, level)
-    finally:
-        environment.asserted_log_entry.reset(token)
+        return None
+
+    if batch_id is not None:
+        _system_log_id = None
+        mod_token = environment.asserted_log_modification.set(True)
+        entry_token = environment.asserted_log_entry.set(True)
+        try:
+            log_id = db_get_or_create_log(batch_id, category)
+            db_insert_log_entry(log_id, message, level)
+        finally:
+            environment.asserted_log_entry.reset(entry_token)
+            environment.asserted_log_modification.reset(mod_token)
+    else:
+        mod_token = environment.asserted_log_modification.set(True)
+        entry_token = environment.asserted_log_entry.set(True)
+        try:
+            if _system_log_id is None:
+                _system_log_id = db_insert_log(None, category)
+            db_insert_log_entry(_system_log_id, message, level)
+            log_id = _system_log_id
+        finally:
+            environment.asserted_log_entry.reset(entry_token)
+            environment.asserted_log_modification.reset(mod_token)
+
     if level == "silent":
-        return
+        return log_id
     if level in ("error", "fatal_error"):
         from utils.notify import notify_failure
         notify_failure(f"log#{log_id}: {message}")
-
-
-def log_batch_planned(batch_id, message, *entries, pipeline='planning'):
-    """Создаёт запись log для события создания/постановки батча.
-
-    pipeline:
-    - 'planning' — событие от планировщика
-    - 'api'      — событие от HTTP API
-
-    batch_id — идентификатор батча.
-    message  — короткий заголовок (будет записан в log.message).
-    entries  — список строк, каждая добавляется как отдельная субзапись.
-    Возвращает log_id или None.
-    """
-    log_id = write_log(pipeline, message, status='ok', batch_id=batch_id)
-    if log_id:
-        for entry_msg in entries:
-            write_log_entry(log_id, entry_msg)
     return log_id

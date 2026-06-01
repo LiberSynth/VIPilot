@@ -76,9 +76,7 @@ def bootstrap():
                 CREATE TABLE IF NOT EXISTS log (
                     id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                     batch_id   UUID,
-                    pipeline   TEXT,
-                    message    TEXT,
-                    status     TEXT,
+                    category   TEXT,
                     created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
                 )
             """)
@@ -284,12 +282,8 @@ def bootstrap():
                     ON log (batch_id)
             """)
             cur.execute("""
-                CREATE INDEX IF NOT EXISTS idx_log_pipeline
-                    ON log (pipeline)
-            """)
-            cur.execute("""
-                CREATE INDEX IF NOT EXISTS idx_log_status
-                    ON log (status)
+                CREATE INDEX IF NOT EXISTS idx_log_category
+                    ON log (category)
             """)
             cur.execute("""
                 CREATE INDEX IF NOT EXISTS idx_log_created_at
@@ -401,7 +395,7 @@ def bootstrap():
             """)
 
         conn.commit()
-    write_log_entry(None, "[DB] bootstrap: схема проверена/создана", level="silent")
+    write_log_entry(None, "system", "[DB] bootstrap: схема проверена/создана", level="silent")
 
 
 def init_db():
@@ -409,5 +403,5 @@ def init_db():
         bootstrap()
         run_migrations()
     except Exception as e:
-        write_log_entry(None, f"[DB] Ошибка инициализации: {e}", level="silent")
+        write_log_entry(None, "system", f"[DB] Ошибка инициализации: {e}", level="silent")
         raise

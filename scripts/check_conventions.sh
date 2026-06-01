@@ -19,11 +19,19 @@ FOUND=$(grep -rn --include="*.py" "^\s*print(" $PROJECT_DIRS \
     | grep -v "^log/log\.py:")
 [ -n "$FOUND" ] && fail "Конвенция 2: print() вне log/log.py" "$FOUND"
 
-# ── Конвенция 2: прямая запись в БД-логи в обход write_log_entry ──────────────
+# ── Конвенция 2: прямая запись в log_entries в обход write_log_entry ──────────────
 FOUND=$(grep -rn --include="*.py" "db_insert_log_entry" $PROJECT_DIRS \
     | grep -v "^log/log\.py:" \
     | grep -v "^db/")
 [ -n "$FOUND" ] && fail "Конвенция 2: db_insert_log_entry вне log/log.py" "$FOUND"
+
+# ── Конвенция 2: прямая модификация log (INSERT/UPDATE) вне log/log.py ─────────
+FOUND=$(grep -rn --include="*.py" -E "(INSERT INTO log|UPDATE log SET)" $PROJECT_DIRS \
+    | grep -v "^log/log\.py:" \
+    | grep -v "^db/db_simple\.py:" \
+    | grep -v "^db/migrations\.py:" \
+    | grep -v "^db/init\.py:")
+[ -n "$FOUND" ] && fail "Конвенция 2: прямой INSERT/UPDATE log вне log/log.py и db_simple" "$FOUND"
 
 # ── Конвенция 3: защищённые ключи окружения — только в environment.py ─────────
 FOUND=$(grep -rn --include="*.py" \
@@ -36,7 +44,7 @@ FOUND=$(grep -rn --include="*.py" \
 # Ищем строки в log/write_log-вызовах, где batch_id или story_id вставлены
 # напрямую в f-строку без fmt_id_msg.
 FOUND=$(grep -rn --include="*.py" \
-    -E "(write_log_entry|write_log|db_log_update)\b.*f['\"].*\{(batch_id|story_id|donor_id|publisher_id)\}" \
+    -E "write_log_entry\b.*f['\"].*\{(batch_id|story_id|donor_id|publisher_id)\}" \
     $PROJECT_DIRS \
     | grep -v "fmt_id_msg")
 [ -n "$FOUND" ] && fail "Конвенция 6: UUID вставлен напрямую в лог (использовать fmt_id_msg)" "$FOUND"
@@ -49,7 +57,7 @@ FOUND=$(grep -rn --include="*.py" \
     $THREAD_PIPELINES 2>/dev/null)
 [ -n "$FOUND" ] && fail "Конвенция 7: прямое environment.* в потоке (использовать snap.*)" "$FOUND"
 
-# ── Конвенция 7: все run(batch_id, log_id) должны вызывать snapshot() ─────────
+# ── Конвенция 7: все run(batch_id, category) должны вызывать snapshot() ───────
 for f in $THREAD_PIPELINES; do
     if [ -f "$f" ] && ! grep -q "environment\.snapshot()" "$f"; then
         fail "Конвенция 7: $f не вызывает environment.snapshot() в run()" ""
@@ -58,8 +66,7 @@ done
 
 # ── Конвенция: статус батча только через db_set_batch_status ─────────────────
 # UPDATE batches SET status = 'literal' — нарушение (db_set_batch_status использует %s)
-FOUND=$(grep -rn --include="*.py" "SET status = '" $PROJECT_DIRS \
-    | grep -v "UPDATE log SET status")
+FOUND=$(grep -rn --include="*.py" "SET status = '" $PROJECT_DIRS)
 [ -n "$FOUND" ] && fail "Конвенция: прямой SET status с литералом (использовать db_set_batch_status)" "$FOUND"
 
 # INSERT INTO batches с явным полем status — нарушение (DB default = 'pending')

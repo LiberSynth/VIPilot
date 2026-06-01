@@ -86,7 +86,7 @@ def _install_chromium() -> bool:
         )
         return result.returncode == 0
     except Exception as e:
-        write_log_entry(None, f'[upgrade] Ошибка установки Chromium: {e}', level='silent')
+        write_log_entry(None, "system", f'[upgrade] Ошибка установки Chromium: {e}', level='silent')
         return False
 
 
@@ -103,7 +103,7 @@ def _check_chromium() -> tuple[bool, str]:
         p.stop()
         if pathlib.Path(exe).exists():
             return True, f'chromium (playwright): {exe}'
-        write_log_entry(None, '[upgrade] Chromium не найден — устанавливаю через playwright.', level='silent')
+        write_log_entry(None, "system", '[upgrade] Chromium не найден — устанавливаю через playwright.', level='silent')
         if _install_chromium():
             return True, 'chromium: установлен через playwright install chromium'
         return False, 'chromium: не удалось установить через playwright install chromium'
@@ -151,6 +151,7 @@ def _check_pg_repack() -> tuple[bool, str]:
         if platform.system() == 'Windows' and not force:
             write_log_entry(
                 None,
+                "system",
                 '[upgrade] pg_repack: на Windows CLI не установлен — '
                 'кнопка «Дефрагментация» использует VACUUM FULL. '
                 'Задайте VIPILOT_REQUIRE_PG_REPACK=1, если нужен строгий pg_repack.',
@@ -179,7 +180,7 @@ def _check_pg_repack() -> tuple[bool, str]:
                 cur.execute("SELECT extversion FROM pg_extension WHERE extname='pg_repack'")
                 row = cur.fetchone()
                 if not row:
-                    write_log_entry(None, '[upgrade] pg_repack extension отсутствует — устанавливаю.', level='silent')
+                    write_log_entry(None, "system", '[upgrade] pg_repack extension отсутствует — устанавливаю.', level='silent')
                     cur.execute('CREATE EXTENSION IF NOT EXISTS pg_repack')
                     conn.commit()
                     cur.execute("SELECT extversion FROM pg_extension WHERE extname='pg_repack'")
@@ -238,7 +239,7 @@ _POST_MIGRATION_CHECKS = [
 
 def _run_checks(checks, label) -> None:
     """Запускает список проверок. Бросает FatalError или RuntimeError при неудаче."""
-    write_log_entry(None, f'[upgrade] {label}.', level='silent')
+    write_log_entry(None, "system", f'[upgrade] {label}.', level='silent')
     failed = []
     for name, fn in checks:
         try:
@@ -248,13 +249,13 @@ def _run_checks(checks, label) -> None:
         except Exception as e:
             ok, msg = False, f'{name}: непредвиденная ошибка — {e}'
         tag = 'OK  ' if ok else 'FAIL'
-        write_log_entry(None, f'[upgrade]   [{tag}] {msg}', level='silent')
+        write_log_entry(None, "system", f'[upgrade]   [{tag}] {msg}', level='silent')
         if not ok:
             failed.append(msg)
     if failed:
         summary = '; '.join(failed)
         raise RuntimeError(f'[upgrade] Проверка не пройдена: {summary}')
-    write_log_entry(None, f'[upgrade] {label}: всё в порядке', level='silent')
+    write_log_entry(None, "system", f'[upgrade] {label}: всё в порядке', level='silent')
 
 
 def _run_env_checks() -> None:
@@ -286,7 +287,7 @@ def check_upgrade():
 
     if stored == BUILD:
         return False
-    write_log_entry(None, f'[upgrade] Обновление: {stored or "первый запуск"} -> {BUILD}', level='silent')
+    write_log_entry(None, "system", f'[upgrade] Обновление: {stored or "первый запуск"} -> {BUILD}', level='silent')
     _run_env_checks()
 
     if not stored:

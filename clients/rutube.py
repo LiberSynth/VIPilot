@@ -41,8 +41,8 @@ class RutubeApiError(RuntimeError):
 def publish(
     video_data: bytes,
     target_config: dict,
-    log_id,
-    batch_id=None,
+    batch_id,
+    category,
     target_id: str | None = None,
     pub_title: str = "",
 ) -> bool:
@@ -72,11 +72,11 @@ def publish(
 
     saved_cookies = session.get("cookies", [])
 
-    write_log_entry(log_id, "Рутьюб: Публикация запущена.")
-    write_log_entry(log_id, fmt_id_msg("[rutube] {} КБ, person_id={}", len(video_data) // 1024, person_id), level='silent')
+    write_log_entry(batch_id, category, "Рутьюб: Публикация запущена.")
+    write_log_entry(batch_id, category, fmt_id_msg("[rutube] {} КБ, person_id={}", len(video_data) // 1024, person_id), level='silent')
 
     file_name = publication_file_name(pub_title)
-    write_log_entry(log_id, f"[rutube] Заголовок: {pub_title}, файл: {file_name}", level='silent')
+    write_log_entry(batch_id, category, f"[rutube] Заголовок: {pub_title}, файл: {file_name}", level='silent')
     tmp_dir = tempfile.mkdtemp()
     video_path = os.path.join(tmp_dir, file_name)
     try:
@@ -84,9 +84,9 @@ def publish(
             _f.write(video_data)
 
         def _do_publish(page, _ctx):
-            _publish_ui(page, video_path, log_id, batch_id=batch_id)
+            _publish_ui(page, video_path, category, batch_id=batch_id)
 
-        result = _get_browser("rutube").run_pipeline_browser(_do_publish, saved_cookies, log_id=log_id)
+        result = _get_browser("rutube").run_pipeline_browser(_do_publish, saved_cookies, batch_id=batch_id, category=category)
 
         if not result["ok"]:
             err = result.get("error", "Неизвестная ошибка")
@@ -97,11 +97,11 @@ def publish(
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
         try:
-            _get_browser("rutube").stop(log_id=log_id)
+            _get_browser("rutube").stop(batch_id=batch_id, category=category)
         except Exception:
             pass
 
-    write_log_entry(log_id, "Рутьюб: видео опубликовано успешно")
+    write_log_entry(batch_id, category, "Рутьюб: видео опубликовано успешно")
     return True
 
 
@@ -119,14 +119,14 @@ def _snap(page, batch_id=None) -> None:
         if batch_id:
             _b.push_frame_for_batch(batch_id, img)
     except Exception as _e:
-        write_log_entry(None, f"[rutube] _snap: {_e}", level='silent')
+        write_log_entry(None, "system", f"[rutube] _snap: {_e}", level='silent')
 
 
-def _publish_ui(page, video_path: str, log_id, batch_id=None):
+def _publish_ui(page, video_path: str, category, batch_id=None):
     """Управляет браузером для публикации видео через UI Рутьюба."""
 
     # ── Шаг 1: Переходим в студию ────────────────────────────────────────
-    write_log_entry(log_id, "Рутьюб: Переход в студию Рутьюба.")
+    write_log_entry(batch_id, category, "Рутьюб: Переход в студию Рутьюба.")
     _last_err = None
     for _attempt in range(1, 6):
         try:
@@ -136,7 +136,7 @@ def _publish_ui(page, video_path: str, log_id, batch_id=None):
         except Exception as _e:
             _last_err = _e
             write_log_entry(
-                log_id,
+                batch_id, category,
                 f"Рутьюб: попытка {_attempt}/5 перейти в студию не удалась: {_e}",
                 level="warn",
             )
@@ -149,60 +149,60 @@ def _publish_ui(page, video_path: str, log_id, batch_id=None):
     _snap(page, batch_id)
 
     cur = page.url
-    write_log_entry(log_id, f"[rutube] URL после перехода: {cur}", level='silent')
+    write_log_entry(batch_id, category, f"[rutube] URL после перехода: {cur}", level='silent')
     if "rutube.ru/login" in cur or "/auth" in cur or "passport" in cur:
         raise RutubeCsrfExpired(
             "Сессия истекла — авторизуйтесь снова в браузере (вкладка «Публикация»)"
         )
 
     # ── Шаг 2: Кнопка «+ Добавить» ───────────────────────────────────────
-    write_log_entry(log_id, "Рутьюб: Ищу кнопку «+ Добавить».")
+    write_log_entry(batch_id, category, "Рутьюб: Ищу кнопку «+ Добавить».")
     add_btn = page.locator("button:has-text('Добавить')").first
     add_btn.wait_for(state="visible", timeout=180_000)
     add_btn.click()
-    write_log_entry(log_id, "Рутьюб: Кнопка «+ Добавить» нажата, жду меню.")
+    write_log_entry(batch_id, category, "Рутьюб: Кнопка «+ Добавить» нажата, жду меню.")
     _snap(page, batch_id)
 
     # ── Шаг 3: «Загрузить видео или Shorts» из меню ──────────────────────
-    write_log_entry(log_id, "Рутьюб: Выбираю «Загрузить видео или Shorts».")
+    write_log_entry(batch_id, category, "Рутьюб: Выбираю «Загрузить видео или Shorts».")
     upload_item = page.get_by_text("Загрузить видео или Shorts", exact=False).first
     try:
         upload_item.wait_for(state="visible", timeout=180_000)
     except Exception:
-        write_log_entry(log_id, "Рутьюб: exact-match не нашёл — пробую contains.")
+        write_log_entry(batch_id, category, "Рутьюб: exact-match не нашёл — пробую contains.")
         upload_item = page.get_by_text("Загрузить видео", exact=False).first
         upload_item.wait_for(state="visible", timeout=180_000)
     upload_item.click()
-    write_log_entry(log_id, "Рутьюб: «Загрузить видео или Shorts» нажато")
+    write_log_entry(batch_id, category, "Рутьюб: «Загрузить видео или Shorts» нажато")
     _snap(page, batch_id)
 
     # ── Шаг 4: Нажимаем «Выбрать файлы» и передаём видео ────────────────
-    write_log_entry(log_id, "Рутьюб: Ищу поле загрузки файла.")
+    write_log_entry(batch_id, category, "Рутьюб: Ищу поле загрузки файла.")
     choose_btn = page.get_by_text("Выбрать файлы", exact=False).first
     choose_btn.wait_for(state="visible", timeout=180_000)
-    write_log_entry(log_id, "Рутьюб: Кнопка «Выбрать файлы» найдена, открываю диалог выбора файла.")
+    write_log_entry(batch_id, category, "Рутьюб: Кнопка «Выбрать файлы» найдена, открываю диалог выбора файла.")
     with page.expect_file_chooser(timeout=180_000) as fc_info:
         choose_btn.click()
     file_chooser = fc_info.value
     file_chooser.set_files(video_path)
-    write_log_entry(log_id, "Рутьюб: Файл передан браузеру, жду загрузки.")
-    write_log_entry(log_id, f"[rutube] Файл: {os.path.basename(video_path)}", level='silent')
+    write_log_entry(batch_id, category, "Рутьюб: Файл передан браузеру, жду загрузки.")
+    write_log_entry(batch_id, category, f"[rutube] Файл: {os.path.basename(video_path)}", level='silent')
     _snap(page, batch_id)
 
     # ── Шаг 5: Ждём завершения загрузки (появление «Модерация») ─────────
-    write_log_entry(log_id, "Рутьюб: Жду завершения загрузки (до 3 минут).")
+    write_log_entry(batch_id, category, "Рутьюб: Жду завершения загрузки (до 3 минут).")
     _upload_ok = False
     try:
         page.wait_for_selector("text=Модерация", timeout=_UPLOAD_WAIT)
         _upload_ok = True
-        write_log_entry(log_id, "Рутьюб: Загрузка завершена, перехожу к публикации.")
+        write_log_entry(batch_id, category, "Рутьюб: Загрузка завершена, перехожу к публикации.")
     except Exception:
-        write_log_entry(log_id, "Рутьюб: Ожидание загрузки истекло — продолжаю.")
+        write_log_entry(batch_id, category, "Рутьюб: Ожидание загрузки истекло — продолжаю.")
         page.wait_for_timeout(5000)
     _snap(page, batch_id)
 
     # ── Шаг 6: Выбираем категорию ─────────────────────────────────────────
-    write_log_entry(log_id, f"Рутьюб: Выбираю категорию «{_CATEGORY}».")
+    write_log_entry(batch_id, category, f"Рутьюб: Выбираю категорию «{_CATEGORY}».")
     _cat_ok = False
     try:
         cat_trigger = page.locator("text=Выберите категорию").first
@@ -216,10 +216,10 @@ def _publish_ui(page, video_path: str, log_id, batch_id=None):
         cat_option.click()
         page.wait_for_timeout(500)
         _cat_ok = True
-        write_log_entry(log_id, f"Рутьюб: Категория «{_CATEGORY}» выбрана")
+        write_log_entry(batch_id, category, f"Рутьюб: Категория «{_CATEGORY}» выбрана")
     except Exception as _e:
-        write_log_entry(log_id, "Рутьюб: Не удалось выбрать категорию — продолжаю.")
-        write_log_entry(log_id, f"[rutube] Ошибка категории: {_e}", level='silent')
+        write_log_entry(batch_id, category, "Рутьюб: Не удалось выбрать категорию — продолжаю.")
+        write_log_entry(batch_id, category, f"[rutube] Ошибка категории: {_e}", level='silent')
     _snap(page, batch_id)
 
     if not _cat_ok and not _upload_ok:
@@ -229,14 +229,14 @@ def _publish_ui(page, video_path: str, log_id, batch_id=None):
         )
 
     # ── Шаг 7: Нажимаем «Опубликовать» ───────────────────────────────────
-    write_log_entry(log_id, "Рутьюб: Нажимаю «Опубликовать».")
+    write_log_entry(batch_id, category, "Рутьюб: Нажимаю «Опубликовать».")
     pub_btn = page.locator("button:has-text('Опубликовать')").last
     pub_btn.wait_for(state="visible", timeout=180_000)
     pub_btn.click(timeout=180_000)
     _snap(page, batch_id)
 
     # ── Шаг 8: Проверяем успех (toast «Видео опубликовано») ──────────────
-    write_log_entry(log_id, "Рутьюб: Проверяю результат публикации.")
+    write_log_entry(batch_id, category, "Рутьюб: Проверяю результат публикации.")
 
     _SUCCESS_TEXTS = ["Видео опубликовано", "опубликовано"]
     _ERROR_TEXTS = [
@@ -271,8 +271,8 @@ def _publish_ui(page, video_path: str, log_id, batch_id=None):
     _snap(page, batch_id)
 
     if _success:
-        write_log_entry(log_id, "Рутьюб: Публикация успешна.")
-        write_log_entry(log_id, f"[rutube] URL: {page.url}", level='silent')
+        write_log_entry(batch_id, category, "Рутьюб: Публикация успешна.")
+        write_log_entry(batch_id, category, f"[rutube] URL: {page.url}", level='silent')
     else:
-        write_log_entry(log_id, "Рутьюб: Публикация завершена (тост не обнаружен, ошибок нет)")
-        write_log_entry(log_id, f"[rutube] URL: {page.url}", level='silent')
+        write_log_entry(batch_id, category, "Рутьюб: Публикация завершена (тост не обнаружен, ошибок нет)")
+        write_log_entry(batch_id, category, f"[rutube] URL: {page.url}", level='silent')

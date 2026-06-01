@@ -16,7 +16,7 @@ from db import (
     db_set_batch_status,
     db_is_batch_scheduled,
 )
-from log import write_log_entry, db_log_update
+from log import write_log_entry
 from utils.utils import fmt_id_msg
 
 
@@ -26,11 +26,11 @@ def _forbidden_print(*args, **kwargs):
     """
     raise AssertionError(
         "Прямой вызов print в pipelines/ запрещён. "
-        "Используйте write_log_entry(log_id, msg, level) из log."
+        "Используйте write_log_entry(batch_id, category, msg, level) из log."
     )
 
 
-def ensure_playwright_chromium(log_id) -> None:
+def ensure_playwright_chromium(batch_id, category) -> None:
     """Проверяет наличие Chromium для Playwright и устанавливает его, если бинарник отсутствует.
 
     Вызывать перед публикацией через браузерные платформы (dzen, rutube, vkvideo).
@@ -43,16 +43,16 @@ def ensure_playwright_chromium(log_id) -> None:
             exec_path = p.chromium.executable_path
     except Exception as e:
         exec_path = None
-        write_log_entry(log_id, f'[playwright] Не удалось определить путь к Chromium: {e}', level='silent')
+        write_log_entry(batch_id, category, f'[playwright] Не удалось определить путь к Chromium: {e}', level='silent')
 
     if exec_path and os.path.exists(exec_path):
-        write_log_entry(log_id, f'[playwright] Chromium найден: {exec_path}', level='silent')
+        write_log_entry(batch_id, category, f'[playwright] Chromium найден: {exec_path}', level='silent')
         return
 
-    write_log_entry(log_id, 'Playwright Chromium не установлен — выполняю установку…')
+    write_log_entry(batch_id, category, 'Playwright Chromium не установлен — выполняю установку…')
     import sys
     cmd = [sys.executable, '-m', 'playwright', 'install', 'chromium', 'chromium-headless-shell']
-    write_log_entry(log_id, f"[playwright] install cmd={' '.join(cmd)}", level='silent')
+    write_log_entry(batch_id, category, f"[playwright] install cmd={' '.join(cmd)}", level='silent')
     result = subprocess.run(
         cmd,
         capture_output=True,
@@ -61,25 +61,23 @@ def ensure_playwright_chromium(log_id) -> None:
     )
     if result.returncode != 0:
         msg = f'playwright install chromium завершился с ошибкой: {result.stderr.strip()}'
-        write_log_entry(log_id, msg, level='error')
+        write_log_entry(batch_id, category, msg, level='error')
         raise RuntimeError(msg)
-    write_log_entry(log_id, '[playwright] install completed successfully', level='silent')
-    write_log_entry(log_id, 'Playwright Chromium успешно установлен')
+    write_log_entry(batch_id, category, '[playwright] install completed successfully', level='silent')
+    write_log_entry(batch_id, category, 'Playwright Chromium успешно установлен')
 
 
-def check_cancelled(pipeline_name: str, batch_id: str, batch: dict, log_id=None) -> bool:
+def check_cancelled(pipeline_name: str, batch_id: str, batch: dict, category=None) -> bool:
     """Проверяет, не отменён ли батч (слот расписания удалён).
 
     Возвращает True, если батч отменён и пайплайн должен прерваться.
     Вызывать только для не-ручных батчей (is_manual проверяет сам вызывающий).
-    log_id — идентификатор текущей записи лога (для обновления статуса).
+    category — категория лога пайплайна (по умолчанию pipeline_name).
     """
     if not db_is_batch_scheduled(batch['scheduled_at'], batch.get('type', 'planning')):
         db_set_batch_status(batch_id, 'cancelled')
-        msg = 'Батч отменён — слот удалён из расписания'
-        if log_id:
-            db_log_update(log_id, msg, 'cancelled')
-        write_log_entry(log_id, fmt_id_msg("[{}] Батч {} отменён, пропускаю", pipeline_name, batch_id), level='silent')
+        cat = category or pipeline_name
+        write_log_entry(batch_id, cat, fmt_id_msg("[{}] Батч {} отменён, пропускаю", pipeline_name, batch_id), level='silent')
         return True
     return False
 

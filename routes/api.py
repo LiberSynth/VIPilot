@@ -59,7 +59,6 @@ from log import (
     db_get_monitor,
     db_get_batch_log_entries,
     db_get_system_log_entries,
-    log_batch_planned,
     write_log_entry,
 )
 from utils.auth import is_authenticated
@@ -297,9 +296,8 @@ def api_run_now():
     batch_id = db_create_planning_batch(None)
     if not batch_id:
         return jsonify({"error": "Не удалось создать батч"}), 500
-    log_batch_planned(
-        batch_id, "Оперативный запуск", "Запуск по запросу пользователя (внеплановый)", pipeline='api'
-    )
+    write_log_entry(batch_id, 'api', 'Оперативный запуск')
+    write_log_entry(batch_id, 'api', 'Запуск по запросу пользователя (внеплановый)')
     environment.wakeup_loop()
     return jsonify({"ok": True, "batch_id": batch_id})
 
@@ -536,7 +534,7 @@ def api_vacuum_db():
         return jsonify({"error": "unauthorized"}), 401
     size_before = db_get_database_size_bytes()
     write_log_entry(
-        None,
+        None, 'api',
         "[api] Дефрагментация БД запущена вручную. "
         f"Размер БД: {_fmt_bytes_short(size_before)} ({size_before} байт).",
         level='info',
@@ -544,7 +542,7 @@ def api_vacuum_db():
     try:
         result = db_vacuum_full()
     except Exception as e:
-        write_log_entry(None, f"[api] Дефрагментация БД: ошибка — {e}", level='error')
+        write_log_entry(None, 'api', f"[api] Дефрагментация БД: ошибка — {e}", level='error')
         return jsonify({"ok": False, "error": str(e)}), 500
     size_after = db_get_database_size_bytes()
     size_delta = size_after - size_before
@@ -564,7 +562,7 @@ def api_vacuum_db():
     if result.get("tables_failed", 0) > 0:
         failed = [r["table"] for r in result.get("results", []) if not r.get("ok")]
         write_log_entry(
-            None,
+            None, 'api',
             f"[api] Дефрагментация БД завершена с ошибками: {summary}, {db_size_summary}",
             level='warn',
         )
@@ -574,7 +572,7 @@ def api_vacuum_db():
             "result": result,
         })
     write_log_entry(
-        None,
+        None, 'api',
         f"[api] Дефрагментация БД завершена ({summary}, {db_size_summary}).",
         level='info',
     )
@@ -596,7 +594,7 @@ def api_workflow_start():
         return jsonify({"error": "unauthorized"}), 401
     env_set("workflow_state", "running")
     environment.set_running()
-    write_log_entry(None, "[api] Движок запущен вручную", level='silent')
+    write_log_entry(None, 'api', "[api] Движок запущен вручную", level='silent')
     return jsonify({"ok": True, "state": "running"})
 
 
@@ -606,7 +604,7 @@ def api_workflow_pause():
         return jsonify({"error": "unauthorized"}), 401
     env_set("workflow_state", "pause")
     environment.set_paused()
-    write_log_entry(None, "[api] Движок приостановлен вручную", level='silent')
+    write_log_entry(None, 'api', "[api] Движок приостановлен вручную", level='silent')
     return jsonify({"ok": True, "state": "pause"})
 
 
@@ -618,7 +616,7 @@ def api_workflow_deep_debugging():
     val = "1" if body.get("enabled") == "1" else "0"
     env_set("deep_debugging", val)
     label = "включена" if val == "1" else "выключена"
-    write_log_entry(None, f"[api] Глубокая отладка {label}", level='silent')
+    write_log_entry(None, 'api', f"[api] Глубокая отладка {label}", level='silent')
     return jsonify({"ok": True, "deep_debugging": val})
 
 
@@ -665,8 +663,8 @@ def api_cycle_config_good_samples_count():
 def api_monitor_batch_entries(batch_id):
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
-    logs = db_get_batch_log_entries(batch_id)
-    return jsonify({"logs": logs})
+    entries = db_get_batch_log_entries(batch_id)
+    return jsonify({"entries": entries})
 
 
 @bp.route("/monitor/log/<log_id>/entries")
@@ -696,7 +694,7 @@ def api_delete_batch(batch_id):
             return jsonify({"error": "not found"}), 404
         return jsonify({"ok": True})
     except Exception as e:
-        write_log_entry(None, f"[api] Ошибка удаления батча: {e}", level="silent")
+        write_log_entry(None, 'api', f"[api] Ошибка удаления батча: {e}", level="silent")
         return jsonify({"ok": False, "error": "internal error"}), 500
 
 
@@ -715,8 +713,7 @@ def api_reset_batch_pipeline(batch_id, pipeline):
 def api_workflow_restart():
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
-    from log.log import log_system_event
-    log_system_event("[api] Перезапуск приложения вручную", status="info")
+    write_log_entry(None, 'api', "[api] Перезапуск приложения вручную", level='info')
 
     def _do_restart():
         import time as _time
@@ -1204,9 +1201,8 @@ def api_production_video_generate():
     if not batch_id:
         return jsonify({"error": "db_error"}), 500
     environment.wakeup_loop()
-    log_batch_planned(
-        batch_id, "Генерация видео вручную", "Запуск по запросу пользователя", pipeline='api'
-    )
+    write_log_entry(batch_id, 'api', 'Генерация видео вручную')
+    write_log_entry(batch_id, 'api', 'Запуск по запросу пользователя')
     return jsonify({"batch_id": batch_id})
 
 
@@ -1221,9 +1217,8 @@ def api_production_story_generate():
     if not batch_id:
         return jsonify({"error": "db_error"}), 500
     environment.wakeup_loop()
-    log_batch_planned(
-        batch_id, "Генерация сюжета вручную", "Запуск по запросу пользователя", pipeline='api'
-    )
+    write_log_entry(batch_id, 'api', 'Генерация сюжета вручную')
+    write_log_entry(batch_id, 'api', 'Запуск по запросу пользователя')
     return jsonify({"batch_id": batch_id})
 
 

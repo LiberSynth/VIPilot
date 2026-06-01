@@ -58,7 +58,7 @@ def _is_provider_fatal(status_code: int, body) -> bool:
     return any(fn(status_code, body) for fn in _FATAL_DETECTORS)
 
 
-def build_body(body_tpl, prompt, ar_x, ar_y, video_duration, log_id=None):
+def build_body(body_tpl, prompt, ar_x, ar_y, video_duration, batch_id=None, category=None):
     """
     Строит тело запроса к fal.ai из шаблона модели.
 
@@ -94,7 +94,7 @@ def build_body(body_tpl, prompt, ar_x, ar_y, video_duration, log_id=None):
                     body[field] = val.format(video_duration)
                 except (IndexError, KeyError) as e:
                     write_log_entry(
-                        log_id,
+                        batch_id, category,
                         f"Поле «{field}» шаблона не поддерживает подстановку video_duration — оставляем как есть ({e})",
                         level='warn',
                     )
@@ -102,7 +102,7 @@ def build_body(body_tpl, prompt, ar_x, ar_y, video_duration, log_id=None):
     return body
 
 
-def submit(log_id, model_name: str, submit_url: str, platform_url: str,
+def submit(batch_id, category, model_name: str, submit_url: str, platform_url: str,
            body_tpl: dict, prompt: str, ar_x: int, ar_y: int,
            video_duration: int):
     """
@@ -114,13 +114,13 @@ def submit(log_id, model_name: str, submit_url: str, platform_url: str,
     :param log_id: идентификатор записи лога
     """
     try:
-        body = build_body(body_tpl, prompt, ar_x, ar_y, video_duration, log_id)
+        body = build_body(body_tpl, prompt, ar_x, ar_y, video_duration, batch_id, category)
         resp = requests.post(submit_url, headers=_headers(), json=body, timeout=30)
     except requests.exceptions.Timeout:
-        write_log_entry(log_id, f"[{model_name}] таймаут (30 с)", level='warn')
+        write_log_entry(batch_id, category, f"[{model_name}] таймаут (30 с)", level='warn')
         return None
     except requests.exceptions.RequestException as e:
-        write_log_entry(log_id, f"[{model_name}] ошибка соединения: {e}", level='warn')
+        write_log_entry(batch_id, category, f"[{model_name}] ошибка соединения: {e}", level='warn')
         return None
 
     try:
@@ -128,22 +128,22 @@ def submit(log_id, model_name: str, submit_url: str, platform_url: str,
     except ValueError:
         if _is_provider_fatal(resp.status_code, resp.text):
             msg = f"[{model_name}] Фатальная ошибка провайдера (HTTP {resp.status_code}): {resp.text}"
-            write_log_entry(log_id, msg, level='error')
+            write_log_entry(batch_id, category, msg, level='error')
             raise ProviderFatalError(msg)
-        write_log_entry(log_id, f"[{model_name}] не-JSON (HTTP {resp.status_code}): {resp.text}", level='warn')
+        write_log_entry(batch_id, category, f"[{model_name}] не-JSON (HTTP {resp.status_code}): {resp.text}", level='warn')
         return None
 
     if resp.status_code >= 400:
         err = data.get('error', data)
         if _is_provider_fatal(resp.status_code, err):
             msg = f"[{model_name}] Фатальная ошибка провайдера (HTTP {resp.status_code}): {err}"
-            write_log_entry(log_id, msg, level='error')
+            write_log_entry(batch_id, category, msg, level='error')
             raise ProviderFatalError(msg)
-        write_log_entry(log_id, f"[{model_name}] HTTP {resp.status_code}: {err}", level='warn')
+        write_log_entry(batch_id, category, f"[{model_name}] HTTP {resp.status_code}: {err}", level='warn')
         return None
 
     if 'request_id' not in data:
-        write_log_entry(log_id, f"[{model_name}] нет request_id: {str(data)}", level='warn')
+        write_log_entry(batch_id, category, f"[{model_name}] нет request_id: {str(data)}", level='warn')
         return None
 
     request_id   = data['request_id']
@@ -159,7 +159,7 @@ def submit(log_id, model_name: str, submit_url: str, platform_url: str,
 _POLL_MAX_ERRORS = 10
 
 
-def poll(log_id, status_url: str, response_url: str):
+def poll(batch_id, category, status_url: str, response_url: str):
     """
     Поллит fal.ai до завершения генерации.
     Возвращает (video_url, None) при успехе или (None, error_msg) при сбое.
@@ -182,21 +182,21 @@ def poll(log_id, status_url: str, response_url: str):
                 s = resp.json()
             except ValueError:
                 consecutive_errors += 1
-                write_log_entry(log_id, f"fal.ai poll [{attempt + 1}] не-JSON (HTTP {resp.status_code})", level='warn')
+                write_log_entry(batch_id, category, f"fal.ai poll [{attempt + 1}] не-JSON (HTTP {resp.status_code})", level='warn')
                 write_log_entry(
-                    log_id,
+                    batch_id, category,
                     f"[video] fal.ai poll [{attempt + 1}] http={resp.status_code}, body={_compact_json(resp.text)}",
                     level='silent',
                 )
                 if consecutive_errors >= _POLL_MAX_ERRORS:
                     msg = f'fal.ai недоступен: {_POLL_MAX_ERRORS} ошибок подряд — прерываем поллинг'
-                    write_log_entry(log_id, msg, level='error')
+                    write_log_entry(batch_id, category, msg, level='error')
                     return None, msg
                 continue
             status = s.get('status')
-            write_log_entry(log_id, f"Статус [{attempt + 1}]: {status}")
+            write_log_entry(batch_id, category, f"Статус [{attempt + 1}]: {status}")
             write_log_entry(
-                log_id,
+                batch_id, category,
                 f"[video] fal.ai poll [{attempt + 1}] http={resp.status_code}, status={status}, keys={list(s.keys()) if isinstance(s, dict) else []}",
                 level='silent',
             )
@@ -213,35 +213,35 @@ def poll(log_id, status_url: str, response_url: str):
                     types = [d.get('type', '') for d in detail] if isinstance(detail, list) else []
                     if any('content_policy' in t for t in types):
                         msg = 'fal.ai отклонил промпт: нарушение политики контента'
-                        write_log_entry(log_id, msg, level='error')
+                        write_log_entry(batch_id, category, msg, level='error')
                         return None, msg
                 video_url = result.get('video', {}).get('url')
                 if not video_url:
                     msg = f'Нет URL видео в ответе fal.ai: {str(result)}'
-                    write_log_entry(log_id, msg, level='error')
+                    write_log_entry(batch_id, category, msg, level='error')
                     return None, msg
                 return video_url, None
 
             elif status == 'FAILED':
                 msg = f'fal.ai: генерация провалилась: {str(s)}'
-                write_log_entry(log_id, msg, level='error')
+                write_log_entry(batch_id, category, msg, level='error')
                 return None, msg
 
         except Exception as e:
             consecutive_errors += 1
-            write_log_entry(log_id, f"Ошибка опроса статуса: {e}", level='warn')
-            write_log_entry(log_id, f"[video] fal.ai poll [{attempt + 1}] exception={type(e).__name__}: {e}", level='silent')
+            write_log_entry(batch_id, category, f"Ошибка опроса статуса: {e}", level='warn')
+            write_log_entry(batch_id, category, f"[video] fal.ai poll [{attempt + 1}] exception={type(e).__name__}: {e}", level='silent')
             if consecutive_errors >= _POLL_MAX_ERRORS:
                 msg = f'fal.ai недоступен: {_POLL_MAX_ERRORS} ошибок подряд — прерываем поллинг'
-                write_log_entry(log_id, msg, level='error')
+                write_log_entry(batch_id, category, msg, level='error')
                 return None, msg
 
     msg = 'Таймаут генерации видео (2 часа)'
-    write_log_entry(log_id, msg, level='error')
+    write_log_entry(batch_id, category, msg, level='error')
     return None, msg
 
 
-def download_video(log_id, video_url: str) -> bytes:
+def download_video(batch_id, category, video_url: str) -> bytes:
     """
     Скачивает видео по URL.
     Возвращает байты видео или бросает исключение при ошибке.
@@ -258,14 +258,14 @@ def download_video(log_id, video_url: str) -> bytes:
             last_err = e
             if attempt < _DOWNLOAD_MAX_ATTEMPTS:
                 write_log_entry(
-                    log_id,
+                    batch_id, category,
                     f"Ошибка скачивания (попытка {attempt}/{_DOWNLOAD_MAX_ATTEMPTS}): {e}",
                     level='warn',
                 )
                 time.sleep(_DOWNLOAD_RETRY_DELAY)
             else:
                 write_log_entry(
-                    log_id,
+                    batch_id, category,
                     f"Ошибка скачивания после {_DOWNLOAD_MAX_ATTEMPTS} попыток: {e}",
                     level='error',
                 )
