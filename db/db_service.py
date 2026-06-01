@@ -100,15 +100,14 @@ def db_get_monitor():
 
 
 def db_get_system_log_entries(log_id: str) -> list:
-    """Возвращает log_entries для системного лога (без batch_id) по log_id."""
+    """Возвращает log_entries для log_id (батч или приложение)."""
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
                 SELECT le.message, le.level, le.created_at
                 FROM log_entries le
-                JOIN log l ON l.id = le.log_id
-                WHERE le.log_id = %s AND l.batch_id IS NULL
+                WHERE le.log_id = %s
                 ORDER BY le.created_at DESC, le.id DESC
                 """,
                 (log_id,),

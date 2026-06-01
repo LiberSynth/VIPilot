@@ -536,6 +536,12 @@
 
   window.monitorRefresh = refreshMonitor;
 
+  function _formatMonitorEntryLines(entries) {
+    return (entries || []).map(function(en) {
+      return '[' + fmtMsk(en.created_at) + '] ' + (en.message || '');
+    });
+  }
+
   function _monitorCopyText(text, btn) {
     window.clipboardWrite(text, function() {
       btn.classList.add('copied');
@@ -623,15 +629,25 @@
 
   window.monitorCopy = function(btn) {
     var batchEl = btn.closest('.monitor-batch');
-    var body = batchEl ? batchEl.querySelector('.monitor-batch-body') : null;
-    if (!body) return;
-    var lines = _batchInfoLines(batchEl);
-    body.querySelectorAll('.monitor-entry-row').forEach(function(row) {
-      var ts  = row.querySelector('.monitor-entry-ts')  ? row.querySelector('.monitor-entry-ts').textContent.trim()  : '';
-      var msg = row.querySelector('.monitor-entry-msg') ? row.querySelector('.monitor-entry-msg').textContent.trim() : '';
-      lines.push('[' + ts + '] ' + msg);
-    });
-    _monitorCopyText(lines.join('\n'), btn);
+    if (!batchEl) return;
+    var infoText = _batchInfoLines(batchEl).join('\n');
+    var logId = batchEl.dataset.logId || '';
+
+    function finish(entryLines) {
+      var text = infoText;
+      if (entryLines.length) text += '\n\n' + entryLines.join('\n');
+      _monitorCopyText(text, btn);
+    }
+
+    if (!logId) {
+      finish([]);
+      return;
+    }
+
+    fetch('/api/monitor/log/' + encodeURIComponent(logId) + '/entries')
+      .then(function(r) { return r.json(); })
+      .then(function(data) { finish(_formatMonitorEntryLines(data.entries || [])); })
+      .catch(function() { finish([]); });
   };
 
   window.monitorBatchCopyInfo = function(btn) {
