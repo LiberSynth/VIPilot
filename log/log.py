@@ -2,6 +2,8 @@
 Все функции логирования приложения.
 """
 
+import threading
+
 _ALLOWED_CATEGORIES = {
     "api",
     "planning",
@@ -22,12 +24,14 @@ _ALLOWED_LOG_LEVELS = {
 
 _lifecycle_stop_logged = False
 _system_log_id: str | None = None
+_system_log_lock = threading.Lock()
 
 
 def log_app_started():
     global _lifecycle_stop_logged, _system_log_id
-    _lifecycle_stop_logged = False
-    _system_log_id = None
+    with _system_log_lock:
+        _lifecycle_stop_logged = False
+        _system_log_id = None
     write_log_entry(None, "system", "[main] Приложение запущено", level="info")
 
 
@@ -64,7 +68,8 @@ def write_log_entry(batch_id, category, message, level="info"):
         return None
 
     if batch_id is not None:
-        _system_log_id = None
+        with _system_log_lock:
+            _system_log_id = None
         mod_token = environment.asserted_log_modification.set(True)
         entry_token = environment.asserted_log_entry.set(True)
         try:
@@ -77,10 +82,11 @@ def write_log_entry(batch_id, category, message, level="info"):
         mod_token = environment.asserted_log_modification.set(True)
         entry_token = environment.asserted_log_entry.set(True)
         try:
-            if _system_log_id is None:
-                _system_log_id = db_insert_log(None, category)
-            db_insert_log_entry(_system_log_id, message, level)
-            log_id = _system_log_id
+            with _system_log_lock:
+                if _system_log_id is None:
+                    _system_log_id = db_insert_log(None, category)
+                db_insert_log_entry(_system_log_id, message, level)
+                log_id = _system_log_id
         finally:
             environment.asserted_log_entry.reset(entry_token)
             environment.asserted_log_modification.reset(mod_token)

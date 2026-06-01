@@ -616,7 +616,7 @@ def api_workflow_deep_debugging():
     val = "1" if body.get("enabled") == "1" else "0"
     env_set("deep_debugging", val)
     label = "включена" if val == "1" else "выключена"
-    write_log_entry(None, 'api', f"[api] Глубокая отладка {label}", level='silent')
+    write_log_entry(None, 'api', f"[api] Глубокая отладка {label}", level='info')
     return jsonify({"ok": True, "deep_debugging": val})
 
 

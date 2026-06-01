@@ -27,7 +27,7 @@ def _movie_video_path(movie_id: str, field: str) -> Path:
     return _VIDEO_DIR / f"{movie_id} - {field}.mp4"
 
 
-def _ffmpeg(src: Path, dst: Path, category):
+def _ffmpeg(batch_id, src: Path, dst: Path, category):
     cmd = [
         'ffmpeg', '-y',
         '-i', str(src),
@@ -89,7 +89,7 @@ def run(batch_id, category):
     dst_path.parent.mkdir(parents=True, exist_ok=True)
 
     write_log_entry(batch_id, category, 'Начало транскодирования.')
-    _ffmpeg(src_path, dst_path, category)
+    _ffmpeg(batch_id, src_path, dst_path, category)
     out_mb = round(dst_path.stat().st_size / 1024 / 1024, 1)
 
     msg = f'Транскодировано (H.264, {out_mb} МБ)'
