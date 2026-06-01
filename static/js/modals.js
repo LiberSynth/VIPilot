@@ -59,6 +59,7 @@
   class StoryModal extends Dialog {
     constructor() {
       super();
+      this._storyTitle = '';
       this._storyText = '';
     }
 
@@ -69,6 +70,7 @@
       var existing = document.getElementById(this.overlayId());
       if (existing) existing.remove();
 
+      this._storyTitle = '';
       this._storyText = '';
       this._el = document.createElement('div');
       this._el.id        = this.overlayId();
@@ -84,8 +86,6 @@
           '</div>' +
           '<div class="story-modal-body" id="story-modal-body" data-memo-scroll><span class="story-modal-loading">Загрузка…</span></div>' +
         '</div>';
-      var titleEl = this._el.querySelector('#story-modal-title');
-      if (titleEl) titleEl.textContent = modelName ? 'Сюжет · ' + modelName : 'Сюжет';
       document.body.appendChild(this._el);
       this._setupKeyboard();
       document.body.style.overflow = 'hidden';
@@ -100,7 +100,10 @@
         .then(function(r) { return r.json(); })
         .then(function(d) {
           if (d.text) {
+            self._storyTitle = d.title || '';
             self._storyText  = d.text;
+            var titleEl = document.getElementById('story-modal-title');
+            if (titleEl) titleEl.textContent = self._storyTitle || '(без названия)';
             body.textContent = d.text;
           } else {
             body.innerHTML = '<span class="story-modal-loading">Сюжет не найден</span>';
@@ -119,11 +122,15 @@
 
     closeInner() {
       document.body.style.overflow = '';
+      this._storyTitle = '';
       this._storyText = '';
       this._removeEl();
     }
 
-    getStoryText() { return this._storyText; }
+    getStoryCopyText() {
+      if (!this._storyText) return '';
+      return this._storyTitle + '\n\n' + this._storyText;
+    }
   }
 
   var _storyModal = new StoryModal();
@@ -133,7 +140,7 @@
   window._closeStoryModalInner = function() { _storyModal.closeInner(); };
 
   window.copyStoryText = function() {
-    var text = _storyModal.getStoryText();
+    var text = _storyModal.getStoryCopyText();
     if (!text) return;
     var btn = document.getElementById('story-modal-copy-btn');
     window.clipboardWrite(text, function() {
