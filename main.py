@@ -85,6 +85,35 @@ def main_loop():
 
 
 _main_loop_started = False
+_instance_lock_file = None
+
+
+def _ensure_single_instance():
+    """Не даёт запустить второй процесс с тем же main loop (общий _system_log_id в памяти)."""
+    global _instance_lock_file
+    import sys
+    import tempfile
+
+    lock_path = pathlib.Path(
+        os.environ.get("VIPILOT_LOCK_FILE", pathlib.Path(tempfile.gettempdir()) / "vipilot.lock")
+    )
+    fh = open(lock_path, "a+", encoding="utf-8")
+    try:
+        if platform.system() == "Windows":
+            import msvcrt
+            fh.seek(0)
+            msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except (OSError, BlockingIOError):
+        fh.close()
+        print(
+            "VIPilot уже запущен. Завершите предыдущий процесс Python "
+            f"(lock: {lock_path})."
+        )
+        sys.exit(1)
+    _instance_lock_file = fh
 
 
 def _on_exit():
@@ -126,6 +155,7 @@ def start_main_loop():
         t.start()
 
 
+_ensure_single_instance()
 start_main_loop()
 
 app = flask_app

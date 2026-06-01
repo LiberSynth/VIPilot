@@ -13,7 +13,11 @@ def _assert_log_modification():
 
 
 def db_get_or_create_log(batch_id, category):
-    """Возвращает log_id для пары (batch_id, category), создаёт строку при отсутствии."""
+    """Возвращает (log_id, is_first_batch_log).
+
+    is_first_batch_log=True только при INSERT первой строки log для batch_id
+    (любая category); повторные category того же батча не считаются.
+    """
     _assert_log_modification()
     with get_db() as conn:
         with conn.cursor() as cur:
@@ -27,14 +31,19 @@ def db_get_or_create_log(batch_id, category):
             )
             row = cur.fetchone()
             if row:
-                return str(row[0])
+                return str(row[0]), False
+            cur.execute(
+                "SELECT 1 FROM log WHERE batch_id = %s::uuid LIMIT 1",
+                (batch_id,),
+            )
+            is_first_batch_log = cur.fetchone() is None
             cur.execute(
                 "INSERT INTO log (batch_id, category) VALUES (%s::uuid, %s) RETURNING id",
                 (batch_id, category),
             )
             log_id = cur.fetchone()[0]
         conn.commit()
-    return str(log_id)
+    return str(log_id), is_first_batch_log
 
 
 def db_insert_log(batch_id, category):
