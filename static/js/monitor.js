@@ -6,6 +6,7 @@
   const STATUS_LABELS = {
     pending:          'ожидание',
     generating:       'генерация',
+    generated:        'сгенерировано',
     story_generating: 'генерация сюжета',
     running:          'выполняется',
     ok:               'готово',
@@ -144,9 +145,10 @@
     const subParts = [schedStr, translateStatus(bs)];
     if (batch.title) subParts.push(batch.title);
     const subDefault = subParts.filter(Boolean).join(' · ');
-    const headTitle = btype === 'story' ? 'Генерация сюжета' : fmtMsk(headTime);
+    const fixedBatchTitle = { story: 'Генерация сюжета', movie: 'Генерация видео' }[btype];
+    const headTitle = fixedBatchTitle || fmtMsk(headTime);
     const entryCnt = formatEntryCount(batch.entry_count);
-    const sub = btype === 'story'
+    const sub = fixedBatchTitle
       ? capitalizeFirst(translateStatus(bs)) + ' · ' + entryCnt
       : subDefault;
     const md = _batchDotClass(bs, batch.batch_id);
