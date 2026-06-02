@@ -61,15 +61,8 @@ def db_get_monitor():
                     (
                         SELECT COUNT(*)::int
                         FROM log_entries le
-                        WHERE le.log_id = (
-                            SELECT l.id
-                            FROM log l
-                            WHERE l.batch_id = b.id
-                            ORDER BY
-                                CASE WHEN l.category = b.type THEN 0 ELSE 1 END,
-                                l.created_at ASC
-                            LIMIT 1
-                        )
+                        JOIN log l ON l.id = le.log_id
+                        WHERE l.batch_id = b.id
                     ) AS entry_count
                 FROM batches b
                 ORDER BY b.created_at DESC, b.id DESC

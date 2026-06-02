@@ -656,7 +656,7 @@
     var batchEl = btn.closest('.monitor-batch');
     if (!batchEl) return;
     var infoText = _batchInfoLines(batchEl).join('\n');
-    var logId = batchEl.dataset.logId || '';
+    var batchId = batchEl.dataset.bid || '';
 
     function finish(entryLines) {
       var text = infoText;
@@ -664,12 +664,12 @@
       _monitorCopyText(text, btn);
     }
 
-    if (!logId) {
+    if (!batchId) {
       finish([]);
       return;
     }
 
-    fetch('/api/monitor/log/' + encodeURIComponent(logId) + '/entries')
+    fetch('/api/monitor/batch/' + encodeURIComponent(batchId) + '/entries')
       .then(function(r) { return r.json(); })
       .then(function(data) { finish(_formatMonitorEntryLines(data.entries || [])); })
       .catch(function() { finish([]); });
