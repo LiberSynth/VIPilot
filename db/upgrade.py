@@ -21,7 +21,7 @@ from db import env_get, env_set
 from db.init import bootstrap, run_migrations
 from db.seed import seed_db
 from common.exceptions import FatalError
-from log.log import write_log_entry
+from log.log import app_log
 
 _BUILD_KEY = 'build_number'
 
@@ -86,7 +86,7 @@ def _install_chromium() -> bool:
         )
         return result.returncode == 0
     except Exception as e:
-        write_log_entry(None, "system", f'[upgrade] Ошибка установки Chromium: {e}', level='silent')
+        app_log("upgrade", f"Ошибка установки Chromium: {e}")
         return False
 
 
@@ -103,7 +103,7 @@ def _check_chromium() -> tuple[bool, str]:
         p.stop()
         if pathlib.Path(exe).exists():
             return True, f'chromium (playwright): {exe}'
-        write_log_entry(None, "system", '[upgrade] Chromium не найден — устанавливаю через playwright.', level='silent')
+        app_log("upgrade", "Chromium не найден — устанавливаю через playwright.")
         if _install_chromium():
             return True, 'chromium: установлен через playwright install chromium'
         return False, 'chromium: не удалось установить через playwright install chromium'
@@ -149,13 +149,11 @@ def _check_pg_repack() -> tuple[bool, str]:
     if not ensure_pg_repack_in_path(auto_install=True):
         force = os.environ.get('VIPILOT_REQUIRE_PG_REPACK') == '1'
         if platform.system() == 'Windows' and not force:
-            write_log_entry(
-                None,
-                "system",
-                '[upgrade] pg_repack: на Windows CLI не установлен — '
-                'кнопка «Дефрагментация» использует VACUUM FULL. '
-                'Задайте VIPILOT_REQUIRE_PG_REPACK=1, если нужен строгий pg_repack.',
-                level='silent',
+            app_log(
+                "upgrade",
+                "pg_repack: на Windows CLI не установлен — "
+                "кнопка «Дефрагментация» использует VACUUM FULL. "
+                "Задайте VIPILOT_REQUIRE_PG_REPACK=1, если нужен строгий pg_repack.",
             )
             return True, (
                 'pg_repack: пропуск на Windows — нет CLI (сжатие через VACUUM FULL)'
@@ -180,7 +178,7 @@ def _check_pg_repack() -> tuple[bool, str]:
                 cur.execute("SELECT extversion FROM pg_extension WHERE extname='pg_repack'")
                 row = cur.fetchone()
                 if not row:
-                    write_log_entry(None, "system", '[upgrade] pg_repack extension отсутствует — устанавливаю.', level='silent')
+                    app_log("upgrade", "pg_repack extension отсутствует — устанавливаю.")
                     cur.execute('CREATE EXTENSION IF NOT EXISTS pg_repack')
                     conn.commit()
                     cur.execute("SELECT extversion FROM pg_extension WHERE extname='pg_repack'")
@@ -239,7 +237,7 @@ _POST_MIGRATION_CHECKS = [
 
 def _run_checks(checks, label) -> None:
     """Запускает список проверок. Бросает FatalError или RuntimeError при неудаче."""
-    write_log_entry(None, "system", f'[upgrade] {label}.', level='silent')
+    app_log("upgrade", f"{label}.")
     failed = []
     for name, fn in checks:
         try:
@@ -249,13 +247,13 @@ def _run_checks(checks, label) -> None:
         except Exception as e:
             ok, msg = False, f'{name}: непредвиденная ошибка — {e}'
         tag = 'OK  ' if ok else 'FAIL'
-        write_log_entry(None, "system", f'[upgrade]   [{tag}] {msg}', level='silent')
+        app_log("upgrade", f"  [{tag}] {msg}")
         if not ok:
             failed.append(msg)
     if failed:
         summary = '; '.join(failed)
         raise RuntimeError(f'[upgrade] Проверка не пройдена: {summary}')
-    write_log_entry(None, "system", f'[upgrade] {label}: всё в порядке', level='silent')
+    app_log("upgrade", f"{label}: всё в порядке")
 
 
 def _run_env_checks() -> None:
@@ -287,7 +285,7 @@ def check_upgrade():
 
     if stored == BUILD:
         return False
-    write_log_entry(None, "system", f'[upgrade] Обновление: {stored or "первый запуск"} -> {BUILD}', level='silent')
+    app_log("upgrade", f'Обновление: {stored or "первый запуск"} -> {BUILD}')
     _run_env_checks()
 
     if not stored:

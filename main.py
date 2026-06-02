@@ -24,7 +24,7 @@ from db import (
 )
 from common.exceptions import AppException
 from common.startup import init_app, create_app
-from log import log_app_started, log_app_stopped, write_log_entry
+from log import app_log, log_app_started, log_app_stopped, write_log_entry
 from pipelines import cleanup
 import pipelines.planning as planning
 from pipelines.dispatch import prepare_batch_dispatch
@@ -79,7 +79,7 @@ def main_loop():
                 level='error',
             )
         except Exception as e:
-            write_log_entry(None, "system", f"[main_loop] Ошибка: {e}", level='error')
+            app_log("main_loop", f"Ошибка: {e}", level="error")
 
         environment.wait_for_wakeup(environment.loop_interval)
 

@@ -33,6 +33,11 @@ FOUND=$(grep -rn --include="*.py" -E "(INSERT INTO log|UPDATE log SET)" $PROJECT
     | grep -v "^db/init\.py:")
 [ -n "$FOUND" ] && fail "Конвенция 2: прямой INSERT/UPDATE log вне log/log.py и db_simple" "$FOUND"
 
+# ── Конвенция 4: лог «Приложение» — только app_log, не write_log_entry(None, …) ─
+FOUND=$(grep -rn --include="*.py" "write_log_entry(None" $PROJECT_DIRS \
+    | grep -v "^log/log\.py:")
+[ -n "$FOUND" ] && fail "Конвенция 4: write_log_entry(None, …) вне log/log.py (использовать app_log)" "$FOUND"
+
 # ── Конвенция 3: защищённые ключи окружения — только в environment.py ─────────
 FOUND=$(grep -rn --include="*.py" \
     "db_get(['\"]deep_debugging\|db_get(['\"]loop_interval\|db_get(['\"]max_batch_threads" \

@@ -7,7 +7,7 @@ from urllib.parse import urlparse, unquote, parse_qsl
 from .connection import get_db
 from .db_media import db_delete_movie_video_files
 from common.statuses import FINAL_BATCH_STATUSES
-from log.log import write_log_entry
+from log.log import app_log
 from utils.utils import fmt_id_msg
 
 
@@ -445,7 +445,7 @@ def db_clear_all_history():
             cur.execute("DELETE FROM batches")
             bl = cur.rowcount
         conn.commit()
-    write_log_entry(None, "system", f"[DB] Очистка истории: log_entries={le}, log={ll}, batches={bl}", level='silent')
+    app_log("db", f"Очистка истории: log_entries={le}, log={ll}, batches={bl}")
     return {"log_entries": le, "logs": ll, "batches": bl}
 
 
@@ -467,7 +467,7 @@ def db_purge_unused_stories() -> dict:
 
             if not story_ids:
                 conn.commit()
-                write_log_entry(None, "system", "[DB] Очистка сюжетов: stories=0, batches=0, log=0, log_entries=0", level='silent')
+                app_log("db", "Очистка сюжетов: stories=0, batches=0, log=0, log_entries=0")
                 return {"stories": 0, "batches": 0, "logs": 0, "log_entries": 0}
 
             fmt = ','.join(['%s'] * len(story_ids))
@@ -500,7 +500,7 @@ def db_purge_unused_stories() -> dict:
 
         conn.commit()
 
-    write_log_entry(None, "system", f"[DB] Очистка сюжетов: stories={sl_count}, batches={bl_count}, log={ll_count}, log_entries={le_count}", level='silent')
+    app_log("db", f"Очистка сюжетов: stories={sl_count}, batches={bl_count}, log={ll_count}, log_entries={le_count}")
     return {"stories": sl_count, "batches": bl_count, "logs": ll_count, "log_entries": le_count}
 
 
@@ -513,7 +513,7 @@ def db_delete_bad_movies() -> dict:
 
             if not movie_ids:
                 conn.commit()
-                write_log_entry(None, "system", "[DB] Удалены неудачные видео: movies=0, batches=0, log=0, log_entries=0", level='silent')
+                app_log("db", "Удалены неудачные видео: movies=0, batches=0, log=0, log_entries=0")
                 return {"movies": 0, "batches": 0, "logs": 0, "log_entries": 0}
 
             mfmt = ','.join(['%s'] * len(movie_ids))
@@ -549,7 +549,7 @@ def db_delete_bad_movies() -> dict:
     for movie_id in deleted_movie_ids:
         db_delete_movie_video_files(movie_id)
 
-    write_log_entry(None, "system", f"[DB] Удалены неудачные видео: movies={ml_count}, batches={bl_count}, log={ll_count}, log_entries={le_count}", level='silent')
+    app_log("db", f"Удалены неудачные видео: movies={ml_count}, batches={bl_count}, log={ll_count}, log_entries={le_count}")
     return {"movies": ml_count, "batches": bl_count, "logs": ll_count, "log_entries": le_count}
 
 
@@ -625,7 +625,7 @@ def db_delete_story(story_id: str) -> dict:
 
         conn.commit()
 
-    write_log_entry(None, "system", fmt_id_msg("[DB] Удалён сюжет {}: batches=" + str(bl_count) + ", log=" + str(ll_count) + ", log_entries=" + str(le_count), story_id), level='silent')
+    app_log("db", fmt_id_msg("Удалён сюжет {}: batches=" + str(bl_count) + ", log=" + str(ll_count) + ", log_entries=" + str(le_count), story_id))
     return {"stories": sl_count, "batches": bl_count, "logs": ll_count, "log_entries": le_count}
 
 
@@ -670,7 +670,7 @@ def db_delete_movie(movie_id: str) -> dict:
     if deleted_movie_id:
         db_delete_movie_video_files(deleted_movie_id)
 
-    write_log_entry(None, "system", fmt_id_msg("[DB] Удалено видео {}: batches=" + str(bl_count) + ", log=" + str(ll_count) + ", log_entries=" + str(le_count), movie_id), level='silent')
+    app_log("db", fmt_id_msg("Удалено видео {}: batches=" + str(bl_count) + ", log=" + str(ll_count) + ", log_entries=" + str(le_count), movie_id))
     return {"movies": ml_count, "batches": bl_count, "logs": ll_count, "log_entries": le_count}
 
 

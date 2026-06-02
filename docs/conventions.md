@@ -53,10 +53,14 @@ write_log_entry(batch_id, category, "Ошибка при загрузке суб
 write_log_entry(batch_id, category, message, level='info')
 ```
 
-- `batch_id` — UUID батча; `None` — системное окно между батчами.
+- `batch_id` — UUID батча; `None` — блок «Приложение» в мониторе (окно без батча).
 - `category` — одна из: `api`, `planning`, `story`, `video`, `transcode`, `publish`, `system`.
 - Уровни: `info`, `warn`, `error`, `fatal_error`, `silent`.
-- `write_log_entry(None, 'system', msg, level='silent')` — диагностика только в stdout (без БД), если не включён `deep_debugging`.
+- **Логи «Приложение»** — только через `app_log(source, message, *, level='silent', phase=None)` из `log/log.py`. Прямой `write_log_entry(None, …)` вне `log/log.py` запрещён.
+- `app_log(..., level='silent')` — диагностика: stdout всегда; в БД только при `deep_debugging`.
+- `app_log(..., level='info')` — действия пользователя и lifecycle (видны в мониторе без deep debug).
+- `source` — из фиксированного набора: `main`, `main_loop`, `api`, `http`, `db`, `upgrade`, `startup`, `cleanup`, `planning`, `browser`, `notify`, `consts`, `dzen`, `rutube`, `vkvideo`. Префикс `[source]` в текст добавляет `app_log`.
+- Диагностика пайплайнов вне батча: `app_log('planning', '…', phase='run_start')` → `phase=run_start, …` в сообщении.
 
 Таблица `log` хранит метаданные (`batch_id`, `category`, `created_at`); текст — в `log_entries`.
 
@@ -216,7 +220,8 @@ DROP TABLE IF EXISTS t;
 | Критическая ошибка внутри пайплайна (прерывает батч) | `raise AppException(batch_id, pipeline, msg)` |
 | Некритичная ошибка / предупреждение | `write_log_entry(batch_id, category, msg, level='warn'/'error')` |
 | Информационное сообщение | `write_log_entry(batch_id, category, msg)` |
-| Системное / диагностическое (stdout) | `write_log_entry(None, 'system', msg, level='silent')` |
+| Лог блока «Приложение» (диагностика) | `app_log(source, msg, level='silent')` или `phase='…'` |
+| Лог блока «Приложение» (операторское) | `app_log(source, msg, level='info')` |
 | Нарушение инварианта приложения вне пайплайна | `raise FatalError(msg)` |
 | Критическое исключение (не глушить) | Дать всплыть до `_batch_thread` |
 | GUID/UUID в лог-сообщении | `fmt_id_msg(template, *ids)` из `utils.utils` |

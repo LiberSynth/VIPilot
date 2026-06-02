@@ -5,7 +5,7 @@
 """
 
 from .connection import get_db
-from log.log import write_log_entry
+from log.log import app_log
 
 
 def seed_db():
@@ -42,7 +42,7 @@ def seed_db():
                 """)
 
             conn.commit()
-        write_log_entry(None, "system", "[DB] Данные инициализированы", level='silent')
+        app_log("db", "Данные инициализированы")
     except Exception as e:
-        write_log_entry(None, "system", f"[DB] Ошибка seed_db: {e}", level='silent')
+        app_log("db", f"Ошибка seed_db: {e}")
         raise

@@ -56,6 +56,7 @@ from db import (
     db_get_movie_pool_count,
 )
 from log import (
+    app_log,
     db_get_monitor,
     db_get_batch_log_entries,
     db_get_system_log_entries,
@@ -542,7 +543,7 @@ def api_vacuum_db():
     try:
         result = db_vacuum_full()
     except Exception as e:
-        write_log_entry(None, "system", f"[api] Дефрагментация БД: ошибка — {e}", level='error')
+        app_log("api", f"Дефрагментация БД: ошибка — {e}", level="error")
         return jsonify({"ok": False, "error": str(e)}), 500
     size_after = db_get_database_size_bytes()
     size_delta = size_after - size_before
@@ -594,7 +595,7 @@ def api_workflow_start():
         return jsonify({"error": "unauthorized"}), 401
     env_set("workflow_state", "running")
     environment.set_running()
-    write_log_entry(None, "system", "[api] Движок запущен вручную", level='silent')
+    app_log("api", "Движок запущен вручную", level="info")
     return jsonify({"ok": True, "state": "running"})
 
 
@@ -604,7 +605,7 @@ def api_workflow_pause():
         return jsonify({"error": "unauthorized"}), 401
     env_set("workflow_state", "pause")
     environment.set_paused()
-    write_log_entry(None, "system", "[api] Движок приостановлен вручную", level='silent')
+    app_log("api", "Движок приостановлен вручную", level="info")
     return jsonify({"ok": True, "state": "pause"})
 
 
@@ -616,7 +617,7 @@ def api_workflow_deep_debugging():
     val = "1" if body.get("enabled") == "1" else "0"
     env_set("deep_debugging", val)
     label = "включена" if val == "1" else "выключена"
-    write_log_entry(None, "system", f"[api] Глубокая отладка {label}", level='info')
+    app_log("api", f"Глубокая отладка {label}", level="info")
     return jsonify({"ok": True, "deep_debugging": val})
 
 
@@ -694,7 +695,7 @@ def api_delete_batch(batch_id):
             return jsonify({"error": "not found"}), 404
         return jsonify({"ok": True})
     except Exception as e:
-        write_log_entry(None, "system", f"[api] Ошибка удаления батча: {e}", level="silent")
+        app_log("api", f"Ошибка удаления батча: {e}", level="silent")
         return jsonify({"ok": False, "error": "internal error"}), 500
 
 
@@ -713,7 +714,7 @@ def api_reset_batch_pipeline(batch_id, pipeline):
 def api_workflow_restart():
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
-    write_log_entry(None, "system", "[api] Перезапуск приложения вручную", level='info')
+    app_log("api", "Перезапуск приложения вручную", level="info")
 
     def _do_restart():
         import time as _time

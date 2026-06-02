@@ -24,7 +24,7 @@
 from pathlib import Path
 
 from .connection import get_db
-from log.log import write_log_entry
+from log.log import app_log
 
 _VIDEO_DIR = Path(__file__).resolve().parents[1] / "video"
 
@@ -192,7 +192,7 @@ def run_migrations():
                         " ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
                         (str(version),),
                     )
-            write_log_entry(None, "system", f"[DB] Миграция {version} применена", level='silent')
+            app_log("db", f"Миграция {version} применена")
         except Exception as e:
-            write_log_entry(None, "system", f"[DB] Ошибка миграции {version}: {e}", level='silent')
+            app_log("db", f"Ошибка миграции {version}: {e}")
             raise

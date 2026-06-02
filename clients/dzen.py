@@ -11,7 +11,7 @@ import shutil
 import tempfile
 import time as _time
 
-from log import write_log_entry
+from log import app_log, write_log_entry
 from utils.utils import fmt_id_msg
 from routes.api import publication_file_name, tags
 
@@ -118,7 +118,7 @@ def _snap(page, batch_id=None) -> None:
         if batch_id:
             _b.push_frame_for_batch(batch_id, img)
     except Exception as _e:
-        write_log_entry(None, "system", f"[dzen] _snap: {_e}", level='silent')
+        app_log("dzen", f"_snap: {_e}")
 
 
 _CAPTCHA_URL_KEYWORDS = (
