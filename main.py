@@ -88,6 +88,51 @@ _main_loop_started = False
 _instance_lock_file = None
 
 
+def _pid_is_running(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    if platform.system() == "Windows":
+        import ctypes
+        synchronize = 0x00100000
+        handle = ctypes.windll.kernel32.OpenProcess(synchronize, False, pid)
+        if handle:
+            ctypes.windll.kernel32.CloseHandle(handle)
+            return True
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def _read_lock_pid(lock_path: pathlib.Path) -> int | None:
+    try:
+        line = lock_path.read_text(encoding="utf-8").strip().splitlines()[0].strip()
+        return int(line) if line else None
+    except (OSError, ValueError, IndexError):
+        return None
+
+
+def _try_instance_file_lock(fh) -> None:
+    if platform.system() == "Windows":
+        import msvcrt
+        fh.seek(0)
+        msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
+    else:
+        import fcntl
+        fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+
+def _write_lock_pid(fh, pid: int) -> None:
+    fh.seek(0)
+    fh.truncate()
+    fh.write(f"{pid}\n")
+    fh.flush()
+
+
 def _ensure_single_instance():
     """Не даёт запустить второй процесс с тем же main loop (общий _system_log_id в памяти)."""
     global _instance_lock_file
@@ -97,23 +142,35 @@ def _ensure_single_instance():
     lock_path = pathlib.Path(
         os.environ.get("VIPILOT_LOCK_FILE", pathlib.Path(tempfile.gettempdir()) / "vipilot.lock")
     )
-    fh = open(lock_path, "a+", encoding="utf-8")
-    try:
-        if platform.system() == "Windows":
-            import msvcrt
-            fh.seek(0)
-            msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
+
+    for attempt in range(2):
+        fh = open(lock_path, "a+", encoding="utf-8")
+        try:
+            _try_instance_file_lock(fh)
+        except (OSError, BlockingIOError):
+            fh.close()
+            other_pid = _read_lock_pid(lock_path)
+            if other_pid and _pid_is_running(other_pid):
+                print(
+                    f"VIPilot уже запущен (PID {other_pid}). "
+                    f"Завершите процесс или lock: {lock_path}"
+                )
+                sys.exit(1)
+            if attempt == 0:
+                try:
+                    lock_path.unlink(missing_ok=True)
+                except OSError:
+                    pass
+                continue
+            print(
+                "Не удалось получить блокировку VIPilot. "
+                f"Завершите другой процесс Python или удалите lock: {lock_path}"
+            )
+            sys.exit(1)
         else:
-            import fcntl
-            fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except (OSError, BlockingIOError):
-        fh.close()
-        print(
-            "VIPilot уже запущен. Завершите предыдущий процесс Python "
-            f"(lock: {lock_path})."
-        )
-        sys.exit(1)
-    _instance_lock_file = fh
+            _write_lock_pid(fh, os.getpid())
+            _instance_lock_file = fh
+            return
 
 
 def _on_exit():
