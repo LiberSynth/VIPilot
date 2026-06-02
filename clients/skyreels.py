@@ -102,7 +102,7 @@ def poll(batch_id, category, status_url: str, response_url: str):
                 write_log_entry(batch_id, category, f"SkyReels poll [{attempt + 1}] не-JSON (HTTP {resp.status_code})", level='warn')
                 write_log_entry(
                     batch_id, category,
-                    f"[video] SkyReels poll [{attempt + 1}] http={resp.status_code}, body={_compact_json(resp.text)}",
+                    f"SkyReels poll [{attempt + 1}] http={resp.status_code}, body={_compact_json(resp.text)}",
                     level='silent',
                 )
                 write_log_entry(batch_id, category, f"Статус [{attempt + 1}]: None")
@@ -112,7 +112,7 @@ def poll(batch_id, category, status_url: str, response_url: str):
             write_log_entry(batch_id, category, f"Статус [{attempt + 1}]: {status}")
             write_log_entry(
                 batch_id, category,
-                f"[video] SkyReels poll [{attempt + 1}] http={resp.status_code}, status={status}, keys={list(data.keys()) if isinstance(data, dict) else []}",
+                f"SkyReels poll [{attempt + 1}] http={resp.status_code}, status={status}, keys={list(data.keys()) if isinstance(data, dict) else []}",
                 level='silent',
             )
 
@@ -135,7 +135,7 @@ def poll(batch_id, category, status_url: str, response_url: str):
 
         except Exception as e:
             write_log_entry(batch_id, category, f"Ошибка опроса статуса: {e}", level='warn')
-            write_log_entry(batch_id, category, f"[video] SkyReels poll [{attempt + 1}] exception={type(e).__name__}: {e}", level='silent')
+            write_log_entry(batch_id, category, f"SkyReels poll [{attempt + 1}] exception={type(e).__name__}: {e}", level='silent')
 
     msg = 'Таймаут генерации видео SkyReels (2 часа)'
     write_log_entry(batch_id, category, msg, level='error')

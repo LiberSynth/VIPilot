@@ -564,7 +564,7 @@ def api_vacuum_db():
         failed = [r["table"] for r in result.get("results", []) if not r.get("ok")]
         write_log_entry(
             None, 'api',
-            f"[api] Дефрагментация БД завершена с ошибками: {summary}, {db_size_summary}",
+            f"Дефрагментация БД завершена с ошибками: {summary}, {db_size_summary}",
             level='warn',
         )
         return jsonify({
@@ -574,7 +574,7 @@ def api_vacuum_db():
         })
     write_log_entry(
         None, 'api',
-        f"[api] Дефрагментация БД завершена ({summary}, {db_size_summary}).",
+        f"Дефрагментация БД завершена ({summary}, {db_size_summary}).",
         level='info',
     )
     return jsonify({"ok": True, "result": result})

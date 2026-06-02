@@ -47,7 +47,7 @@ def db_insert_log(batch_id):
     return str(log_id)
 
 
-def db_insert_log_entry(log_id, category, message, level):
+def db_insert_log_entry(log_id, channel, message, level):
     import common.environment as environment
 
     if not environment.asserted_log_entry.get():
@@ -56,10 +56,10 @@ def db_insert_log_entry(log_id, category, message, level):
         with conn.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO log_entries (log_id, category, message, level)
+                INSERT INTO log_entries (log_id, channel, message, level)
                 VALUES (%s, %s, %s, %s)
                 """,
-                (log_id, category, message, level),
+                (log_id, channel, message, level),
             )
         conn.commit()
 
@@ -483,7 +483,7 @@ def db_get_last_pipeline_run(pipeline, scheduled_only: bool = False):
                     FROM log_entries le
                     JOIN log l ON l.id = le.log_id
                     JOIN batches b ON b.id = l.batch_id
-                    WHERE le.category = %s
+                    WHERE le.channel = %s
                       AND b.scheduled_at IS NOT NULL
                     """,
                     (pipeline,),
@@ -493,7 +493,7 @@ def db_get_last_pipeline_run(pipeline, scheduled_only: bool = False):
                     """
                     SELECT MAX(le.created_at)
                     FROM log_entries le
-                    WHERE le.category = %s
+                    WHERE le.channel = %s
                     """,
                     (pipeline,),
                 )

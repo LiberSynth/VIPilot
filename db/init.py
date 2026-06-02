@@ -25,12 +25,12 @@ def _ensure_log_indexes(cur) -> None:
         FROM information_schema.columns
         WHERE table_schema = current_schema()
           AND table_name = 'log_entries'
-          AND column_name = 'category'
+          AND column_name = 'channel'
     """)
     if cur.fetchone():
         cur.execute("""
-            CREATE INDEX IF NOT EXISTS idx_log_entries_category
-                ON log_entries (category)
+            CREATE INDEX IF NOT EXISTS idx_log_entries_channel
+                ON log_entries (channel)
         """)
 
 
@@ -105,7 +105,7 @@ def bootstrap():
                 CREATE TABLE IF NOT EXISTS log_entries (
                     id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                     log_id     UUID,
-                    category   TEXT NOT NULL DEFAULT 'system',
+                    channel    TEXT NOT NULL DEFAULT 'system',
                     message    TEXT,
                     level      TEXT,
                     created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
@@ -113,8 +113,18 @@ def bootstrap():
             """)
             cur.execute("""
                 ALTER TABLE log_entries
-                ADD COLUMN IF NOT EXISTS category TEXT NOT NULL DEFAULT 'system'
+                ADD COLUMN IF NOT EXISTS channel TEXT NOT NULL DEFAULT 'system'
             """)
+            cur.execute("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_schema = current_schema()
+                  AND table_name = 'log_entries'
+                  AND column_name IN ('category', 'channel')
+            """)
+            le_cols = {r[0] for r in cur.fetchall()}
+            if 'category' in le_cols and 'channel' not in le_cols:
+                cur.execute("ALTER TABLE log_entries RENAME COLUMN category TO channel")
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS model_durations (
                     id       UUID PRIMARY KEY DEFAULT gen_random_uuid(),

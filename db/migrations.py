@@ -229,6 +229,41 @@ def _m1008_log_entries_category(cur):
     """)
 
 
+_LOG_ENTRY_CHANNELS = (
+    "api", "planning", "story", "video", "transcode", "publish", "runner", "playwright",
+    "main", "main_loop", "http", "db", "upgrade", "startup", "cleanup", "browser",
+    "notify", "consts", "dzen", "rutube", "vkvideo", "system",
+)
+
+
+def _m1009_log_entries_channel(cur):
+    cur.execute("""
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = current_schema()
+          AND table_name = 'log_entries'
+          AND column_name IN ('category', 'channel')
+    """)
+    cols = {r[0] for r in cur.fetchall()}
+    if "category" in cols and "channel" not in cols:
+        cur.execute("ALTER TABLE log_entries RENAME COLUMN category TO channel")
+
+    cur.execute("DROP INDEX IF EXISTS idx_log_entries_category")
+
+    cur.execute("""
+        UPDATE log_entries
+        SET channel = lower((regexp_match(message, '^\\[([^\\]]+)\\]'))[1]),
+            message = regexp_replace(message, '^\\[[^\\]]+\\]\\s*', '')
+        WHERE message ~ '^\\[[^\\]]+\\]'
+          AND lower((regexp_match(message, '^\\[([^\\]]+)\\]'))[1]) = ANY(%s)
+    """, (list(_LOG_ENTRY_CHANNELS),))
+
+    cur.execute("""
+        CREATE INDEX IF NOT EXISTS idx_log_entries_channel
+            ON log_entries (channel)
+    """)
+
+
 MIGRATIONS = [
     (2026052901, _m1001_drop_targets_legacy_columns),
     (2026052902, _m1002_add_movies_transcoded),
@@ -238,6 +273,7 @@ MIGRATIONS = [
     (2026052906, _m1006_fix_published_movies_transcoded),
     (2026052907, _m1007_log_category_and_drop_message_status),
     (2026052908, _m1008_log_entries_category),
+    (2026052909, _m1009_log_entries_channel),
 ]
 
 

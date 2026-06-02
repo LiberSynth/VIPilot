@@ -185,7 +185,7 @@ def poll(batch_id, category, status_url: str, response_url: str):
                 write_log_entry(batch_id, category, f"fal.ai poll [{attempt + 1}] не-JSON (HTTP {resp.status_code})", level='warn')
                 write_log_entry(
                     batch_id, category,
-                    f"[video] fal.ai poll [{attempt + 1}] http={resp.status_code}, body={_compact_json(resp.text)}",
+                    f"fal.ai poll [{attempt + 1}] http={resp.status_code}, body={_compact_json(resp.text)}",
                     level='silent',
                 )
                 if consecutive_errors >= _POLL_MAX_ERRORS:
@@ -197,7 +197,7 @@ def poll(batch_id, category, status_url: str, response_url: str):
             write_log_entry(batch_id, category, f"Статус [{attempt + 1}]: {status}")
             write_log_entry(
                 batch_id, category,
-                f"[video] fal.ai poll [{attempt + 1}] http={resp.status_code}, status={status}, keys={list(s.keys()) if isinstance(s, dict) else []}",
+                f"fal.ai poll [{attempt + 1}] http={resp.status_code}, status={status}, keys={list(s.keys()) if isinstance(s, dict) else []}",
                 level='silent',
             )
             consecutive_errors = 0
@@ -230,7 +230,7 @@ def poll(batch_id, category, status_url: str, response_url: str):
         except Exception as e:
             consecutive_errors += 1
             write_log_entry(batch_id, category, f"Ошибка опроса статуса: {e}", level='warn')
-            write_log_entry(batch_id, category, f"[video] fal.ai poll [{attempt + 1}] exception={type(e).__name__}: {e}", level='silent')
+            write_log_entry(batch_id, category, f"fal.ai poll [{attempt + 1}] exception={type(e).__name__}: {e}", level='silent')
             if consecutive_errors >= _POLL_MAX_ERRORS:
                 msg = f'fal.ai недоступен: {_POLL_MAX_ERRORS} ошибок подряд — прерываем поллинг'
                 write_log_entry(batch_id, category, msg, level='error')

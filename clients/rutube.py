@@ -76,7 +76,7 @@ def publish(
     write_log_entry(batch_id, category, fmt_id_msg("[rutube] {} КБ, person_id={}", len(video_data) // 1024, person_id), level='silent')
 
     file_name = publication_file_name(pub_title)
-    write_log_entry(batch_id, category, f"[rutube] Заголовок: {pub_title}, файл: {file_name}", level='silent')
+    write_log_entry(batch_id, category, f"Заголовок: {pub_title}, файл: {file_name}", level='silent')
     tmp_dir = tempfile.mkdtemp()
     video_path = os.path.join(tmp_dir, file_name)
     try:
@@ -149,7 +149,7 @@ def _publish_ui(page, video_path: str, category, batch_id=None):
     _snap(page, batch_id)
 
     cur = page.url
-    write_log_entry(batch_id, category, f"[rutube] URL после перехода: {cur}", level='silent')
+    write_log_entry(batch_id, category, f"URL после перехода: {cur}", level='silent')
     if "rutube.ru/login" in cur or "/auth" in cur or "passport" in cur:
         raise RutubeCsrfExpired(
             "Сессия истекла — авторизуйтесь снова в браузере (вкладка «Публикация»)"
@@ -186,7 +186,7 @@ def _publish_ui(page, video_path: str, category, batch_id=None):
     file_chooser = fc_info.value
     file_chooser.set_files(video_path)
     write_log_entry(batch_id, category, "Рутьюб: Файл передан браузеру, жду загрузки.")
-    write_log_entry(batch_id, category, f"[rutube] Файл: {os.path.basename(video_path)}", level='silent')
+    write_log_entry(batch_id, category, f"Файл: {os.path.basename(video_path)}", level='silent')
     _snap(page, batch_id)
 
     # ── Шаг 5: Ждём завершения загрузки (появление «Модерация») ─────────
@@ -219,7 +219,7 @@ def _publish_ui(page, video_path: str, category, batch_id=None):
         write_log_entry(batch_id, category, f"Рутьюб: Категория «{_CATEGORY}» выбрана")
     except Exception as _e:
         write_log_entry(batch_id, category, "Рутьюб: Не удалось выбрать категорию — продолжаю.")
-        write_log_entry(batch_id, category, f"[rutube] Ошибка категории: {_e}", level='silent')
+        write_log_entry(batch_id, category, f"Ошибка категории: {_e}", level='silent')
     _snap(page, batch_id)
 
     if not _cat_ok and not _upload_ok:
@@ -272,7 +272,7 @@ def _publish_ui(page, video_path: str, category, batch_id=None):
 
     if _success:
         write_log_entry(batch_id, category, "Рутьюб: Публикация успешна.")
-        write_log_entry(batch_id, category, f"[rutube] URL: {page.url}", level='silent')
+        write_log_entry(batch_id, category, f"URL: {page.url}", level='silent')
     else:
         write_log_entry(batch_id, category, "Рутьюб: Публикация завершена (тост не обнаружен, ошибок нет)")
-        write_log_entry(batch_id, category, f"[rutube] URL: {page.url}", level='silent')
+        write_log_entry(batch_id, category, f"URL: {page.url}", level='silent')

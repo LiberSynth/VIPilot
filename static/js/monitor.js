@@ -3,9 +3,11 @@
     api:         'API',
     planning:    'Планирование',
     story:       'Сюжет',
+    runner:      'Runner',
     video:       'Видео',
     transcode:   'Транскодирование',
     publish:     'Публикация',
+    playwright:  'Playwright',
     main:        'Приложение',
     main_loop:   'Цикл',
     http:        'HTTP',
@@ -27,7 +29,7 @@
   }
 
   function formatEntryLine(en) {
-    return fmtMsk(en.created_at) + ' — ' + channelLabel(en.category) + ' — ' + (en.message || '');
+    return fmtMsk(en.created_at) + ' — ' + channelLabel(en.channel) + ' — ' + (en.message || '');
   }
 
   const STATUS_LABELS = {
@@ -327,7 +329,7 @@
     var lvl = en.level || 'info';
     return '<div class="monitor-entry-row">' +
       '<span class="monitor-entry-ts">' + fmtMsk(en.created_at) + '</span>' +
-      '<span class="monitor-entry-ch">' + esc(channelLabel(en.category)) + '</span>' +
+      '<span class="monitor-entry-ch">' + esc(channelLabel(en.channel)) + '</span>' +
       '<span class="monitor-entry-msg ' + esc(lvl) + '">' + esc(en.message || '') + '</span>' +
     '</div>';
   }

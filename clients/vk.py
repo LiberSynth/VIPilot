@@ -35,7 +35,7 @@ def publish_story(video_data: bytes, group_id: int, batch_id, category, pub_titl
 
     upload_url = r['response']['upload_url']
     filename = publication_file_name(pub_title)
-    write_log_entry(batch_id, category, f"[publish] VK story upload_url received: {upload_url}", level='silent')
+    write_log_entry(batch_id, category, f"VK story upload_url received: {upload_url}", level='silent')
 
     for attempt in range(3):
         try:
@@ -55,7 +55,7 @@ def publish_story(video_data: bytes, group_id: int, batch_id, category, pub_titl
                 time.sleep(5)
                 continue
             upload_result = up_data['response']['upload_result']
-            write_log_entry(batch_id, category, f"[publish] VK story upload completed on attempt {attempt+1}", level='silent')
+            write_log_entry(batch_id, category, f"VK story upload completed on attempt {attempt+1}", level='silent')
             break
         except Exception as e:
             write_log_entry(batch_id, category, f'Ошибка загрузки (попытка {attempt+1}/3): {e}', level='warn')
@@ -167,7 +167,7 @@ def publish_wall(video_data: bytes, group_id: int, batch_id, category, pub_title
                 write_log_entry(batch_id, category, f'Неожиданный ответ CDN wall (попытка {attempt+1}/3): {up.text[:200]}', level='warn')
                 time.sleep(5)
                 continue
-            write_log_entry(batch_id, category, f"[publish] VK wall upload completed on attempt {attempt+1}", level='silent')
+            write_log_entry(batch_id, category, f"VK wall upload completed on attempt {attempt+1}", level='silent')
             break
         except Exception as e:
             write_log_entry(batch_id, category, f'Ошибка загрузки wall (попытка {attempt+1}/3): {e}', level='warn')

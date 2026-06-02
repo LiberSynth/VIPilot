@@ -93,23 +93,23 @@ def _download_and_finalize(batch_id, batch, category, batch_data, used_model, us
         raise AppException(batch_id, 'video', msg)
 
     write_log_entry(batch_id, category, 'Скачиваю оригинал от провайдера.')
-    write_log_entry(batch_id, category, f"[video] Скачиваю оригинал: {video_url}", level='silent')
+    write_log_entry(batch_id, category, f"Скачиваю оригинал: {video_url}", level='silent')
     try:
         original_data = falai.download_video(batch_id, category, video_url)
         orig_mb = round(len(original_data) / 1024 / 1024, 1)
         db_create_batch_movie(batch_id, original_data, video_url, used_model_id)
         write_log_entry(batch_id, category, "Оригинал сохранён в базе данных.")
-        write_log_entry(batch_id, category, f"[video] Оригинал сохранён в БД ({orig_mb} МБ)", level='silent')
+        write_log_entry(batch_id, category, f"Оригинал сохранён в БД ({orig_mb} МБ)", level='silent')
     except Exception as e:
         msg = f"Ошибка скачивания оригинала: {e}"
         write_log_entry(batch_id, category, msg, level='error')
-        write_log_entry(batch_id, category, f"[video] {msg}", level='silent')
+        write_log_entry(batch_id, category, f"{msg}", level='silent')
         raise AppException(batch_id, 'video', msg)
 
     db_set_batch_status(batch_id, 'ready')
     msg = f'Видео сгенерировано ({used_model})' if used_model else 'Видео сгенерировано'
     write_log_entry(batch_id, category, 'Готово: batch → ready')
-    write_log_entry(batch_id, category, f"[video] URL: {video_url}", level='silent')
+    write_log_entry(batch_id, category, f"URL: {video_url}", level='silent')
     write_log_entry(
         batch_id, category,
         fmt_id_msg("[video] Батч {} — phase=run_done, status=ready, model_id={}", batch_id, used_model_id),
@@ -191,7 +191,7 @@ def run(batch_id, category):
         if not client_is_configured('falai'):
             msg = 'FAL_API_KEY не задан — генерация невозможна'
             write_log_entry(batch_id, category, msg, level='error')
-            write_log_entry(batch_id, category, f"[video] {msg}", level='silent')
+            write_log_entry(batch_id, category, f"{msg}", level='silent')
             raise AppException(batch_id, 'video', msg)
 
         # generating: строго polling уже существующего запроса (без submit).
@@ -244,7 +244,7 @@ def run(batch_id, category):
                 if _is_content_moderation_error(poll_err):
                     msg = 'Видео отклонено модерацией контента провайдера'
                     write_log_entry(batch_id, category, msg, level='error')
-                    write_log_entry(batch_id, category, f"[video] {msg}", level='silent')
+                    write_log_entry(batch_id, category, f"{msg}", level='silent')
                     raise AppException(batch_id, 'video', msg)
                 # Немодерационная ошибка: новый запуск с pending.
                 db_save_video_job_and_set_pending(batch_id, _clear_handshake_payload())
@@ -263,7 +263,7 @@ def run(batch_id, category):
         if not story_text:
             msg = fmt_id_msg('Не найден сюжет story_id={}', story_id)
             write_log_entry(batch_id, category, msg, level='error')
-            write_log_entry(batch_id, category, f"[video] {msg}", level='silent')
+            write_log_entry(batch_id, category, f"{msg}", level='silent')
             raise AppException(batch_id, 'video', msg)
 
         story_title = db_get_story_title(story_id) or '(без названия)'
@@ -290,7 +290,7 @@ def run(batch_id, category):
                 write_log_entry(batch_id, category, f"[{model_name}] попытка {attempt}/{max_attempts_per_model}", level='warn')
             else:
                 write_log_entry(batch_id, category, "Отправляю запрос к провайдеру.")
-                write_log_entry(batch_id, category, f"[video] Запрос к провайдеру: модель={model_name}, ar={ar_x}:{ar_y}", level='silent')
+                write_log_entry(batch_id, category, f"Запрос к провайдеру: модель={model_name}, ar={ar_x}:{ar_y}", level='silent')
 
             sr = client.submit(
                 batch_id, category, model_name, model['submit_url'], model['platform_url'],
@@ -336,7 +336,7 @@ def run(batch_id, category):
                 if _is_content_moderation_error(poll_err):
                     msg = 'Видео отклонено модерацией контента провайдера'
                     write_log_entry(batch_id, category, msg, level='error')
-                    write_log_entry(batch_id, category, f"[video] {msg}", level='silent')
+                    write_log_entry(batch_id, category, f"{msg}", level='silent')
                     raise AppException(batch_id, 'video', msg)
                 db_save_video_job_and_set_pending(batch_id, _clear_handshake_payload())
                 continue
@@ -347,11 +347,11 @@ def run(batch_id, category):
 
         msg = f'Модель {model_name} не дала результата ({max_attempts_per_model} попыток)'
         write_log_entry(batch_id, category, msg, level='error')
-        write_log_entry(batch_id, category, f"[video] {msg}", level='silent')
+        write_log_entry(batch_id, category, f"{msg}", level='silent')
         raise AppException(batch_id, 'video', msg)
 
     except ProviderFatalError as e:
         msg = f"Фатальная ошибка провайдера: {e}"
         write_log_entry(batch_id, category, msg, level='error')
-        write_log_entry(batch_id, category, f"[video] {msg}", level='silent')
+        write_log_entry(batch_id, category, f"{msg}", level='silent')
         raise AppException(batch_id, 'video', msg)

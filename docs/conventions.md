@@ -50,20 +50,20 @@ write_log_entry(batch_id, category, "Ошибка при загрузке суб
 Прямые вызовы `print()` в приложении запрещены. Единая точка записи:
 
 ```python
-write_log_entry(batch_id, category, message, level='info')
+write_log_entry(batch_id, channel, message, level='info')
 ```
 
 - `batch_id` — UUID батча; `None` — блок «Приложение» в мониторе (окно без батча).
-- `category` — канал записи (`api`, `planning`, `story`, `video`, `transcode`, `publish`, `main`, `db`, …); хранится в `log_entries.category`, не в тексте сообщения.
+- `channel` — канал записи (`api`, `planning`, `story`, `runner`, `video`, …); хранится в `log_entries.channel`. Префиксы `[tag]` в тексте запрещены — `write_log_entry` переносит известный `tag` в `channel`.
 - Уровни: `info`, `warn`, `error`, `fatal_error`, `silent`.
 - **Логи «Приложение»** — только через `app_log(source, message, *, level='silent', phase=None)` из `log/log.py`. Прямой `write_log_entry(None, …)` вне `log/log.py` запрещён.
 - `app_log(..., level='silent')` — диагностика: stdout всегда; в БД только при `deep_debugging`.
 - `app_log(..., level='info')` — действия пользователя и lifecycle (видны в мониторе без deep debug).
 - `write_log_entry` автоматически добавляет `.` в конец обычных фраз; не трогает служебные хвосты (`phase=`, `key=value`, URL, `…`, уже есть `.!?`).
-- `source` — из фиксированного набора каналов (`main`, `main_loop`, `api`, `http`, `db`, …); для «Приложение» пишется в `log_entries.category` через `app_log`, без `[source]` в тексте.
+- `source` — из фиксированного набора каналов (`main`, `main_loop`, `api`, `http`, `db`, …); для «Приложение» пишется в `log_entries.channel` через `app_log`, без `[source]` в тексте.
 - Диагностика пайплайнов вне батча: `app_log('planning', '…', phase='run_start')` → `phase=run_start, …` в сообщении.
 
-Таблица `log` — одна строка на `batch_id` (или окно «Приложение» при `batch_id IS NULL`); канал и текст — в `log_entries` (`category`, `message`, `level`).
+Таблица `log` — одна строка на `batch_id` (или окно «Приложение» при `batch_id IS NULL`); канал и текст — в `log_entries` (`channel`, `message`, `level`).
 
 **Запрещено:** прямой SQL к `log` / `log_entries` вне `db_*` с assert-флагами; функции `write_log`, `log_batch_planned`, `log_system_event`, `db_log_update` удалены.
 

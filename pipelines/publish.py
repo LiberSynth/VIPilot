@@ -56,12 +56,12 @@ def _call_vk(slug, method, batch_id, category, target, pub_title):
     group_id = int(cfg.get('group_id', 236929597))
     if method == 'story':
         write_log_entry(batch_id, category, 'Публикую историю.')
-        write_log_entry(batch_id, category, f"[publish] group_id={group_id}", level='silent')
+        write_log_entry(batch_id, category, f"group_id={group_id}", level='silent')
         video_data = _get_video(batch_id, category)
         return vk.publish_story(video_data, group_id, batch_id, category, pub_title) is not None
     elif method == 'wall':
         write_log_entry(batch_id, category, 'Публикую на стену.')
-        write_log_entry(batch_id, category, f"[publish] group_id={group_id}", level='silent')
+        write_log_entry(batch_id, category, f"group_id={group_id}", level='silent')
         video_data = _get_video(batch_id, category)
         return vk.publish_wall(video_data, group_id, batch_id, category, pub_title) is not None
     elif method == 'clip_wall':
@@ -70,7 +70,7 @@ def _call_vk(slug, method, batch_id, category, target, pub_title):
             write_log_entry(batch_id, category, 'VK clip_wall: clip_url не найден в БД — vkvideo не завершился или не записал ссылку', level='error')
             return False
         write_log_entry(batch_id, category, f'VK: Публикую пост с клипом VK Видео.')
-        write_log_entry(batch_id, category, f"[publish] clip_url={clip_url}", level='silent')
+        write_log_entry(batch_id, category, f"clip_url={clip_url}", level='silent')
         return vk.publish_clip_wall(clip_url, pub_title, group_id, batch_id, category) is not None
     else:
         write_log_entry(batch_id, category, f'VK: неизвестный метод «{method}» — пропуск', level='warn')
@@ -210,7 +210,7 @@ def run(batch_id, category):
         else:
             msg = 'Нет активных таргетов — публикация невозможна'
             write_log_entry(batch_id, category, msg, level='error')
-            write_log_entry(batch_id, category, f"[publish] {msg}", level='silent')
+            write_log_entry(batch_id, category, f"{msg}", level='silent')
             raise AppException(batch_id, 'publish', msg)
 
     steps = _build_steps(active_targets)
@@ -229,7 +229,7 @@ def run(batch_id, category):
         else:
             msg = 'Нет методов публикации в конфиге таргетов'
             write_log_entry(batch_id, category, msg, level='error')
-            write_log_entry(batch_id, category, f"[publish] {msg}", level='silent')
+            write_log_entry(batch_id, category, f"{msg}", level='silent')
             raise AppException(batch_id, 'publish', msg)
 
     # Проверяем зависимость: vk.clip_wall требует, чтобы vkvideo-таргет
@@ -304,7 +304,7 @@ def run(batch_id, category):
     pub_title = batch.get('title') or ''
     if pub_title:
         write_log_entry(batch_id, category, f'Заголовок публикации (из БД): «{pub_title}»')
-        write_log_entry(batch_id, category, f"[publish] Заголовок публикации (из БД): {pub_title}", level='silent')
+        write_log_entry(batch_id, category, f"Заголовок публикации (из БД): {pub_title}", level='silent')
 
     ensure_playwright_chromium(batch_id, category)
     write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} — phase=playwright_checked", batch_id), level='silent')
@@ -339,7 +339,7 @@ def run(batch_id, category):
             pub_title = build_publication_title()
             db_set_batch_title(batch_id, pub_title)
             write_log_entry(batch_id, category, f'Заголовок публикации: «{pub_title}»')
-            write_log_entry(batch_id, category, f"[publish] Заголовок публикации (новый): {pub_title}", level='silent')
+            write_log_entry(batch_id, category, f"Заголовок публикации (новый): {pub_title}", level='silent')
 
         write_log_entry(batch_id, category, f'Шаг {slug}.{method}: выполняю.')
         write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {}: шаг {}.{} — начало", batch_id, slug, method), level='silent')

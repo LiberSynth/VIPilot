@@ -111,7 +111,7 @@ def poll(batch_id, category, status_url: str, response_url: str):
             write_log_entry(
                 batch_id, category,
                 (
-                    f"[video] Grok poll [{attempt + 1}] "
+                    f"Grok poll [{attempt + 1}] "
                     f"http={resp.status_code}, status={status}, keys={keys}, status_url={status_url}"
                 ),
                 level='silent',

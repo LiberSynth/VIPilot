@@ -56,7 +56,7 @@ def run(batch_id, category):
     if not client_is_configured('text'):
         msg = "API-ключ текстовой платформы не задан — генерация невозможна"
         write_log_entry(batch_id, category, msg, level="error")
-        write_log_entry(batch_id, category, f"[story] {msg}", level='silent')
+        write_log_entry(batch_id, category, f"{msg}", level='silent')
         raise AppException(batch_id, "story", msg)
 
     batch_data = batch.get("data") or {}
@@ -76,7 +76,7 @@ def run(batch_id, category):
     if not models:
         msg = "Нет активных text-моделей в ai_models"
         write_log_entry(batch_id, category, msg, level="error")
-        write_log_entry(batch_id, category, f"[story] {msg}", level='silent')
+        write_log_entry(batch_id, category, f"{msg}", level='silent')
         raise AppException(batch_id, "story", msg)
 
     try:
@@ -123,7 +123,7 @@ def run(batch_id, category):
         if cnt == 0:
             write_log_entry(batch_id, category, f"Модель: {model_name}")
             write_log_entry(
-                batch_id, category, f"[story] Запрос к текстовой платформе: модель={model_name}", level='silent'
+                batch_id, category, f"Запрос к текстовой платформе: модель={model_name}", level='silent'
             )
         raw = text_client.generate(batch_id, category, model_name, m, format_prompt, user_prompt)
         if raw:
@@ -186,7 +186,7 @@ def run(batch_id, category):
     if not iterate_result:
         msg = f"Все активные модели не дали результата после {max_passes} проходов"
         write_log_entry(batch_id, category, msg, level="error")
-        write_log_entry(batch_id, category, f"[story] {msg}", level='silent')
+        write_log_entry(batch_id, category, f"{msg}", level='silent')
         write_log_entry(
             batch_id, category,
             fmt_id_msg("[story] Батч {} — phase=iterate_failed, max_passes={}", batch_id, max_passes),
@@ -200,14 +200,14 @@ def run(batch_id, category):
     write_log_entry(batch_id, category, f"Сюжет:\n{result}", level='silent')
     write_log_entry(
         batch_id, category,
-        f"[story] Сюжет получен: {result[:100]}{'.' if len(result) > 100 else ''}",
+        f"Сюжет получен: {result[:100]}{'.' if len(result) > 100 else ''}",
         level='silent',
     )
 
     if not db_set_batch_story(batch_id, story_id):
         msg = "Ошибка сохранения статуса батча (db_set_batch_story вернул False)"
         write_log_entry(batch_id, category, msg, level="error")
-        write_log_entry(batch_id, category, f"[story] {msg}", level='silent')
+        write_log_entry(batch_id, category, f"{msg}", level='silent')
         raise AppException(batch_id, "story", msg)
 
     db_set_story_model(story_id, used_model_id)

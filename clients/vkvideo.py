@@ -90,7 +90,7 @@ def publish(
 
     file_name = publication_file_name(pub_title)
     write_log_entry(
-        batch_id, category, f"[vkvideo] Заголовок: {pub_title}, файл: {file_name}", level="silent"
+        batch_id, category, f"Заголовок: {pub_title}, файл: {file_name}", level="silent"
     )
     tmp_dir = tempfile.mkdtemp()
     video_path = os.path.join(tmp_dir, file_name)
@@ -219,7 +219,7 @@ def _publish_ui(
     _snap(page, batch_id)
 
     cur = page.url
-    write_log_entry(batch_id, category, f"[vkvideo] URL после перехода: {cur}", level="silent")
+    write_log_entry(batch_id, category, f"URL после перехода: {cur}", level="silent")
     if "vk.com/login" in cur or "/auth" in cur or "passport" in cur:
         raise VkVideoCsrfExpired(
             "Сессия истекла — авторизуйтесь снова в браузере (вкладка «Публикация»)"
@@ -252,7 +252,7 @@ def _publish_ui(
     file_chooser.set_files(video_path)
     write_log_entry(batch_id, category, "VK Видео: Файл передан, жду форму «Публикация клипа».")
     write_log_entry(
-        batch_id, category, f"[vkvideo] Файл: {os.path.basename(video_path)}", level="silent"
+        batch_id, category, f"Файл: {os.path.basename(video_path)}", level="silent"
     )
     _snap(page, batch_id)
 
@@ -280,13 +280,13 @@ def _publish_ui(
     _snap(page, batch_id)
     if clip_url:
         write_log_entry(batch_id, category, "VK Видео: Ссылка на клип получена.")
-        write_log_entry(batch_id, category, f"[vkvideo] Ссылка на клип: {clip_url}", level="silent")
+        write_log_entry(batch_id, category, f"Ссылка на клип: {clip_url}", level="silent")
     else:
         write_log_entry(batch_id, category, "VK Видео: Ссылка на клип не найдена — продолжаю.")
 
     # ── Шаг 6: Заполняем поле «Описание» хэштегами ────────────────────────
     write_log_entry(batch_id, category, "VK Видео: Заполняю описание хэштегами.")
-    write_log_entry(batch_id, category, f"[vkvideo] Хэштеги: {hashtags()}", level="silent")
+    write_log_entry(batch_id, category, f"Хэштеги: {hashtags()}", level="silent")
     try:
         desc_field = page.locator(
             "textarea[placeholder*='клип'], "
@@ -300,11 +300,11 @@ def _publish_ui(
         description = f"{pub_title}. {hashtags()}"
         desc_field.fill(description)
         write_log_entry(batch_id, category, "VK Видео: Описание заполнено.")
-        write_log_entry(batch_id, category, f"[vkvideo] Описание: {description}", level="silent")
+        write_log_entry(batch_id, category, f"Описание: {description}", level="silent")
         _snap(page, batch_id)
     except Exception as _e:
         write_log_entry(batch_id, category, "VK Видео: Не удалось заполнить описание — продолжаю.")
-        write_log_entry(batch_id, category, f"[vkvideo] Ошибка описания: {_e}", level="silent")
+        write_log_entry(batch_id, category, f"Ошибка описания: {_e}", level="silent")
 
     # ── Шаг 7: Ждём активную кнопку «Опубликовать» ───────────────────────
     write_log_entry(
@@ -357,12 +357,12 @@ def _publish_ui(
 
     if _success:
         write_log_entry(batch_id, category, "VK Видео: Клип опубликован успешно.")
-        write_log_entry(batch_id, category, f"[vkvideo] URL: {page.url}", level="silent")
+        write_log_entry(batch_id, category, f"URL: {page.url}", level="silent")
     else:
         write_log_entry(
             batch_id, category, "VK Видео: Публикация завершена (тост не обнаружен, ошибок нет)"
         )
-        write_log_entry(batch_id, category, f"[vkvideo] URL: {page.url}", level="silent")
+        write_log_entry(batch_id, category, f"URL: {page.url}", level="silent")
 
     if not _form_ok and not _success:
         raise VkVideoApiError(

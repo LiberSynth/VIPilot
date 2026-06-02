@@ -43,16 +43,16 @@ def ensure_playwright_chromium(batch_id, category) -> None:
             exec_path = p.chromium.executable_path
     except Exception as e:
         exec_path = None
-        write_log_entry(batch_id, category, f'[playwright] Не удалось определить путь к Chromium: {e}', level='silent')
+        write_log_entry(batch_id, category, f'Не удалось определить путь к Chromium: {e}', level='silent')
 
     if exec_path and os.path.exists(exec_path):
-        write_log_entry(batch_id, category, f'[playwright] Chromium найден: {exec_path}', level='silent')
+        write_log_entry(batch_id, category, f'Chromium найден: {exec_path}', level='silent')
         return
 
     write_log_entry(batch_id, category, 'Playwright Chromium не установлен — выполняю установку…')
     import sys
     cmd = [sys.executable, '-m', 'playwright', 'install', 'chromium', 'chromium-headless-shell']
-    write_log_entry(batch_id, category, f"[playwright] install cmd={' '.join(cmd)}", level='silent')
+    write_log_entry(batch_id, category, f"install cmd={' '.join(cmd)}", level='silent')
     result = subprocess.run(
         cmd,
         capture_output=True,

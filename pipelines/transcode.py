@@ -47,7 +47,7 @@ def _ffmpeg(batch_id, src: Path, dst: Path, category):
     cmd.append(str(dst))
     write_log_entry(
         batch_id, category,
-        f"[transcode] phase=ffmpeg_start, src={src}, dst={dst}",
+        f"phase=ffmpeg_start, src={src}, dst={dst}",
         level='silent',
     )
     subprocess.run(cmd, check=True, timeout=300)
@@ -96,7 +96,7 @@ def run(batch_id, category):
     write_log_entry(batch_id, category, msg)
     db_set_movie_transcoded(str(movie_id))
     db_set_batch_status(batch_id, 'ready')
-    write_log_entry(batch_id, category, f"[transcode] Готово: {out_mb} МБ → transcoded-файл", level='silent')
+    write_log_entry(batch_id, category, f"Готово: {out_mb} МБ → transcoded-файл", level='silent')
     write_log_entry(
         batch_id, category,
         fmt_id_msg("[transcode] Батч {} — phase=run_done, status=ready, transcoded_mb={}", batch_id, out_mb),

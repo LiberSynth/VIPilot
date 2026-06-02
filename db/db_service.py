@@ -22,7 +22,7 @@ def db_get_log_entries(log_id):
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT message, level, created_at, category
+                SELECT message, level, created_at, channel
                 FROM log_entries WHERE log_id = %s
                 ORDER BY created_at DESC, id DESC
                 """,
@@ -34,7 +34,7 @@ def db_get_log_entries(log_id):
             "msg": r[0],
             "level": r[1],
             "ts": r[2].isoformat() if r[2] else None,
-            "category": r[3],
+            "channel": r[3],
         }
         for r in rows
     ]
@@ -122,7 +122,7 @@ def db_get_system_log_entries(log_id: str) -> list:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT le.message, le.level, le.created_at, le.category
+                SELECT le.message, le.level, le.created_at, le.channel
                 FROM log_entries le
                 WHERE le.log_id = %s
                 ORDER BY le.created_at DESC, le.id DESC
@@ -135,7 +135,7 @@ def db_get_system_log_entries(log_id: str) -> list:
             "message":    r[0],
             "level":      r[1],
             "created_at": r[2].isoformat() if r[2] else None,
-            "category":   r[3],
+            "channel":   r[3],
         }
         for r in rows
     ]
@@ -146,7 +146,7 @@ def db_get_batch_log_entries(batch_id: str) -> list:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT le.message, le.level, le.created_at, le.category
+                SELECT le.message, le.level, le.created_at, le.channel
                 FROM log_entries le
                 JOIN log l ON l.id = le.log_id
                 WHERE l.batch_id = %s::uuid
@@ -160,7 +160,7 @@ def db_get_batch_log_entries(batch_id: str) -> list:
             "message":    r[0],
             "level":      r[1],
             "created_at": r[2].isoformat() if r[2] else None,
-            "category":   r[3],
+            "channel":   r[3],
         }
         for r in rows
     ]

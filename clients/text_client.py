@@ -68,7 +68,7 @@ def generate(batch_id, category, model_name: str, model: dict, system_prompt: st
         write_log_entry(
             batch_id, category,
             (
-                f"[story] text request: model={model_name}, "
+                f"text request: model={model_name}, "
                 f"platform_url={model.get('platform_url')}, model_url={model.get('model_url')}, "
                 f"env_key_name={model.get('env_key_name')}"
             ),
@@ -93,14 +93,14 @@ def generate(batch_id, category, model_name: str, model: dict, system_prompt: st
         write_log_entry(batch_id, category, f"[{model_name}] не-JSON (HTTP {resp.status_code}): {resp.text}", level='warn')
         write_log_entry(
             batch_id, category,
-            f"[story] text response non-json: model={model_name}, http={resp.status_code}, body={_compact_json(resp.text)}",
+            f"text response non-json: model={model_name}, http={resp.status_code}, body={_compact_json(resp.text)}",
             level='silent',
         )
         return None
 
     write_log_entry(
         batch_id, category,
-        f"[story] text response: model={model_name}, http={resp.status_code}, keys={list(data.keys()) if isinstance(data, dict) else []}",
+        f"text response: model={model_name}, http={resp.status_code}, keys={list(data.keys()) if isinstance(data, dict) else []}",
         level='silent',
     )
 
@@ -111,7 +111,7 @@ def generate(batch_id, category, model_name: str, model: dict, system_prompt: st
         write_log_entry(batch_id, category, f"[{model_name}] HTTP {resp.status_code}: {err}", level='warn')
         write_log_entry(
             batch_id, category,
-            f"[story] text response error: model={model_name}, http={resp.status_code}, error={_compact_json(err)}",
+            f"text response error: model={model_name}, http={resp.status_code}, error={_compact_json(err)}",
             level='silent',
         )
         return None
@@ -121,7 +121,7 @@ def generate(batch_id, category, model_name: str, model: dict, system_prompt: st
         write_log_entry(batch_id, category, f"[{model_name}] нет поля choices в ответе", level='warn')
         write_log_entry(
             batch_id, category,
-            f"[story] text response invalid: model={model_name}, reason=no_choices, body={_compact_json(data)}",
+            f"text response invalid: model={model_name}, reason=no_choices, body={_compact_json(data)}",
             level='silent',
         )
         return None
@@ -131,14 +131,14 @@ def generate(batch_id, category, model_name: str, model: dict, system_prompt: st
         write_log_entry(batch_id, category, f"[{model_name}] пустой текст", level='warn')
         write_log_entry(
             batch_id, category,
-            f"[story] text response invalid: model={model_name}, reason=empty_content, body={_compact_json(data)}",
+            f"text response invalid: model={model_name}, reason=empty_content, body={_compact_json(data)}",
             level='silent',
         )
         return None
 
     write_log_entry(
         batch_id, category,
-        f"[story] text response ok: model={model_name}, chars={len(result)}",
+        f"text response ok: model={model_name}, chars={len(result)}",
         level='silent',
     )
 

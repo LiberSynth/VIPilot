@@ -6,13 +6,15 @@ import re
 import sys
 import threading
 
-_ALLOWED_LOG_CHANNELS = frozenset({
+ALLOWED_LOG_CHANNELS = frozenset({
     "api",
     "planning",
     "story",
     "video",
     "transcode",
     "publish",
+    "runner",
+    "playwright",
     "main",
     "main_loop",
     "http",
@@ -27,6 +29,10 @@ _ALLOWED_LOG_CHANNELS = frozenset({
     "rutube",
     "vkvideo",
 })
+
+_ALLOWED_LOG_CHANNELS = ALLOWED_LOG_CHANNELS
+
+_LOG_BRACKET_PREFIX = re.compile(r"^\[([^\]]+)\]\s*", re.DOTALL)
 
 _ALLOWED_LOG_LEVELS = {
     "silent",
@@ -76,8 +82,19 @@ def _ensure_log_period(message: str) -> str:
     return message
 
 
-def _stdout_log(category: str, message: str) -> None:
-    text = f"{category} — {message}".encode("cp1251", errors="replace").decode("cp1251")
+def _resolve_channel_and_message(default_channel: str, message: str) -> tuple[str, str]:
+    """Префикс [tag] в тексте → log_entries.channel, без дубля в message."""
+    m = _LOG_BRACKET_PREFIX.match(message or "")
+    if not m:
+        return default_channel, message
+    tag = m.group(1).lower()
+    if tag in _ALLOWED_LOG_CHANNELS:
+        return tag, message[m.end() :]
+    return default_channel, message
+
+
+def _stdout_log(channel: str, message: str) -> None:
+    text = f"{channel} — {message}".encode("cp1251", errors="replace").decode("cp1251")
     try:
         print(text)
     except UnicodeEncodeError:
@@ -86,7 +103,7 @@ def _stdout_log(category: str, message: str) -> None:
 
 
 def app_log(source: str, message: str = "", *, level: str = "silent", phase: str | None = None):
-    """Лог блока «Приложение» (batch_id=None). Канал — в log_entries.category."""
+    """Лог блока «Приложение» (batch_id=None). Канал — в log_entries.channel."""
     assert source in _ALLOWED_LOG_CHANNELS, (
         f"app_log: недопустимый source {source!r}. "
         f"Допустимые: {sorted(_ALLOWED_LOG_CHANNELS)}."
@@ -113,15 +130,17 @@ def log_app_stopped():
     app_log("main", "Приложение остановлено", level="info")
 
 
-def write_log_entry(batch_id, category, message, level="info"):
-    """Единая точка записи в log и log_entries. Канал — log_entries.category."""
+def write_log_entry(batch_id, channel, message, level="info"):
+    """Единая точка записи в log и log_entries. Канал — log_entries.channel."""
     import common.environment as environment
     from db.db_simple import db_get_or_create_log, db_insert_log, db_insert_log_entry
 
     global _system_log_id
 
-    assert category in _ALLOWED_LOG_CHANNELS, (
-        f"write_log_entry: недопустимый channel {category!r}. "
+    channel, message = _resolve_channel_and_message(channel, message or "")
+
+    assert channel in _ALLOWED_LOG_CHANNELS, (
+        f"write_log_entry: недопустимый channel {channel!r}. "
         f"Допустимые: {sorted(_ALLOWED_LOG_CHANNELS)}."
     )
     assert level in _ALLOWED_LOG_LEVELS, (
@@ -130,7 +149,7 @@ def write_log_entry(batch_id, category, message, level="info"):
     )
 
     message = _ensure_log_period(message)
-    _stdout_log(category, message)
+    _stdout_log(channel, message)
     if level == "silent" and not environment.deep_debugging:
         return None
 
@@ -142,11 +161,11 @@ def write_log_entry(batch_id, category, message, level="info"):
                 log_id, is_first_batch_log = db_get_or_create_log(batch_id)
                 if is_first_batch_log:
                     _system_log_id = None
-                db_insert_log_entry(log_id, category, message, level)
+                db_insert_log_entry(log_id, channel, message, level)
             else:
                 if _system_log_id is None:
                     _system_log_id = db_insert_log(None)
-                db_insert_log_entry(_system_log_id, category, message, level)
+                db_insert_log_entry(_system_log_id, channel, message, level)
                 log_id = _system_log_id
     finally:
         environment.asserted_log_entry.reset(entry_token)

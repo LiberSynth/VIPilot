@@ -75,7 +75,7 @@ def publish(
 
     # Пишем видео во временный файл с именем = заголовок (Дзен автоподставляет имя файла)
     file_name = publication_file_name(pub_title)
-    write_log_entry(batch_id, category, f"[dzen] Заголовок: {pub_title}, файл: {file_name}", level='silent')
+    write_log_entry(batch_id, category, f"Заголовок: {pub_title}, файл: {file_name}", level='silent')
     tmp_dir = tempfile.mkdtemp()
     video_path = os.path.join(tmp_dir, file_name)
     try:
@@ -197,7 +197,7 @@ def _try_click_captcha_checkbox(page, category) -> bool:
                         f'if (el) {{ el.click(); return true; }} return false; }}'
                     )
                     if done:
-                        write_log_entry(batch_id, category, f"[dzen] Капча: JS-клик {js_sel!r} в фрейме {furl or 'main'}", level='silent')
+                        write_log_entry(batch_id, category, f"Капча: JS-клик {js_sel!r} в фрейме {furl or 'main'}", level='silent')
                         clicked = True
                         break
                 except Exception:
@@ -213,7 +213,7 @@ def _try_click_captcha_checkbox(page, category) -> bool:
                 el = page.locator(sel).first
                 if el.is_visible(timeout=300):
                     el.click(force=True, timeout=2000)
-                    write_log_entry(batch_id, category, f"[dzen] Капча: Playwright-клик {sel!r} в основном фрейме", level='silent')
+                    write_log_entry(batch_id, category, f"Капча: Playwright-клик {sel!r} в основном фрейме", level='silent')
                     clicked = True
                     break
             except Exception:
@@ -294,7 +294,7 @@ def _handle_confirm_element(page, category, batch_id) -> None:
             btn = page.locator(f"button:has-text('{text}')").first
             if btn.is_visible(timeout=300):
                 write_log_entry(batch_id, category, f"Дзен: Нажимаю «{text}».")
-                write_log_entry(batch_id, category, f"[dzen] Кнопка подтверждения: «{text}»", level='silent')
+                write_log_entry(batch_id, category, f"Кнопка подтверждения: «{text}»", level='silent')
                 btn.click()
                 _snap(page, batch_id)
                 return
@@ -370,7 +370,7 @@ def _click_primary_publish_control(page, category, batch_id=None) -> bool:
         pub_btn.click(timeout=3_000)
     except Exception as _click_err:
         write_log_entry(batch_id, category, "[dzen] Обычный клик не прошёл — пробую JS-клик.", level='silent')
-        write_log_entry(batch_id, category, f"[dzen] Причина: {_click_err}", level='silent')
+        write_log_entry(batch_id, category, f"Причина: {_click_err}", level='silent')
         try:
             page.evaluate(
                 """() => {
@@ -386,7 +386,7 @@ def _click_primary_publish_control(page, category, batch_id=None) -> bool:
                 }"""
             )
         except Exception as _js_err:
-            write_log_entry(batch_id, category, f"[dzen] JS-клик тоже не прошёл: {_js_err}", level='silent')
+            write_log_entry(batch_id, category, f"JS-клик тоже не прошёл: {_js_err}", level='silent')
             return False
     _snap(page, batch_id)
     return True
@@ -449,7 +449,7 @@ def _dismiss_unknown(page, category=None) -> None:
             cls_before = ""
 
         write_log_entry(batch_id, category, f"Дзен: Закрываю хинт (попытка {_attempt + 1}).", level=_user_lvl)
-        write_log_entry(batch_id, category, f"[dzen] hint close target class={cls_before!r}", level='silent')
+        write_log_entry(batch_id, category, f"hint close target class={cls_before!r}", level='silent')
 
         try:
             url_before_click = page.url
@@ -459,7 +459,7 @@ def _dismiss_unknown(page, category=None) -> None:
         try:
             btn.click(timeout=2_000)
         except Exception as _e:
-            write_log_entry(batch_id, category, f"[dzen] hint click failed: {_e}", level='silent')
+            write_log_entry(batch_id, category, f"hint click failed: {_e}", level='silent')
             # Во время публикации страница может мгновенно перейти в список материалов.
             # В этом случае close-кнопка хинта естественно detatch'ится, это не ошибка.
             try:
@@ -480,7 +480,7 @@ def _dismiss_unknown(page, category=None) -> None:
                 and ("videoEditorPublicationId" not in (url_now or ""))
             ) or ("state=published" in (url_now or "")) or ("state=pending" in (url_now or ""))
             if left_editor:
-                write_log_entry(batch_id, category, f"[dzen] hint close interrupted by navigation: {url_now}", level='silent')
+                write_log_entry(batch_id, category, f"hint close interrupted by navigation: {url_now}", level='silent')
                 return
 
             write_log_entry(batch_id, category, "[dzen] hint click failed, retrying.", level='silent')
@@ -531,7 +531,7 @@ def _set_comments_all_users(page, category, batch_id=None) -> None:
             return
 
         current_text = (trigger.inner_text() or "").strip()
-        write_log_entry(batch_id, category, f"[dzen] _set_comments: триггер найден, текущий: {current_text!r}", level='silent')
+        write_log_entry(batch_id, category, f"_set_comments: триггер найден, текущий: {current_text!r}", level='silent')
 
         if _TARGET in current_text:
             write_log_entry(batch_id, category, "Дзен: Комментарии уже «Все пользователи».", level='silent')
@@ -562,7 +562,7 @@ def _set_comments_all_users(page, category, batch_id=None) -> None:
                 f"Дзен: Опция [data-testid=\"{_TARGET}\"] не появилась после клика по триггеру.",
                 level='warn',
             )
-            write_log_entry(batch_id, category, f"[dzen] Ошибка выбора опции: {_e}", level='silent')
+            write_log_entry(batch_id, category, f"Ошибка выбора опции: {_e}", level='silent')
             try:
                 page.keyboard.press("Escape")
             except Exception:
@@ -576,7 +576,7 @@ def _set_comments_all_users(page, category, batch_id=None) -> None:
             new_text = (trigger.inner_text() or "").strip()
         except Exception:
             new_text = ""
-        write_log_entry(batch_id, category, f"[dzen] _set_comments: триггер ПОСЛЕ установки: {new_text!r}", level='silent')
+        write_log_entry(batch_id, category, f"_set_comments: триггер ПОСЛЕ установки: {new_text!r}", level='silent')
 
         if _TARGET in new_text:
             write_log_entry(batch_id, category, "Дзен: Комментарии выставлены «Все пользователи» (подтверждено).")
@@ -590,7 +590,7 @@ def _set_comments_all_users(page, category, batch_id=None) -> None:
             _snap(page, batch_id)
     except Exception as _e:
         write_log_entry(batch_id, category, "Дзен: Ошибка при настройке комментариев — продолжаю.", level='warn')
-        write_log_entry(batch_id, category, f"[dzen] Ошибка _set_comments_all_users: {_e}", level='silent')
+        write_log_entry(batch_id, category, f"Ошибка _set_comments_all_users: {_e}", level='silent')
 
 
 def _handle_popups(page, category=None, batch_id=None) -> None:
@@ -602,7 +602,7 @@ def _handle_popups(page, category=None, batch_id=None) -> None:
     """
     for name, detect, handle in _EXPECTED_ELEMENTS:
         if detect(page):
-            write_log_entry(batch_id, category, f"[dzen] Ожидаемый элемент: {name}", level='silent')
+            write_log_entry(batch_id, category, f"Ожидаемый элемент: {name}", level='silent')
             if handle is not None:
                 handle(page, category, batch_id)
             return
@@ -616,7 +616,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
 
     # ── Шаг 1: Переходим в студию ────────────────────────────────────────
     write_log_entry(batch_id, category, "Дзен: Переход в студию.")
-    write_log_entry(batch_id, category, f"[dzen] URL студии: {studio_url}", level='silent')
+    write_log_entry(batch_id, category, f"URL студии: {studio_url}", level='silent')
     _last_err = None
     for _attempt in range(1, 6):
         try:
@@ -639,7 +639,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
     _snap(page, batch_id)
 
     cur = page.url
-    write_log_entry(batch_id, category, f"[dzen] URL после перехода: {cur}", level='silent')
+    write_log_entry(batch_id, category, f"URL после перехода: {cur}", level='silent')
     if "passport.yandex" in cur or "/auth" in cur:
         raise DzenCsrfExpired(
             "Сессия истекла — авторизуйтесь снова в браузере (вкладка «Публикация»)"
@@ -726,7 +726,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
     file_chooser = fc_info.value
     file_chooser.set_files(video_path)
     write_log_entry(batch_id, category, "Дзен: Файл передан браузеру, жду загрузки.")
-    write_log_entry(batch_id, category, f"[dzen] Файл: {os.path.basename(video_path)}", level='silent')
+    write_log_entry(batch_id, category, f"Файл: {os.path.basename(video_path)}", level='silent')
     _snap(page, batch_id)
 
     # Ждём одно из двух:
@@ -742,12 +742,12 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
         if "state=published" in _cur:
             _auto_published = True
             write_log_entry(batch_id, category, "Дзен: Видео опубликовано автоматически.")
-            write_log_entry(batch_id, category, f"[dzen] URL авто-публикации: {_cur}", level='silent')
+            write_log_entry(batch_id, category, f"URL авто-публикации: {_cur}", level='silent')
             break
         if "videoEditorPublicationId" in _cur:
             _editor_opened = True
             write_log_entry(batch_id, category, "Дзен: Редактор видео открылся.")
-            write_log_entry(batch_id, category, f"[dzen] URL редактора: {_cur}", level='silent')
+            write_log_entry(batch_id, category, f"URL редактора: {_cur}", level='silent')
             break
         _handle_popups(page, category, batch_id)
         page.wait_for_timeout(1_500)
@@ -779,7 +779,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
 
     # ── Шаг 5: Заполняем теги ────────────────────────────────────────────
     write_log_entry(batch_id, category, "Дзен: Заполняю теги.")
-    write_log_entry(batch_id, category, f"[dzen] Теги: {tags()}", level='silent')
+    write_log_entry(batch_id, category, f"Теги: {tags()}", level='silent')
     try:
         tags_input = page.locator(
             "input[placeholder*='теги'], "
@@ -795,7 +795,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
         _snap(page, batch_id)
     except Exception as _e:
         write_log_entry(batch_id, category, "Дзен: Не удалось заполнить теги — продолжаю.")
-        write_log_entry(batch_id, category, f"[dzen] Ошибка тегов: {_e}", level='silent')
+        write_log_entry(batch_id, category, f"Ошибка тегов: {_e}", level='silent')
 
     # Перед шагом 6: закрываем хинт «Уже можно публиковать» (он часто
     # всплывает после ввода тегов и перекрывает дропдаун комментариев).
@@ -822,7 +822,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
                 batch_id, category,
                 "Дзен: Публикация уже ушла (редирект/студия) — отдельный клик не нужен.",
             )
-            write_log_entry(batch_id, category, f"[dzen] URL: {page.url}", level='silent')
+            write_log_entry(batch_id, category, f"URL: {page.url}", level='silent')
             pub_btn = None
             break
         pub_btn = _find_primary_publish_control(page)
@@ -936,7 +936,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
         state_label = "state=published" if "state=published" in url_before else "state=pending"
         confirmed = True
         write_log_entry(batch_id, category, f"Дзен: URL → {state_label} — публикация подтверждена.")
-        write_log_entry(batch_id, category, f"[dzen] Полный URL: {url_before}", level='silent')
+        write_log_entry(batch_id, category, f"Полный URL: {url_before}", level='silent')
 
     # CSS-селекторы (только чистый CSS, без text= — они несовместимы с wait_for_selector)
     css_success_selector = (
@@ -979,7 +979,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
             if el.is_visible():
                 confirmed = True
                 write_log_entry(batch_id, category, "Дзен: Уведомление об успешной публикации получено (CSS).")
-                write_log_entry(batch_id, category, f"[dzen] URL: {page.url}", level='silent')
+                write_log_entry(batch_id, category, f"URL: {page.url}", level='silent')
                 break
         except Exception:
             pass
@@ -991,7 +991,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
                 if el.is_visible():
                     confirmed = True
                     write_log_entry(batch_id, category, "Дзен: Публикация подтверждена (текст).")
-                    write_log_entry(batch_id, category, f"[dzen] Совпадение: {pat!r}", level='silent')
+                    write_log_entry(batch_id, category, f"Совпадение: {pat!r}", level='silent')
                     break
             except Exception:
                 pass
@@ -1030,7 +1030,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
             if video_match or "editor" not in url_now:
                 confirmed = True
                 write_log_entry(batch_id, category, "Дзен: Публикация подтверждена (смена URL).")
-                write_log_entry(batch_id, category, f"[dzen] URL сменился: {url_now}", level='silent')
+                write_log_entry(batch_id, category, f"URL сменился: {url_now}", level='silent')
                 break
 
         page.wait_for_timeout(_CONFIRM_POLL)
@@ -1040,23 +1040,23 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
     if not confirmed:
         # Финальный URL-снимок
         url_after = page.url
-        write_log_entry(batch_id, category, f"[dzen] URL до публикации: {url_before}", level='silent')
-        write_log_entry(batch_id, category, f"[dzen] URL после публикации: {url_after}", level='silent')
+        write_log_entry(batch_id, category, f"URL до публикации: {url_before}", level='silent')
+        write_log_entry(batch_id, category, f"URL после публикации: {url_after}", level='silent')
         if "state=published" in url_after or "state=pending" in url_after:
             state_label = "state=published" if "state=published" in url_after else "state=pending"
             confirmed = True
             write_log_entry(batch_id, category, f"Дзен: URL → {state_label} — публикация подтверждена (финал).")
-            write_log_entry(batch_id, category, f"[dzen] Полный URL: {url_after}", level='silent')
+            write_log_entry(batch_id, category, f"Полный URL: {url_after}", level='silent')
         else:
             video_url_pattern = re.search(r"/video/|/shorts/|/watch\?", url_after)
             if video_url_pattern and url_after != url_before:
                 confirmed = True
                 write_log_entry(batch_id, category, "Дзен: Публикация подтверждена (видео-страница).")
-                write_log_entry(batch_id, category, f"[dzen] URL видео: {url_after}", level='silent')
+                write_log_entry(batch_id, category, f"URL видео: {url_after}", level='silent')
             elif url_after != url_before and "editor" not in url_after:
                 confirmed = True
                 write_log_entry(batch_id, category, "Дзен: Публикация предположительно подтверждена.")
-                write_log_entry(batch_id, category, f"[dzen] URL сменился: {url_after}", level='silent')
+                write_log_entry(batch_id, category, f"URL сменился: {url_after}", level='silent')
 
     _snap(page, batch_id)
 
@@ -1068,5 +1068,5 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
             "видео предположительно в черновиках. Проверьте вручную."
         )
 
-    write_log_entry(batch_id, category, f"[dzen] URL после публикации: {page.url}", level='silent')
+    write_log_entry(batch_id, category, f"URL после публикации: {page.url}", level='silent')
     write_log_entry(batch_id, category, "Дзен: Публикация завершена.")
