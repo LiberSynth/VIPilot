@@ -1,35 +1,6 @@
 (function() {
-  const CHANNEL_LABELS = {
-    api:         'API',
-    planning:    'Планирование',
-    story:       'Сюжет',
-    runner:      'Runner',
-    video:       'Видео',
-    transcode:   'Транскодирование',
-    publish:     'Публикация',
-    playwright:  'Playwright',
-    main:        'Приложение',
-    main_loop:   'Цикл',
-    http:        'HTTP',
-    db:          'БД',
-    upgrade:     'Обновление',
-    startup:     'Старт',
-    cleanup:     'Очистка',
-    browser:     'Браузер',
-    notify:      'Уведомления',
-    consts:      'Константы',
-    dzen:        'Дзен',
-    rutube:      'Rutube',
-    vkvideo:     'VK Видео',
-    system:      'Система',
-  };
-
-  function channelLabel(cat) {
-    return CHANNEL_LABELS[cat] || cat || '—';
-  }
-
   function formatEntryLine(en) {
-    return fmtMsk(en.created_at) + ' — ' + channelLabel(en.channel) + ' — ' + (en.message || '');
+    return fmtMsk(en.created_at) + ' — ' + (en.channel || '—') + ' — ' + (en.message || '');
   }
 
   const STATUS_LABELS = {
@@ -329,7 +300,7 @@
     var lvl = en.level || 'info';
     return '<div class="monitor-entry-row">' +
       '<span class="monitor-entry-ts">' + fmtMsk(en.created_at) + '</span>' +
-      '<span class="monitor-entry-ch">' + esc(channelLabel(en.channel)) + '</span>' +
+      '<span class="monitor-entry-ch">' + esc(en.channel || '—') + '</span>' +
       '<span class="monitor-entry-msg ' + esc(lvl) + '">' + esc(en.message || '') + '</span>' +
     '</div>';
   }
