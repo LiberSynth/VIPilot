@@ -12,6 +12,33 @@ from .migrations import merge_duplicate_batch_logs, run_migrations
 from log.log import app_log
 
 
+def _consolidate_log_entries_channel(cur) -> None:
+    """Одна колонка channel: переименование category или удаление дубля после ошибочного ADD."""
+    cur.execute("""
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = current_schema()
+          AND table_name = 'log_entries'
+          AND column_name IN ('category', 'channel')
+    """)
+    le_cols = {r[0] for r in cur.fetchall()}
+    if 'category' in le_cols and 'channel' in le_cols:
+        cur.execute("""
+            UPDATE log_entries
+            SET channel = category
+            WHERE category IS NOT NULL
+        """)
+        cur.execute("ALTER TABLE log_entries DROP COLUMN category")
+    elif 'category' in le_cols:
+        cur.execute("ALTER TABLE log_entries RENAME COLUMN category TO channel")
+    elif 'channel' not in le_cols:
+        cur.execute("""
+            ALTER TABLE log_entries
+            ADD COLUMN channel TEXT NOT NULL DEFAULT 'system'
+        """)
+    cur.execute("DROP INDEX IF EXISTS idx_log_entries_category")
+
+
 def _ensure_log_indexes(cur) -> None:
     """Индексы log / log_entries по фактической схеме."""
     merge_duplicate_batch_logs(cur)
@@ -111,20 +138,7 @@ def bootstrap():
                     created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
                 )
             """)
-            cur.execute("""
-                ALTER TABLE log_entries
-                ADD COLUMN IF NOT EXISTS channel TEXT NOT NULL DEFAULT 'system'
-            """)
-            cur.execute("""
-                SELECT column_name
-                FROM information_schema.columns
-                WHERE table_schema = current_schema()
-                  AND table_name = 'log_entries'
-                  AND column_name IN ('category', 'channel')
-            """)
-            le_cols = {r[0] for r in cur.fetchall()}
-            if 'category' in le_cols and 'channel' not in le_cols:
-                cur.execute("ALTER TABLE log_entries RENAME COLUMN category TO channel")
+            _consolidate_log_entries_channel(cur)
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS model_durations (
                     id       UUID PRIMARY KEY DEFAULT gen_random_uuid(),

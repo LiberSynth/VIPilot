@@ -264,6 +264,29 @@ def _m1009_log_entries_channel(cur):
     """)
 
 
+def _m1010_drop_log_entries_category(cur):
+    cur.execute("""
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = current_schema()
+          AND table_name = 'log_entries'
+          AND column_name IN ('category', 'channel')
+    """)
+    cols = {r[0] for r in cur.fetchall()}
+    if "category" not in cols:
+        return
+    if "channel" in cols:
+        cur.execute("""
+            UPDATE log_entries
+            SET channel = category
+            WHERE category IS NOT NULL
+        """)
+        cur.execute("ALTER TABLE log_entries DROP COLUMN category")
+    else:
+        cur.execute("ALTER TABLE log_entries RENAME COLUMN category TO channel")
+    cur.execute("DROP INDEX IF EXISTS idx_log_entries_category")
+
+
 MIGRATIONS = [
     (2026052901, _m1001_drop_targets_legacy_columns),
     (2026052902, _m1002_add_movies_transcoded),
@@ -274,6 +297,7 @@ MIGRATIONS = [
     (2026052907, _m1007_log_category_and_drop_message_status),
     (2026052908, _m1008_log_entries_category),
     (2026052909, _m1009_log_entries_channel),
+    (2026052910, _m1010_drop_log_entries_category),
 ]
 
 
