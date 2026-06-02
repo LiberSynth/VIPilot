@@ -57,7 +57,20 @@ def db_get_monitor():
                             CASE WHEN l.category = b.type THEN 0 ELSE 1 END,
                             l.created_at ASC
                         LIMIT 1
-                    ) AS log_id
+                    ) AS log_id,
+                    (
+                        SELECT COUNT(*)::int
+                        FROM log_entries le
+                        WHERE le.log_id = (
+                            SELECT l.id
+                            FROM log l
+                            WHERE l.batch_id = b.id
+                            ORDER BY
+                                CASE WHEN l.category = b.type THEN 0 ELSE 1 END,
+                                l.created_at ASC
+                            LIMIT 1
+                        )
+                    ) AS entry_count
                 FROM batches b
                 ORDER BY b.created_at DESC, b.id DESC
                 """
@@ -66,7 +79,11 @@ def db_get_monitor():
 
             cur.execute(
                 """
-                SELECT l.id::text, l.category, l.created_at
+                SELECT
+                    l.id::text,
+                    l.category,
+                    l.created_at,
+                    (SELECT COUNT(*)::int FROM log_entries le WHERE le.log_id = l.id) AS entry_count
                 FROM log l
                 WHERE l.batch_id IS NULL
                 ORDER BY l.created_at DESC, l.id DESC
@@ -85,14 +102,16 @@ def db_get_monitor():
             "movie_id":       str(r[6]) if r[6] else None,
             "title":          r[7],
             "log_id":         r[8] if r[8] else None,
+            "entry_count":    int(r[9] or 0),
         }
         for r in batch_rows
     ]
     system = [
         {
-            "id":         r[0],
-            "category":   r[1],
-            "created_at": r[2].isoformat() if r[2] else None,
+            "id":           r[0],
+            "category":     r[1],
+            "created_at":   r[2].isoformat() if r[2] else None,
+            "entry_count":  int(r[3] or 0),
         }
         for r in sys_rows
     ]

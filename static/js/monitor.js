@@ -134,6 +134,16 @@
     return s.charAt(0).toUpperCase() + s.slice(1);
   }
 
+  function formatEntryCount(n) {
+    n = Number(n) || 0;
+    var mod10 = n % 10;
+    var mod100 = n % 100;
+    var word = 'записей';
+    if (mod10 === 1 && mod100 !== 11) word = 'запись';
+    else if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) word = 'записи';
+    return n + ' ' + word;
+  }
+
   function renderBatch(batch) {
     const bs = batch.batch_status || 'pending';
     const btype = batch.type || '';
@@ -146,7 +156,10 @@
     if (batch.title) subParts.push(batch.title);
     const subDefault = subParts.filter(Boolean).join(' · ');
     const headTitle = btype === 'story' ? 'Генерация сюжета' : fmtMsk(headTime);
-    const sub = btype === 'story' ? capitalizeFirst(translateStatus(bs)) : subDefault;
+    const entryCnt = formatEntryCount(batch.entry_count);
+    const sub = btype === 'story'
+      ? capitalizeFirst(translateStatus(bs)) + ' · ' + entryCnt
+      : subDefault;
     const md = _batchDotClass(bs, batch.batch_id);
     const isActive = md === 'md-active';
 
@@ -222,6 +235,7 @@
         '<span class="monitor-sysgroup-dot"></span>' +
         '<div class="monitor-sysgroup-meta">' +
           '<div class="monitor-sysgroup-title">Приложение</div>' +
+          '<div class="monitor-sysgroup-sub">' + esc(formatEntryCount(sys.entry_count)) + '</div>' +
         '</div>' +
         sysActions +
         '<span class="monitor-sysgroup-arrow">▼</span>' +
