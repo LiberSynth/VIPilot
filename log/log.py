@@ -2,6 +2,7 @@
 Все функции логирования приложения.
 """
 
+import re
 import sys
 import threading
 
@@ -44,6 +45,41 @@ _APP_SOURCES = frozenset({
 _lifecycle_stop_logged = False
 _system_log_id: str | None = None
 _system_log_lock = threading.Lock()
+
+_LOG_PERIOD_SKIP_TAIL = re.compile(
+    r"(?:"
+    r"\.{3}|…|"  # многоточие
+    r"->|→|"  # стрелки (версии, переходы статусов)
+    r"https?://|"  # URL
+    r"phase=|"  # диагностика пайплайна
+    r"_snap|"  # снимки Playwright
+    r"\b\w+=\S"  # key=value
+    r")",
+    re.IGNORECASE,
+)
+_LOG_UUID_TAIL = re.compile(
+    r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\s*$",
+    re.IGNORECASE,
+)
+
+
+def _ensure_log_period(message: str) -> str:
+    """Точка в конце обычных фраз; без изменений для служебных/структурных хвостов."""
+    if not message:
+        return message
+    s = message.rstrip()
+    if not s:
+        return message
+    last = s[-1]
+    if last in ".!?…":
+        return message
+    if last in "=,;:})]>%»«\"'":
+        return message
+    if _LOG_PERIOD_SKIP_TAIL.search(s) or _LOG_UUID_TAIL.search(s):
+        return message
+    if last.isalnum() or last in "»«":
+        return s + "."
+    return message
 
 
 def _stdout_log(message: str) -> None:
@@ -112,6 +148,7 @@ def write_log_entry(batch_id, category, message, level="info"):
             f"получено {category!r}."
         )
 
+    message = _ensure_log_period(message)
     _stdout_log(message)
     if level == "silent" and not environment.deep_debugging:
         return None

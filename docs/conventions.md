@@ -59,6 +59,7 @@ write_log_entry(batch_id, category, message, level='info')
 - **Логи «Приложение»** — только через `app_log(source, message, *, level='silent', phase=None)` из `log/log.py`. Прямой `write_log_entry(None, …)` вне `log/log.py` запрещён.
 - `app_log(..., level='silent')` — диагностика: stdout всегда; в БД только при `deep_debugging`.
 - `app_log(..., level='info')` — действия пользователя и lifecycle (видны в мониторе без deep debug).
+- `write_log_entry` автоматически добавляет `.` в конец обычных фраз; не трогает служебные хвосты (`phase=`, `key=value`, URL, `…`, уже есть `.!?`).
 - `source` — из фиксированного набора: `main`, `main_loop`, `api`, `http`, `db`, `upgrade`, `startup`, `cleanup`, `planning`, `browser`, `notify`, `consts`, `dzen`, `rutube`, `vkvideo`. Префикс `[source]` в текст добавляет `app_log`.
 - Диагностика пайплайнов вне батча: `app_log('planning', '…', phase='run_start')` → `phase=run_start, …` в сообщении.
 
