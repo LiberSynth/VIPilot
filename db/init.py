@@ -8,29 +8,29 @@ bootstrap() вызывается безусловно при каждом ста
 """
 
 from .connection import get_db
-from .migrations import run_migrations
+from .migrations import merge_duplicate_batch_logs, run_migrations
 from log.log import app_log
 
 
 def _ensure_log_indexes(cur) -> None:
-    """Индексы log по фактическим колонкам: category (новая схема) или pipeline (до m1007)."""
+    """Индексы log / log_entries по фактической схеме."""
+    merge_duplicate_batch_logs(cur)
+    cur.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_log_batch_id_unique
+            ON log (batch_id)
+        WHERE batch_id IS NOT NULL
+    """)
     cur.execute("""
         SELECT column_name
         FROM information_schema.columns
         WHERE table_schema = current_schema()
-          AND table_name = 'log'
-          AND column_name IN ('category', 'pipeline')
+          AND table_name = 'log_entries'
+          AND column_name = 'category'
     """)
-    cols = {r[0] for r in cur.fetchall()}
-    if 'category' in cols:
+    if cur.fetchone():
         cur.execute("""
-            CREATE INDEX IF NOT EXISTS idx_log_category
-                ON log (category)
-        """)
-    if 'pipeline' in cols:
-        cur.execute("""
-            CREATE INDEX IF NOT EXISTS idx_log_pipeline
-                ON log (pipeline)
+            CREATE INDEX IF NOT EXISTS idx_log_entries_category
+                ON log_entries (category)
         """)
 
 
@@ -98,7 +98,6 @@ def bootstrap():
                 CREATE TABLE IF NOT EXISTS log (
                     id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                     batch_id   UUID,
-                    category   TEXT,
                     created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
                 )
             """)
@@ -106,10 +105,15 @@ def bootstrap():
                 CREATE TABLE IF NOT EXISTS log_entries (
                     id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                     log_id     UUID,
+                    category   TEXT NOT NULL DEFAULT 'system',
                     message    TEXT,
                     level      TEXT,
                     created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
                 )
+            """)
+            cur.execute("""
+                ALTER TABLE log_entries
+                ADD COLUMN IF NOT EXISTS category TEXT NOT NULL DEFAULT 'system'
             """)
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS model_durations (

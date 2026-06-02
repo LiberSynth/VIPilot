@@ -21,12 +21,21 @@ def db_get_log_entries(log_id):
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT message, level, created_at FROM log_entries WHERE log_id = %s ORDER BY created_at DESC, id DESC",
+                """
+                SELECT message, level, created_at, category
+                FROM log_entries WHERE log_id = %s
+                ORDER BY created_at DESC, id DESC
+                """,
                 (log_id,),
             )
             rows = cur.fetchall()
     return [
-        {"msg": r[0], "level": r[1], "ts": r[2].isoformat() if r[2] else None}
+        {
+            "msg": r[0],
+            "level": r[1],
+            "ts": r[2].isoformat() if r[2] else None,
+            "category": r[3],
+        }
         for r in rows
     ]
 
@@ -53,9 +62,7 @@ def db_get_monitor():
                         SELECT l.id::text
                         FROM log l
                         WHERE l.batch_id = b.id
-                        ORDER BY
-                            CASE WHEN l.category = b.type THEN 0 ELSE 1 END,
-                            l.created_at ASC
+                        ORDER BY l.created_at ASC
                         LIMIT 1
                     ) AS log_id,
                     (
@@ -74,7 +81,6 @@ def db_get_monitor():
                 """
                 SELECT
                     l.id::text,
-                    l.category,
                     l.created_at,
                     (SELECT COUNT(*)::int FROM log_entries le WHERE le.log_id = l.id) AS entry_count
                 FROM log l
@@ -102,9 +108,8 @@ def db_get_monitor():
     system = [
         {
             "id":           r[0],
-            "category":     r[1],
-            "created_at":   r[2].isoformat() if r[2] else None,
-            "entry_count":  int(r[3] or 0),
+            "created_at":   r[1].isoformat() if r[1] else None,
+            "entry_count":  int(r[2] or 0),
         }
         for r in sys_rows
     ]
@@ -117,7 +122,7 @@ def db_get_system_log_entries(log_id: str) -> list:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT le.message, le.level, le.created_at
+                SELECT le.message, le.level, le.created_at, le.category
                 FROM log_entries le
                 WHERE le.log_id = %s
                 ORDER BY le.created_at DESC, le.id DESC
@@ -130,6 +135,7 @@ def db_get_system_log_entries(log_id: str) -> list:
             "message":    r[0],
             "level":      r[1],
             "created_at": r[2].isoformat() if r[2] else None,
+            "category":   r[3],
         }
         for r in rows
     ]
@@ -140,7 +146,7 @@ def db_get_batch_log_entries(batch_id: str) -> list:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT le.message, le.level, le.created_at
+                SELECT le.message, le.level, le.created_at, le.category
                 FROM log_entries le
                 JOIN log l ON l.id = le.log_id
                 WHERE l.batch_id = %s::uuid
@@ -154,6 +160,7 @@ def db_get_batch_log_entries(batch_id: str) -> list:
             "message":    r[0],
             "level":      r[1],
             "created_at": r[2].isoformat() if r[2] else None,
+            "category":   r[3],
         }
         for r in rows
     ]

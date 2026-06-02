@@ -1,14 +1,34 @@
 (function() {
-  const CATEGORY_LABELS = {
-    system:      'Приложение',
+  const CHANNEL_LABELS = {
     api:         'API',
     planning:    'Планирование',
     story:       'Сюжет',
     video:       'Видео',
     transcode:   'Транскодирование',
     publish:     'Публикация',
+    main:        'Приложение',
+    main_loop:   'Цикл',
+    http:        'HTTP',
+    db:          'БД',
+    upgrade:     'Обновление',
+    startup:     'Старт',
     cleanup:     'Очистка',
+    browser:     'Браузер',
+    notify:      'Уведомления',
+    consts:      'Константы',
+    dzen:        'Дзен',
+    rutube:      'Rutube',
+    vkvideo:     'VK Видео',
+    system:      'Система',
   };
+
+  function channelLabel(cat) {
+    return CHANNEL_LABELS[cat] || cat || '—';
+  }
+
+  function formatEntryLine(en) {
+    return fmtMsk(en.created_at) + ' — ' + channelLabel(en.category) + ' — ' + (en.message || '');
+  }
 
   const STATUS_LABELS = {
     pending:          'ожидание',
@@ -102,11 +122,7 @@
     if (!entries || entries.length === 0) return '';
     return '<div class="monitor-entries">' +
       entries.map(function(e) {
-        const lvl = e.level || 'info';
-        return '<div class="monitor-entry-row">' +
-          '<span class="monitor-entry-ts">'  + fmtMsk(e.created_at)  + '</span>' +
-          '<span class="monitor-entry-msg ' + esc(lvl) + '">' + esc(e.message) + '</span>' +
-        '</div>';
+        return _buildEntryRow(e);
       }).join('') +
     '</div>';
   }
@@ -230,7 +246,7 @@
       '</div>';
 
     return '<div class="monitor-sysgroup monitor-system-block" data-lid="' + esc(sys.id) +
-      '" data-category="' + esc(sys.category || '') + '" onclick="monitorToggleSystemBlock(event,this)">' +
+      '" onclick="monitorToggleSystemBlock(event,this)">' +
       '<div class="monitor-sysgroup-header">' +
         '<span class="monitor-sysgroup-dot"></span>' +
         '<div class="monitor-sysgroup-meta">' +
@@ -310,7 +326,8 @@
   function _buildEntryRow(en) {
     var lvl = en.level || 'info';
     return '<div class="monitor-entry-row">' +
-      '<span class="monitor-entry-ts">'                      + fmtMsk(en.created_at)   + '</span>' +
+      '<span class="monitor-entry-ts">' + fmtMsk(en.created_at) + '</span>' +
+      '<span class="monitor-entry-ch">' + esc(channelLabel(en.category)) + '</span>' +
       '<span class="monitor-entry-msg ' + esc(lvl) + '">' + esc(en.message || '') + '</span>' +
     '</div>';
   }
@@ -551,9 +568,7 @@
   window.monitorRefresh = refreshMonitor;
 
   function _formatMonitorEntryLines(entries) {
-    return (entries || []).map(function(en) {
-      return '[' + fmtMsk(en.created_at) + '] ' + (en.message || '');
-    });
+    return (entries || []).map(formatEntryLine);
   }
 
   function _monitorCopyText(text, btn) {
@@ -576,8 +591,7 @@
   function _systemInfoLines(sysEl) {
     if (!sysEl) return [];
     return [
-      'log_id: ' + (sysEl.dataset.lid      || ''),
-      'type: '   + (sysEl.dataset.category || ''),
+      'log_id: ' + (sysEl.dataset.lid || ''),
     ];
   }
 

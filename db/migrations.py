@@ -157,6 +157,78 @@ def _m1007_log_category_and_drop_message_status(cur):
     cur.execute("CREATE INDEX IF NOT EXISTS idx_log_category ON log (category)")
 
 
+def merge_duplicate_batch_logs(cur) -> None:
+    """Один log на batch_id: перенос log_entries, удаление лишних строк log."""
+    cur.execute("""
+        SELECT batch_id, array_agg(id ORDER BY created_at ASC, id ASC) AS ids
+        FROM log
+        WHERE batch_id IS NOT NULL
+        GROUP BY batch_id
+        HAVING COUNT(*) > 1
+    """)
+    for _batch_id, ids in cur.fetchall():
+        keep_id, *extra_ids = ids
+        for extra in extra_ids:
+            cur.execute(
+                "UPDATE log_entries SET log_id = %s WHERE log_id = %s",
+                (keep_id, extra),
+            )
+            cur.execute("DELETE FROM log WHERE id = %s", (extra,))
+
+
+def _m1008_log_entries_category(cur):
+    cur.execute("ALTER TABLE log_entries ADD COLUMN IF NOT EXISTS category TEXT")
+
+    cur.execute("""
+        UPDATE log_entries le
+        SET category = l.category
+        FROM log l
+        WHERE l.id = le.log_id
+          AND le.category IS NULL
+          AND l.category IS NOT NULL
+    """)
+
+    cur.execute("""
+        UPDATE log_entries le
+        SET category = (regexp_match(le.message, '^\\[([^\\]]+)\\]'))[1]
+        FROM log l
+        WHERE l.id = le.log_id
+          AND le.category IS NULL
+          AND l.batch_id IS NULL
+          AND le.message ~ '^\\[[^\\]]+\\]'
+    """)
+
+    cur.execute("""
+        UPDATE log_entries SET category = 'system'
+        WHERE category IS NULL
+    """)
+
+    merge_duplicate_batch_logs(cur)
+
+    cur.execute("""
+        UPDATE log_entries
+        SET message = regexp_replace(message, '^\\[' || category || '\\]\\s*', '')
+        WHERE message ~ ('^\\[' || category || '\\]')
+    """)
+
+    cur.execute("DROP INDEX IF EXISTS idx_log_category")
+    cur.execute("ALTER TABLE log DROP COLUMN IF EXISTS category")
+
+    cur.execute("ALTER TABLE log_entries ALTER COLUMN category SET DEFAULT 'system'")
+    cur.execute("UPDATE log_entries SET category = 'system' WHERE category IS NULL")
+    cur.execute("ALTER TABLE log_entries ALTER COLUMN category SET NOT NULL")
+
+    cur.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_log_batch_id_unique
+            ON log (batch_id)
+        WHERE batch_id IS NOT NULL
+    """)
+    cur.execute("""
+        CREATE INDEX IF NOT EXISTS idx_log_entries_category
+            ON log_entries (category)
+    """)
+
+
 MIGRATIONS = [
     (2026052901, _m1001_drop_targets_legacy_columns),
     (2026052902, _m1002_add_movies_transcoded),
@@ -165,6 +237,7 @@ MIGRATIONS = [
     (2026052905, _m1005_mark_published_movies_used),
     (2026052906, _m1006_fix_published_movies_transcoded),
     (2026052907, _m1007_log_category_and_drop_message_status),
+    (2026052908, _m1008_log_entries_category),
 ]
 
 

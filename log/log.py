@@ -6,15 +6,27 @@ import re
 import sys
 import threading
 
-_ALLOWED_CATEGORIES = {
+_ALLOWED_LOG_CHANNELS = frozenset({
     "api",
     "planning",
     "story",
     "video",
     "transcode",
     "publish",
-    "system",
-}
+    "main",
+    "main_loop",
+    "http",
+    "db",
+    "upgrade",
+    "startup",
+    "cleanup",
+    "browser",
+    "notify",
+    "consts",
+    "dzen",
+    "rutube",
+    "vkvideo",
+})
 
 _ALLOWED_LOG_LEVELS = {
     "silent",
@@ -24,36 +36,18 @@ _ALLOWED_LOG_LEVELS = {
     "fatal_error",
 }
 
-_APP_SOURCES = frozenset({
-    "main",
-    "main_loop",
-    "api",
-    "http",
-    "db",
-    "upgrade",
-    "startup",
-    "cleanup",
-    "planning",
-    "browser",
-    "notify",
-    "consts",
-    "dzen",
-    "rutube",
-    "vkvideo",
-})
-
 _lifecycle_stop_logged = False
 _system_log_id: str | None = None
 _system_log_lock = threading.Lock()
 
 _LOG_PERIOD_SKIP_TAIL = re.compile(
     r"(?:"
-    r"\.{3}|…|"  # многоточие
-    r"->|→|"  # стрелки (версии, переходы статусов)
-    r"https?://|"  # URL
-    r"phase=|"  # диагностика пайплайна
-    r"_snap|"  # снимки Playwright
-    r"\b\w+=\S"  # key=value
+    r"\.{3}|…|"
+    r"->|→|"
+    r"https?://|"
+    r"phase=|"
+    r"_snap|"
+    r"\b\w+=\S"
     r")",
     re.IGNORECASE,
 )
@@ -82,8 +76,8 @@ def _ensure_log_period(message: str) -> str:
     return message
 
 
-def _stdout_log(message: str) -> None:
-    text = message.encode("cp1251", errors="replace").decode("cp1251")
+def _stdout_log(category: str, message: str) -> None:
+    text = f"{category} — {message}".encode("cp1251", errors="replace").decode("cp1251")
     try:
         print(text)
     except UnicodeEncodeError:
@@ -92,18 +86,15 @@ def _stdout_log(message: str) -> None:
 
 
 def app_log(source: str, message: str = "", *, level: str = "silent", phase: str | None = None):
-    """Лог блока «Приложение» (batch_id=None, category=system).
-
-    source — подсистема из _APP_SOURCES; префикс [{source}] добавляется здесь.
-    phase — машиночитаемая метка для диагностики (silent + deep_debugging).
-    """
-    assert source in _APP_SOURCES, (
-        f"app_log: недопустимый source {source!r}. Допустимые: {sorted(_APP_SOURCES)}."
+    """Лог блока «Приложение» (batch_id=None). Канал — в log_entries.category."""
+    assert source in _ALLOWED_LOG_CHANNELS, (
+        f"app_log: недопустимый source {source!r}. "
+        f"Допустимые: {sorted(_ALLOWED_LOG_CHANNELS)}."
     )
     body = message
     if phase:
         body = f"phase={phase}" + (f", {message}" if message else "")
-    write_log_entry(None, "system", f"[{source}] {body}", level=level)
+    write_log_entry(None, source, body, level=level)
 
 
 def log_app_started():
@@ -123,33 +114,23 @@ def log_app_stopped():
 
 
 def write_log_entry(batch_id, category, message, level="info"):
-    """Единая точка записи в log и log_entries.
-
-    batch_id=None — системное окно между батчами (system_log_id), category='system'.
-    batch_id задан — пишет в log (batch_id, category); system_log_id сбрасывается
-    только при создании первой строки log для этого batch_id.
-    """
+    """Единая точка записи в log и log_entries. Канал — log_entries.category."""
     import common.environment as environment
     from db.db_simple import db_get_or_create_log, db_insert_log, db_insert_log_entry
 
     global _system_log_id
 
-    assert category in _ALLOWED_CATEGORIES, (
-        f"write_log_entry: недопустимая category {category!r}. "
-        f"Допустимые: {_ALLOWED_CATEGORIES}."
+    assert category in _ALLOWED_LOG_CHANNELS, (
+        f"write_log_entry: недопустимый channel {category!r}. "
+        f"Допустимые: {sorted(_ALLOWED_LOG_CHANNELS)}."
     )
     assert level in _ALLOWED_LOG_LEVELS, (
         f"write_log_entry: недопустимый уровень {level!r}. "
         f"Допустимые: {_ALLOWED_LOG_LEVELS}."
     )
-    if batch_id is None:
-        assert category == "system", (
-            f"write_log_entry: при batch_id=None category должна быть 'system', "
-            f"получено {category!r}."
-        )
 
     message = _ensure_log_period(message)
-    _stdout_log(message)
+    _stdout_log(category, message)
     if level == "silent" and not environment.deep_debugging:
         return None
 
@@ -158,14 +139,14 @@ def write_log_entry(batch_id, category, message, level="info"):
     try:
         with _system_log_lock:
             if batch_id is not None:
-                log_id, is_first_batch_log = db_get_or_create_log(batch_id, category)
+                log_id, is_first_batch_log = db_get_or_create_log(batch_id)
                 if is_first_batch_log:
                     _system_log_id = None
-                db_insert_log_entry(log_id, message, level)
+                db_insert_log_entry(log_id, category, message, level)
             else:
                 if _system_log_id is None:
-                    _system_log_id = db_insert_log(None, "system")
-                db_insert_log_entry(_system_log_id, message, level)
+                    _system_log_id = db_insert_log(None)
+                db_insert_log_entry(_system_log_id, category, message, level)
                 log_id = _system_log_id
     finally:
         environment.asserted_log_entry.reset(entry_token)
@@ -177,4 +158,3 @@ def write_log_entry(batch_id, category, message, level="info"):
         from utils.notify import notify_failure
         notify_failure(f"log#{log_id}: {message}")
     return log_id
-

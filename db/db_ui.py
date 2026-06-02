@@ -31,7 +31,7 @@ def db_get_batch_logs(batch_id):
                 return None
 
             cur.execute("""
-                SELECT le.message, le.level, le.created_at
+                SELECT le.message, le.level, le.created_at, le.category
                 FROM log_entries le
                 JOIN log l ON l.id = le.log_id
                 WHERE l.batch_id = %s::uuid
@@ -56,6 +56,7 @@ def db_get_batch_logs(batch_id):
                 'message':    r[0],
                 'level':      r[1],
                 'created_at': r[2].isoformat() if r[2] else None,
+                'category':   r[3],
             }
             for r in entries
         ],

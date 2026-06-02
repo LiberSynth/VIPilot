@@ -12,55 +12,42 @@ def _assert_log_modification():
         raise FatalError("Нарушение конвенции: модификация log вне log.py")
 
 
-def db_get_or_create_log(batch_id, category):
-    """Возвращает (log_id, is_first_batch_log).
-
-    is_first_batch_log=True только при INSERT первой строки log для batch_id
-    (любая category); повторные category того же батча не считаются.
-    """
+def db_get_or_create_log(batch_id):
+    """Один log на batch_id. Возвращает (log_id, is_first_batch_log)."""
     _assert_log_modification()
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                """
-                SELECT id FROM log
-                WHERE batch_id = %s::uuid AND category = %s
-                ORDER BY id DESC LIMIT 1
-                """,
-                (batch_id, category),
+                "SELECT id FROM log WHERE batch_id = %s::uuid ORDER BY id ASC LIMIT 1",
+                (batch_id,),
             )
             row = cur.fetchone()
             if row:
                 return str(row[0]), False
             cur.execute(
-                "SELECT 1 FROM log WHERE batch_id = %s::uuid LIMIT 1",
+                "INSERT INTO log (batch_id) VALUES (%s::uuid) RETURNING id",
                 (batch_id,),
-            )
-            is_first_batch_log = cur.fetchone() is None
-            cur.execute(
-                "INSERT INTO log (batch_id, category) VALUES (%s::uuid, %s) RETURNING id",
-                (batch_id, category),
             )
             log_id = cur.fetchone()[0]
         conn.commit()
-    return str(log_id), is_first_batch_log
+    return str(log_id), True
 
 
-def db_insert_log(batch_id, category):
-    """INSERT новой строки log (batch_id может быть NULL для системного окна)."""
+def db_insert_log(batch_id):
+    """Новое окно log (batch_id=None — блок «Приложение»)."""
     _assert_log_modification()
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "INSERT INTO log (batch_id, category) VALUES (%s, %s) RETURNING id",
-                (batch_id, category),
+                "INSERT INTO log (batch_id) VALUES (%s) RETURNING id",
+                (batch_id,),
             )
             log_id = cur.fetchone()[0]
         conn.commit()
     return str(log_id)
 
 
-def db_insert_log_entry(log_id, message, level):
+def db_insert_log_entry(log_id, category, message, level):
     import common.environment as environment
 
     if not environment.asserted_log_entry.get():
@@ -68,8 +55,11 @@ def db_insert_log_entry(log_id, message, level):
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "INSERT INTO log_entries (log_id, message, level) VALUES (%s, %s, %s)",
-                (log_id, message, level),
+                """
+                INSERT INTO log_entries (log_id, category, message, level)
+                VALUES (%s, %s, %s, %s)
+                """,
+                (log_id, category, message, level),
             )
         conn.commit()
 
@@ -489,17 +479,22 @@ def db_get_last_pipeline_run(pipeline, scheduled_only: bool = False):
             if scheduled_only:
                 cur.execute(
                     """
-                    SELECT MAX(l.created_at)
-                    FROM log l
+                    SELECT MAX(le.created_at)
+                    FROM log_entries le
+                    JOIN log l ON l.id = le.log_id
                     JOIN batches b ON b.id = l.batch_id
-                    WHERE l.category = %s
+                    WHERE le.category = %s
                       AND b.scheduled_at IS NOT NULL
                     """,
                     (pipeline,),
                 )
             else:
                 cur.execute(
-                    "SELECT MAX(created_at) FROM log WHERE category = %s",
+                    """
+                    SELECT MAX(le.created_at)
+                    FROM log_entries le
+                    WHERE le.category = %s
+                    """,
                     (pipeline,),
                 )
             row = cur.fetchone()
