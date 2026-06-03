@@ -134,28 +134,38 @@
     return n + ' ' + word;
   }
 
+  const FIXED_BATCH_TITLES = {
+    planning:  'Планирование',
+    story:     'Генерация сюжета',
+    movie:     'Генерация видео',
+    transcode: 'Транскодирование',
+    publish:   'Публикация',
+  };
+
+  function buildFixedBatchSub(batch, btype, bs, entryCnt) {
+    var statusPart = capitalizeFirst(translateStatus(bs)) + ' · ' + entryCnt;
+    if (btype === 'planning' && batch.scheduled_at) {
+      return 'Публикация: ' + fmtMskShort(batch.scheduled_at) + ' · ' + statusPart;
+    }
+    return statusPart;
+  }
+
   function renderBatch(batch) {
     const bs = batch.batch_status || 'pending';
     const btype = batch.type || '';
     const headTime = batch.created_at;
     const isScheduledPlanning = btype === 'planning' && !!batch.scheduled_at;
-    const schedStr = isScheduledPlanning
-      ? 'Публикация: ' + fmtMskShort(batch.scheduled_at)
-      : 'Публикация: сейчас';
-    const subParts = [schedStr, translateStatus(bs)];
-    if (batch.title) subParts.push(batch.title);
-    const subDefault = subParts.filter(Boolean).join(' · ');
-    const fixedBatchTitle = {
-      story:     'Генерация сюжета',
-      movie:     'Генерация видео',
-      transcode: 'Транскодирование',
-      publish:   'Публикация',
-    }[btype];
+    const fixedBatchTitle = FIXED_BATCH_TITLES[btype];
     const headTitle = fixedBatchTitle || fmtMsk(headTime);
     const entryCnt = formatEntryCount(batch.entry_count);
-    const sub = fixedBatchTitle
-      ? capitalizeFirst(translateStatus(bs)) + ' · ' + entryCnt
-      : subDefault;
+    var sub;
+    if (fixedBatchTitle) {
+      sub = buildFixedBatchSub(batch, btype, bs, entryCnt);
+    } else {
+      var subParts = [translateStatus(bs)];
+      if (batch.title) subParts.push(batch.title);
+      sub = capitalizeFirst(subParts.filter(Boolean).join(' · ')) + ' · ' + entryCnt;
+    }
     const md = _batchDotClass(bs, batch.batch_id);
     const isActive = md === 'md-active';
 
