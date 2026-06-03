@@ -142,12 +142,8 @@
     publish:   'Публикация',
   };
 
-  function buildFixedBatchSub(batch, btype, bs, entryCnt) {
-    var statusPart = capitalizeFirst(translateStatus(bs)) + ' · ' + entryCnt;
-    if (btype === 'planning' && batch.scheduled_at) {
-      return 'Публикация: ' + fmtMskShort(batch.scheduled_at) + ' · ' + statusPart;
-    }
-    return statusPart;
+  function buildFixedBatchSub(_batch, _btype, bs, entryCnt) {
+    return capitalizeFirst(translateStatus(bs)) + ' · ' + entryCnt;
   }
 
   function renderBatch(batch) {
