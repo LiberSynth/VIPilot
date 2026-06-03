@@ -145,7 +145,12 @@
     const subParts = [schedStr, translateStatus(bs)];
     if (batch.title) subParts.push(batch.title);
     const subDefault = subParts.filter(Boolean).join(' · ');
-    const fixedBatchTitle = { story: 'Генерация сюжета', movie: 'Генерация видео' }[btype];
+    const fixedBatchTitle = {
+      story:     'Генерация сюжета',
+      movie:     'Генерация видео',
+      transcode: 'Транскодирование',
+      publish:   'Публикация',
+    }[btype];
     const headTitle = fixedBatchTitle || fmtMsk(headTime);
     const entryCnt = formatEntryCount(batch.entry_count);
     const sub = fixedBatchTitle
