@@ -160,20 +160,41 @@ def _m1007_log_category_and_drop_message_status(cur):
 def merge_duplicate_batch_logs(cur) -> None:
     """Один log на batch_id: перенос log_entries, удаление лишних строк log."""
     cur.execute("""
-        SELECT batch_id, array_agg(id ORDER BY created_at ASC, id ASC) AS ids
-        FROM log
-        WHERE batch_id IS NOT NULL
-        GROUP BY batch_id
-        HAVING COUNT(*) > 1
+        WITH ranked AS (
+            SELECT id,
+                   batch_id,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY batch_id
+                       ORDER BY created_at ASC, id ASC
+                   ) AS rn
+            FROM log
+            WHERE batch_id IS NOT NULL
+        ),
+        mapping AS (
+            SELECT e.id AS extra_id, k.id AS keep_id
+            FROM ranked e
+            JOIN ranked k
+              ON k.batch_id = e.batch_id AND k.rn = 1
+            WHERE e.rn > 1
+        )
+        UPDATE log_entries le
+        SET log_id = m.keep_id
+        FROM mapping m
+        WHERE le.log_id = m.extra_id
     """)
-    for _batch_id, ids in cur.fetchall():
-        keep_id, *extra_ids = ids
-        for extra in extra_ids:
-            cur.execute(
-                "UPDATE log_entries SET log_id = %s WHERE log_id = %s",
-                (keep_id, extra),
-            )
-            cur.execute("DELETE FROM log WHERE id = %s", (extra,))
+    cur.execute("""
+        DELETE FROM log l
+        USING (
+            SELECT id,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY batch_id
+                       ORDER BY created_at ASC, id ASC
+                   ) AS rn
+            FROM log
+            WHERE batch_id IS NOT NULL
+        ) r
+        WHERE l.id = r.id AND r.rn > 1
+    """)
 
 
 def _m1008_log_entries_category(cur):
