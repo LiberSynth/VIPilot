@@ -89,16 +89,18 @@ def run(batch_id, category):
     dst_path.parent.mkdir(parents=True, exist_ok=True)
 
     write_log_entry(batch_id, category, 'Начало транскодирования.')
-    _ffmpeg(batch_id, src_path, dst_path, category)
-    out_mb = round(dst_path.stat().st_size / 1024 / 1024, 1)
+    try:
+        _ffmpeg(batch_id, src_path, dst_path, category)
+        out_mb = round(dst_path.stat().st_size / 1024 / 1024, 1)
 
-    msg = f'Транскодировано (H.264, {out_mb} МБ)'
-    write_log_entry(batch_id, category, msg)
-    db_set_movie_transcoded(str(movie_id))
-    db_set_batch_status(batch_id, 'ready')
-    write_log_entry(batch_id, category, f"Готово: {out_mb} МБ → transcoded-файл", level='silent')
-    write_log_entry(
-        batch_id, category,
-        fmt_id_msg("[transcode] Батч {} — phase=run_done, status=ready, transcoded_mb={}", batch_id, out_mb),
-        level='silent',
-    )
+        msg = f'Транскодировано (H.264, {out_mb} МБ)'
+        write_log_entry(batch_id, category, msg)
+        db_set_batch_status(batch_id, 'ready')
+        write_log_entry(batch_id, category, f"Готово: {out_mb} МБ → transcoded-файл", level='silent')
+        write_log_entry(
+            batch_id, category,
+            fmt_id_msg("[transcode] Батч {} — phase=run_done, status=ready, transcoded_mb={}", batch_id, out_mb),
+            level='silent',
+        )
+    finally:
+        db_set_movie_transcoded(str(movie_id))
