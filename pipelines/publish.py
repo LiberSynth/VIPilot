@@ -89,7 +89,7 @@ def _call_dzen(slug, method, batch_id, category, target, pub_title):
 
     video_data = _get_video(batch_id, category)
 
-    return dzen_client.publish(video_data, cfg, batch_id, category, batch_id=batch_id, target_id=target_id, pub_title=pub_title)
+    return dzen_client.publish(video_data, cfg, batch_id, category, target_id=target_id, pub_title=pub_title)
 
 
 def _call_rutube(slug, method, batch_id, category, target, pub_title):
@@ -104,7 +104,7 @@ def _call_rutube(slug, method, batch_id, category, target, pub_title):
 
     video_data = _get_video(batch_id, category)
 
-    return rutube_client.publish(video_data, cfg, batch_id, category, batch_id=batch_id, target_id=target_id, pub_title=pub_title)
+    return rutube_client.publish(video_data, cfg, batch_id, category, target_id=target_id, pub_title=pub_title)
 
 
 def _call_vkvideo(slug, method, batch_id, category, target, pub_title):
@@ -119,7 +119,7 @@ def _call_vkvideo(slug, method, batch_id, category, target, pub_title):
 
     video_data = _get_video(batch_id, category)
 
-    result = vkvideo_client.publish(video_data, cfg, category, batch_id=batch_id, target_id=target_id, pub_title=pub_title)
+    result = vkvideo_client.publish(video_data, cfg, batch_id, category, target_id=target_id, pub_title=pub_title)
     return result.get('ok', False)
 
 
