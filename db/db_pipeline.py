@@ -298,7 +298,7 @@ def db_create_publish_batches() -> list[str]:
                     tc.scheduled_at
                 FROM batches tc
                 WHERE tc.type = 'transcode'
-                  AND tc.status IN ('ready', 'error')
+                  AND tc.status IN ('ready', 'error', 'fatal_error')
                   AND (
                       tc.scheduled_at IS NULL
                       OR tc.scheduled_at <= clock_timestamp()
@@ -309,40 +309,17 @@ def db_create_publish_batches() -> list[str]:
                       WHERE pb.type = 'publish'
                         AND pb.batch_id_source = tc.id
                   )
-                RETURNING id::text
-                """
-            )
-            rows = [str(r[0]) for r in cur.fetchall()]
-
-            cur.execute(
-                """
-                INSERT INTO batches (type, movie_id, story_id, batch_id_source, scheduled_at)
-                SELECT
-                    'publish',
-                    pl.movie_id,
-                    pl.story_id,
-                    pl.id,
-                    pl.scheduled_at
-                FROM batches pl
-                JOIN movies m ON m.id = pl.movie_id
-                WHERE pl.type = 'planning'
-                  AND pl.status = 'ready'
-                  AND pl.movie_id IS NOT NULL
-                  AND m.transcoded = B'1'
-                  AND (
-                      pl.scheduled_at IS NULL
-                      OR pl.scheduled_at <= clock_timestamp()
-                  )
                   AND NOT EXISTS (
                       SELECT 1
                       FROM batches pb
                       WHERE pb.type = 'publish'
-                        AND pb.batch_id_source = pl.id
+                        AND pb.movie_id = tc.movie_id
+                        AND pb.status != 'cancelled'
                   )
                 RETURNING id::text
                 """
             )
-            rows.extend(str(r[0]) for r in cur.fetchall())
+            rows = [str(r[0]) for r in cur.fetchall()]
 
         for batch_id in rows:
             db_set_batch_status(batch_id, 'pending', conn)

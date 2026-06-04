@@ -83,7 +83,7 @@ def publish(
             _f.write(video_data)
 
         def _do_publish(page, _ctx):
-            _publish_ui(page, publisher_id, video_path, batch_id, category, batch_id=batch_id)
+            _publish_ui(page, publisher_id, video_path, category, batch_id=batch_id)
 
         result = _get_browser("dzen").run_pipeline_browser(_do_publish, saved_cookies, batch_id=batch_id, category=category)
 
