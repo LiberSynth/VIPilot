@@ -306,20 +306,35 @@ def _publish_ui(
         write_log_entry(batch_id, category, "VK Видео: Не удалось заполнить описание — продолжаю.")
         write_log_entry(batch_id, category, f"Ошибка описания: {_e}", level="silent")
 
-    # ── Шаг 7: Ждём активную кнопку «Опубликовать» ───────────────────────
-    write_log_entry(
-        batch_id, category,
-        "VK Видео: Жду кнопку «Опубликовать» (ожидаю загрузки и обработки видео).",
-    )
+    # ── Шаг 7: Ждём кнопку «Опубликовать» ─────────────────────────────────
+    write_log_entry(batch_id, category, "VK Видео: Жду кнопку «Опубликовать».")
     pub_btn = page.locator("button:has-text('Опубликовать')").last
     _snap(page, batch_id)
     pub_btn.wait_for(state="visible", timeout=_UPLOAD_WAIT)
     _snap(page, batch_id)
 
-    # ── Шаг 8: Нажимаем «Опубликовать» (click ждёт enabled автоматически) ─
-    write_log_entry(batch_id, category, "VK Видео: Нажимаю «Опубликовать».")
+    # ── Шаг 8: Нажимаем «Опубликовать» ───────────────────────────────────
+    # Кнопка внизу модалки — часто за пределами viewport; без прокрутки
+    # Playwright висит на click() до таймаута, ожидая actionability.
+    write_log_entry(batch_id, category, "VK Видео: Прокручиваю к кнопке «Опубликовать».")
     _snap(page, batch_id)
-    pub_btn.click(timeout=_UPLOAD_WAIT)
+    try:
+        pub_btn.scroll_into_view_if_needed(timeout=10_000)
+    except Exception:
+        pass
+    page.wait_for_timeout(300)
+    _snap(page, batch_id)
+
+    write_log_entry(batch_id, category, "VK Видео: Нажимаю «Опубликовать».")
+    try:
+        pub_btn.click(timeout=30_000)
+    except Exception as _click_err:
+        write_log_entry(
+            batch_id, category,
+            f"VK Видео: Обычный клик не прошёл — пробую JS-клик: {_click_err}",
+            level="silent",
+        )
+        pub_btn.evaluate("el => el.click()")
     _snap(page, batch_id)
 
     # ── Шаг 9: Проверяем успех (тост «Клип опубликован») ────────────────
