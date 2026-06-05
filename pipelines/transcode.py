@@ -31,17 +31,13 @@ def _ffmpeg(batch_id, src: Path, dst: Path, category):
     cmd = [
         'ffmpeg', '-y',
         '-i', str(src),
-        '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo',
         '-c:v', 'libx264',
         '-profile:v', 'baseline',
         '-preset', 'ultrafast',
         '-crf', '26',
         '-pix_fmt', 'yuv420p',
         '-r', '30',
-        '-c:a', 'aac',
-        '-b:a', '96k',
-        '-af', 'apad',
-        '-shortest',
+        '-c:a', 'copy',
         '-movflags', '+faststart',
     ]
     cmd.append(str(dst))
