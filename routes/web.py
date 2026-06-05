@@ -176,6 +176,7 @@ def root_page():
         if non_root:
             return redirect(url_for("web.select_module"))
         return redirect(url_for("web.login"))
+    environment.refresh_environment()
     text_prompt     = cycle_config_get("text_prompt")
     format_prompt   = cycle_config_get("format_prompt")
     batch_lifetime     = parse_batch_lifetime(settings_get("batch_lifetime", "7"))
@@ -469,6 +470,7 @@ def save():
         except (ValueError, TypeError):
             pass
 
+    environment.refresh_environment()
     return redirect(url_for("web.root_page") + f"?tab={active_tab}")
 
 
