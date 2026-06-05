@@ -171,7 +171,7 @@ def _has_captcha_dom(page) -> bool:
     return False
 
 
-def _try_click_captcha_checkbox(page, category) -> bool:
+def _try_click_captcha_checkbox(page, category, batch_id=None) -> bool:
     """
     Пытается кликнуть чекбокс капчи «Я не робот» во всех фреймах и в основном.
     Возвращает True если клик выполнен хотя бы в одном месте.
@@ -270,7 +270,7 @@ def _handle_captcha_element(page, category, batch_id) -> None:
     Бросает DzenApiError если капча не прошла за 30 сек.
     """
     write_log_entry(batch_id, category, "Дзен: Обнаружена капча, пытаюсь нажать «Я не робот».")
-    _clicked = _try_click_captcha_checkbox(page, category)
+    _clicked = _try_click_captcha_checkbox(page, category, batch_id)
     if not _clicked:
         write_log_entry(batch_id, category, "Дзен: Капча обнаружена, но кликнуть чекбокс не удалось.")
         return
@@ -413,7 +413,7 @@ _EXPECTED_ELEMENTS = [
 _HINT_CLOSE_SELECTOR = "[class*='helper-tooltip__closeButton']"
 
 
-def _dismiss_unknown(page, category=None) -> None:
+def _dismiss_unknown(page, category=None, batch_id=None) -> None:
     """Закрывает хинт-попап Дзена — только если он реально есть.
 
     Единственный путь: клик по `[class*='helper-tooltip__closeButton']` через
@@ -606,7 +606,7 @@ def _handle_popups(page, category=None, batch_id=None) -> None:
             if handle is not None:
                 handle(page, category, batch_id)
             return
-    _dismiss_unknown(page, category)
+    _dismiss_unknown(page, category, batch_id)
 
 
 def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=None):
@@ -695,7 +695,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
     _snap(page, batch_id)
 
     # Перед шагом 3: закрываем любой неожиданный попап/хинт.
-    _dismiss_unknown(page, category)
+    _dismiss_unknown(page, category, batch_id)
 
     # ── Шаг 3: «Загрузить видео» из выпадающего меню ─────────────────────
     write_log_entry(batch_id, category, "Дзен: Выбираю «Загрузить видео».")
@@ -711,7 +711,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
     _snap(page, batch_id)
 
     # Перед шагом 4: закрываем любой неожиданный попап/хинт.
-    _dismiss_unknown(page, category)
+    _dismiss_unknown(page, category, batch_id)
 
     # ── Шаг 4: Загружаем файл ────────────────────────────────────────────
     write_log_entry(batch_id, category, "Дзен: Ищу поле загрузки файла.")
@@ -799,14 +799,14 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
 
     # Перед шагом 6: закрываем хинт «Уже можно публиковать» (он часто
     # всплывает после ввода тегов и перекрывает дропдаун комментариев).
-    _dismiss_unknown(page, category)
+    _dismiss_unknown(page, category, batch_id)
 
     # ── Шаг 6: Выставляем «Все пользователи» в «Кто может комментировать» ─
     # Сразу после тегов — контрол виден в той же модалке «Публикация ролика».
     _set_comments_all_users(page, category, batch_id)
 
     # Перед шагом 7: ещё раз закрываем любые всплывшие хинты/попапы.
-    _dismiss_unknown(page, category)
+    _dismiss_unknown(page, category, batch_id)
 
     # ── Шаг 7: Публикуем ─────────────────────────────────────────────────
     write_log_entry(
@@ -914,7 +914,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
     write_log_entry(batch_id, category, "Дзен: Шаг 8 завершён, жду подтверждения публикации.")
 
     # Перед шагом 9: закрываем хинты и повторяем клик, если CTA всё ещё на экране.
-    _dismiss_unknown(page, category)
+    _dismiss_unknown(page, category, batch_id)
     if not _step8_done:
         _retry_publish_if_button_visible(
             page,
