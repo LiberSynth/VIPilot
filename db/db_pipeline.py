@@ -309,13 +309,6 @@ def db_create_publish_batches() -> list[str]:
                       WHERE pb.type = 'publish'
                         AND pb.batch_id_source = tc.id
                   )
-                  AND NOT EXISTS (
-                      SELECT 1
-                      FROM batches pb
-                      WHERE pb.type = 'publish'
-                        AND pb.movie_id = tc.movie_id
-                        AND pb.status != 'cancelled'
-                  )
                 RETURNING id::text
                 """
             )

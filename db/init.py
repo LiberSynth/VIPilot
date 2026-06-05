@@ -8,7 +8,7 @@ bootstrap() вызывается безусловно при каждом ста
 """
 
 from .connection import get_db
-from .migrations import merge_duplicate_batch_logs, run_migrations
+from .migrations import run_migrations
 from log.log import app_log
 
 
@@ -41,7 +41,6 @@ def _consolidate_log_entries_channel(cur) -> None:
 
 def _ensure_log_indexes(cur) -> None:
     """Индексы log / log_entries по фактической схеме."""
-    merge_duplicate_batch_logs(cur)
     cur.execute("""
         CREATE UNIQUE INDEX IF NOT EXISTS idx_log_batch_id_unique
             ON log (batch_id)

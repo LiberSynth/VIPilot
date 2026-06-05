@@ -18,19 +18,29 @@ def db_get_or_create_log(batch_id):
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT id FROM log WHERE batch_id = %s::uuid ORDER BY id ASC LIMIT 1",
+                """
+                INSERT INTO log (batch_id) VALUES (%s::uuid)
+                ON CONFLICT (batch_id) WHERE batch_id IS NOT NULL
+                DO NOTHING
+                RETURNING id
+                """,
                 (batch_id,),
             )
             row = cur.fetchone()
             if row:
-                return str(row[0]), False
+                log_id = str(row[0])
+                conn.commit()
+                return log_id, True
             cur.execute(
-                "INSERT INTO log (batch_id) VALUES (%s::uuid) RETURNING id",
+                "SELECT id FROM log WHERE batch_id = %s::uuid LIMIT 1",
                 (batch_id,),
             )
-            log_id = cur.fetchone()[0]
+            row = cur.fetchone()
+            if not row:
+                raise FatalError(f"log для batch_id={batch_id} не найден после ON CONFLICT")
+            log_id = str(row[0])
         conn.commit()
-    return str(log_id), True
+    return log_id, False
 
 
 def db_insert_log(batch_id):
