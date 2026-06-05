@@ -27,6 +27,13 @@ def _movie_video_path(movie_id: str, field: str) -> Path:
     return _VIDEO_DIR / f"{movie_id} - {field}.mp4"
 
 
+def _remove_transcoded_file(path: Path) -> None:
+    try:
+        path.unlink()
+    except FileNotFoundError:
+        pass
+
+
 def _ffmpeg(batch_id, src: Path, dst: Path, category):
     cmd = [
         'ffmpeg', '-y',
@@ -98,5 +105,8 @@ def run(batch_id, category):
             fmt_id_msg("[transcode] Батч {} — phase=run_done, status=ready, transcoded_mb={}", batch_id, out_mb),
             level='silent',
         )
+    except Exception:
+        _remove_transcoded_file(dst_path)
+        raise
     finally:
         db_set_movie_transcoded(str(movie_id))
