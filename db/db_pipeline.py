@@ -262,7 +262,6 @@ def db_create_transcode_batches() -> list[str]:
                 LEFT JOIN batches bt
                     ON bt.movie_id = m.id
                    AND bt.type = 'transcode'
-                   AND bt.status IN ('pending', 'processing')
                 LEFT JOIN LATERAL (
                     SELECT b.id, b.scheduled_at, b.story_id
                     FROM batches b
