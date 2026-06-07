@@ -918,8 +918,8 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
     if not _step8_done:
         _retry_publish_if_button_visible(
             page,
-            batch_id,
             category,
+            batch_id,
             url_step7_start,
             "Кнопка «Опубликовать» всё ещё видна — повторяю клик после закрытия хинтов.",
         )
@@ -1009,8 +1009,8 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
             and _publish_retries < _PUBLISH_RETRY_MAX
             and _retry_publish_if_button_visible(
                 page,
-                batch_id,
                 category,
+                batch_id,
                 url_step7_start,
                 "Повторный клик «Опубликовать» (ожидание подтверждения).",
             )
