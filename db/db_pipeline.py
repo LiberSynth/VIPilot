@@ -254,25 +254,22 @@ def db_create_transcode_batches() -> list[str]:
                 INSERT INTO batches (type, movie_id, batch_id_source, scheduled_at, story_id)
                 SELECT
                     'transcode',
-                    m.id,
-                    bs.id,
-                    bs.scheduled_at,
-                    bs.story_id
-                FROM movies m
-                LEFT JOIN batches bt
-                    ON bt.movie_id = m.id
-                   AND bt.type = 'transcode'
-                LEFT JOIN LATERAL (
-                    SELECT b.id, b.scheduled_at, b.story_id
-                    FROM batches b
-                    WHERE b.movie_id = m.id
-                      AND b.type = 'planning'
-                    ORDER BY b.created_at DESC, b.id DESC
-                    LIMIT 1
-                ) bs ON TRUE
-                WHERE m.used = B'1'
+                    pl.movie_id,
+                    pl.id,
+                    pl.scheduled_at,
+                    pl.story_id
+                FROM batches pl
+                JOIN movies m ON m.id = pl.movie_id
+                WHERE pl.type = 'planning'
+                  AND pl.status = 'ready'
+                  AND m.used = B'1'
                   AND m.transcoded = B'0'
-                  AND bt.id IS NULL
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM batches tc
+                      WHERE tc.movie_id = pl.movie_id
+                        AND tc.type = 'transcode'
+                  )
                 RETURNING id::text
                 """
             )
