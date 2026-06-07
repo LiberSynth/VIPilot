@@ -298,7 +298,7 @@ def db_create_publish_batches() -> list[str]:
                     tc.scheduled_at
                 FROM batches tc
                 WHERE tc.type = 'transcode'
-                  AND tc.status IN ('ready', 'error', 'fatal_error')
+                  AND tc.status NOT IN ('pending', 'processing')
                   AND (
                       tc.scheduled_at IS NULL
                       OR tc.scheduled_at <= clock_timestamp()
