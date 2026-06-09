@@ -39,6 +39,7 @@
   };
 
   const TYPE_RESTARTABLE = ['story', 'movie', 'transcode', 'publish'];
+  const TYPE_LINKED_MEDIA = ['transcode', 'publish', 'planning'];
   const TYPE_TO_RESET_PIPELINE = {
     story:     'story',
     movie:     'video',
@@ -174,16 +175,17 @@
       ? '<button class="cycle-float-btn" title="Перезапустить" data-bid="' + esc(batch.batch_id) + '" data-pip="' + esc(resetPipeline) + '" onclick="monitorPipelineRestart(this)">' + MON_SVG_RESTART + '</button>'
       : '';
 
-    const isReady = bs === 'ready';
-    const batchStoryBtn = (btype === 'story' && batch.story_id)
+    const hasLinkedMedia = TYPE_LINKED_MEDIA.indexOf(btype) >= 0;
+    const previewDisabled = (btype === 'story' || btype === 'movie') && bs !== 'ready';
+    const batchStoryBtn = batch.story_id && (btype === 'story' || hasLinkedMedia)
       ? '<button class="cycle-float-btn story-view-btn" title="Посмотреть сюжет"' +
-        (isReady ? '' : ' disabled') +
+        (previewDisabled ? ' disabled' : '') +
         ' onclick="openStoryModal(\'' + esc(batch.story_id) + '\',\'\')">' + MON_SVG_EYE + '</button>'
       : '';
 
-    const batchVideoBtn = (btype === 'movie' && batch.movie_id)
+    const batchVideoBtn = batch.movie_id && (btype === 'movie' || hasLinkedMedia)
       ? '<button class="cycle-float-btn" title="Просмотр видео"' +
-        (isReady ? '' : ' disabled') +
+        (previewDisabled ? ' disabled' : '') +
         ' onclick="openVideoModal(\'' + esc(batch.batch_id) + '\',\'\')">' + MON_SVG_PLAY + '</button>'
       : '';
 
