@@ -15,5 +15,5 @@ def create_app() -> Flask:
     return app
 
 
-def init_app(app: Flask) -> None:
+def init_app() -> None:
     os.environ.setdefault('PLAYWRIGHT_BROWSERS_PATH', PLAYWRIGHT_BROWSERS_PATH)

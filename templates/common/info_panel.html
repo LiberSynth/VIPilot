@@ -71,7 +71,7 @@
         <div style="font-size:13px;color:#c0c0d8;line-height:1.7">
 
           <p style="margin:0 0 12px"><strong style="color:#e0e0f0">Инициализация при старте</strong><br>
-          При запуске однократно выполняется <code>start_main_loop</code>: <code>check_upgrade</code>, регистрация маршрутов (<code>register_blueprints</code>), <code>init_app</code> (неизменяемые параметры окружения), <code>recover_interrupted_batches</code> — подхват батчей, прерванных при остановке приложения во время обработки. Затем <code>init_from_db()</code> сбрасывает счётчик активных потоков и читает из БД сохранённое состояние воркфлоу — если оно было поставлено на паузу до перезапуска, состояние восстанавливается. После этого запускается фоновый демон-поток главного цикла (<code>main_loop</code>).</p>
+          При импорте <code>main</code> после <code>ensure_required_software</code> вызывается <code>init_app</code> (неизменяемые параметры окружения, в т.ч. путь Playwright). Однократно выполняется <code>start_main_loop</code>: <code>check_upgrade</code>, регистрация маршрутов (<code>register_blueprints</code>), <code>recover_interrupted_batches</code> — подхват батчей, прерванных при остановке приложения во время обработки. Затем <code>init_from_db()</code> сбрасывает счётчик активных потоков и читает из БД сохранённое состояние воркфлоу — если оно было поставлено на паузу до перезапуска, состояние восстанавливается. После этого запускается фоновый демон-поток главного цикла (<code>main_loop</code>).</p>
 
           <p style="margin:0 0 8px"><strong style="color:#e0e0f0">Главный цикл (<code>main_loop</code>)</strong><br>
           Работает в бесконечном цикле. Каждая итерация:</p>
