@@ -114,14 +114,6 @@ def app_log(source: str, message: str = "", *, level: str = "silent", phase: str
     write_log_entry(None, source, body, level=level)
 
 
-def log_app_stopped():
-    global _lifecycle_stop_logged
-    if _lifecycle_stop_logged:
-        return
-    _lifecycle_stop_logged = True
-    app_log("main", "Приложение остановлено", level="info")
-
-
 def write_log_entry(batch_id, channel, message, level="info"):
     """Единая точка записи в log и log_entries. Канал — log_entries.channel."""
     import common.environment as environment

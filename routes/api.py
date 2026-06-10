@@ -719,10 +719,15 @@ def api_workflow_restart():
     def _do_restart():
         import time as _time
         import sys as _sys
-        from log.log import log_app_stopped
+        import log.log as log_state
 
         _time.sleep(0.8)
-        log_app_stopped()
+        with log_state._system_log_lock:
+            already = log_state._lifecycle_stop_logged
+            if not already:
+                log_state._lifecycle_stop_logged = True
+        if not already:
+            app_log("main", "Приложение остановлено", level="info")
         # Закрываем все унаследованные файловые дескрипторы (в т.ч. сокет Flask),
         # чтобы новый процесс мог занять порт 5000 без конфликтов.
         try:

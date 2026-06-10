@@ -5,7 +5,8 @@ from datetime import timedelta
 
 from flask import Flask
 
-from log.log import log_app_stopped
+import log.log as log_state
+from log import app_log
 from utils.consts import FLASK_SECRET, PLAYWRIGHT_BROWSERS_PATH
 from utils.limiter import limiter
 
@@ -24,10 +25,19 @@ def init_app() -> None:
 
 def register_shutdown_hooks() -> None:
     def _on_exit():
-        log_app_stopped()
+        with log_state._system_log_lock:
+            if log_state._lifecycle_stop_logged:
+                return
+            log_state._lifecycle_stop_logged = True
+        app_log("main", "Приложение остановлено", level="info")
 
     def _handler(signum, _frame):
-        log_app_stopped()
+        with log_state._system_log_lock:
+            already = log_state._lifecycle_stop_logged
+            if not already:
+                log_state._lifecycle_stop_logged = True
+        if not already:
+            app_log("main", "Приложение остановлено", level="info")
         if signum == signal.SIGINT:
             # Preserve standard Ctrl+C behavior in dev console.
             signal.default_int_handler(signum, _frame)
