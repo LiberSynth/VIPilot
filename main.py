@@ -33,6 +33,7 @@ import db.upgrade as _db_upgrade
 def main_loop():
     while True:
         try:
+            write_log_entry(None, 'main_loop', 'phase=tick', level='info')
             environment.wait_if_paused()
             environment.refresh_environment()
 
