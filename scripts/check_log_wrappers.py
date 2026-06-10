@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Convention 4: no logging wrapper functions outside log/log.py."""
+"""Convention 4: no logging wrapper functions; no app_log."""
 from __future__ import annotations
 
 import ast
@@ -7,11 +7,11 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SCAN_DIRS = ("common", "db", "pipelines", "routes", "utils", "clients", "services")
+SCAN_DIRS = ("common", "db", "log", "pipelines", "routes", "utils", "clients", "services")
 EXTRA_FILES = ("main.py",)
 SKIP_FILES = frozenset({"log/log.py"})
 ALLOWED_FUNCTIONS = frozenset({"log_request"})
-LOG_CALLS = frozenset({"app_log", "write_log_entry"})
+LOG_CALLS = frozenset({"write_log_entry"})
 BUILTIN_CALLS = frozenset(
     {
         "len",
@@ -69,7 +69,7 @@ def is_log_wrapper(func: ast.FunctionDef, file_rel: str) -> str | None:
     if file_rel in SKIP_FILES:
         return None
 
-    if func.name.startswith(("log_app_", "log_batch_", "log_system_")):
+    if func.name == "app_log" or func.name.startswith(("log_app_", "log_batch_", "log_system_")):
         return f"запрещённое имя {func.name!r}"
 
     if func.name.startswith("log_") and func.name != "log_request":
@@ -78,11 +78,11 @@ def is_log_wrapper(func: ast.FunctionDef, file_rel: str) -> str | None:
     if _is_fmt_id_msg_only_helper(func):
         return (
             f"оболочка сообщения для лога {func.name!r} "
-            "(inline fmt_id_msg в write_log_entry/app_log)"
+            "(inline fmt_id_msg в write_log_entry)"
         )
 
     if _is_thin_log_delegate(func):
-        return f"оболочка логирования {func.name!r} (inline app_log/write_log_entry)"
+        return f"оболочка логирования {func.name!r} (inline write_log_entry)"
 
     return None
 

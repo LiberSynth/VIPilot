@@ -56,27 +56,26 @@ write_log_entry(batch_id, channel, message, level='info')
 - `batch_id` — UUID батча; `None` — блок «Приложение» в мониторе (окно без батча).
 - `channel` — канал записи (`api`, `planning`, `story`, `runner`, `video`, …); хранится в `log_entries.channel`. Префиксы `[tag]` в тексте запрещены — `write_log_entry` переносит известный `tag` в `channel`.
 - Уровни: `info`, `warn`, `error`, `fatal_error`, `silent`.
-- **Логи «Приложение»** — только через `app_log(source, message, *, level='silent', phase=None)` из `log/log.py`. Прямой `write_log_entry(None, …)` вне `log/log.py` запрещён.
-- `app_log(..., level='silent')` — диагностика: stdout всегда; в БД только при `deep_debugging`.
-- `app_log(..., level='info')` — действия пользователя и lifecycle (видны в мониторе без deep debug).
+- **Логи «Приложение»** — `write_log_entry(None, channel, message, level=…)` **inline в месте события**; канал из фиксированного набора (`main`, `main_loop`, `api`, `http`, `db`, …), без `[source]` в тексте.
+- `write_log_entry(..., level='silent')` — диагностика: stdout всегда; в БД только при `deep_debugging`.
+- `write_log_entry(..., level='info')` — действия пользователя и lifecycle (видны в мониторе без deep debug).
 - `write_log_entry` автоматически добавляет `.` в конец обычных фраз; не трогает служебные хвосты (`phase=`, `key=value`, URL, `…`, уже есть `.!?`).
-- `source` — из фиксированного набора каналов (`main`, `main_loop`, `api`, `http`, `db`, …); для «Приложение» пишется в `log_entries.channel` через `app_log`, без `[source]` в тексте.
-- Диагностика пайплайнов вне батча: `app_log('planning', '…', phase='run_start')` → `phase=run_start, …` в сообщении.
+- Диагностика вне батча: `write_log_entry(None, 'planning', 'phase=run_start', level='silent')` или `'phase=run_start, slots=3'` в `message`.
 
 Таблица `log` — одна строка на `batch_id` (или окно «Приложение» при `batch_id IS NULL`); канал и текст — в `log_entries` (`channel`, `message`, `level`).
 
-**Запрещено:** прямой SQL к `log` / `log_entries` вне `db_*` с assert-флагами; функции `write_log`, `log_batch_planned`, `log_system_event`, `db_log_update` удалены.
+**Запрещено:** прямой SQL к `log` / `log_entries` вне `db_*` с assert-флагами; функции `write_log`, `log_batch_planned`, `log_system_event`, `db_log_update`, **`app_log`** удалены.
 
-**Оболочки для логирования запрещены.** В месте события вызывай `app_log(...)` или `write_log_entry(...)` напрямую — без промежуточных функций, которые скрывают канал, уровень или текст записи. Примеры запрещённых оболочек:
+**Оболочки для логирования запрещены.** В месте события — только inline `write_log_entry(...)`. Примеры:
 
-- `log_app_started()` / `log_app_stopped()` и любые `log_app_*()` → inline `app_log("main", …)`; dedup lifecycle — флаг `_lifecycle_stop_logged` под `_system_log_lock`, сам `app_log` **вне** lock (как в `main.py` при старте).
+- `app_log(...)`, `log_app_*()` — удалены; замена: `write_log_entry(None, 'main', '…', level='info')`.
 - `_runner_msg(...)` и аналоги → inline `fmt_id_msg(...)` в аргументе `write_log_entry`.
-- Любая `def log_*()` вне `log/log.py`, кроме явно перечисленных исключений ниже.
+- Любая `def log_*()` вне `log/log.py`, кроме исключений ниже.
 
 **Допустимые исключения (не оболочки):**
 
-- `log/log.py` — реализация (`app_log`, `write_log_entry`, `_stdout_log`, `_ensure_log_period`, …).
-- `utils/middleware.py::log_request` — Flask `before_request`; фильтрует URL и вызывает `app_log` в том же теле функции.
+- `log/log.py` — реализация (`write_log_entry`, `_stdout_log`, `_ensure_log_period`, …).
+- `utils/middleware.py::log_request` — Flask `before_request`; фильтрует URL и вызывает `write_log_entry` в том же теле функции.
 
 **Единственное допустимое исключение для `print()`:**
 - `print()` внутри самого `log/log.py` — единственная точка вывода в stdout.
@@ -232,9 +231,9 @@ DROP TABLE IF EXISTS t;
 | Критическая ошибка внутри пайплайна (прерывает батч) | `raise AppException(batch_id, pipeline, msg)` |
 | Некритичная ошибка / предупреждение | `write_log_entry(batch_id, category, msg, level='warn'/'error')` |
 | Информационное сообщение | `write_log_entry(batch_id, category, msg)` |
-| Лог блока «Приложение» (диагностика) | `app_log(source, msg, level='silent')` или `phase='…'` |
-| Лог блока «Приложение» (операторское) | `app_log(source, msg, level='info')` |
-| Оболочка вокруг `app_log` / `write_log_entry` | **Запрещено** — inline в месте события |
+| Лог блока «Приложение» (диагностика) | `write_log_entry(None, channel, msg, level='silent')` |
+| Лог блока «Приложение» (операторское) | `write_log_entry(None, channel, msg, level='info')` |
+| Оболочка вокруг `write_log_entry` (`app_log`, `log_*`, …) | **Запрещено** — inline в месте события |
 | Нарушение инварианта приложения вне пайплайна | `raise FatalError(msg)` |
 | Критическое исключение (не глушить) | Дать всплыть до `_batch_thread` |
 | GUID/UUID в лог-сообщении | `fmt_id_msg(template, *ids)` из `utils.utils` |

@@ -8,7 +8,7 @@ from db import (
     db_get_schedule, db_get_active_targets, db_create_planning_batch, db_get_last_pipeline_run,
     db_get_batch_by_id, db_claim_unused_movie_for_batch,
 )
-from log import app_log, write_log_entry
+from log import write_log_entry
 from utils.consts import MSK
 from utils.utils import parse_hhmm, fmt_id_msg
 
@@ -64,9 +64,9 @@ def run(batch_id, category):
 
 def tick():
     """Планирование расписания: создаёт planning-батчи в горизонте."""
-    app_log("planning", phase="run_start")
+    write_log_entry(None, 'planning', 'phase=run_start', level='silent')
     cancelled = db_cancel_orphaned_planning_batches()
-    app_log("planning", f"cancelled_count={len(cancelled)}", phase="orphan_cleanup")
+    write_log_entry(None, 'planning', 'phase=orphan_cleanup, ' + f'cancelled_count={len(cancelled)}', level='silent')
     for bid in cancelled:
         write_log_entry(
             bid, 'planning',
@@ -81,14 +81,10 @@ def tick():
 
     schedule = db_get_schedule()
     targets  = db_get_active_targets()
-    app_log(
-        "planning",
-        f"schedule_count={len(schedule)}, targets_count={len(targets)}",
-        phase="data_loaded",
-    )
+    write_log_entry(None, 'planning', 'phase=data_loaded, ' + f'schedule_count={len(schedule)}, targets_count={len(targets)}', level='silent')
 
     if not schedule or not targets:
-        app_log("planning", "reason=no_schedule_or_targets", phase="run_done")
+        write_log_entry(None, 'planning', 'phase=run_done, reason=no_schedule_or_targets', level='silent')
         return
 
     try:
@@ -100,11 +96,7 @@ def tick():
     effective_now = now + timedelta(seconds=environment.loop_interval)
     window_end    = effective_now + timedelta(hours=buffer_hours)
     A             = db_get_last_pipeline_run('planning', scheduled_only=True)
-    app_log(
-        "planning",
-        f"now={now.isoformat()}, effective_now={effective_now.isoformat()}, window_end={window_end.isoformat()}, last_run={(A.isoformat() if A else None)}, buffer_hours={buffer_hours}",
-        phase="window_built",
-    )
+    write_log_entry(None, 'planning', 'phase=window_built, ' + f'now={now.isoformat()}, effective_now={effective_now.isoformat()}, window_end={window_end.isoformat()}, last_run={(A.isoformat() if A else None)}, buffer_hours={buffer_hours}', level='silent')
 
     for day_offset in range(-1, 2):
         day = (now + timedelta(days=day_offset)).date()
@@ -128,11 +120,7 @@ def tick():
 
             if in_future_window or is_catchup:
                 batch_id = db_create_planning_batch(dt)
-                app_log(
-                    "planning",
-                    f"dt={dt.isoformat()}, in_future_window={in_future_window}, is_catchup={is_catchup}, batch_created={bool(batch_id)}",
-                    phase="slot_evaluated",
-                )
+                write_log_entry(None, 'planning', 'phase=slot_evaluated, ' + f'dt={dt.isoformat()}, in_future_window={in_future_window}, is_catchup={is_catchup}, batch_created={bool(batch_id)}', level='silent')
                 if batch_id:
                     dt_msk = dt.astimezone(MSK)
                     target_names = ', '.join(t['name'] for t in targets)
@@ -151,4 +139,4 @@ def tick():
                         fmt_id_msg("[planning] Создан planning-батч: {} UTC", dt.strftime('%d.%m %H:%M')),
                         level='silent',
                     )
-    app_log("planning", "result=ok", phase="run_done")
+    write_log_entry(None, 'planning', 'phase=run_done, result=ok', level='silent')

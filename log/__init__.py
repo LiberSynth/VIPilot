@@ -1,5 +1,4 @@
 from .log import (
-    app_log,
     write_log_entry,
 )
 from db.db_service import (

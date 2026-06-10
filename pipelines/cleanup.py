@@ -17,7 +17,7 @@ from db import (
     db_cleanup_logs,
     db_cleanup_batches,
 )
-from log import app_log
+from log import write_log_entry
 from utils.utils import parse_long_lifetime, parse_batch_lifetime
 
 _thread = None
@@ -36,39 +36,35 @@ def run():
         entries_lifetime    = parse_long_lifetime(settings_get("entries_lifetime", "30"), default=30)
         log_lifetime        = parse_long_lifetime(settings_get("log_lifetime", "365"))
         batch_lifetime      = parse_batch_lifetime(settings_get("batch_lifetime", "7"))
-        app_log(
-            "cleanup",
-            f"entries_lifetime={entries_lifetime}, log_lifetime={log_lifetime}, batch_lifetime={batch_lifetime}",
-            phase="run_start",
-        )
+        write_log_entry(None, 'cleanup', 'phase=run_start, ' + f'entries_lifetime={entries_lifetime}, log_lifetime={log_lifetime}, batch_lifetime={batch_lifetime}', level='silent')
 
         summary = []
 
         if entries_lifetime > 0:
             n = db_cleanup_log_entries(entries_lifetime)
-            app_log("cleanup", f"affected={n}", phase="entries_cleanup_done")
+            write_log_entry(None, 'cleanup', 'phase=entries_cleanup_done, ' + f'affected={n}', level='silent')
             if n:
                 summary.append(f"log_entries: -{n}")
-                app_log("cleanup", f"Удалено log_entries: {n}")
+                write_log_entry(None, 'cleanup', f'Удалено log_entries: {n}', level='silent')
 
         if log_lifetime > 0:
             n = db_cleanup_logs(log_lifetime)
-            app_log("cleanup", f"affected={n}", phase="logs_cleanup_done")
+            write_log_entry(None, 'cleanup', 'phase=logs_cleanup_done, ' + f'affected={n}', level='silent')
             if n:
                 summary.append(f"log: -{n}")
-                app_log("cleanup", f"Удалено log-записей: {n}")
+                write_log_entry(None, 'cleanup', f'Удалено log-записей: {n}', level='silent')
 
         if batch_lifetime > 0:
             n = db_cleanup_batches(batch_lifetime)
-            app_log("cleanup", f"affected={n}", phase="batches_cleanup_done")
+            write_log_entry(None, 'cleanup', 'phase=batches_cleanup_done, ' + f'affected={n}', level='silent')
             if n:
                 summary.append(f"batches: -{n}")
-                app_log("cleanup", f"Удалено батчей: {n}")
+                write_log_entry(None, 'cleanup', f'Удалено батчей: {n}', level='silent')
 
         if summary:
-            app_log("cleanup", "Очистка: " + ", ".join(summary))
-        app_log("cleanup", f"had_changes={bool(summary)}", phase="run_done")
+            write_log_entry(None, 'cleanup', 'Очистка: ' + ', '.join(summary), level='silent')
+        write_log_entry(None, 'cleanup', 'phase=run_done, ' + f'had_changes={bool(summary)}', level='silent')
 
     except Exception as e:
-        app_log("cleanup", f"Необработанная ошибка: {e}", level="error")
+        write_log_entry(None, 'cleanup', f'Необработанная ошибка: {e}', level='error')
         raise

@@ -17,7 +17,7 @@ from db import (
 from common.exceptions import AppException
 from common.startup import create_app
 import log.log as log_state
-from log import app_log, write_log_entry
+from log import write_log_entry
 from pipelines import cleanup
 from pipelines.recovery import recover_interrupted_batches
 import pipelines.planning as planning
@@ -71,7 +71,7 @@ def main_loop():
                 level='error',
             )
         except Exception as e:
-            app_log("main_loop", f"Ошибка: {e}", level="error")
+            write_log_entry(None, 'main_loop', f'Ошибка: {e}', level='error')
 
         environment.wait_for_wakeup(environment.loop_interval)
 
@@ -87,7 +87,7 @@ environment.init()
 with log_state._system_log_lock:
     log_state._lifecycle_stop_logged = False
     log_state._system_log_id = None
-app_log("main", "Приложение запущено", level="info")
+write_log_entry(None, 'main', 'Приложение запущено', level='info')
 
 register_shutdown_hooks()
 threading.Thread(target=main_loop, daemon=True).start()

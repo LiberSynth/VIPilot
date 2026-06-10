@@ -15,13 +15,8 @@ def _get_flask_secret():
     if secret:
         return secret
     generated = secrets.token_hex(32)
-    from log.log import app_log
-    app_log(
-        "consts",
-        "FLASK_SECRET не задан в окружении — сгенерирован случайный ключ, "
-        "сессии будут сброшены при перезапуске",
-        level="warn",
-    )
+    from log.log import write_log_entry
+    write_log_entry(None, 'consts', 'FLASK_SECRET не задан в окружении — сгенерирован случайный ключ, сессии будут сброшены при перезапуске', level='warn')
     return generated
 
 

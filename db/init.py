@@ -9,7 +9,7 @@ bootstrap() вызывается безусловно при каждом ста
 
 from .connection import get_db
 from .migrations import run_migrations
-from log.log import app_log
+from log.log import write_log_entry
 
 
 def _consolidate_log_entries_channel(cur) -> None:
@@ -441,7 +441,7 @@ def bootstrap():
             """)
 
         conn.commit()
-    app_log("db", "bootstrap: схема проверена/создана")
+    write_log_entry(None, 'db', 'bootstrap: схема проверена/создана', level='silent')
 
 
 def init_db():
@@ -449,5 +449,5 @@ def init_db():
         bootstrap()
         run_migrations()
     except Exception as e:
-        app_log("db", f"Ошибка инициализации: {e}")
+        write_log_entry(None, 'db', f'Ошибка инициализации: {e}', level='silent')
         raise

@@ -19,7 +19,7 @@ import tempfile
 import time as _time
 
 from db import db_set_batch_vkvideo_clip_url
-from log import app_log, write_log_entry
+from log import write_log_entry
 from utils.utils import fmt_id_msg
 from routes.api import publication_file_name, hashtags
 
@@ -144,7 +144,7 @@ def _snap(page, batch_id=None) -> None:
         if batch_id:
             _b.push_frame_for_batch(batch_id, img)
     except Exception as _e:
-        app_log("vkvideo", f"_snap: {_e}")
+        write_log_entry(None, 'vkvideo', f'_snap: {_e}', level='silent')
 
 
 def _read_clip_url(page) -> str:

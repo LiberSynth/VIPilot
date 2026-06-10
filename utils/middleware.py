@@ -1,5 +1,5 @@
 from flask import request
-from log.log import app_log
+from log.log import write_log_entry
 
 _SILENT_GET_PATHS = {
     '/api/monitor',
@@ -24,7 +24,7 @@ def log_request():
         return
     full_path = request.full_path if request.query_string else path
     remote = request.remote_addr
-    app_log("http", f"{method} {full_path} | IP: {remote}")
+    write_log_entry(None, 'http', f'{method} {full_path} | IP: {remote}', level='silent')
 
 
 def register_middleware(app):

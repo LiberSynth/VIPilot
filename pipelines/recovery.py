@@ -1,13 +1,13 @@
 """Подхват батчей, прерванных при остановке приложения."""
 from db import db_reset_stalled_batches
-from log.log import app_log, write_log_entry
+from log.log import write_log_entry
 from utils.utils import fmt_id_msg
 
 
 def recover_interrupted_batches() -> None:
     affected = db_reset_stalled_batches()
     if not affected:
-        app_log("startup", "Незавершённых батчей не обнаружено.")
+        write_log_entry(None, 'startup', 'Незавершённых батчей не обнаружено.', level='silent')
         return
     for item in affected:
         bid = item["id"]
@@ -15,4 +15,4 @@ def recover_interrupted_batches() -> None:
         new = item["new_status"]
         msg = f"Батч сброшен при рестарте: {old} → {new}"
         write_log_entry(bid, "planning", msg, level='warn')
-        app_log("startup", fmt_id_msg("Батч {} сброшен: {} → {}", bid, old, new))
+        write_log_entry(None, 'startup', fmt_id_msg('Батч {} сброшен: {} → {}', bid, old, new), level='silent')

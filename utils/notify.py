@@ -1,7 +1,7 @@
 import os
 import requests
 from db import settings_get
-from log import app_log
+from log import write_log_entry
 
 
 def _msk_ts() -> str:
@@ -20,7 +20,7 @@ def send_failure_email(message: str, log_entries=None, partial: bool = False):
     smtp_pass = os.environ.get("SMTP_PASSWORD", "").strip()
 
     if not all([to_addr, smtp_host, smtp_user, smtp_pass]):
-        app_log("notify", "Email не отправлен: не заданы SMTP-настройки или адрес")
+        write_log_entry(None, 'notify', 'Email не отправлен: не заданы SMTP-настройки или адрес', level='silent')
         return
 
     smtp_port = int(os.environ.get("SMTP_PORT", "587"))
@@ -44,7 +44,7 @@ def send_failure_email(message: str, log_entries=None, partial: bool = False):
             s.send_message(msg)
 
     except Exception as e:
-        app_log("notify", f"Ошибка отправки email: {e}")
+        write_log_entry(None, 'notify', f'Ошибка отправки email: {e}', level='silent')
 
 
 def send_failure_sms(message: str):
@@ -70,19 +70,19 @@ def send_failure_sms(message: str):
         )
         data = r.json()
         if data.get("error_code"):
-            app_log("notify", f"SMSC ошибка: {data}")
+            write_log_entry(None, 'notify', f'SMSC ошибка: {data}', level='silent')
         else:
-            app_log("notify", f"SMS отправлено на {phone}")
+            write_log_entry(None, 'notify', f'SMS отправлено на {phone}', level='silent')
     except Exception as e:
-        app_log("notify", f"Ошибка отправки SMS: {e}")
+        write_log_entry(None, 'notify', f'Ошибка отправки SMS: {e}', level='silent')
 
 
 def notify_failure(reason: str, log_entries=None, partial: bool = False):
     try:
         prefix = "Частично" if partial else "Сбой"
         msg = f"{prefix} {_msk_ts()}: {reason}"
-        app_log("notify", f"Отправляю уведомление [{prefix}]: {reason}")
+        write_log_entry(None, 'notify', f'Отправляю уведомление [{prefix}]: {reason}', level='silent')
         send_failure_email(msg, log_entries=log_entries or [], partial=partial)
         send_failure_sms(msg)
     except Exception as e:
-        app_log("notify", f"Ошибка notify_failure: {e}", level="warn")
+        write_log_entry(None, 'notify', f'Ошибка notify_failure: {e}', level='warn')

@@ -33,10 +33,10 @@ FOUND=$(grep -rn --include="*.py" -E "(INSERT INTO log|UPDATE log SET)" $PROJECT
     | grep -v "^db/init\.py:")
 [ -n "$FOUND" ] && fail "Конвенция 2: прямой INSERT/UPDATE log вне log/log.py и db_simple" "$FOUND"
 
-# ── Конвенция 4: лог «Приложение» — только app_log, не write_log_entry(None, …) ─
-FOUND=$(grep -rn --include="*.py" "write_log_entry(None" $PROJECT_DIRS \
-    | grep -v "^log/log\.py:")
-[ -n "$FOUND" ] && fail "Конвенция 4: write_log_entry(None, …) вне log/log.py (использовать app_log)" "$FOUND"
+# ── Конвенция 4: app_log и оболочки логирования запрещены ─────────────────────
+FOUND=$(grep -rn --include="*.py" -E "\bapp_log\b" $PROJECT_DIRS services main.py \
+    | grep -v "^scripts/check_log_wrappers\.py:")
+[ -n "$FOUND" ] && fail "Конвенция 4: app_log запрещён (inline write_log_entry)" "$FOUND"
 
 # ── Конвенция 4: оболочки логирования запрещены (см. docs/conventions.md) ────
 _run_python() {
