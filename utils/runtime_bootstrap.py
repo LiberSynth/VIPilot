@@ -1,5 +1,5 @@
 """
-Минимальный загрузчик пакетов — только stdlib, никаких DB-зависимостей.
+Проверка и установка необходимого софта — только stdlib, без DB-зависимостей.
 Вызывается из main.py до любых других импортов.
 """
 import importlib.util
@@ -37,8 +37,15 @@ def _pip_install(package: str) -> None:
     )
 
 
+def _ensure_dotenv() -> None:
+    if importlib.util.find_spec("dotenv") is None:
+        _pip_install("python-dotenv")
+    if pathlib.Path(".env").exists():
+        from dotenv import load_dotenv
+        load_dotenv()
+
+
 def _install_ffmpeg_windows() -> None:
-    import os
     import urllib.request
     import zipfile
 
@@ -75,8 +82,6 @@ def _install_ffmpeg_windows() -> None:
 
 
 def _prepend_to_path(path: pathlib.Path) -> None:
-    import os
-
     os.environ["PATH"] = str(path) + os.pathsep + os.environ.get("PATH", "")
 
 
@@ -297,10 +302,10 @@ def _ensure_ffmpeg() -> None:
         )
 
 
-def ensure_all_packages() -> None:
-    """Устанавливает все необходимые пакеты если они не найдены."""
+def ensure_required_software() -> None:
+    """Проверяет и при необходимости устанавливает необходимый софт."""
+    _ensure_dotenv()
     _packages = [
-        ("dotenv",        "python-dotenv"),
         ("psycopg2",      "psycopg2-binary"),
         ("flask",         "flask"),
         ("requests",      "requests"),

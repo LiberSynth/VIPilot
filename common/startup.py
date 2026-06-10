@@ -1,14 +1,10 @@
+import os
 from datetime import timedelta
 
 from flask import Flask
 
-from db import (
-    db_reset_stalled_batches,
-)
-from log.log import app_log, write_log_entry
-from utils.consts import FLASK_SECRET
+from utils.consts import FLASK_SECRET, PLAYWRIGHT_BROWSERS_PATH
 from utils.limiter import limiter
-from utils.utils import fmt_id_msg
 
 
 def create_app() -> Flask:
@@ -19,28 +15,5 @@ def create_app() -> Flask:
     return app
 
 
-def init_app(app: Flask):
-    from routes.web import bp as web_bp
-    from routes.api import bp as api_bp, production_bp
-    from routes.browser_widget import bp as browser_widget_bp
-
-    app.register_blueprint(web_bp)
-    app.register_blueprint(api_bp)
-    app.register_blueprint(production_bp)
-    app.register_blueprint(browser_widget_bp)
-
-    _reset_stalled_batches()
-
-
-def _reset_stalled_batches():
-    affected = db_reset_stalled_batches()
-    if not affected:
-        app_log("startup", "Незавершённых батчей не обнаружено.")
-        return
-    for item in affected:
-        bid = item["id"]
-        old = item["old_status"]
-        new = item["new_status"]
-        msg = f"Батч сброшен при рестарте: {old} → {new}"
-        write_log_entry(bid, "planning", msg, level='warn')
-        app_log("startup", fmt_id_msg("Батч {} сброшен: {} → {}", bid, old, new))
+def init_app(app: Flask) -> None:
+    os.environ.setdefault('PLAYWRIGHT_BROWSERS_PATH', PLAYWRIGHT_BROWSERS_PATH)

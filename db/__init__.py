@@ -89,7 +89,6 @@ from .db_ui import (
 )
 
 from .db_service import (
-    db_interrupt_stale_logs,
     db_get_database_size_bytes,
     db_cleanup_log_entries,
     db_cleanup_logs,

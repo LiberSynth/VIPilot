@@ -11,11 +11,6 @@ from log.log import app_log
 from utils.utils import fmt_id_msg
 
 
-def db_interrupt_stale_logs():
-    """Legacy no-op: log.status удалён из схемы."""
-    return
-
-
 def db_get_log_entries(log_id):
     """Возвращает список субзаписей для указанного log_id."""
     with get_db() as conn:
@@ -327,7 +322,7 @@ def db_vacuum_full() -> dict:
     Возвращает сводку:
     `{tables_total, tables_ok, tables_failed, freed_bytes, results: [...]}`.
     """
-    from utils.pkg_bootstrap import ensure_pg_repack_in_path, get_pg_repack_bootstrap_error
+    from utils.runtime_bootstrap import ensure_pg_repack_in_path, get_pg_repack_bootstrap_error
 
     tables = _public_tables()
     # На Windows официального pg_repack нет — только поиск уже установленного CLI.

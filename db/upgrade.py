@@ -144,7 +144,7 @@ def _check_pg_repack() -> tuple[bool, str]:
     (сжатие через VACUUM FULL). При `VIPILOT_REQUIRE_PG_REPACK=1` на Windows
     проверка строгая.
     """
-    from utils.pkg_bootstrap import ensure_pg_repack_in_path
+    from utils.runtime_bootstrap import ensure_pg_repack_in_path
 
     if not ensure_pg_repack_in_path(auto_install=True):
         force = os.environ.get('VIPILOT_REQUIRE_PG_REPACK') == '1'
