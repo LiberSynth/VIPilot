@@ -67,6 +67,17 @@ write_log_entry(batch_id, channel, message, level='info')
 
 **Запрещено:** прямой SQL к `log` / `log_entries` вне `db_*` с assert-флагами; функции `write_log`, `log_batch_planned`, `log_system_event`, `db_log_update` удалены.
 
+**Оболочки для логирования запрещены.** В месте события вызывай `app_log(...)` или `write_log_entry(...)` напрямую — без промежуточных функций, которые скрывают канал, уровень или текст записи. Примеры запрещённых оболочек:
+
+- `log_app_started()` / `log_app_stopped()` и любые `log_app_*()` → inline `app_log("main", …)`; dedup lifecycle — флаг `_lifecycle_stop_logged` под `_system_log_lock`, сам `app_log` **вне** lock (как в `main.py` при старте).
+- `_runner_msg(...)` и аналоги → inline `fmt_id_msg(...)` в аргументе `write_log_entry`.
+- Любая `def log_*()` вне `log/log.py`, кроме явно перечисленных исключений ниже.
+
+**Допустимые исключения (не оболочки):**
+
+- `log/log.py` — реализация (`app_log`, `write_log_entry`, `_stdout_log`, `_ensure_log_period`, …).
+- `utils/middleware.py::log_request` — Flask `before_request`; фильтрует URL и вызывает `app_log` в том же теле функции.
+
 **Единственное допустимое исключение для `print()`:**
 - `print()` внутри самого `log/log.py` — единственная точка вывода в stdout.
 
@@ -223,6 +234,7 @@ DROP TABLE IF EXISTS t;
 | Информационное сообщение | `write_log_entry(batch_id, category, msg)` |
 | Лог блока «Приложение» (диагностика) | `app_log(source, msg, level='silent')` или `phase='…'` |
 | Лог блока «Приложение» (операторское) | `app_log(source, msg, level='info')` |
+| Оболочка вокруг `app_log` / `write_log_entry` | **Запрещено** — inline в месте события |
 | Нарушение инварианта приложения вне пайплайна | `raise FatalError(msg)` |
 | Критическое исключение (не глушить) | Дать всплыть до `_batch_thread` |
 | GUID/UUID в лог-сообщении | `fmt_id_msg(template, *ids)` из `utils.utils` |

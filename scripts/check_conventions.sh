@@ -38,6 +38,30 @@ FOUND=$(grep -rn --include="*.py" "write_log_entry(None" $PROJECT_DIRS \
     | grep -v "^log/log\.py:")
 [ -n "$FOUND" ] && fail "Конвенция 4: write_log_entry(None, …) вне log/log.py (использовать app_log)" "$FOUND"
 
+# ── Конвенция 4: оболочки логирования запрещены (см. docs/conventions.md) ────
+_run_python() {
+    if command -v python >/dev/null 2>&1 && python -c "import ast" >/dev/null 2>&1; then
+        python "$@"
+        return $?
+    fi
+    if command -v py >/dev/null 2>&1 && py -3 -c "import ast" >/dev/null 2>&1; then
+        py -3 "$@"
+        return $?
+    fi
+    if command -v python3 >/dev/null 2>&1 && python3 -c "import ast" >/dev/null 2>&1; then
+        python3 "$@"
+        return $?
+    fi
+    return 127
+}
+WRAPPER_RC=0
+WRAPPER_OUT=$(_run_python scripts/check_log_wrappers.py 2>&1) || WRAPPER_RC=$?
+if [ "$WRAPPER_RC" -eq 127 ]; then
+    fail "Конвенция 4: python не найден для scripts/check_log_wrappers.py" ""
+elif [ "$WRAPPER_RC" -ne 0 ]; then
+    fail "Конвенция 4: оболочки логирования вне log/log.py" "$WRAPPER_OUT"
+fi
+
 # ── Конвенция 3: защищённые ключи окружения — только в environment.py ─────────
 FOUND=$(grep -rn --include="*.py" \
     "db_get(['\"]deep_debugging\|db_get(['\"]loop_interval\|db_get(['\"]max_batch_threads" \
