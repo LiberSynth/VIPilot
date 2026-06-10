@@ -1,7 +1,6 @@
 from .log import (
     app_log,
     write_log_entry,
-    log_app_started,
     log_app_stopped,
 )
 from db.db_service import (

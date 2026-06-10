@@ -114,14 +114,6 @@ def app_log(source: str, message: str = "", *, level: str = "silent", phase: str
     write_log_entry(None, source, body, level=level)
 
 
-def log_app_started():
-    global _lifecycle_stop_logged, _system_log_id
-    with _system_log_lock:
-        _lifecycle_stop_logged = False
-        _system_log_id = None
-    app_log("main", "Приложение запущено", level="info")
-
-
 def log_app_stopped():
     global _lifecycle_stop_logged
     if _lifecycle_stop_logged:

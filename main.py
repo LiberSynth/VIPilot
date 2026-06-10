@@ -18,7 +18,8 @@ from db import (
 )
 from common.exceptions import AppException
 from common.startup import create_app
-from log import app_log, log_app_started, log_app_stopped, write_log_entry
+import log.log as log_state
+from log import app_log, log_app_stopped, write_log_entry
 from pipelines import cleanup
 from pipelines.recovery import recover_interrupted_batches
 import pipelines.planning as planning
@@ -29,9 +30,6 @@ import common.environment as environment
 from routes.register import register_blueprints
 from utils.middleware import register_middleware
 import db.upgrade as _db_upgrade
-
-flask_app = create_app()
-register_middleware(flask_app)
 
 
 def main_loop():
@@ -80,9 +78,6 @@ def main_loop():
         environment.wait_for_wakeup(environment.loop_interval)
 
 
-_main_loop_started = False
-
-
 def _on_exit():
     log_app_stopped()
 
@@ -107,22 +102,22 @@ def _install_shutdown_hooks():
             pass
 
 
-def start_main_loop():
-    global _main_loop_started
-    if not _main_loop_started:
-        _main_loop_started = True
-        _db_upgrade.check_upgrade()
-        register_blueprints(flask_app)
-        recover_interrupted_batches()
-        environment.init_from_db()
-        log_app_started()
-        _install_shutdown_hooks()
-        atexit.register(_on_exit)
-        t = threading.Thread(target=main_loop, daemon=True)
-        t.start()
+flask_app = create_app()
+register_middleware(flask_app)
+register_blueprints(flask_app)
 
+_db_upgrade.check_upgrade()
+recover_interrupted_batches()
+environment.init()
 
-start_main_loop()
+with log_state._system_log_lock:
+    log_state._lifecycle_stop_logged = False
+    log_state._system_log_id = None
+app_log("main", "Приложение запущено", level="info")
+
+_install_shutdown_hooks()
+atexit.register(_on_exit)
+threading.Thread(target=main_loop, daemon=True).start()
 
 app = flask_app
 

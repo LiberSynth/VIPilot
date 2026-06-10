@@ -120,8 +120,8 @@ def refresh_environment() -> EnvSnapshot:
     return snap
 
 
-def init_from_db():
-    """Инициализирует состояние workflow из БД."""
+def init():
+    """Инициализирует runtime workflow: счётчик потоков и pause/running из БД."""
     reset_active_threads()
     if env_get('workflow_state', 'running') == 'pause':
         set_paused()
