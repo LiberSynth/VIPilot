@@ -33,12 +33,18 @@ import db.upgrade as _db_upgrade
 def main_loop():
     while True:
         try:
+            write_log_entry(None, 'main_loop', 'phase=tick_start', level='info')
             environment.wait_if_paused()
+            write_log_entry(None, 'main_loop', 'phase=after_pause', level='info')
             environment.refresh_environment()
+            write_log_entry(None, 'main_loop', 'phase=after_refresh', level='info')
 
             planning.tick()
+            write_log_entry(None, 'main_loop', 'phase=after_planning', level='info')
             db_create_transcode_batches()
+            write_log_entry(None, 'main_loop', 'phase=after_transcode_create', level='info')
             db_create_publish_batches()
+            write_log_entry(None, 'main_loop', 'phase=after_publish_create', level='info')
 
             if environment.get_active_threads() < environment.max_threads:
                 batches = db_get_actionable_batches()
@@ -59,7 +65,9 @@ def main_loop():
                     pipeline_name = getattr(pipeline_module, '__name__', str(pipeline_module)).split('.')[-1]
                     start_batch_thread(bid, pipeline_module, pipeline_name)
 
+            write_log_entry(None, 'main_loop', 'phase=after_dispatch', level='info')
             cleanup.tick()
+            write_log_entry(None, 'main_loop', 'phase=after_cleanup', level='info')
 
         except AppException as e:
             if e.batch_id:
