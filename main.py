@@ -1,12 +1,10 @@
-import atexit
 import platform
-import signal
 import threading
 
 from utils.runtime_bootstrap import ensure_required_software, ensure_single_instance
 ensure_required_software()
 
-from common.startup import init_app
+from common.startup import init_app, register_shutdown_hooks
 init_app()
 ensure_single_instance()
 
@@ -19,7 +17,7 @@ from db import (
 from common.exceptions import AppException
 from common.startup import create_app
 import log.log as log_state
-from log import app_log, log_app_stopped, write_log_entry
+from log import app_log, write_log_entry
 from pipelines import cleanup
 from pipelines.recovery import recover_interrupted_batches
 import pipelines.planning as planning
@@ -78,30 +76,6 @@ def main_loop():
         environment.wait_for_wakeup(environment.loop_interval)
 
 
-def _on_exit():
-    log_app_stopped()
-
-
-def _install_shutdown_hooks():
-    def _handler(signum, _frame):
-        log_app_stopped()
-        if signum == signal.SIGINT:
-            # Preserve standard Ctrl+C behavior in dev console.
-            signal.default_int_handler(signum, _frame)
-        raise SystemExit(0)
-
-    for sig in (signal.SIGTERM, signal.SIGINT):
-        try:
-            signal.signal(sig, _handler)
-        except (ValueError, OSError):
-            pass
-    if hasattr(signal, "SIGBREAK"):
-        try:
-            signal.signal(signal.SIGBREAK, _handler)
-        except (ValueError, OSError):
-            pass
-
-
 flask_app = create_app()
 register_middleware(flask_app)
 register_blueprints(flask_app)
@@ -115,8 +89,7 @@ with log_state._system_log_lock:
     log_state._system_log_id = None
 app_log("main", "Приложение запущено", level="info")
 
-_install_shutdown_hooks()
-atexit.register(_on_exit)
+register_shutdown_hooks()
 threading.Thread(target=main_loop, daemon=True).start()
 
 app = flask_app
