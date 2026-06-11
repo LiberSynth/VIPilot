@@ -3,7 +3,6 @@ from db import db_reset_stalled_batches
 from log.log import write_log_entry
 from utils.utils import fmt_id_msg
 
-
 def recover_interrupted_batches() -> None:
     affected = db_reset_stalled_batches()
     if not affected:

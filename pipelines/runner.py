@@ -9,7 +9,6 @@ from common.exceptions import AppException
 import common.environment as environment
 from utils.utils import fmt_id_msg
 
-
 def _handle_batch_error(e, batch_id, category):
     pipeline_name = category
     if isinstance(e, AppException):
@@ -39,7 +38,6 @@ def _handle_batch_error(e, batch_id, category):
             level='silent',
         )
 
-
 def run_batch(batch_id, pipeline, category):
     """Запускает пайплайн, обрабатывает ошибки и освобождает слот потока."""
     write_log_entry(batch_id, category, f'Запуск пайплайна {category}.', level='info')
@@ -68,7 +66,6 @@ def run_batch(batch_id, pipeline, category):
             fmt_id_msg(f"batch={{}}, pipeline={category}, phase=released", batch_id),
             level='silent',
         )
-
 
 def start_batch_thread(batch_id, pipeline, pipeline_name):
     """Запускает поток для обработки батча."""

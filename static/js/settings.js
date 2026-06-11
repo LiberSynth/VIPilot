@@ -83,7 +83,6 @@ function schedulePublishSave() {
   _publishSaveTimer = setTimeout(savePublishSettings, 600);
 }
 
-
 var _serviceSaveTimer = null;
 function saveServiceSettings() {
   fetch('/save', { method: 'POST', body: collectAllSettings('service') }).catch(() => {});

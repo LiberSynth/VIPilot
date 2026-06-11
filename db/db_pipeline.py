@@ -5,7 +5,6 @@ import psycopg2.extras
 from .connection import get_db
 from common.statuses import _assert_known_status, PIPELINE_RESET_STATUS
 
-
 def _get_story_source_batch_id(cur, story_id: str | None) -> str | None:
     if not story_id:
         return None
@@ -21,7 +20,6 @@ def _get_story_source_batch_id(cur, story_id: str | None) -> str | None:
     )
     row = cur.fetchone()
     return row[0] if row else None
-
 
 def db_create_planning_batch(scheduled_at):
     with get_db() as conn:
@@ -52,7 +50,6 @@ def db_create_planning_batch(scheduled_at):
         db_set_batch_status(batch_id, 'pending', conn)
     return batch_id
 
-
 def db_create_video_batch(batch_type, model_id=None, story_id=None):
     data = (
         json.dumps({"model_id": str(model_id)}) if model_id else None
@@ -76,7 +73,6 @@ def db_create_video_batch(batch_type, model_id=None, story_id=None):
         db_set_batch_status(batch_id, 'pending', conn)
     return batch_id
 
-
 def db_create_story_batch(text_model_id: str | None = None):
     data = (
         json.dumps({"story_model_id": str(text_model_id)})
@@ -98,7 +94,6 @@ def db_create_story_batch(text_model_id: str | None = None):
         db_set_batch_status(batch_id, 'pending', conn)
     return batch_id
 
-
 def db_set_batch_story(batch_id, story_id):
     with get_db() as conn:
         with conn.cursor() as cur:
@@ -108,7 +103,6 @@ def db_set_batch_story(batch_id, story_id):
             )
         db_set_batch_status(batch_id, "ready", conn)
     return True
-
 
 def db_set_batch_status(batch_id: str, status: str, conn=None):
     _assert_known_status(status)
@@ -123,7 +117,6 @@ def db_set_batch_status(batch_id: str, status: str, conn=None):
         )
     conn.commit()
 
-
 def db_claim_batch_status(batch_id: str, from_status: str, to_status: str) -> bool:
     _assert_known_status(from_status)
     with get_db() as conn:
@@ -137,7 +130,6 @@ def db_claim_batch_status(batch_id: str, from_status: str, to_status: str) -> bo
             return False
         db_set_batch_status(batch_id, to_status, conn)
     return True
-
 
 def db_cancel_orphaned_planning_batches():
     with get_db() as conn:
@@ -159,7 +151,6 @@ def db_cancel_orphaned_planning_batches():
         for batch_id in batch_ids:
             db_set_batch_status(batch_id, "cancelled", conn)
     return batch_ids
-
 
 def db_claim_unused_movie_for_batch(batch_id: str) -> dict | None:
     with get_db() as conn:
@@ -230,7 +221,6 @@ def db_claim_unused_movie_for_batch(batch_id: str) -> dict | None:
         "batch_id_source": source_batch_id,
     }
 
-
 def db_get_movie_pool_count(good_only: bool = False) -> int:
     with get_db() as conn:
         with conn.cursor() as cur:
@@ -244,7 +234,6 @@ def db_get_movie_pool_count(good_only: bool = False) -> int:
                 (good_only,),
             )
             return cur.fetchone()[0]
-
 
 def db_create_transcode_batches() -> list[str]:
     with get_db() as conn:
@@ -278,7 +267,6 @@ def db_create_transcode_batches() -> list[str]:
             db_set_batch_status(str(row[0]), 'pending', conn)
         conn.commit()
     return [str(row[0]) for row in rows]
-
 
 def db_create_publish_batches() -> list[str]:
     with get_db() as conn:
@@ -315,7 +303,6 @@ def db_create_publish_batches() -> list[str]:
         conn.commit()
     return rows
 
-
 def db_get_actionable_batches():
     with get_db() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
@@ -332,7 +319,6 @@ def db_get_actionable_batches():
             """)
             rows = cur.fetchall()
     return [dict(r) for r in rows]
-
 
 def db_get_batch_by_id(batch_id):
     with get_db() as conn:
@@ -352,7 +338,6 @@ def db_get_batch_by_id(batch_id):
             row = cur.fetchone()
     return dict(row) if row else None
 
-
 def db_is_batch_scheduled(scheduled_at, batch_type="planning"):
     if scheduled_at is None:
         return True
@@ -371,7 +356,6 @@ def db_is_batch_scheduled(scheduled_at, batch_type="planning"):
             )
             row = cur.fetchone()
             return bool(row[0])
-
 
 def db_reset_stalled_batches() -> list[dict]:
     typed_resets = [
@@ -419,7 +403,6 @@ def db_reset_stalled_batches() -> list[dict]:
 
     return affected
 
-
 def _video_reset_status(batch_data) -> str:
     """Статус для перезапуска video: подхват URL/handshake вместо нового submit."""
     if not isinstance(batch_data, dict):
@@ -434,7 +417,6 @@ def _video_reset_status(batch_data) -> str:
         return 'generating'
     return PIPELINE_RESET_STATUS['video']
 
-
 def db_reset_batch_pipeline(batch_id: str, pipeline: str) -> bool:
     if pipeline not in PIPELINE_RESET_STATUS:
         return False
@@ -447,7 +429,6 @@ def db_reset_batch_pipeline(batch_id: str, pipeline: str) -> bool:
         target_status = PIPELINE_RESET_STATUS[pipeline]
     db_set_batch_status(batch_id, target_status)
     return True
-
 
 def db_get_active_text_models():
     with get_db() as conn:
@@ -476,7 +457,6 @@ def db_get_active_text_models():
         )
     return result
 
-
 def db_get_text_model_by_id(model_id: str):
     with get_db() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
@@ -502,7 +482,6 @@ def db_get_text_model_by_id(model_id: str):
         "id": str(row["id"]),
     }
 
-
 def _fetch_allowed_durations(cur, model_ids):
     """Вспомогательная функция: возвращает dict {model_id_str: [int, ...]}."""
     if not model_ids:
@@ -518,7 +497,6 @@ def _fetch_allowed_durations(cur, model_ids):
         (ids_str,),
     )
     return {row["model_id"]: list(row["durations"]) for row in cur.fetchall()}
-
 
 def db_get_active_video_models():
     with get_db() as conn:
@@ -550,7 +528,6 @@ def db_get_active_video_models():
             }
         )
     return result
-
 
 def db_get_video_model_by_id(model_id: str):
     with get_db() as conn:
@@ -584,7 +561,6 @@ def db_get_video_model_by_id(model_id: str):
         "allowed_durations": durations_map.get(mid, [0]),
     }
 
-
 def db_set_batch_title(batch_id: str, title: str) -> None:
     with get_db() as conn:
         with conn.cursor() as cur:
@@ -593,7 +569,6 @@ def db_set_batch_title(batch_id: str, title: str) -> None:
                 (title, batch_id),
             )
         conn.commit()
-
 
 def db_set_batch_vkvideo_clip_url(batch_id: str, clip_url: str) -> None:
     """Сохраняет ссылку на клип VK Видео в batches.data['vkvideo_clip_url']."""
@@ -609,7 +584,6 @@ def db_set_batch_vkvideo_clip_url(batch_id: str, clip_url: str) -> None:
                 (clip_url, batch_id),
             )
         conn.commit()
-
 
 def db_get_batch_vkvideo_clip_url(batch_id: str) -> str:
     """Читает ссылку на клип VK Видео из batches.data['vkvideo_clip_url']."""

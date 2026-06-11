@@ -11,7 +11,6 @@ from .connection import get_db
 from .migrations import run_migrations
 from log.log import write_log_entry
 
-
 def _consolidate_log_entries_channel(cur) -> None:
     """Одна колонка channel: переименование category или удаление дубля после ошибочного ADD."""
     cur.execute("""
@@ -38,7 +37,6 @@ def _consolidate_log_entries_channel(cur) -> None:
         """)
     cur.execute("DROP INDEX IF EXISTS idx_log_entries_category")
 
-
 def _ensure_log_indexes(cur) -> None:
     """Индексы log / log_entries по фактической схеме."""
     cur.execute("""
@@ -58,7 +56,6 @@ def _ensure_log_indexes(cur) -> None:
             CREATE INDEX IF NOT EXISTS idx_log_entries_channel
                 ON log_entries (channel)
         """)
-
 
 def bootstrap():
     """
@@ -442,7 +439,6 @@ def bootstrap():
 
         conn.commit()
     write_log_entry(None, 'db', 'bootstrap: схема проверена/создана', level='silent')
-
 
 def init_db():
     try:

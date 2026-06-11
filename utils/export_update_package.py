@@ -5,7 +5,6 @@ import sys
 import psycopg2
 import yaml
 
-
 SECTIONS = [
     {
         "name": "settings",
@@ -54,21 +53,16 @@ SECTIONS = [
     },
 ]
 
-
 class _LiteralStr(str):
     pass
-
 
 class _PackageDumper(yaml.Dumper):
     pass
 
-
 def _literal_representer(dumper, data):
     return dumper.represent_scalar("tag:yaml.org,2002:str", data, style="|")
 
-
 _PackageDumper.add_representer(_LiteralStr, _literal_representer)
-
 
 def _build_row(section, col_names, row_values):
     jsonb_fields = set(section.get("jsonb_fields", []))
@@ -85,7 +79,6 @@ def _build_row(section, col_names, row_values):
             val = bytes(val)
         record[col] = val
     return record
-
 
 def export(output_path="update_package.yaml", stream=None):
     database_url = os.environ.get("DATABASE_URL")
@@ -131,7 +124,6 @@ def export(output_path="update_package.yaml", stream=None):
                 sort_keys=False,
             )
         sys.stdout.write(f"Exported to {output_path}\n")
-
 
 if __name__ == "__main__":
     export()

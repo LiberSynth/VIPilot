@@ -13,7 +13,6 @@ _CLAIM_AT_DISPATCH: dict[tuple[str, str], tuple[str, str]] = {
     ("transcode", "pending"): ("pending", "processing"),
 }
 
-
 def prepare_batch_dispatch(batch_id: str, batch_type: str, status: str) -> bool:
     """Атомарно переводит батч в рабочий статус. False — батч уже занят или статус устарел."""
     claim = _CLAIM_AT_DISPATCH.get((batch_type, status))

@@ -12,19 +12,16 @@ import requests
 from log import write_log_entry
 from clients.falai import ProviderFatalError, build_body
 
-
 _XAI_KEY = os.environ.get('XAI_API_KEY', '')
 
 _POLL_INTERVAL = 10
 _POLL_MAX      = 240  # 40 минут максимум
-
 
 def _headers():
     return {
         'Authorization': f'Bearer {_XAI_KEY}',
         'Content-Type': 'application/json',
     }
-
 
 def _compact_json(value, limit: int = 1200) -> str:
     """Возвращает компактный JSON/строку для диагностических логов с ограничением размера."""
@@ -35,7 +32,6 @@ def _compact_json(value, limit: int = 1200) -> str:
     if len(text) <= limit:
         return text
     return text[:limit] + '...'
-
 
 def submit(batch_id, category, model_name: str, submit_url: str, platform_url: str,
            body_tpl: dict, prompt: str, ar_x: int, ar_y: int,
@@ -83,7 +79,6 @@ def submit(batch_id, category, model_name: str, submit_url: str, platform_url: s
         'status_url':   status_url,
         'response_url': response_url,
     }
-
 
 def poll(batch_id, category, status_url: str, response_url: str):
     """

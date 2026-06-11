@@ -36,10 +36,8 @@ BUILTIN_CALLS = frozenset(
     }
 )
 
-
 def rel(path: Path) -> str:
     return path.relative_to(ROOT).as_posix()
-
 
 def iter_py_files() -> list[Path]:
     files: list[Path] = []
@@ -53,7 +51,6 @@ def iter_py_files() -> list[Path]:
             files.append(path)
     return files
 
-
 def callee_name(node: ast.Call) -> str | None:
     func = node.func
     if isinstance(func, ast.Name):
@@ -61,7 +58,6 @@ def callee_name(node: ast.Call) -> str | None:
     if isinstance(func, ast.Attribute):
         return func.attr
     return None
-
 
 def is_log_wrapper(func: ast.FunctionDef, file_rel: str) -> str | None:
     if func.name in ALLOWED_FUNCTIONS:
@@ -86,7 +82,6 @@ def is_log_wrapper(func: ast.FunctionDef, file_rel: str) -> str | None:
 
     return None
 
-
 def _is_fmt_id_msg_only_helper(func: ast.FunctionDef) -> bool:
     if not func.name.startswith("_"):
         return False
@@ -105,7 +100,6 @@ def _is_fmt_id_msg_only_helper(func: ast.FunctionDef) -> bool:
                 other_calls = True
     return returns_fmt and not other_calls
 
-
 def _is_thin_log_delegate(func: ast.FunctionDef) -> bool:
     log_calls = 0
     other_calls = 0
@@ -120,7 +114,6 @@ def _is_thin_log_delegate(func: ast.FunctionDef) -> bool:
         elif name not in BUILTIN_CALLS:
             other_calls += 1
     return log_calls > 0 and other_calls == 0
-
 
 def check_file(path: Path) -> list[str]:
     file_rel = rel(path)
@@ -140,7 +133,6 @@ def check_file(path: Path) -> list[str]:
                 violations.append(f"{file_rel}:{node.lineno}: {reason}")
     return violations
 
-
 def main() -> int:
     violations: list[str] = []
     for path in iter_py_files():
@@ -151,7 +143,6 @@ def main() -> int:
             print(line)
         return 1
     return 0
-
 
 if __name__ == "__main__":
     sys.exit(main())

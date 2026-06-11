@@ -7,7 +7,6 @@
 from .connection import get_db
 from log.log import write_log_entry
 
-
 def seed_db():
     try:
         with get_db() as conn:

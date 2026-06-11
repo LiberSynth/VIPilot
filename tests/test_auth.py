@@ -15,7 +15,6 @@ def _assert_401(response):
         "The auth guard may be missing or broken."
     )
 
-
 # ---------------------------------------------------------------------------
 # /api/* endpoints (bp blueprint)
 # ---------------------------------------------------------------------------
@@ -139,7 +138,6 @@ class TestApiBlueprintAuth:
 
     def test_get_export_update_package(self, client):
         _assert_401(client.get("/api/export-update-package"))
-
 
 # ---------------------------------------------------------------------------
 # /production/* endpoints (production_bp blueprint)

@@ -3,7 +3,6 @@ import os
 
 _VERSION_BASE = os.environ.get("APP_VERSION_BASE", "2.0.0")
 
-
 def _get_build_number() -> str:
     try:
         count = subprocess.check_output(
@@ -19,7 +18,6 @@ def _get_build_number() -> str:
         return BUILD
     except Exception:
         return "0"
-
 
 BUILD = _get_build_number()
 VERSION = f"{_VERSION_BASE}.{BUILD}"

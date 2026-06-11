@@ -4,7 +4,6 @@ from psycopg2 import pool as pg_pool
 
 _pool: pg_pool.ThreadedConnectionPool | None = None
 
-
 def _get_pool() -> pg_pool.ThreadedConnectionPool:
     global _pool
     if _pool is None or _pool.closed:
@@ -15,7 +14,6 @@ def _get_pool() -> pg_pool.ThreadedConnectionPool:
             connect_timeout=10,
         )
     return _pool
-
 
 @contextlib.contextmanager
 def get_db():
@@ -29,7 +27,6 @@ def get_db():
         raise
     finally:
         p.putconn(conn)
-
 
 def close_pool() -> None:
     """Закрывает все соединения пула. Следующий get_db() создаст новый пул.

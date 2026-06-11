@@ -4,7 +4,6 @@ import os
 import psycopg2
 import yaml
 
-
 SECTIONS = [
     {"name": "settings",        "fields": ["key", "value"],                                                          "pk": "key"},
     {"name": "environment",     "fields": ["key"],                                          "pk": "key", "insert_only": True},
@@ -18,12 +17,10 @@ SECTIONS = [
     {"name": "user_role_links", "fields": ["id", "user_id", "role_id"],                                              "pk": "id"},
 ]
 
-
 def _to_db(col, val, jsonb_fields):
     if col in jsonb_fields and isinstance(val, (dict, list)):
         return json.dumps(val, ensure_ascii=False)
     return val
-
 
 def import_package(stream):
     database_url = os.environ.get("DATABASE_URL")

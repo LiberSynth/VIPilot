@@ -23,27 +23,21 @@ from log import write_log_entry
 from utils.utils import fmt_id_msg
 from routes.api import publication_file_name, hashtags
 
-
 _NAV_TIMEOUT = 60_000  # ms — таймаут одной попытки навигации (1 минута; до 5 попыток подряд)
 _UPLOAD_WAIT = 180_000  # ms — ожидание завершения загрузки (до 3 минут)
-
 
 class VkVideoSessionMissing(RuntimeError):
     """Браузерная сессия VK Видео не сохранена — требуется авторизация."""
 
-
 class VkVideoCsrfExpired(RuntimeError):
     """Сессия истекла — необходима повторная авторизация."""
-
 
 class VkVideoApiError(RuntimeError):
     """Ошибка публикации на VK Видео."""
 
-
 # ---------------------------------------------------------------------------
 # Публичный API
 # ---------------------------------------------------------------------------
-
 
 def publish(
     video_data: bytes,
@@ -127,11 +121,9 @@ def publish(
     write_log_entry(batch_id, category, "VK Видео: клип опубликован успешно")
     return {"ok": True, "clip_url": _state["clip_url"]}
 
-
 # ---------------------------------------------------------------------------
 # UI-driven публикация
 # ---------------------------------------------------------------------------
-
 
 def _snap(page, batch_id=None) -> None:
     """Снимает скриншот и передаёт кадр в SSE-трансляцию и монитор (thread-safe)."""
@@ -145,7 +137,6 @@ def _snap(page, batch_id=None) -> None:
             _b.push_frame_for_batch(batch_id, img)
     except Exception as _e:
         write_log_entry(None, 'vkvideo', f'_snap: {_e}', level='silent')
-
 
 def _read_clip_url(page) -> str:
     """Читает ссылку на клип из DOM (раздел «Ссылка на клип»)."""
@@ -164,7 +155,6 @@ def _read_clip_url(page) -> str:
     except Exception:
         pass
     return ""
-
 
 def _wait_visible(locator, timeout_ms: int, page, batch_id, interval_ms: int = 2_000):
     """Ждёт видимости локатора, снимая скриншот каждые interval_ms мс.
@@ -185,7 +175,6 @@ def _wait_visible(locator, timeout_ms: int, page, batch_id, interval_ms: int = 2
                 locator.wait_for(state="visible", timeout=1_000)  # бросит TimeoutError
                 return
             _snap(page, batch_id)
-
 
 def _publish_ui(
     page, club_id: str, video_path: str, pub_title: str, category, batch_id=None

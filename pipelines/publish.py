@@ -27,7 +27,6 @@ from clients.rutube import RutubeCsrfExpired, RutubeSessionMissing
 from clients import vkvideo as vkvideo_client
 from clients.vkvideo import VkVideoCsrfExpired, VkVideoSessionMissing
 
-
 def _get_video(batch_id, category):
     """Возвращает видеоданные батча (transcoded или original).
     Бросает RuntimeError если отсутствуют оба файла."""
@@ -45,8 +44,6 @@ def _get_video(batch_id, category):
         level='silent',
     )
     return video_data
-
-
 
 def _call_vk(slug, method, batch_id, category, target, pub_title):
     cfg = target.get('config') or {}
@@ -76,7 +73,6 @@ def _call_vk(slug, method, batch_id, category, target, pub_title):
         write_log_entry(batch_id, category, f'VK: неизвестный метод «{method}» — пропуск', level='warn')
         return False
 
-
 def _call_dzen(slug, method, batch_id, category, target, pub_title):
     cfg = target.get('config') or {}
     target_id = target.get('id')
@@ -91,7 +87,6 @@ def _call_dzen(slug, method, batch_id, category, target, pub_title):
 
     return dzen_client.publish(video_data, cfg, batch_id, category, target_id=target_id, pub_title=pub_title)
 
-
 def _call_rutube(slug, method, batch_id, category, target, pub_title):
     cfg = target.get('config') or {}
     target_id = target.get('id')
@@ -105,7 +100,6 @@ def _call_rutube(slug, method, batch_id, category, target, pub_title):
     video_data = _get_video(batch_id, category)
 
     return rutube_client.publish(video_data, cfg, batch_id, category, target_id=target_id, pub_title=pub_title)
-
 
 def _call_vkvideo(slug, method, batch_id, category, target, pub_title):
     cfg = target.get('config') or {}
@@ -122,7 +116,6 @@ def _call_vkvideo(slug, method, batch_id, category, target, pub_title):
     result = vkvideo_client.publish(video_data, cfg, batch_id, category, target_id=target_id, pub_title=pub_title)
     return result.get('ok', False)
 
-
 _CLIENTS = {
     'vk':      _call_vk,
     'dzen':    _call_dzen,
@@ -138,14 +131,12 @@ def _call_client(slug, method, batch_id, category, target, pub_title):
         return False
     return handler(slug, method, batch_id, category, target, pub_title)
 
-
 def _parse_composite_status(status: str):
     """Парсит составной статус вида slug.method.phase → (slug, method, phase) или None."""
     parts = status.split('.')
     if len(parts) == 3:
         return parts[0], parts[1], parts[2]
     return None
-
 
 def _build_steps(active_targets):
     """Строит список шагов публикации: [(slug, method, target), ...] по алфавиту метода внутри таргета."""
@@ -160,7 +151,6 @@ def _build_steps(active_targets):
         for method in enabled_methods:
             steps.append((slug, method, t))
     return steps
-
 
 def run(batch_id, category):
     snap = environment.snapshot()

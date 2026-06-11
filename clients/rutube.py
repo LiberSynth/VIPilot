@@ -14,25 +14,20 @@ from log import write_log_entry
 from utils.utils import fmt_id_msg
 from routes.api import publication_file_name
 
-
 _NAV_TIMEOUT  = 60_000   # ms — таймаут одной попытки навигации (1 минута; до 5 попыток подряд)
 _UPLOAD_WAIT  = 180_000  # ms — ожидание завершения загрузки (до 3 минут)
 _CATEGORY     = "Юмор"   # категория по умолчанию
 
 STUDIO_URL = "https://studio.rutube.ru/"
 
-
 class RutubeSessionMissing(RuntimeError):
     """Браузерная сессия Рутьюба не сохранена — требуется авторизация."""
-
 
 class RutubeCsrfExpired(RuntimeError):
     """Сессия истекла — необходима повторная авторизация."""
 
-
 class RutubeApiError(RuntimeError):
     """Ошибка публикации на Рутьюб."""
-
 
 # ---------------------------------------------------------------------------
 # Публичный API
@@ -104,7 +99,6 @@ def publish(
     write_log_entry(batch_id, category, "Рутьюб: видео опубликовано успешно")
     return True
 
-
 # ---------------------------------------------------------------------------
 # UI-driven публикация
 # ---------------------------------------------------------------------------
@@ -120,7 +114,6 @@ def _snap(page, batch_id=None) -> None:
             _b.push_frame_for_batch(batch_id, img)
     except Exception as _e:
         write_log_entry(None, 'rutube', f'_snap: {_e}', level='silent')
-
 
 def _publish_ui(page, video_path: str, category, batch_id=None):
     """Управляет браузером для публикации видео через UI Рутьюба."""

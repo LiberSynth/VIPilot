@@ -9,7 +9,6 @@ PLAYWRIGHT_BROWSERS_PATH = (
     else '/usr/local/share/ms-playwright'
 )
 
-
 def _get_flask_secret():
     secret = os.environ.get("FLASK_SECRET", "").strip()
     if secret:
@@ -18,7 +17,6 @@ def _get_flask_secret():
     from log.log import write_log_entry
     write_log_entry(None, 'consts', 'FLASK_SECRET не задан в окружении — сгенерирован случайный ключ, сессии будут сброшены при перезапуске', level='warn')
     return generated
-
 
 FLASK_SECRET = _get_flask_secret()
 

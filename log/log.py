@@ -62,7 +62,6 @@ _LOG_UUID_TAIL = re.compile(
     re.IGNORECASE,
 )
 
-
 def _ensure_log_period(message: str) -> str:
     """Точка в конце обычных фраз; без изменений для служебных/структурных хвостов."""
     if not message:
@@ -81,7 +80,6 @@ def _ensure_log_period(message: str) -> str:
         return s + "."
     return message
 
-
 def _resolve_channel_and_message(default_channel: str, message: str) -> tuple[str, str]:
     """Префикс [tag] в тексте → log_entries.channel, без дубля в message."""
     m = _LOG_BRACKET_PREFIX.match(message or "")
@@ -92,7 +90,6 @@ def _resolve_channel_and_message(default_channel: str, message: str) -> tuple[st
         return tag, message[m.end() :]
     return default_channel, message
 
-
 def _stdout_log(channel: str, message: str) -> None:
     text = f"{channel} — {message}".encode("cp1251", errors="replace").decode("cp1251")
     try:
@@ -100,7 +97,6 @@ def _stdout_log(channel: str, message: str) -> None:
     except UnicodeEncodeError:
         sys.stdout.buffer.write(text.encode("cp1251", errors="replace") + b"\n")
         sys.stdout.flush()
-
 
 def write_log_entry(batch_id, channel, message, level="info"):
     """Единая точка записи в log и log_entries. Канал — log_entries.channel."""

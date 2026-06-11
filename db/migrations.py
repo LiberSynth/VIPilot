@@ -28,7 +28,6 @@ from log.log import write_log_entry
 
 _VIDEO_DIR = Path(__file__).resolve().parents[1] / "video"
 
-
 # ---------------------------------------------------------------------------
 # Функции миграций
 # ---------------------------------------------------------------------------
@@ -38,7 +37,6 @@ def _m1001_drop_targets_legacy_columns(cur):
     cur.execute("ALTER TABLE targets DROP COLUMN IF EXISTS aspect_ratio_x")
     cur.execute("ALTER TABLE targets DROP COLUMN IF EXISTS aspect_ratio_y")
     cur.execute("ALTER TABLE targets DROP COLUMN IF EXISTS transcode")
-
 
 def _m1002_add_movies_transcoded(cur):
     """Add movies.transcoded with backfill based on transcoded_data files."""
@@ -58,7 +56,6 @@ def _m1002_add_movies_transcoded(cur):
         "CREATE INDEX IF NOT EXISTS idx_movies_transcode_pick ON movies (used, transcoded, created_at, id)"
     )
 
-
 # ---------------------------------------------------------------------------
 # Реестр миграций — добавляйте только в конец, никогда не переиспользуйте номера
 # ---------------------------------------------------------------------------
@@ -76,7 +73,6 @@ def _m1003_backfill_transcode_schedule_from_planning(cur):
           AND pl.type = 'planning'
         """
     )
-
 
 def _m1004_backfill_movies_story_id(cur):
     """Fill movies.story_id from the latest linked batch."""
@@ -98,7 +94,6 @@ def _m1004_backfill_movies_story_id(cur):
         """
     )
 
-
 def _m1005_mark_published_movies_used(cur):
     """Mark published movies used and transcoded (already published — no re-transcode)."""
     cur.execute(
@@ -117,7 +112,6 @@ def _m1005_mark_published_movies_used(cur):
         )
         """
     )
-
 
 def _m1006_fix_published_movies_transcoded(cur):
     """Backfill transcoded=1 for published movies (fix after _m1005 without transcoded)."""
@@ -138,7 +132,6 @@ def _m1006_fix_published_movies_transcoded(cur):
         """
     )
 
-
 def _m1007_log_category_and_drop_message_status(cur):
     cur.execute("""
         SELECT column_name
@@ -155,7 +148,6 @@ def _m1007_log_category_and_drop_message_status(cur):
     cur.execute("DROP INDEX IF EXISTS idx_log_pipeline")
     cur.execute("DROP INDEX IF EXISTS idx_log_status")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_log_category ON log (category)")
-
 
 def merge_duplicate_batch_logs(cur) -> None:
     """Один log на batch_id: перенос log_entries, удаление лишних строк log."""
@@ -195,7 +187,6 @@ def merge_duplicate_batch_logs(cur) -> None:
         ) r
         WHERE l.id = r.id AND r.rn > 1
     """)
-
 
 def _m1008_log_entries_category(cur):
     cur.execute("ALTER TABLE log_entries ADD COLUMN IF NOT EXISTS category TEXT")
@@ -249,13 +240,11 @@ def _m1008_log_entries_category(cur):
             ON log_entries (category)
     """)
 
-
 _LOG_ENTRY_CHANNELS = (
     "api", "planning", "story", "video", "transcode", "publish", "runner", "playwright",
     "main", "main_loop", "http", "db", "upgrade", "startup", "cleanup", "browser",
     "notify", "consts", "dzen", "rutube", "vkvideo", "system",
 )
-
 
 def _m1009_log_entries_channel(cur):
     cur.execute("""
@@ -284,7 +273,6 @@ def _m1009_log_entries_channel(cur):
             ON log_entries (channel)
     """)
 
-
 def _m1010_drop_log_entries_category(cur):
     cur.execute("""
         SELECT column_name
@@ -307,7 +295,6 @@ def _m1010_drop_log_entries_category(cur):
         cur.execute("ALTER TABLE log_entries RENAME COLUMN category TO channel")
     cur.execute("DROP INDEX IF EXISTS idx_log_entries_category")
 
-
 MIGRATIONS = [
     (2026052901, _m1001_drop_targets_legacy_columns),
     (2026052902, _m1002_add_movies_transcoded),
@@ -320,7 +307,6 @@ MIGRATIONS = [
     (2026052909, _m1009_log_entries_channel),
     (2026052910, _m1010_drop_log_entries_category),
 ]
-
 
 # ---------------------------------------------------------------------------
 # Запуск миграций

@@ -31,7 +31,6 @@ from routes.api import client_is_configured
 from clients.falai import ProviderFatalError
 from utils.utils import fmt_id_msg, nearest_allowed_duration
 
-
 def _video_client(platform_name: str):
     """Возвращает клиент нужной платформы по имени."""
     if platform_name == 'Grok':
@@ -40,11 +39,9 @@ def _video_client(platform_name: str):
         return skyreels
     return falai
 
-
 def _is_content_moderation_error(err_text: str) -> bool:
     low = (err_text or '').lower()
     return 'moderation' in low or 'политик' in low or 'content policy' in low
-
 
 def _clear_handshake_payload() -> dict:
     return {
@@ -53,7 +50,6 @@ def _clear_handshake_payload() -> dict:
         'response_url': None,
         'generated_video_url': None,
     }
-
 
 def _video_pending_resume_target(batch_data) -> str | None:
     """Если pending, но в data есть прогресс — куда подхватить без нового submit."""
@@ -68,7 +64,6 @@ def _video_pending_resume_target(batch_data) -> str | None:
     ):
         return 'generating'
     return None
-
 
 def _download_and_finalize(batch_id, batch, category, batch_data, used_model, used_model_id):
     # Подхват после падения между сохранением файла и выставлением ready:
@@ -115,7 +110,6 @@ def _download_and_finalize(batch_id, batch, category, batch_data, used_model, us
         fmt_id_msg("[video] Батч {} — phase=run_done, status=ready, model_id={}", batch_id, used_model_id),
         level='silent',
     )
-
 
 def run(batch_id, category):
     _snap = environment.snapshot()

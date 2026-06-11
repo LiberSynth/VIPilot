@@ -14,21 +14,17 @@ _PG_REPACK_BOOTSTRAP_ERROR = ""
 # Официальных win-бинарников у reorg/pg_repack нет (только исходники на GitHub).
 _WINDOWS_USES_VACUUM_FALLBACK = True
 
-
 def _set_pg_repack_bootstrap_error(msg: str | None) -> None:
     global _PG_REPACK_BOOTSTRAP_ERROR
     _PG_REPACK_BOOTSTRAP_ERROR = (msg or "").strip()
 
-
 def get_pg_repack_bootstrap_error() -> str:
     return _PG_REPACK_BOOTSTRAP_ERROR
-
 
 def _project_bin_dir() -> pathlib.Path:
     d = pathlib.Path(__file__).resolve().parent.parent / "bin"
     d.mkdir(exist_ok=True)
     return d
-
 
 def _pip_install(package: str) -> None:
     subprocess.run(
@@ -36,14 +32,12 @@ def _pip_install(package: str) -> None:
         check=True,
     )
 
-
 def _ensure_dotenv() -> None:
     if importlib.util.find_spec("dotenv") is None:
         _pip_install("python-dotenv")
     if pathlib.Path(".env").exists():
         from dotenv import load_dotenv
         load_dotenv()
-
 
 def _install_ffmpeg_windows() -> None:
     import urllib.request
@@ -80,10 +74,8 @@ def _install_ffmpeg_windows() -> None:
     sys.stdout.write(f"[bootstrap] ffmpeg установлен: {ffmpeg_exe}\n")
     sys.stdout.flush()
 
-
 def _prepend_to_path(path: pathlib.Path) -> None:
     os.environ["PATH"] = str(path) + os.pathsep + os.environ.get("PATH", "")
-
 
 def _iter_windows_postgres_bin_dirs():
     seen: set[str] = set()
@@ -104,7 +96,6 @@ def _iter_windows_postgres_bin_dirs():
                 continue
             seen.add(key)
             yield bin_dir
-
 
 def _find_pg_repack_windows() -> bool:
     if shutil.which("pg_repack"):
@@ -130,7 +121,6 @@ def _find_pg_repack_windows() -> bool:
             return True
     return False
 
-
 def _run_cmd(args: list[str], timeout: int) -> tuple[bool, str]:
     try:
         r = subprocess.run(args, capture_output=True, timeout=timeout)
@@ -144,7 +134,6 @@ def _run_cmd(args: list[str], timeout: int) -> tuple[bool, str]:
         return False, err
     except Exception as e:
         return False, f"{type(e).__name__}: {e}"
-
 
 def _detect_pg_major_from_database_url() -> int | None:
     dsn = os.environ.get("DATABASE_URL")
@@ -163,7 +152,6 @@ def _detect_pg_major_from_database_url() -> int | None:
         return ver_num // 10000
     except Exception:
         return None
-
 
 def _install_pg_repack_linux() -> bool:
     if shutil.which("apt-get") is None:
@@ -195,7 +183,6 @@ def _install_pg_repack_linux() -> bool:
             return True
     return shutil.which("pg_repack") is not None
 
-
 def _install_pg_repack_macos() -> bool:
     if shutil.which("brew") is None:
         return shutil.which("pg_repack") is not None
@@ -205,7 +192,6 @@ def _install_pg_repack_macos() -> bool:
         sys.stdout.flush()
         return False
     return shutil.which("pg_repack") is not None
-
 
 def _install_pg_repack_windows() -> bool:
     """На Windows готовых бинарников pg_repack нет — только поиск уже установленного CLI."""
@@ -217,7 +203,6 @@ def _install_pg_repack_windows() -> bool:
     (dest_dir / "pg_repack.skip").unlink(missing_ok=True)
     return _find_pg_repack_windows()
 
-
 def _auto_install_pg_repack() -> bool:
     system = platform.system()
     if system == "Linux":
@@ -227,7 +212,6 @@ def _auto_install_pg_repack() -> bool:
     if system == "Windows":
         return _install_pg_repack_windows()
     return False
-
 
 def ensure_pg_repack_in_path(auto_install: bool = False) -> bool:
     """Гарантирует доступность pg_repack в PATH.
@@ -280,7 +264,6 @@ def ensure_pg_repack_in_path(auto_install: bool = False) -> bool:
         _set_pg_repack_bootstrap_error("pg_repack не найден после автоустановки")
     return found
 
-
 def _ensure_ffmpeg() -> None:
     if shutil.which("ffmpeg"):
         return
@@ -301,7 +284,6 @@ def _ensure_ffmpeg() -> None:
             f"ffmpeg не найден. Установите вручную (платформа: {system})."
         )
 
-
 def ensure_required_software() -> None:
     """Проверяет и при необходимости устанавливает необходимый софт."""
     _ensure_dotenv()
@@ -320,9 +302,7 @@ def ensure_required_software() -> None:
     _ensure_ffmpeg()
     ensure_pg_repack_in_path()
 
-
 _instance_lock_file = None
-
 
 def _pid_is_running(pid: int) -> bool:
     if pid <= 0:
@@ -343,14 +323,12 @@ def _pid_is_running(pid: int) -> bool:
         return True
     return True
 
-
 def _read_lock_pid(lock_path: pathlib.Path) -> int | None:
     try:
         line = lock_path.read_text(encoding="utf-8").strip().splitlines()[0].strip()
         return int(line) if line else None
     except (OSError, ValueError, IndexError):
         return None
-
 
 def _try_instance_file_lock(fh) -> None:
     if platform.system() == "Windows":
@@ -361,13 +339,11 @@ def _try_instance_file_lock(fh) -> None:
         import fcntl
         fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
 
-
 def _write_lock_pid(fh, pid: int) -> None:
     fh.seek(0)
     fh.truncate()
     fh.write(f"{pid}\n")
     fh.flush()
-
 
 def ensure_single_instance() -> None:
     """Не даёт запустить второй процесс с тем же main loop (общий _system_log_id в памяти)."""
@@ -408,7 +384,6 @@ def ensure_single_instance() -> None:
             _write_lock_pid(fh, os.getpid())
             _instance_lock_file = fh
             return
-
 
 def run_foreground(flask_app, module_name: str) -> None:
     """HTTP-сервер при запуске python main.py (не при import main:app)."""

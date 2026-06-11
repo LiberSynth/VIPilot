@@ -18,7 +18,6 @@ _VK_TOKEN = os.environ.get('VK_USER_TOKEN', '')
 _VK_API   = 'https://api.vk.com/method'
 _VK_VER   = '5.131'
 
-
 def publish_story(video_data: bytes, group_id: int, batch_id, category, pub_title: str = "") -> int | None:
     """Публикует видео как историю ВКонтакте. Возвращает story_id или None."""
     write_log_entry(batch_id, category, fmt_id_msg("[publish] VK story start: group_id={}, bytes={}", group_id, len(video_data)), level='silent')
@@ -79,7 +78,6 @@ def publish_story(video_data: bytes, group_id: int, batch_id, category, pub_titl
     write_log_entry(batch_id, category, f"stories.save: {save.get('error', save)}", level='error')
     return None
 
-
 def _clip_url_to_attachment(clip_url: str) -> str:
     """Преобразует ссылку VK Видео в attachment-строку для wall.post.
 
@@ -93,7 +91,6 @@ def _clip_url_to_attachment(clip_url: str) -> str:
         if clip_url.startswith(prefix):
             return "video" + clip_url[len(prefix):]
     return ""
-
 
 def publish_clip_wall(clip_url: str, title: str, group_id: int, batch_id, category) -> int | None:
     """Публикует пост на стену сообщества со ссылкой на существующий клип VK Видео.
@@ -126,7 +123,6 @@ def publish_clip_wall(clip_url: str, title: str, group_id: int, batch_id, catego
 
     write_log_entry(batch_id, category, f"VK: wall.post: {post_resp.get('error', post_resp)}", level='error')
     return None
-
 
 def publish_wall(video_data: bytes, group_id: int, batch_id, category, pub_title: str = "") -> int | None:
     """Публикует видео на стену сообщества ВКонтакте. Возвращает post_id или None."""

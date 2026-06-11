@@ -874,7 +874,6 @@
   .story-info-btn.copied svg { stroke: #3ecf8e; }
   .story-info-btn.copied circle[fill] { fill: #3ecf8e; }
 
-
   /* ── Тултип долгого нажатия (мобильный) ── */
   #touch-tooltip {
     position: fixed;
@@ -893,7 +892,6 @@
     transition: opacity 0.15s;
   }
   #touch-tooltip.hidden { opacity: 0; }
-
 
   /* ── Поле поиска с кнопкой "Очистить" ── */
   .search-input-wrap {

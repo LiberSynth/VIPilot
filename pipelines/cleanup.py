@@ -22,14 +22,12 @@ from utils.utils import parse_long_lifetime, parse_batch_lifetime
 
 _thread = None
 
-
 def tick():
     """Запускает поток очистки, если предыдущий уже завершился."""
     global _thread
     if _thread is None or not _thread.is_alive():
         _thread = threading.Thread(target=run, daemon=True)
         _thread.start()
-
 
 def run():
     try:

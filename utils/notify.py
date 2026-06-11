@@ -3,12 +3,10 @@ import requests
 from db import settings_get
 from log import write_log_entry
 
-
 def _msk_ts() -> str:
     from datetime import datetime, timezone, timedelta
     msk = timezone(timedelta(hours=3))
     return datetime.now(msk).strftime("%d.%m.%Y %H:%M:%S")
-
 
 def send_failure_email(message: str, log_entries=None, partial: bool = False):
     import smtplib
@@ -46,7 +44,6 @@ def send_failure_email(message: str, log_entries=None, partial: bool = False):
     except Exception as e:
         write_log_entry(None, 'notify', f'Ошибка отправки email: {e}', level='silent')
 
-
 def send_failure_sms(message: str):
     phone      = settings_get("notify_phone", "").strip()
     smsc_login = os.environ.get("SMSC_LOGIN", "").strip()
@@ -75,7 +72,6 @@ def send_failure_sms(message: str):
             write_log_entry(None, 'notify', f'SMS отправлено на {phone}', level='silent')
     except Exception as e:
         write_log_entry(None, 'notify', f'Ошибка отправки SMS: {e}', level='silent')
-
 
 def notify_failure(reason: str, log_entries=None, partial: bool = False):
     try:

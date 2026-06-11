@@ -11,7 +11,6 @@ import requests
 
 from log import write_log_entry
 
-
 _FAL_KEY = os.environ.get('FAL_API_KEY', '')
 
 _POLL_INTERVAL = 30
@@ -20,17 +19,14 @@ _POLL_MAX      = 240
 _DOWNLOAD_MAX_ATTEMPTS = 3
 _DOWNLOAD_RETRY_DELAY  = 5
 
-
 class ProviderFatalError(Exception):
     """Raised when a provider returns a permanent, non-retryable billing/account error."""
-
 
 def _headers():
     return {
         'Authorization': f'Key {_FAL_KEY}',
         'Content-Type': 'application/json',
     }
-
 
 def _compact_json(value, limit: int = 1200) -> str:
     """Возвращает компактный JSON/строку для диагностики с ограничением размера."""
@@ -42,7 +38,6 @@ def _compact_json(value, limit: int = 1200) -> str:
         return text
     return text[:limit] + '...'
 
-
 def _is_fatal_fal(status_code: int, body) -> bool:
     """Detect fal.ai balance-exhausted / account-locked errors (HTTP 403)."""
     if status_code != 403:
@@ -50,13 +45,10 @@ def _is_fatal_fal(status_code: int, body) -> bool:
     text = str(body).lower()
     return 'exhausted balance' in text or 'locked' in text
 
-
 _FATAL_DETECTORS = [_is_fatal_fal]
-
 
 def _is_provider_fatal(status_code: int, body) -> bool:
     return any(fn(status_code, body) for fn in _FATAL_DETECTORS)
-
 
 def build_body(body_tpl, prompt, ar_x, ar_y, video_duration, batch_id=None, category=None):
     """
@@ -100,7 +92,6 @@ def build_body(body_tpl, prompt, ar_x, ar_y, video_duration, batch_id=None, cate
                     )
 
     return body
-
 
 def submit(batch_id, category, model_name: str, submit_url: str, platform_url: str,
            body_tpl: dict, prompt: str, ar_x: int, ar_y: int,
@@ -155,9 +146,7 @@ def submit(batch_id, category, model_name: str, submit_url: str, platform_url: s
         'response_url': response_url,
     }
 
-
 _POLL_MAX_ERRORS = 10
-
 
 def poll(batch_id, category, status_url: str, response_url: str):
     """
@@ -239,7 +228,6 @@ def poll(batch_id, category, status_url: str, response_url: str):
     msg = 'Таймаут генерации видео (2 часа)'
     write_log_entry(batch_id, category, msg, level='error')
     return None, msg
-
 
 def download_video(batch_id, category, video_url: str) -> bytes:
     """

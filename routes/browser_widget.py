@@ -17,19 +17,16 @@ from services.browser_registry import get_browser, SLUGS
 
 bp = Blueprint("browser_widget", __name__, url_prefix="/api")
 
-
 def _auth_required():
     if not is_authenticated():
         return jsonify({"ok": False, "error": "Unauthorized"}), 401
     return None
-
 
 def _resolve(slug):
     """Возвращает (browser, None) или (None, error_response)."""
     if slug not in SLUGS:
         return None, (jsonify({"ok": False, "error": f"Unknown platform: {slug}"}), 404)
     return get_browser(slug), None
-
 
 @bp.route("/<slug>-browser/start", methods=["POST"])
 def start(slug):
@@ -46,7 +43,6 @@ def start(slug):
         return jsonify({"ok": False, "error": "target_id required"}), 400
 
     return jsonify(svc.start(target_id))
-
 
 @bp.route("/<slug>-browser/stream")
 def stream(slug):
@@ -69,7 +65,6 @@ def stream(slug):
         },
     )
 
-
 @bp.route("/<slug>-browser/event", methods=["POST"])
 def event(slug):
     err = _auth_required()
@@ -84,7 +79,6 @@ def event(slug):
         return jsonify({"ok": False, "error": "JSON required"}), 400
 
     return jsonify({"ok": svc.send_event(request.json)})
-
 
 @bp.route("/<slug>-browser/save-session", methods=["POST"])
 def save_session(slug):
@@ -102,7 +96,6 @@ def save_session(slug):
 
     return jsonify(svc.request_save(target_id))
 
-
 @bp.route("/<slug>-browser/stop", methods=["POST"])
 def stop(slug):
     err = _auth_required()
@@ -114,7 +107,6 @@ def stop(slug):
         return err
 
     return jsonify(svc.stop())
-
 
 @bp.route("/<slug>-browser/status")
 def status(slug):

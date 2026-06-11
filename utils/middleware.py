@@ -13,7 +13,6 @@ _SILENT_GET_PREFIXES = (
     '/static/',
 )
 
-
 def log_request():
     method = request.method
     path = request.path
@@ -25,7 +24,6 @@ def log_request():
     full_path = request.full_path if request.query_string else path
     remote = request.remote_addr
     write_log_entry(None, 'http', f'{method} {full_path} | IP: {remote}', level='silent')
-
 
 def register_middleware(app):
     app.before_request(log_request)

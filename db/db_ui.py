@@ -2,7 +2,6 @@ import psycopg2.extras
 
 from .connection import get_db
 
-
 def db_get_batch_logs(batch_id):
     with get_db() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
@@ -62,14 +61,12 @@ def db_get_batch_logs(batch_id):
         ],
     }
 
-
 def _build_stories_used_expr() -> str:
     return """EXISTS (
                     SELECT 1 FROM movies m
                     WHERE m.story_id = s.id
                       AND m.grade = 'good'
                 )"""
-
 
 def _build_stories_where(used_expr: str, show_used: bool, show_bad: bool, for_approval: bool, only_pinned: bool, only_bad: bool, pin_id=None):
     filter_conditions = []
@@ -98,7 +95,6 @@ def _build_stories_where(used_expr: str, show_used: bool, show_bad: bool, for_ap
         where_clause = ""
     return where_clause, params
 
-
 def db_get_story_ids_by_filter(show_used=True, show_bad=True, for_approval=False, only_pinned=False, only_bad=False) -> list:
     used_expr = _build_stories_used_expr()
     where_clause, params = _build_stories_where(used_expr, show_used, show_bad, for_approval, only_pinned, only_bad)
@@ -109,7 +105,6 @@ def db_get_story_ids_by_filter(show_used=True, show_bad=True, for_approval=False
                 params or None,
             )
             return [row[0] for row in cur.fetchall()]
-
 
 def db_get_stories_list(show_used=True, show_bad=True, for_approval=False, pin_id=None, only_pinned: bool = False, only_bad: bool = False):
     from common.statuses import FINAL_BATCH_STATUSES
@@ -161,14 +156,12 @@ def db_get_stories_list(show_used=True, show_bad=True, for_approval=False, pin_i
         for row in rows
     ]
 
-
 _MOVIES_PUBLISHED_CHECK = """EXISTS (
         SELECT 1 FROM batches b2
         WHERE b2.movie_id = m.id
           AND (b2.status IN ('published', 'published_partially')
                OR b2.status LIKE '%%.published')
     )"""
-
 
 def _build_movies_where(show_published: bool, show_bad: bool, for_approval: bool, pin_id=None):
     filter_conditions = []
@@ -191,7 +184,6 @@ def _build_movies_where(show_published: bool, show_bad: bool, for_approval: bool
         where_clause = ""
     return where_clause, params
 
-
 def db_get_movie_ids_by_filter(show_published=True, show_bad=True, for_approval=False) -> list:
     where_clause, params = _build_movies_where(show_published, show_bad, for_approval)
     with get_db() as conn:
@@ -201,7 +193,6 @@ def db_get_movie_ids_by_filter(show_published=True, show_bad=True, for_approval=
                 params or None,
             )
             return [row[0] for row in cur.fetchall()]
-
 
 def db_get_movies_list(show_published=True, show_bad=True, for_approval=False, pin_id=None):
     where_clause, params = _build_movies_where(show_published, show_bad, for_approval, pin_id)
@@ -255,7 +246,6 @@ def db_get_movies_list(show_published=True, show_bad=True, for_approval=False, p
         for row in rows
     ]
 
-
 def db_get_stories_pool() -> list:
     with get_db() as conn:
         with conn.cursor() as cur:
@@ -273,7 +263,6 @@ def db_get_stories_pool() -> list:
             rows = cur.fetchall()
     return [{"id": row[0], "title": row[1] or "", "content": row[2] or ""} for row in rows]
 
-
 def db_count_good_pool() -> int:
     with get_db() as conn:
         with conn.cursor() as cur:
@@ -289,7 +278,6 @@ def db_count_good_pool() -> int:
             """)
             row = cur.fetchone()
     return row[0] if row else 0
-
 
 def db_get_models(model_type: str):
     with get_db() as conn:
@@ -322,13 +310,11 @@ def db_get_models(model_type: str):
 
     return models
 
-
 def db_get_role_modules():
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute("SELECT slug, module FROM user_roles")
             return {row[0]: row[1] for row in cur.fetchall()}
-
 
 def db_get_user_by_login(login):
     with get_db() as conn:

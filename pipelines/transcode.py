@@ -22,17 +22,14 @@ _VIDEO_DIR = Path(__file__).resolve().parents[1] / "video"
 _RAW_FIELD = "raw_data"
 _TRANSCODED_FIELD = "transcoded_data"
 
-
 def _movie_video_path(movie_id: str, field: str) -> Path:
     return _VIDEO_DIR / f"{movie_id} - {field}.mp4"
-
 
 def _remove_transcoded_file(path: Path) -> None:
     try:
         path.unlink()
     except FileNotFoundError:
         pass
-
 
 def _ffmpeg(batch_id, src: Path, dst: Path, category):
     cmd = [
@@ -55,7 +52,6 @@ def _ffmpeg(batch_id, src: Path, dst: Path, category):
     )
     subprocess.run(cmd, check=True, timeout=300)
     write_log_entry(batch_id, category, "[transcode] phase=ffmpeg_done", level='silent')
-
 
 def run(batch_id, category):
     _snap = environment.snapshot()

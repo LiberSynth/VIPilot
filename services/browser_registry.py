@@ -38,7 +38,6 @@ _browsers: dict[str, PlatformBrowser] = {
 
 SLUGS: tuple[str, ...] = tuple(_CONFIGS.keys())
 
-
 def get_browser(slug: str) -> PlatformBrowser:
     """Возвращает экземпляр PlatformBrowser для указанного slug."""
     return _browsers[slug]

@@ -3,11 +3,9 @@ def wrap_block(title: str, body: str, number: int | None = None) -> str:
     label = f'{title} {number}' if number is not None else title
     return f'/* {label} НАЧАЛО */\n{body}\n/* {label} КОНЕЦ */'
 
-
 def fmt_id_msg(template: str, *ids) -> str:
     """Подставляет каждый идентификатор целиком (без обрезки) в соответствующий {} плейсхолдер шаблона."""
     return template.format(*[str(i) for i in ids])
-
 
 def parse_hhmm(s):
     try:
@@ -16,14 +14,12 @@ def parse_hhmm(s):
     except Exception:
         return 6, 0
 
-
 def parse_batch_lifetime(s):
     try:
         v = int(s)
         return 0 if v == 0 else max(1, min(365, v))
     except Exception:
         return 7
-
 
 def parse_long_lifetime(s, default=365):
     try:
@@ -32,16 +28,13 @@ def parse_long_lifetime(s, default=365):
     except Exception:
         return default
 
-
 def to_msk(h, m):
     total = (h * 60 + m + 180) % 1440
     return total // 60, total % 60
 
-
 def to_utc_from_msk(h, m):
     total = (h * 60 + m - 180) % 1440
     return total // 60, total % 60
-
 
 def nearest_allowed_duration(value: int, allowed: list[int]) -> int:
     """

@@ -2,7 +2,6 @@
 Единый класс исключения для прерывающих ошибок в пайплайнах.
 """
 
-
 class FatalError(Exception):
     """Критическое нарушение инварианта приложения вне контекста пайплайна.
 
@@ -20,7 +19,6 @@ class FatalError(Exception):
 
     def __str__(self):
         return self.message
-
 
 class AppException(Exception):
     """Прерывающая ошибка пайплайна.

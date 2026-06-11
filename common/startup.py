@@ -10,7 +10,6 @@ from log import write_log_entry
 from utils.consts import FLASK_SECRET, PLAYWRIGHT_BROWSERS_PATH
 from utils.limiter import limiter
 
-
 def create_app() -> Flask:
     app = Flask('main', static_folder="static", static_url_path="/static")
     app.secret_key = FLASK_SECRET
@@ -18,10 +17,8 @@ def create_app() -> Flask:
     limiter.init_app(app)
     return app
 
-
 def init_app() -> None:
     os.environ.setdefault('PLAYWRIGHT_BROWSERS_PATH', PLAYWRIGHT_BROWSERS_PATH)
-
 
 def register_shutdown_hooks() -> None:
     def _on_exit():

@@ -1,7 +1,6 @@
 import time
 from flask import session
 
-
 def is_authenticated():
     if session.get("auth") is not True:
         return False

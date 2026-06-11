@@ -25,7 +25,6 @@ from routes.register import register_blueprints
 from utils.middleware import register_middleware
 import db.upgrade as _db_upgrade
 
-
 def main_loop():
     while True:
         try:
@@ -72,7 +71,6 @@ def main_loop():
         environment.wait_for_wakeup(environment.loop_interval)
         environment.wait_paused()
 
-
 def start_application():
     ensure_single_instance()
     ensure_required_software()
@@ -91,7 +89,6 @@ def start_application():
 
     threading.Thread(target=main_loop, daemon=True).start()
     return flask_app
-
 
 flask_app = start_application()
 app = flask_app

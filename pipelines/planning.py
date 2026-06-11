@@ -12,7 +12,6 @@ from log import write_log_entry
 from utils.consts import MSK
 from utils.utils import parse_hhmm, fmt_id_msg
 
-
 def run(batch_id, category):
     """Stage planning: захватывает видео из пула (pending -> ready)."""
     batch = db_get_batch_by_id(batch_id)
@@ -60,7 +59,6 @@ def run(batch_id, category):
         ),
         level='silent',
     )
-
 
 def tick():
     """Планирование расписания: создаёт planning-батчи в горизонте."""

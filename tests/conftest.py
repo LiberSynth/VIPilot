@@ -6,7 +6,6 @@ from flask import Flask
 
 os.environ.setdefault("FLASK_SECRET", "test-secret-for-tests")
 
-
 @pytest.fixture
 def app():
     """Minimal Flask app with API blueprints, no real DB connections."""
@@ -27,7 +26,6 @@ def app():
         flask_app.register_blueprint(production_bp)
 
     return flask_app
-
 
 @pytest.fixture
 def client(app):

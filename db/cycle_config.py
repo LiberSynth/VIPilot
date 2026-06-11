@@ -11,7 +11,6 @@ _DEFAULTS = {
 
 _ALLOWED_KEYS = frozenset(_DEFAULTS.keys())
 
-
 def _coerce(key, raw):
     if raw is None:
         return _DEFAULTS[key]
@@ -32,7 +31,6 @@ def _coerce(key, raw):
             return _DEFAULTS[key]
     return raw
 
-
 def cycle_config_get(key: str):
     if key not in _ALLOWED_KEYS:
         raise ValueError(f"Unknown cycle_config key: {key!r}")
@@ -44,7 +42,6 @@ def cycle_config_get(key: str):
             )
             row = cur.fetchone()
     return _coerce(key, row[0] if row else None)
-
 
 def cycle_config_set(key: str, value) -> None:
     if key not in _ALLOWED_KEYS:

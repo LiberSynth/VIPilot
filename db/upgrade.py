@@ -25,7 +25,6 @@ from log.log import write_log_entry
 
 _BUILD_KEY = 'build_number'
 
-
 def _check_ffmpeg() -> tuple[bool, str]:
     path = shutil.which('ffmpeg')
     if not path:
@@ -37,14 +36,12 @@ def _check_ffmpeg() -> tuple[bool, str]:
     except Exception as e:
         return False, f'ffmpeg: ошибка — {e}'
 
-
 def _check_flask() -> tuple[bool, str]:
     try:
         import flask
         return True, f'flask {flask.__version__}'
     except ImportError:
         return False, 'flask не установлен'
-
 
 def _check_requests() -> tuple[bool, str]:
     try:
@@ -53,14 +50,12 @@ def _check_requests() -> tuple[bool, str]:
     except ImportError:
         return False, 'requests не установлен'
 
-
 def _check_psycopg2() -> tuple[bool, str]:
     try:
         import psycopg2
         return True, f'psycopg2 {psycopg2.__version__}'
     except ImportError:
         return False, 'psycopg2 не установлен'
-
 
 def _check_playwright() -> tuple[bool, str]:
     try:
@@ -73,7 +68,6 @@ def _check_playwright() -> tuple[bool, str]:
             return True, 'playwright (версия неизвестна)'
         except ImportError:
             return False, 'playwright не установлен'
-
 
 def _install_chromium() -> bool:
     """Запускает playwright install chromium chromium-headless-shell. Возвращает True при успехе."""
@@ -88,7 +82,6 @@ def _install_chromium() -> bool:
     except Exception as e:
         write_log_entry(None, 'upgrade', f'Ошибка установки Chromium: {e}', level='silent')
         return False
-
 
 def _check_chromium() -> tuple[bool, str]:
     path = (shutil.which('chromium')
@@ -110,7 +103,6 @@ def _check_chromium() -> tuple[bool, str]:
     except Exception as e:
         return False, f'chromium: {e}'
 
-
 def _check_dotenv() -> tuple[bool, str]:
     try:
         import dotenv  # noqa: F401
@@ -130,7 +122,6 @@ def _check_dotenv() -> tuple[bool, str]:
         return True, 'python-dotenv: установлен через pip install'
     except Exception as e:
         return False, f'python-dotenv: не удалось установить — {e}'
-
 
 def _check_pg_repack() -> tuple[bool, str]:
     """Проверяет CLI pg_repack и серверное extension pg_repack.
@@ -188,7 +179,6 @@ def _check_pg_repack() -> tuple[bool, str]:
         return False, f'pg_repack: версии не совпадают (CLI={cli_ver}, extension={ext_ver})'
     return True, f'pg_repack {cli_ver} (CLI и extension)'
 
-
 def _check_model_durations() -> tuple[bool, str]:
     try:
         from db.connection import get_db
@@ -213,7 +203,6 @@ def _check_model_durations() -> tuple[bool, str]:
     except Exception as e:
         return False, f'model_durations: ошибка проверки — {e}'
 
-
 _CHECKS = [
     ('ffmpeg',      _check_ffmpeg),
     ('flask',       _check_flask),
@@ -228,7 +217,6 @@ _CHECKS = [
 _POST_MIGRATION_CHECKS = [
     ('model_durations', _check_model_durations),
 ]
-
 
 def _run_checks(checks, label) -> None:
     """Запускает список проверок. Бросает FatalError или RuntimeError при неудаче."""
@@ -250,20 +238,17 @@ def _run_checks(checks, label) -> None:
         raise RuntimeError(f'[upgrade] Проверка не пройдена: {summary}')
     write_log_entry(None, 'upgrade', f'{label}: всё в порядке', level='silent')
 
-
 def _run_env_checks() -> None:
     """
     Проверяет серверное окружение. Бросает RuntimeError если хотя бы одна проверка не прошла.
     """
     _run_checks(_CHECKS, 'Проверка серверного окружения')
 
-
 def _run_post_migration_checks() -> None:
     """
     Проверки после применения миграций. Бросает FatalError если данные не соответствуют ожиданиям.
     """
     _run_checks(_POST_MIGRATION_CHECKS, 'Пост-миграционные проверки')
-
 
 def check_upgrade():
     """

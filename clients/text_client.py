@@ -10,14 +10,12 @@ import requests
 
 from log import write_log_entry
 
-
 def _headers(env_key_name: str | None):
     api_key = os.environ.get(env_key_name or '', '') if env_key_name else ''
     return {
         'Authorization': f'Bearer {api_key}',
         'Content-Type': 'application/json',
     }
-
 
 def _build_body(body_tpl, model_url, system_prompt, user_prompt):
     body = dict(body_tpl)
@@ -40,7 +38,6 @@ def _build_body(body_tpl, model_url, system_prompt, user_prompt):
     body['model'] = model_url
     return body
 
-
 def _compact_json(value, limit: int = 1200) -> str:
     """Возвращает компактный JSON/строку для диагностических логов с ограничением размера."""
     try:
@@ -50,7 +47,6 @@ def _compact_json(value, limit: int = 1200) -> str:
     if len(text) <= limit:
         return text
     return text[:limit] + '...'
-
 
 def generate(batch_id, category, model_name: str, model: dict, system_prompt: str, user_prompt: str):
     """

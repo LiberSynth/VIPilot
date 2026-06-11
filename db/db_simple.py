@@ -5,12 +5,10 @@ import psycopg2.extras
 from .connection import get_db
 from common.exceptions import FatalError
 
-
 def _assert_log_modification():
     import common.environment as environment
     if not environment.asserted_log_modification.get():
         raise FatalError("Нарушение конвенции: модификация log вне log.py")
-
 
 def db_get_or_create_log(batch_id):
     """Один log на batch_id. Возвращает (log_id, is_first_batch_log)."""
@@ -42,7 +40,6 @@ def db_get_or_create_log(batch_id):
         conn.commit()
     return log_id, False
 
-
 def db_insert_log(batch_id):
     """Новое окно log (batch_id=None — блок «Приложение»)."""
     _assert_log_modification()
@@ -55,7 +52,6 @@ def db_insert_log(batch_id):
             log_id = cur.fetchone()[0]
         conn.commit()
     return str(log_id)
-
 
 def db_insert_log_entry(log_id, channel, message, level):
     import common.environment as environment
@@ -73,14 +69,12 @@ def db_insert_log_entry(log_id, channel, message, level):
             )
         conn.commit()
 
-
 def env_get(key, default=""):
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute("SELECT value FROM environment WHERE key = %s", (key,))
             row = cur.fetchone()
             return row[0] if row else default
-
 
 def env_set(key, value):
     with get_db() as conn:
@@ -93,7 +87,6 @@ def env_set(key, value):
                 (key, value),
             )
         conn.commit()
-
 
 def db_next_publication_number() -> int:
     """Атомарно инкрементирует счётчик публикаций и возвращает новое значение."""
@@ -109,14 +102,12 @@ def db_next_publication_number() -> int:
         conn.commit()
     return row[0] if row else 1
 
-
 def settings_get(key, default=""):
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute("SELECT value FROM settings WHERE key = %s", (key,))
             row = cur.fetchone()
             return row[0] if row else default
-
 
 def settings_set(key, value):
     with get_db() as conn:
@@ -130,7 +121,6 @@ def settings_set(key, value):
             )
         conn.commit()
 
-
 def db_get_schedule():
     with get_db() as conn:
         with conn.cursor() as cur:
@@ -141,7 +131,6 @@ def db_get_schedule():
     return [
         {"id": str(row[0]), "time_utc": row[1], "created_at": row[2]} for row in rows
     ]
-
 
 def db_add_schedule_slot(time_utc):
     with get_db() as conn:
@@ -154,14 +143,12 @@ def db_add_schedule_slot(time_utc):
         conn.commit()
     return str(row[0])
 
-
 def db_delete_schedule_slot(slot_id):
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute("DELETE FROM schedule WHERE id = %s", (slot_id,))
         conn.commit()
     return True
-
 
 def db_get_active_targets():
     with get_db() as conn:
@@ -180,7 +167,6 @@ def db_get_active_targets():
         for row in rows
     ]
 
-
 def db_get_all_targets():
     with get_db() as conn:
         with conn.cursor() as cur:
@@ -193,7 +179,6 @@ def db_get_all_targets():
         for row in rows
     ]
 
-
 def db_get_target_by_name(name: str) -> dict | None:
     with get_db() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
@@ -205,7 +190,6 @@ def db_get_target_by_name(name: str) -> dict | None:
             row = cur.fetchone()
     return dict(row) if row else None
 
-
 def db_update_target_publish_method_by_slug(slug: str, methods: dict) -> bool:
     with get_db() as conn:
         with conn.cursor() as cur:
@@ -216,7 +200,6 @@ def db_update_target_publish_method_by_slug(slug: str, methods: dict) -> bool:
             )
         conn.commit()
     return True
-
 
 def db_get_target_session_context(target_id: str) -> dict | None:
     with get_db() as conn:
@@ -230,7 +213,6 @@ def db_get_target_session_context(target_id: str) -> dict | None:
         return row[0]
     return None
 
-
 def db_set_target_session_context(target_id: str, state: dict) -> bool:
     with get_db() as conn:
         with conn.cursor() as cur:
@@ -242,7 +224,6 @@ def db_set_target_session_context(target_id: str, state: dict) -> bool:
         conn.commit()
     return updated
 
-
 def db_get_target_session_context_saved_at(target_id: str) -> str | None:
     with get_db() as conn:
         with conn.cursor() as cur:
@@ -252,7 +233,6 @@ def db_get_target_session_context_saved_at(target_id: str) -> str | None:
             )
             row = cur.fetchone()
     return row[0] if row else None
-
 
 def db_create_story(model_id, title, result):
     with get_db() as conn:
@@ -265,7 +245,6 @@ def db_create_story(model_id, title, result):
         conn.commit()
     return str(row[0]) if row else None
 
-
 def db_set_story_grade(story_id, grade):
     with get_db() as conn:
         with conn.cursor() as cur:
@@ -276,7 +255,6 @@ def db_set_story_grade(story_id, grade):
             updated = cur.rowcount
         conn.commit()
     return updated > 0
-
 
 def db_set_story_pinned(story_id, value: bool):
     with get_db() as conn:
@@ -289,7 +267,6 @@ def db_set_story_pinned(story_id, value: bool):
         conn.commit()
     return updated > 0
 
-
 def db_set_movie_grade(movie_id, grade):
     with get_db() as conn:
         with conn.cursor() as cur:
@@ -301,7 +278,6 @@ def db_set_movie_grade(movie_id, grade):
         conn.commit()
     return updated > 0
 
-
 def db_get_story_text(story_id):
     with get_db() as conn:
         with conn.cursor() as cur:
@@ -309,14 +285,12 @@ def db_get_story_text(story_id):
             row = cur.fetchone()
     return row[0] if row else None
 
-
 def db_get_story_title(story_id):
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute("SELECT title FROM stories WHERE id = %s", (story_id,))
             row = cur.fetchone()
     return row[0] if row else None
-
 
 def db_get_story_export_data(story_id):
     with get_db() as conn:
@@ -351,7 +325,6 @@ def db_get_story_export_data(story_id):
         "model_body": row[6],
     }
 
-
 def db_set_story_model(story_id, model_id):
     with get_db() as conn:
         with conn.cursor() as cur:
@@ -361,7 +334,6 @@ def db_set_story_model(story_id, model_id):
             )
         conn.commit()
     return True
-
 
 def db_update_story_content(story_id, content):
     with get_db() as conn:
@@ -373,7 +345,6 @@ def db_update_story_content(story_id, content):
             row = cur.fetchone()
         conn.commit()
     return str(row[0]) if row else None
-
 
 def db_upsert_story_draft(story_id, title, content):
     with get_db() as conn:
@@ -403,7 +374,6 @@ def db_upsert_story_draft(story_id, title, content):
         conn.commit()
     return str(row[0]) if row else None
 
-
 def db_toggle_model(model_id: str):
     with get_db() as conn:
         with conn.cursor() as cur:
@@ -413,7 +383,6 @@ def db_toggle_model(model_id: str):
             )
         conn.commit()
     return True
-
 
 def db_reorder_models(ids: list):
     with get_db() as conn:
@@ -425,7 +394,6 @@ def db_reorder_models(ids: list):
         conn.commit()
     return True
 
-
 def db_set_model_grade(model_id: str, grade: str):
     with get_db() as conn:
         with conn.cursor() as cur:
@@ -436,7 +404,6 @@ def db_set_model_grade(model_id: str, grade: str):
         conn.commit()
     return True
 
-
 def db_set_model_note(model_id: str, note: str):
     with get_db() as conn:
         with conn.cursor() as cur:
@@ -446,7 +413,6 @@ def db_set_model_note(model_id: str, note: str):
             )
         conn.commit()
     return True
-
 
 def db_set_model_body(model_id: str, body: dict):
     import json
@@ -459,7 +425,6 @@ def db_set_model_body(model_id: str, body: dict):
         conn.commit()
     return True
 
-
 def db_set_target_config_body(target_id: str, body: dict):
     import json
     with get_db() as conn:
@@ -471,7 +436,6 @@ def db_set_target_config_body(target_id: str, body: dict):
         conn.commit()
     return True
 
-
 def db_set_target_active(target_id: str, active: bool) -> bool:
     with get_db() as conn:
         with conn.cursor() as cur:
@@ -481,7 +445,6 @@ def db_set_target_active(target_id: str, active: bool) -> bool:
             )
         conn.commit()
     return True
-
 
 def db_get_last_pipeline_run(pipeline, scheduled_only: bool = False):
     with get_db() as conn:
@@ -510,7 +473,6 @@ def db_get_last_pipeline_run(pipeline, scheduled_only: bool = False):
             row = cur.fetchone()
     return row[0] if row and row[0] is not None else None
 
-
 def db_get_graded_stories():
     with get_db() as conn:
         with conn.cursor() as cur:
@@ -521,7 +483,6 @@ def db_get_graded_stories():
             )
             rows = cur.fetchall()
     return [{"title": row[0], "content": row[1], "grade": row[2]} for row in rows]
-
 
 def db_get_used_stories() -> list:
     used_cond = (

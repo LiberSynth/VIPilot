@@ -12,16 +12,13 @@ import requests
 from clients.falai import build_body, ProviderFatalError
 from log import write_log_entry
 
-
 _SKYREELS_KEY = os.environ.get('SKYREELS_API_KEY', '')
 
 _POLL_INTERVAL = 15
 _POLL_MAX      = 480  # 480 × 15 с = 2 часа
 
-
 def _headers():
     return {'Content-Type': 'application/json'}
-
 
 def _compact_json(value, limit: int = 1200) -> str:
     """Возвращает компактный JSON/строку для диагностики с ограничением размера."""
@@ -32,7 +29,6 @@ def _compact_json(value, limit: int = 1200) -> str:
     if len(text) <= limit:
         return text
     return text[:limit] + '...'
-
 
 def submit(batch_id, category, model_name: str, submit_url: str, platform_url: str,
            body_tpl: dict, prompt: str, ar_x: int, ar_y: int,
@@ -83,7 +79,6 @@ def submit(batch_id, category, model_name: str, submit_url: str, platform_url: s
         'status_url':   status_url,
         'response_url': response_url,
     }
-
 
 def poll(batch_id, category, status_url: str, response_url: str):
     """
@@ -140,7 +135,6 @@ def poll(batch_id, category, status_url: str, response_url: str):
     msg = 'Таймаут генерации видео SkyReels (2 часа)'
     write_log_entry(batch_id, category, msg, level='error')
     return None, msg
-
 
 def download_video(batch_id, category, video_url: str) -> bytes:
     """Скачивает видео по URL."""

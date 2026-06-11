@@ -10,7 +10,6 @@ from common.statuses import FINAL_BATCH_STATUSES
 from log.log import write_log_entry
 from utils.utils import fmt_id_msg
 
-
 def db_get_log_entries(log_id):
     """Возвращает список субзаписей для указанного log_id."""
     with get_db() as conn:
@@ -33,7 +32,6 @@ def db_get_log_entries(log_id):
         }
         for r in rows
     ]
-
 
 def db_get_monitor():
     """
@@ -110,7 +108,6 @@ def db_get_monitor():
     ]
     return {"batches": batches, "system": system}
 
-
 def db_get_system_log_entries(log_id: str) -> list:
     """Возвращает log_entries для log_id (батч или приложение)."""
     with get_db() as conn:
@@ -134,7 +131,6 @@ def db_get_system_log_entries(log_id: str) -> list:
         }
         for r in rows
     ]
-
 
 def db_get_batch_log_entries(batch_id: str) -> list:
     with get_db() as conn:
@@ -160,7 +156,6 @@ def db_get_batch_log_entries(batch_id: str) -> list:
         for r in rows
     ]
 
-
 def db_cleanup_log_entries(log_lifetime_days: int) -> int:
     with get_db() as conn:
         with conn.cursor() as cur:
@@ -174,7 +169,6 @@ def db_cleanup_log_entries(log_lifetime_days: int) -> int:
             count = cur.rowcount
         conn.commit()
     return count
-
 
 def db_cleanup_logs(log_lifetime_days: int) -> int:
     with get_db() as conn:
@@ -194,7 +188,6 @@ def db_cleanup_logs(log_lifetime_days: int) -> int:
         conn.commit()
     return count
 
-
 _LIBPQ_QUERY_ENV = {
     'sslmode': 'PGSSLMODE',
     'sslrootcert': 'PGSSLROOTCERT',
@@ -208,7 +201,6 @@ _LIBPQ_QUERY_ENV = {
     'gssencmode': 'PGGSSENCMODE',
     'channel_binding': 'PGCHANNELBINDING',
 }
-
 
 def _parse_db_url() -> dict:
     """Парсит DATABASE_URL в параметры подключения для pg_repack CLI.
@@ -237,7 +229,6 @@ def _parse_db_url() -> dict:
         'extra_env': extra_env,
     }
 
-
 def _public_tables() -> list[tuple[str, str]]:
     with get_db() as conn:
         with conn.cursor() as cur:
@@ -249,13 +240,11 @@ def _public_tables() -> list[tuple[str, str]]:
             """)
             return [(r[0], r[1]) for r in cur.fetchall()]
 
-
 def _ensure_pg_repack_extension() -> None:
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute('CREATE EXTENSION IF NOT EXISTS pg_repack')
         conn.commit()
-
 
 def _db_vacuum_full_fallback(tables: list[tuple[str, str]]) -> dict:
     """Fallback на Windows: VACUUM FULL (блокирует таблицу на время операции)."""
@@ -311,7 +300,6 @@ def _db_vacuum_full_fallback(tables: list[tuple[str, str]]) -> dict:
         'freed_bytes': freed_total,
         'results': results,
     }
-
 
 def db_vacuum_full() -> dict:
     """Сжимает все таблицы схемы public через pg_repack (онлайн, без блокировки).
@@ -432,7 +420,6 @@ def db_vacuum_full() -> dict:
     )
     return summary
 
-
 def _table_size(qualified: str) -> int:
     with get_db() as conn:
         with conn.cursor() as cur:
@@ -440,14 +427,12 @@ def _table_size(qualified: str) -> int:
             row = cur.fetchone()
             return int(row[0]) if row and row[0] is not None else 0
 
-
 def db_get_database_size_bytes() -> int:
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute('SELECT pg_database_size(current_database())')
             row = cur.fetchone()
             return int(row[0]) if row and row[0] is not None else 0
-
 
 def db_clear_all_history():
     with get_db() as conn:
@@ -461,7 +446,6 @@ def db_clear_all_history():
         conn.commit()
     write_log_entry(None, 'db', f'Очистка истории: log_entries={le}, log={ll}, batches={bl}', level='silent')
     return {"log_entries": le, "logs": ll, "batches": bl}
-
 
 def db_purge_unused_stories() -> dict:
     with get_db() as conn:
@@ -517,7 +501,6 @@ def db_purge_unused_stories() -> dict:
     write_log_entry(None, 'db', f'Очистка сюжетов: stories={sl_count}, batches={bl_count}, log={ll_count}, log_entries={le_count}', level='silent')
     return {"stories": sl_count, "batches": bl_count, "logs": ll_count, "log_entries": le_count}
 
-
 def db_delete_bad_movies() -> dict:
     with get_db() as conn:
         with conn.cursor() as cur:
@@ -566,7 +549,6 @@ def db_delete_bad_movies() -> dict:
     write_log_entry(None, 'db', f'Удалены неудачные видео: movies={ml_count}, batches={bl_count}, log={ll_count}, log_entries={le_count}', level='silent')
     return {"movies": ml_count, "batches": bl_count, "logs": ll_count, "log_entries": le_count}
 
-
 def db_get_batch_status(batch_id: str) -> str | None:
     """Возвращает текущий статус батча или None если не найден."""
     with get_db() as conn:
@@ -574,7 +556,6 @@ def db_get_batch_status(batch_id: str) -> str | None:
             cur.execute("SELECT status FROM batches WHERE id = %s", (batch_id,))
             row = cur.fetchone()
             return row[0] if row else None
-
 
 def db_delete_batch(batch_id: str) -> bool:
     deleted_movie_id = None
@@ -606,7 +587,6 @@ def db_delete_batch(batch_id: str) -> bool:
     if deleted_movie_id:
         db_delete_movie_video_files(deleted_movie_id)
     return deleted > 0
-
 
 def db_delete_story(story_id: str) -> dict:
     with get_db() as conn:
@@ -641,7 +621,6 @@ def db_delete_story(story_id: str) -> dict:
 
     write_log_entry(None, 'db', fmt_id_msg('Удалён сюжет {}: batches=' + str(bl_count) + ', log=' + str(ll_count) + ', log_entries=' + str(le_count), story_id), level='silent')
     return {"stories": sl_count, "batches": bl_count, "logs": ll_count, "log_entries": le_count}
-
 
 def db_delete_movie(movie_id: str) -> dict:
     deleted_movie_id = None
@@ -687,7 +666,6 @@ def db_delete_movie(movie_id: str) -> dict:
     write_log_entry(None, 'db', fmt_id_msg('Удалено видео {}: batches=' + str(bl_count) + ', log=' + str(ll_count) + ', log_entries=' + str(le_count), movie_id), level='silent')
     return {"movies": ml_count, "batches": bl_count, "logs": ll_count, "log_entries": le_count}
 
-
 def db_cleanup_batches(batch_lifetime_days: int) -> int:
     with get_db() as conn:
         with conn.cursor() as cur:
@@ -723,5 +701,4 @@ def db_cleanup_batches(batch_lifetime_days: int) -> int:
 
         conn.commit()
     return len(batch_ids)
-
 

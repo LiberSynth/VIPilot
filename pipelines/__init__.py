@@ -23,11 +23,9 @@ _GUARDED_MODULES = frozenset({
 
 _currently_loading = set()
 
-
 def _apply_guards_to(mod):
     """Устанавливает guard-обёртку в пространство имён модуля."""
     mod.__dict__['print'] = _forbidden_print
-
 
 class _PipelineLogGuard:
     """sys.meta_path finder: после загрузки pipeline-модуля применяет guard-обёртку."""
@@ -63,7 +61,6 @@ class _PipelineLogGuard:
         spec.loader = _GuardedLoader()
         return spec
 
-
 def _install_guard():
     guard = _PipelineLogGuard()
     if not any(isinstance(f, _PipelineLogGuard) for f in sys.meta_path):
@@ -72,6 +69,5 @@ def _install_guard():
         mod = sys.modules.get(mod_name)
         if mod is not None:
             _apply_guards_to(mod)
-
 
 _install_guard()

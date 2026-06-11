@@ -4,13 +4,11 @@ import os
 import psycopg2
 import yaml
 
-
 def _connect():
     database_url = os.environ.get("DATABASE_URL")
     if not database_url:
         raise RuntimeError("DATABASE_URL is not set")
     return psycopg2.connect(database_url, connect_timeout=10)
-
 
 def _get_table_meta(conn, table):
     with conn.cursor() as cur:
@@ -43,7 +41,6 @@ def _get_table_meta(conn, table):
 
     return columns, pk, jsonb_cols, bit_cols
 
-
 def _coerce_bit(val, default='0'):
     if val is None:
         return default
@@ -62,7 +59,6 @@ def _coerce_bit(val, default='0'):
             return '0'
     return default
 
-
 def _to_db(val, col, jsonb_cols, bit_cols):
     if col in bit_cols:
         return _coerce_bit(val)
@@ -70,10 +66,8 @@ def _to_db(val, col, jsonb_cols, bit_cols):
         return json.dumps(val, ensure_ascii=False)
     return val
 
-
 def _record_values(rec, columns, jsonb_cols, bit_cols):
     return [_to_db(rec.get(c), c, jsonb_cols, bit_cols) for c in columns]
-
 
 def import_table(table, yaml_content):
     records = yaml.safe_load(yaml_content)

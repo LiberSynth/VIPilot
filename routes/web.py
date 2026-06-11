@@ -39,26 +39,20 @@ bp = Blueprint("web", __name__)
 RESERVED_SLUGS = {"web", "save", "logout", "select-module", "favicon.ico", "icon-preview", "root", "production"}
 failed_logins = {}
 
-
 def _get_session_roles():
     return session.get("roles", [])
-
 
 def _has_slug(slug):
     return any(r["slug"] == slug for r in _get_session_roles())
 
-
 _SLUG_TO_URL = {"producer": "/production"}
-
 
 def _role_url(role):
     if role["slug"] == "root":
         return url_for("web.root_page")
     return _SLUG_TO_URL.get(role["slug"], f"/{role['slug']}")
 
-
 _URL_TO_SLUG = {v.lstrip("/"): k for k, v in _SLUG_TO_URL.items()}
-
 
 def _nav_modules(current_slug):
     roles = _get_session_roles()
@@ -67,11 +61,9 @@ def _nav_modules(current_slug):
     effective_slug = _URL_TO_SLUG.get(current_slug, current_slug)
     return [r for r in roles if r["slug"] != effective_slug]
 
-
 def _save_last_page():
     qs = request.query_string.decode()
     session["last_page"] = request.path + ("?" + qs if qs else "")
-
 
 def _get_last_page():
     last = session.get("last_page")
@@ -90,7 +82,6 @@ def _get_last_page():
             return last
     return None
 
-
 def _redirect_after_login():
     roles = _get_session_roles()
     if len(roles) == 1:
@@ -103,16 +94,13 @@ def _redirect_after_login():
     session.clear()
     return redirect(url_for("web.login", reason="no_roles"))
 
-
 @bp.route("/favicon.ico")
 def favicon():
     return send_file("generated-icon.png", mimetype="image/png")
 
-
 @bp.route("/icon-preview")
 def icon_preview():
     return render_template("icon_preview.html")
-
 
 @bp.route("/", methods=["GET", "POST"])
 @limiter.limit("10 per minute", exempt_when=lambda: request.method != "POST")
@@ -162,7 +150,6 @@ def login():
             left = max(0, 3 - state["count"])
             error_text = f"Неверный логин или пароль. Осталось попыток: {left}"
     return _render_login()
-
 
 @bp.route("/web")
 def root_page():
@@ -316,7 +303,6 @@ def root_page():
     resp.headers["Expires"] = "0"
     return resp
 
-
 @bp.route("/production")
 def production_page():
     if not is_authenticated():
@@ -373,7 +359,6 @@ def production_page():
     resp.headers["Pragma"] = "no-cache"
     resp.headers["Expires"] = "0"
     return resp
-
 
 @bp.route("/save", methods=["POST"])
 def save():
@@ -473,7 +458,6 @@ def save():
     environment.refresh_environment()
     return redirect(url_for("web.root_page") + f"?tab={active_tab}")
 
-
 @bp.route("/select-module")
 def select_module():
     if not is_authenticated():
@@ -486,7 +470,6 @@ def select_module():
     fresh_modules = db_get_role_modules()
     roles_display = [dict(r, url=_role_url(r), module=fresh_modules.get(r["slug"], r["module"])) for r in roles]
     return render_template("select_module.html", roles=roles_display)
-
 
 @bp.route("/<slug>")
 def module_page(slug):
@@ -510,7 +493,6 @@ def module_page(slug):
     resp.headers["Pragma"] = "no-cache"
     resp.headers["Expires"] = "0"
     return resp
-
 
 @bp.route("/logout")
 def logout():

@@ -15,7 +15,6 @@ from typing import Optional
 from log import write_log_entry
 from utils.utils import fmt_id_msg
 
-
 class PlatformBrowser:
     """Playwright-браузер для авторизации и публикации на одной платформе."""
 

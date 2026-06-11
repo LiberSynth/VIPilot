@@ -24,7 +24,6 @@ from clients import text_client
 from routes.api import client_is_configured
 from utils.utils import fmt_id_msg
 
-
 def run(batch_id, category):
     snap = environment.snapshot()
     batch = db_get_batch_by_id(batch_id)

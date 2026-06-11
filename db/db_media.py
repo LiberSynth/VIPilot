@@ -8,22 +8,18 @@ _RAW_FIELD = "raw_data"
 _TRANSCODED_FIELD = "transcoded_data"
 _VIDEO_DIR = Path(__file__).resolve().parents[1] / "video"
 
-
 def _video_file_path(movie_id: str, field: str) -> Path:
     return _VIDEO_DIR / f"{movie_id} - {field}.mp4"
-
 
 def _write_video_file(movie_id: str, field: str, video_data: bytes) -> None:
     _VIDEO_DIR.mkdir(parents=True, exist_ok=True)
     _video_file_path(movie_id, field).write_bytes(video_data)
-
 
 def _read_video_file_or_none(movie_id: str, field: str) -> bytes | None:
     try:
         return _video_file_path(movie_id, field).read_bytes()
     except FileNotFoundError:
         return None
-
 
 def db_delete_movie_video_files(movie_id: str) -> None:
     movie_id = str(movie_id)
@@ -32,7 +28,6 @@ def db_delete_movie_video_files(movie_id: str) -> None:
             _video_file_path(movie_id, field).unlink()
         except FileNotFoundError:
             pass
-
 
 def db_create_batch_movie(batch_id, video_data: bytes, video_url: str, model_id=None):
     with get_db() as conn:
@@ -73,7 +68,6 @@ def db_create_batch_movie(batch_id, video_data: bytes, video_url: str, model_id=
         conn.commit()
     return True
 
-
 def db_get_batch_original_video(batch_id) -> bytes | None:
     with get_db() as conn:
         with conn.cursor() as cur:
@@ -87,7 +81,6 @@ def db_get_batch_original_video(batch_id) -> bytes | None:
         return None
     return _read_video_file_or_none(str(row[0]), _RAW_FIELD)
 
-
 def db_save_video_job_and_set_pending(batch_id, job_data):
     with get_db() as conn:
         with conn.cursor() as cur:
@@ -98,7 +91,6 @@ def db_save_video_job_and_set_pending(batch_id, job_data):
                 (json.dumps(job_data), batch_id),
             )
         db_set_batch_status(batch_id, 'pending', conn)
-
 
 def db_save_video_job_and_set_generating(batch_id, job_data):
     with get_db() as conn:
@@ -111,7 +103,6 @@ def db_save_video_job_and_set_generating(batch_id, job_data):
             )
         db_set_batch_status(batch_id, 'generating', conn)
 
-
 def db_save_generated_video_url(batch_id, video_url: str):
     with get_db() as conn:
         with conn.cursor() as cur:
@@ -123,7 +114,6 @@ def db_save_generated_video_url(batch_id, video_url: str):
                 (json.dumps({"generated_video_url": video_url}), batch_id),
             )
         db_set_batch_status(batch_id, 'generated', conn)
-
 
 def db_save_transcoded_data(batch_id, video_data: bytes):
     with get_db() as conn:
@@ -144,7 +134,6 @@ def db_save_transcoded_data(batch_id, video_data: bytes):
         _write_video_file(movie_id, _TRANSCODED_FIELD, video_data)
         db_set_movie_transcoded(movie_id, conn)
 
-
 def db_set_movie_transcoded(movie_id: str, conn=None):
     if conn is None:
         with get_db() as _conn:
@@ -156,7 +145,6 @@ def db_set_movie_transcoded(movie_id: str, conn=None):
             (movie_id,),
         )
     conn.commit()
-
 
 def db_get_batch_video_data_with_source(batch_id) -> tuple[bytes | None, str | None]:
     with get_db() as conn:
@@ -178,11 +166,9 @@ def db_get_batch_video_data_with_source(batch_id) -> tuple[bytes | None, str | N
         return raw, _RAW_FIELD
     return None, None
 
-
 def db_get_batch_video_data(batch_id) -> bytes | None:
     video_data, _source = db_get_batch_video_data_with_source(batch_id)
     return video_data
-
 
 def db_get_movie_video_data(movie_id) -> bytes | None:
     """Возвращает видеоданные ролика по id.
@@ -202,7 +188,6 @@ def db_get_movie_video_data(movie_id) -> bytes | None:
     if transcoded is not None:
         return transcoded
     return _read_video_file_or_none(movie_id, _RAW_FIELD)
-
 
 def db_create_manual_movie(title: str, video_data: bytes) -> str:
     """Создаёт сюжет, батч movie (ready) и ролик из файла в одной транзакции.
@@ -243,5 +228,4 @@ def db_create_manual_movie(title: str, video_data: bytes) -> str:
             _write_video_file(movie_id, _RAW_FIELD, video_data)
         db_set_batch_status(batch_id, 'ready', conn)
     return batch_id
-
 

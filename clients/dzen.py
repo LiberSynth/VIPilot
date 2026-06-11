@@ -15,22 +15,17 @@ from log import write_log_entry
 from utils.utils import fmt_id_msg
 from routes.api import publication_file_name, tags
 
-
 _NAV_TIMEOUT = 60_000   # ms — таймаут одной попытки навигации (1 минута; до 5 попыток подряд)
 _UPLOAD_WAIT  = 60_000  # ms — ожидание завершения загрузки видео
-
 
 class DzenSessionMissing(RuntimeError):
     """Браузерная сессия Дзен не сохранена — требуется авторизация."""
 
-
 class DzenCsrfExpired(RuntimeError):
     """Сессия истекла — необходима повторная авторизация."""
 
-
 class DzenApiError(RuntimeError):
     """Ошибка публикации на Дзен."""
-
 
 # ---------------------------------------------------------------------------
 # Публичный API
@@ -103,7 +98,6 @@ def publish(
     write_log_entry(batch_id, category, "Дзен: видео опубликовано успешно")
     return True
 
-
 # ---------------------------------------------------------------------------
 # UI-driven публикация
 # ---------------------------------------------------------------------------
@@ -120,7 +114,6 @@ def _snap(page, batch_id=None) -> None:
     except Exception as _e:
         write_log_entry(None, 'dzen', f'_snap: {_e}', level='silent')
 
-
 _CAPTCHA_URL_KEYWORDS = (
     "not_robot_captcha", "smartcaptcha", "yandexcloud",
     "captcha.yandex", "recaptcha", "id.vk.com",
@@ -130,7 +123,6 @@ _CAPTCHA_DOM_KEYWORDS = (
     "не робот", "not a robot", "подтвердите", "я не робот",
     "captcha", "капча",
 )
-
 
 def _has_captcha_frame(page) -> bool:
     """Возвращает True если в page есть активный iframe капчи (по URL)."""
@@ -142,7 +134,6 @@ def _has_captcha_frame(page) -> bool:
     except Exception:
         pass
     return False
-
 
 def _has_captcha_dom(page) -> bool:
     """Резервная проверка: капча обнаружена по тексту страницы или DOM-классам."""
@@ -169,7 +160,6 @@ def _has_captcha_dom(page) -> bool:
     except Exception:
         pass
     return False
-
 
 def _try_click_captcha_checkbox(page, category, batch_id=None) -> bool:
     """
@@ -221,7 +211,6 @@ def _try_click_captcha_checkbox(page, category, batch_id=None) -> bool:
 
     return clicked
 
-
 def _has_publish_confirm_dialog(page) -> bool:
     """
     Возвращает True если виден вторичный диалог подтверждения.
@@ -239,7 +228,6 @@ def _has_publish_confirm_dialog(page) -> bool:
             pass
     return False
 
-
 # ---------------------------------------------------------------------------
 # Известные ожидаемые элементы — список признаков и действий
 #
@@ -251,10 +239,8 @@ def _has_publish_confirm_dialog(page) -> bool:
 def _detect_captcha(page) -> bool:
     return _has_captcha_frame(page) or _has_captcha_dom(page)
 
-
 def _detect_confirm_dialog(page) -> bool:
     return _has_publish_confirm_dialog(page)
-
 
 def _detect_file_input(page) -> bool:
     """input[type=file] в DOM — нативный диалог уже закрыт после set_files(), не трогаем."""
@@ -262,7 +248,6 @@ def _detect_file_input(page) -> bool:
         return page.locator('input[type="file"]').count() > 0
     except Exception:
         return False
-
 
 def _handle_captcha_element(page, category, batch_id) -> None:
     """
@@ -286,7 +271,6 @@ def _handle_captcha_element(page, category, batch_id) -> None:
     _snap(page, batch_id)
     raise DzenApiError("Капча не прошла за 30 сек — публикация невозможна.")
 
-
 def _handle_confirm_element(page, category, batch_id) -> None:
     """Обрабатывает вторичный диалог подтверждения (не основную CTA модалки)."""
     for text in ("Опубликовать после подтверждения",):
@@ -301,7 +285,6 @@ def _handle_confirm_element(page, category, batch_id) -> None:
         except Exception:
             pass
 
-
 def _dzen_step7_success_without_click(page, url_step7_start: str) -> bool:
     """Признак что публикация уже ушла без финального клика «Опубликовать»."""
     u = page.url
@@ -315,7 +298,6 @@ def _dzen_step7_success_without_click(page, url_step7_start: str) -> bool:
     ):
         return True
     return False
-
 
 def _find_primary_publish_control(page):
     """
@@ -358,7 +340,6 @@ def _find_primary_publish_control(page):
             pass
     return None
 
-
 def _click_primary_publish_control(page, category, batch_id=None) -> bool:
     """Закрывает попапы и нажимает основную кнопку «Опубликовать». Возвращает True если кликнули."""
     _handle_popups(page, category, batch_id)
@@ -391,7 +372,6 @@ def _click_primary_publish_control(page, category, batch_id=None) -> bool:
     _snap(page, batch_id)
     return True
 
-
 def _retry_publish_if_button_visible(page, category, batch_id, url_step7_start, reason: str) -> bool:
     """Повторный клик, если публикация ещё не ушла, а CTA всё ещё на экране."""
     if _dzen_step7_success_without_click(page, url_step7_start):
@@ -401,7 +381,6 @@ def _retry_publish_if_button_visible(page, category, batch_id, url_step7_start, 
     write_log_entry(batch_id, category, f"Дзен: {reason}")
     return _click_primary_publish_control(page, category, batch_id)
 
-
 _EXPECTED_ELEMENTS = [
     ("captcha", _detect_captcha,        _handle_captcha_element),
     ("confirm", _detect_confirm_dialog, _handle_confirm_element),
@@ -409,9 +388,7 @@ _EXPECTED_ELEMENTS = [
     # на всё время публикации и блокирует вызов _dismiss_unknown для любых других попапов.
 ]
 
-
 _HINT_CLOSE_SELECTOR = "[class*='helper-tooltip__closeButton']"
-
 
 def _dismiss_unknown(page, category=None, batch_id=None) -> None:
     """Закрывает хинт-попап Дзена — только если он реально есть.
@@ -503,7 +480,6 @@ def _dismiss_unknown(page, category=None, batch_id=None) -> None:
     if hint_was_seen:
         write_log_entry(batch_id, category, "Дзен: Хинт helper-tooltip не закрылся за 3 попытки.", level=_warn_lvl)
 
-
 def _set_comments_all_users(page, category, batch_id=None) -> None:
     """
     Выставляет «Все пользователи» в дропдауне «Кто может комментировать».
@@ -592,7 +568,6 @@ def _set_comments_all_users(page, category, batch_id=None) -> None:
         write_log_entry(batch_id, category, "Дзен: Ошибка при настройке комментариев — продолжаю.", level='warn')
         write_log_entry(batch_id, category, f"Ошибка _set_comments_all_users: {_e}", level='silent')
 
-
 def _handle_popups(page, category=None, batch_id=None) -> None:
     """
     Проверяет страницу на попапы, хинты, тултипы и диалоги.
@@ -607,7 +582,6 @@ def _handle_popups(page, category=None, batch_id=None) -> None:
                 handle(page, category, batch_id)
             return
     _dismiss_unknown(page, category, batch_id)
-
 
 def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=None):
     """Управляет браузером для публикации видео через UI Дзена."""

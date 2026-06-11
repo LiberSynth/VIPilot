@@ -19,7 +19,6 @@ from db import (
 from log import write_log_entry
 from utils.utils import fmt_id_msg
 
-
 def _forbidden_print(*args, **kwargs):
     """Guard: прямой вызов print в файлах pipelines/ запрещён.
     Используйте write_log_entry вместо этого.
@@ -28,7 +27,6 @@ def _forbidden_print(*args, **kwargs):
         "Прямой вызов print в pipelines/ запрещён. "
         "Используйте write_log_entry(batch_id, category, msg, level) из log."
     )
-
 
 def ensure_playwright_chromium(batch_id, category) -> None:
     """Проверяет наличие Chromium для Playwright и устанавливает его, если бинарник отсутствует.
@@ -66,7 +64,6 @@ def ensure_playwright_chromium(batch_id, category) -> None:
     write_log_entry(batch_id, category, '[playwright] install completed successfully', level='silent')
     write_log_entry(batch_id, category, 'Playwright Chromium успешно установлен')
 
-
 def check_cancelled(pipeline_name: str, batch_id: str, batch: dict, category=None) -> bool:
     """Проверяет, не отменён ли батч (слот расписания удалён).
 
@@ -80,7 +77,6 @@ def check_cancelled(pipeline_name: str, batch_id: str, batch: dict, category=Non
         write_log_entry(batch_id, cat, fmt_id_msg("[{}] Батч {} отменён, пропускаю", pipeline_name, batch_id), level='silent')
         return True
     return False
-
 
 def iterate_models(models, max_attempts_per_model, callback, max_passes=5):
     """Перебирает модели с повторными проходами до первого успешного результата.

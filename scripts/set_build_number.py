@@ -16,7 +16,6 @@ import psycopg2
 
 _BUILD_FILE = os.path.join(os.path.dirname(__file__), '..', 'utils', '_build.py')
 
-
 def main() -> None:
     build_only = '--build-only' in sys.argv[1:]
     try:
@@ -76,7 +75,6 @@ def main() -> None:
 
     _install_pg_repack_extension()
 
-
 def _install_pg_repack_extension() -> None:
     """Подключается к БД и создаёт extension pg_repack (идемпотентно).
 
@@ -102,7 +100,6 @@ def _install_pg_repack_extension() -> None:
         sys.exit(1)
     finally:
         conn.close()
-
 
 if __name__ == '__main__':
     main()
