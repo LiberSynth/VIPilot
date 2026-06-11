@@ -52,10 +52,10 @@ def db_get_batch_logs(batch_id):
         'title':            row['title'],
         'entries': [
             {
-                'message':    r[0],
-                'level':      r[1],
-                'created_at': r[2].isoformat() if r[2] else None,
-                'channel':   r[3],
+                'message':    r['message'],
+                'level':      r['level'],
+                'created_at': r['created_at'].isoformat() if r['created_at'] else None,
+                'channel':    r['channel'],
             }
             for r in entries
         ],
