@@ -192,7 +192,6 @@ class GenerationConsoleController {
     }
 
     if (this._completionVisible) {
-      parts.push(this._completionMessage);
       parts.push(this._defaultHint);
     } else if (parts.length === 0) {
       parts.push(this._statusText || this._defaultHint);
