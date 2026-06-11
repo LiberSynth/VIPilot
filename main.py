@@ -1,13 +1,11 @@
-import platform
 import threading
 
-from utils.runtime_bootstrap import ensure_required_software, ensure_single_instance
-ensure_required_software()
-
-from common.startup import init_app, register_shutdown_hooks
-init_app()
-ensure_single_instance()
-
+from utils.runtime_bootstrap import ensure_required_software, ensure_single_instance, run_foreground
+from common.startup import (
+    create_app,
+    init_app,
+    register_shutdown_hooks,
+)
 from db import (
     db_get_actionable_batches,
     db_create_transcode_batches,
@@ -15,8 +13,6 @@ from db import (
     db_set_batch_status,
 )
 from common.exceptions import AppException
-from common.startup import create_app
-import log.log as log_state
 from log import write_log_entry
 from pipelines import cleanup
 from pipelines.recovery import recover_interrupted_batches
@@ -34,9 +30,8 @@ def main_loop():
     while True:
         try:
             write_log_entry(None, 'main_loop', 'phase=tick', level='info')
-            environment.wait_if_paused()
-            environment.refresh_environment()
 
+            environment.refresh_environment()
             planning.tick()
             db_create_transcode_batches()
             db_create_publish_batches()
@@ -75,29 +70,29 @@ def main_loop():
             write_log_entry(None, 'main_loop', f'Ошибка: {e}', level='error')
 
         environment.wait_for_wakeup(environment.loop_interval)
+        environment.wait_paused()
 
 
-flask_app = create_app()
-register_middleware(flask_app)
-register_blueprints(flask_app)
+def start_application():
+    ensure_required_software()
+    init_app()
+    ensure_single_instance()
 
-_db_upgrade.check_upgrade()
-recover_interrupted_batches()
-environment.init()
+    flask_app = create_app()
+    register_middleware(flask_app)
+    register_blueprints(flask_app)
 
-with log_state._system_log_lock:
-    log_state._lifecycle_stop_logged = False
-    log_state._system_log_id = None
-write_log_entry(None, 'main', 'Приложение запущено', level='info')
+    _db_upgrade.check_upgrade()
+    recover_interrupted_batches()
+    environment.init()
 
-register_shutdown_hooks()
-threading.Thread(target=main_loop, daemon=True).start()
+    write_log_entry(None, 'main', 'Приложение запущено', level='info')
 
+    register_shutdown_hooks()
+    threading.Thread(target=main_loop, daemon=True).start()
+    return flask_app
+
+
+flask_app = start_application()
 app = flask_app
-
-if __name__ == "__main__":
-    if platform.system() == "Windows":
-        from waitress import serve
-        serve(flask_app, host="0.0.0.0", port=5000)
-    else:
-        flask_app.run(host="0.0.0.0", port=5000, debug=False)
+run_foreground(flask_app, __name__)

@@ -408,3 +408,14 @@ def ensure_single_instance() -> None:
             _write_lock_pid(fh, os.getpid())
             _instance_lock_file = fh
             return
+
+
+def run_foreground(flask_app, module_name: str) -> None:
+    """HTTP-сервер при запуске python main.py (не при import main:app)."""
+    if module_name != "__main__":
+        return
+    if platform.system() == "Windows":
+        from waitress import serve
+        serve(flask_app, host="0.0.0.0", port=5000)
+    else:
+        flask_app.run(host="0.0.0.0", port=5000, debug=False)
