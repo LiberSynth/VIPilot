@@ -26,7 +26,7 @@ def set_paused():
     _running_event.clear()
 
 
-def wait_if_paused():
+def wait_paused():
     _running_event.wait()
 
 

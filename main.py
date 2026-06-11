@@ -74,21 +74,21 @@ def main_loop():
 
 
 def start_application():
+    ensure_single_instance()
     ensure_required_software()
     init_app()
-    ensure_single_instance()
+    environment.init()
 
     flask_app = create_app()
     register_middleware(flask_app)
     register_blueprints(flask_app)
+    register_shutdown_hooks()
 
     _db_upgrade.check_upgrade()
     recover_interrupted_batches()
-    environment.init()
 
     write_log_entry(None, 'main', 'Приложение запущено', level='info')
 
-    register_shutdown_hooks()
     threading.Thread(target=main_loop, daemon=True).start()
     return flask_app
 
