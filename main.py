@@ -1,6 +1,9 @@
 import threading
 
 from utils.runtime_bootstrap import ensure_required_software, ensure_single_instance, run_foreground
+ensure_single_instance()
+ensure_required_software()
+
 from common.startup import (
     create_app,
     init_app,
@@ -72,8 +75,6 @@ def main_loop():
         environment.wait_paused()
 
 def start_application():
-    ensure_single_instance()
-    ensure_required_software()
     init_app()
     environment.init()
 
