@@ -292,6 +292,7 @@ def db_create_publish_batches() -> list[str]:
                       FROM batches pb
                       WHERE pb.type = 'publish'
                         AND pb.batch_id_source = tc.id
+                        AND pb.status != 'cancelled'
                   )
                 RETURNING id::text
                 """
@@ -560,6 +561,27 @@ def db_get_video_model_by_id(model_id: str):
         "submit_url": f"{platform_url}/{model_url}",
         "allowed_durations": durations_map.get(mid, [0]),
     }
+
+def db_release_movie_after_publish_cancel(batch_id: str) -> None:
+    """Возвращает ролик в пул после отмены publish-батча."""
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT movie_id::text
+                FROM batches
+                WHERE id = %s::uuid AND type = 'publish'
+                """,
+                (batch_id,),
+            )
+            row = cur.fetchone()
+            if not row or not row[0]:
+                return
+            cur.execute(
+                "UPDATE movies SET used = B'0' WHERE id = %s::uuid",
+                (row[0],),
+            )
+        conn.commit()
 
 def db_set_batch_title(batch_id: str, title: str) -> None:
     with get_db() as conn:

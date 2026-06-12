@@ -13,6 +13,7 @@ from db import (
     db_claim_batch_status,
     db_set_batch_title,
     db_get_batch_vkvideo_clip_url,
+    db_release_movie_after_publish_cancel,
 )
 from log import db_get_batch_log_entries, write_log_entry
 from pipelines.base import check_cancelled, ensure_playwright_chromium
@@ -138,6 +139,12 @@ def _parse_composite_status(status: str):
         return parts[0], parts[1], parts[2]
     return None
 
+def _cancel_publish(batch_id, category, msg):
+    db_set_batch_status(batch_id, 'cancelled')
+    db_release_movie_after_publish_cancel(batch_id)
+    write_log_entry(batch_id, category, msg)
+    write_log_entry(batch_id, category, fmt_id_msg("[publish] {} (батч {})", msg, batch_id), level='silent')
+
 def _build_steps(active_targets):
     """Строит список шагов публикации: [(slug, method, target), ...] по алфавиту метода внутри таргета."""
     steps = []
@@ -188,14 +195,12 @@ def run(batch_id, category):
 
     if parsed is None:
         if check_cancelled('publish', batch_id, batch, category):
+            db_release_movie_after_publish_cancel(batch_id)
             return
 
     if not active_targets:
         if parsed is None:
-            msg = 'Батч отменён — нет активных таргетов'
-            db_set_batch_status(batch_id, 'cancelled')
-            write_log_entry(batch_id, category, msg)
-            write_log_entry(batch_id, category, fmt_id_msg("[publish] {} (батч {})", msg, batch_id), level='silent')
+            _cancel_publish(batch_id, category, 'Батч отменён — нет активных таргетов')
             return
         else:
             msg = 'Нет активных таргетов — публикация невозможна'
@@ -211,10 +216,7 @@ def run(batch_id, category):
     )
     if not steps:
         if parsed is None:
-            msg = 'Батч отменён — нет методов публикации в конфиге таргетов'
-            db_set_batch_status(batch_id, 'cancelled')
-            write_log_entry(batch_id, category, msg)
-            write_log_entry(batch_id, category, fmt_id_msg("[publish] {} (батч {})", msg, batch_id), level='silent')
+            _cancel_publish(batch_id, category, 'Батч отменён — нет методов публикации в конфиге таргетов')
             return
         else:
             msg = 'Нет методов публикации в конфиге таргетов'

@@ -61,6 +61,7 @@ from .db_pipeline import (
     db_set_batch_title,
     db_set_batch_vkvideo_clip_url,
     db_get_batch_vkvideo_clip_url,
+    db_release_movie_after_publish_cancel,
 )
 from .db_media import (
     db_create_batch_movie,
