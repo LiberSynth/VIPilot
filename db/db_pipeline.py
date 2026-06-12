@@ -292,7 +292,6 @@ def db_create_publish_batches() -> list[str]:
                       FROM batches pb
                       WHERE pb.type = 'publish'
                         AND pb.batch_id_source = tc.id
-                        AND pb.status != 'cancelled'
                   )
                 RETURNING id::text
                 """
