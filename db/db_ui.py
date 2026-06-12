@@ -159,8 +159,7 @@ def db_get_stories_list(show_used=True, show_bad=True, for_approval=False, pin_i
 _MOVIES_PUBLISHED_CHECK = """EXISTS (
         SELECT 1 FROM batches b2
         WHERE b2.movie_id = m.id
-          AND (b2.status IN ('published', 'published_partially')
-               OR b2.status LIKE '%%.published')
+          AND b2.status LIKE '%%published%%'
     )"""
 
 def _build_movies_where(show_published: bool, show_bad: bool, for_approval: bool, pin_id=None):
