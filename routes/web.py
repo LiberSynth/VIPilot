@@ -179,7 +179,10 @@ def root_page():
     vk_targets_config_json = json.dumps(_vk_tc, ensure_ascii=False, indent=2) if _vk_tc is not None else ""
     video_duration     = max(1, min(60, cycle_config_get("video_duration")))
     video_post_prompt  = cycle_config_get("video_post_prompt")
-    buffer_hours       = max(1, min(720, int(settings_get("buffer_hours", "24"))))
+    try:
+        buffer_minutes = int(settings_get("buffer_minutes", "60"))
+    except (ValueError, TypeError):
+        buffer_minutes = 60
     loop_interval       = environment.loop_interval
     max_batch_threads   = environment.max_threads
     max_model_passes    = environment.max_model_passes
@@ -266,7 +269,7 @@ def root_page():
         notify_phone=notify_phone,
         video_duration=video_duration,
         video_post_prompt=video_post_prompt,
-        buffer_hours=buffer_hours,
+        buffer_minutes=buffer_minutes,
         loop_interval=loop_interval,
         max_batch_threads=max_batch_threads,
         max_model_passes=max_model_passes,
@@ -410,10 +413,10 @@ def save():
     if video_post_prompt_val is not None:
         cycle_config_set("video_post_prompt", video_post_prompt_val)
 
-    buf_str = request.form.get("buffer_hours", "").strip()
+    buf_str = request.form.get("buffer_minutes", "").strip()
     if buf_str:
         try:
-            settings_set("buffer_hours", str(max(1, min(720, int(buf_str)))))
+            settings_set("buffer_minutes", str(int(buf_str)))
         except (ValueError, TypeError):
             pass
 

@@ -176,10 +176,10 @@
         <div style="margin-top:14px">
           <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block">Горизонт планирования</label>
           <div class="lead-row">
-            <input type="number" name="buffer_hours" id="buffer_hours" value="{{ buffer_hours }}" min="1" max="720" step="1" autocomplete="off">
-            <span class="lead-unit">ч</span>
+            <input type="number" name="buffer_minutes" id="buffer_minutes" value="{{ buffer_minutes }}" step="1" autocomplete="off">
+            <span class="lead-unit">мин</span>
           </div>
-          <div class="hint" style="margin-top:5px">Насколько вперёд создаются батчи. По умолчанию: 24 ч.</div>
+          <div class="hint" style="margin-top:5px">Насколько вперёд создаются батчи. По умолчанию: 60 мин.</div>
         </div>
         <div style="margin-top:14px">
           <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block">Таймаут рабочего цикла</label>

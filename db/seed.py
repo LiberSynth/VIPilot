@@ -40,6 +40,11 @@ def seed_db():
                     JOIN user_roles r ON r.slug  = v.role_slug
                 """)
 
+                cur.execute("""
+                    INSERT INTO settings (key, value) VALUES ('buffer_minutes', '60')
+                    ON CONFLICT (key) DO NOTHING
+                """)
+
             conn.commit()
         write_log_entry(None, 'db', 'Данные инициализированы', level='silent')
     except Exception as e:

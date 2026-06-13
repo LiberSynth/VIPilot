@@ -295,6 +295,30 @@ def _m1010_drop_log_entries_category(cur):
         cur.execute("ALTER TABLE log_entries RENAME COLUMN category TO channel")
     cur.execute("DROP INDEX IF EXISTS idx_log_entries_category")
 
+def _m1011_buffer_hours_to_minutes(cur):
+    """Convert planning horizon setting from hours to minutes."""
+    cur.execute("SELECT value FROM settings WHERE key = 'buffer_hours'")
+    row = cur.fetchone()
+    if row is not None:
+        try:
+            minutes = int(row[0]) * 60
+        except (ValueError, TypeError):
+            minutes = 60
+        cur.execute(
+            """
+            INSERT INTO settings (key, value) VALUES ('buffer_minutes', %s)
+            ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+            """,
+            (str(minutes),),
+        )
+        cur.execute("DELETE FROM settings WHERE key = 'buffer_hours'")
+        return
+    cur.execute("SELECT 1 FROM settings WHERE key = 'buffer_minutes'")
+    if cur.fetchone() is None:
+        cur.execute(
+            "INSERT INTO settings (key, value) VALUES ('buffer_minutes', '60')"
+        )
+
 MIGRATIONS = [
     (2026052901, _m1001_drop_targets_legacy_columns),
     (2026052902, _m1002_add_movies_transcoded),
@@ -306,6 +330,7 @@ MIGRATIONS = [
     (2026052908, _m1008_log_entries_category),
     (2026052909, _m1009_log_entries_channel),
     (2026052910, _m1010_drop_log_entries_category),
+    (2026052911, _m1011_buffer_hours_to_minutes),
 ]
 
 # ---------------------------------------------------------------------------

@@ -86,15 +86,15 @@ def tick():
         return
 
     try:
-        buffer_hours = int(settings_get('buffer_hours', '24'))
+        buffer_minutes = int(settings_get('buffer_minutes', '60'))
     except (ValueError, TypeError):
-        buffer_hours = 24
+        buffer_minutes = 60
 
     now           = datetime.now(timezone.utc)
     effective_now = now + timedelta(seconds=environment.loop_interval)
-    window_end    = effective_now + timedelta(hours=buffer_hours)
+    window_end    = effective_now + timedelta(minutes=buffer_minutes)
     A             = db_get_last_pipeline_run('planning', scheduled_only=True)
-    write_log_entry(None, 'planning', 'phase=window_built, ' + f'now={now.isoformat()}, effective_now={effective_now.isoformat()}, window_end={window_end.isoformat()}, last_run={(A.isoformat() if A else None)}, buffer_hours={buffer_hours}', level='silent')
+    write_log_entry(None, 'planning', 'phase=window_built, ' + f'now={now.isoformat()}, effective_now={effective_now.isoformat()}, window_end={window_end.isoformat()}, last_run={(A.isoformat() if A else None)}, buffer_minutes={buffer_minutes}', level='silent')
 
     for day_offset in range(-1, 2):
         day = (now + timedelta(days=day_offset)).date()
@@ -110,7 +110,7 @@ def tick():
                     is_catchup = False
                 elif dt < A:
                     is_catchup = False
-                elif dt < A + timedelta(hours=buffer_hours):
+                elif dt < A + timedelta(minutes=buffer_minutes):
                     is_catchup = True
                 else:
                     created_at = slot.get('created_at')
@@ -130,7 +130,7 @@ def tick():
                     write_log_entry(batch_id, 'planning', f"Таргеты: {target_names}")
                     write_log_entry(
                         batch_id, 'planning',
-                        f"Горизонт планирования: {buffer_hours} ч",
+                        f"Горизонт планирования: {buffer_minutes} мин",
                     )
                     write_log_entry(
                         batch_id, 'planning',
