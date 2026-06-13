@@ -13,7 +13,7 @@ from db import (
     db_claim_batch_status,
     db_set_batch_title,
     db_get_batch_vkvideo_clip_url,
-    db_release_movie_after_publish_cancel,
+    db_on_publish_cancelled,
 )
 from log import db_get_batch_log_entries, write_log_entry
 from pipelines.base import check_cancelled, ensure_playwright_chromium
@@ -141,7 +141,7 @@ def _parse_composite_status(status: str):
 
 def _cancel_publish(batch_id, category, msg):
     db_set_batch_status(batch_id, 'cancelled')
-    db_release_movie_after_publish_cancel(batch_id)
+    db_on_publish_cancelled(batch_id)
     write_log_entry(batch_id, category, msg)
     write_log_entry(batch_id, category, fmt_id_msg("[publish] {} (батч {})", msg, batch_id), level='silent')
 
@@ -195,7 +195,7 @@ def run(batch_id, category):
 
     if parsed is None:
         if check_cancelled('publish', batch_id, batch, category):
-            db_release_movie_after_publish_cancel(batch_id)
+            db_on_publish_cancelled(batch_id)
             return
 
     if not active_targets:
