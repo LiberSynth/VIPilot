@@ -30,7 +30,7 @@ def db_create_planning_batch(scheduled_at):
                     SELECT id FROM batches
                     WHERE scheduled_at = %s
                       AND type        = 'planning'
-                      AND status      != 'cancelled'
+                      AND status      IN ('pending', 'ready')
                     LIMIT 1
                     """,
                     (scheduled_at,),
@@ -130,27 +130,6 @@ def db_claim_batch_status(batch_id: str, from_status: str, to_status: str) -> bo
             return False
         db_set_batch_status(batch_id, to_status, conn)
     return True
-
-def db_cancel_orphaned_planning_batches():
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT id FROM batches
-                WHERE status = 'pending'
-                  AND type = 'planning'
-                  AND scheduled_at IS NOT NULL
-                  AND NOT EXISTS (
-                      SELECT 1 FROM schedule
-                      WHERE time_utc = to_char(
-                          batches.scheduled_at AT TIME ZONE 'UTC', 'HH24:MI'
-                      )
-                  )
-                FOR UPDATE
-            """)
-            batch_ids = [str(r[0]) for r in cur.fetchall()]
-        for batch_id in batch_ids:
-            db_set_batch_status(batch_id, "cancelled", conn)
-    return batch_ids
 
 def db_claim_unused_movie_for_batch(batch_id: str) -> dict | None:
     with get_db() as conn:
@@ -300,7 +279,6 @@ def db_create_publish_batches() -> list[str]:
                       FROM batches pb
                       WHERE pb.type = 'publish'
                         AND pb.batch_id_source = tc.id
-                        AND pb.status != 'cancelled'
                   )
                 RETURNING id::text
                 """
@@ -346,25 +324,6 @@ def db_get_batch_by_id(batch_id):
             )
             row = cur.fetchone()
     return dict(row) if row else None
-
-def db_is_batch_scheduled(scheduled_at, batch_type="planning"):
-    if scheduled_at is None:
-        return True
-    if batch_type not in ("planning", "publish"):
-        return True
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT EXISTS (
-                    SELECT 1 FROM schedule
-                    WHERE time_utc = to_char(%s::timestamptz AT TIME ZONE 'UTC', 'HH24:MI')
-                )
-                """,
-                (scheduled_at,),
-            )
-            row = cur.fetchone()
-            return bool(row[0])
 
 def db_reset_stalled_batches() -> list[dict]:
     typed_resets = [
@@ -569,35 +528,6 @@ def db_get_video_model_by_id(model_id: str):
         "submit_url": f"{platform_url}/{model_url}",
         "allowed_durations": durations_map.get(mid, [0]),
     }
-
-def db_on_publish_cancelled(batch_id: str) -> None:
-    """После отмены publish: planning cancelled, ролик used=0."""
-    planning_id = None
-    movie_id = None
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT tc.batch_id_source, pb.movie_id
-                FROM batches pb
-                JOIN batches tc ON tc.id = pb.batch_id_source AND tc.type = 'transcode'
-                WHERE pb.id = %s::uuid AND pb.type = 'publish'
-                """,
-                (batch_id,),
-            )
-            row = cur.fetchone()
-            if row:
-                planning_id, movie_id = row[0], row[1]
-    if planning_id:
-        db_set_batch_status(str(planning_id), 'cancelled')
-    if movie_id:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "UPDATE movies SET used = B'0' WHERE id = %s",
-                    (movie_id,),
-                )
-            conn.commit()
 
 def db_set_batch_title(batch_id: str, title: str) -> None:
     with get_db() as conn:

@@ -2,14 +2,14 @@ KNOWN_BATCH_STATUSES = frozenset({
     'pending', 'processing', 'generating', 'generated', 'ready',
     'video_generating', 'video_pending',
     'video_ready', 'transcoding',
-    'cancelled', 'error', 'donated', 'reserved',
+    'error', 'donated', 'reserved',
     'video_error', 'transcode_error', 'publish_error', 'published',
     'published_partially', 'fatal_error',
 })
 
 FINAL_BATCH_STATUSES = (
     'published', 'published_partially', 'ready',
-    'cancelled', 'error', 'fatal_error',
+    'error', 'fatal_error',
     'video_error', 'transcode_error', 'publish_error',
     'donated', 'reserved',
 )

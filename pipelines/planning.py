@@ -4,7 +4,6 @@ import common.environment as environment
 from common.exceptions import AppException
 from db import (
     settings_get,
-    db_cancel_orphaned_planning_batches,
     db_get_schedule, db_get_active_targets, db_create_planning_batch, db_get_last_pipeline_run,
     db_get_batch_by_id, db_claim_unused_movie_for_batch,
 )
@@ -63,19 +62,6 @@ def run(batch_id, category):
 def tick():
     """Планирование расписания: создаёт planning-батчи в горизонте."""
     write_log_entry(None, 'planning', 'phase=run_start', level='silent')
-    cancelled = db_cancel_orphaned_planning_batches()
-    write_log_entry(None, 'planning', 'phase=orphan_cleanup, ' + f'cancelled_count={len(cancelled)}', level='silent')
-    for bid in cancelled:
-        write_log_entry(
-            bid, 'planning',
-            'Батч отменён — слот удалён из расписания',
-            level='warn',
-        )
-        write_log_entry(
-            bid, 'planning',
-            fmt_id_msg("[planning] Батч {} отменён (слот расписания исчез)", bid),
-            level='silent',
-        )
 
     schedule = db_get_schedule()
     targets  = db_get_active_targets()

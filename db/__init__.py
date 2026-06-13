@@ -44,14 +44,12 @@ from .db_pipeline import (
     db_set_batch_story,
     db_set_batch_status,
     db_claim_batch_status,
-    db_cancel_orphaned_planning_batches,
     db_claim_unused_movie_for_batch,
     db_create_transcode_batches,
     db_create_publish_batches,
     db_get_movie_pool_count,
     db_get_actionable_batches,
     db_get_batch_by_id,
-    db_is_batch_scheduled,
     db_reset_stalled_batches,
     db_reset_batch_pipeline,
     db_get_active_text_models,
@@ -61,7 +59,6 @@ from .db_pipeline import (
     db_set_batch_title,
     db_set_batch_vkvideo_clip_url,
     db_get_batch_vkvideo_clip_url,
-    db_on_publish_cancelled,
 )
 from .db_media import (
     db_create_batch_movie,

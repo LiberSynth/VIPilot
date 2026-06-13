@@ -12,12 +12,7 @@
 import os
 import subprocess
 
-from db import (
-    db_set_batch_status,
-    db_is_batch_scheduled,
-)
 from log import write_log_entry
-from utils.utils import fmt_id_msg
 
 def _forbidden_print(*args, **kwargs):
     """Guard: прямой вызов print в файлах pipelines/ запрещён.
@@ -63,20 +58,6 @@ def ensure_playwright_chromium(batch_id, category) -> None:
         raise RuntimeError(msg)
     write_log_entry(batch_id, category, '[playwright] install completed successfully', level='silent')
     write_log_entry(batch_id, category, 'Playwright Chromium успешно установлен')
-
-def check_cancelled(pipeline_name: str, batch_id: str, batch: dict, category=None) -> bool:
-    """Проверяет, не отменён ли батч (слот расписания удалён).
-
-    Возвращает True, если батч отменён и пайплайн должен прерваться.
-    Вызывать только для не-ручных батчей (is_manual проверяет сам вызывающий).
-    category — категория лога пайплайна (по умолчанию pipeline_name).
-    """
-    if not db_is_batch_scheduled(batch['scheduled_at'], batch.get('type', 'planning')):
-        db_set_batch_status(batch_id, 'cancelled')
-        cat = category or pipeline_name
-        write_log_entry(batch_id, cat, fmt_id_msg("[{}] Батч {} отменён, пропускаю", pipeline_name, batch_id), level='silent')
-        return True
-    return False
 
 def iterate_models(models, max_attempts_per_model, callback, max_passes=5):
     """Перебирает модели с повторными проходами до первого успешного результата.
