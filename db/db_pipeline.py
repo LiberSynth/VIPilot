@@ -556,3 +556,121 @@ def db_get_batch_vkvideo_clip_url(batch_id: str) -> str:
             )
             row = cur.fetchone()
     return (row[0] or '') if row else ''
+
+_PIPELINE_CHAIN_TYPES = ("story", "movie", "planning", "transcode", "publish")
+
+def _pipeline_chain_type_index(batch_type: str | None) -> int | None:
+    if not batch_type:
+        return None
+    try:
+        return _PIPELINE_CHAIN_TYPES.index(batch_type)
+    except ValueError:
+        return None
+
+def _db_fetch_batch_chain_link(batch_id: str) -> dict | None:
+    with get_db() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT id, type, batch_id_source, created_at
+                FROM batches
+                WHERE id = %s::uuid
+                """,
+                (batch_id,),
+            )
+            row = cur.fetchone()
+    return dict(row) if row else None
+
+def _db_fetch_pipeline_child_rows(parent_id: str, child_type: str) -> list[dict]:
+    with get_db() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT id, type, batch_id_source, created_at
+                FROM batches
+                WHERE batch_id_source = %s::uuid AND type = %s
+                ORDER BY created_at DESC, id DESC
+                """,
+                (parent_id, child_type),
+            )
+            rows = cur.fetchall()
+    return [dict(r) for r in rows]
+
+def _pipeline_downstream_depth(batch_id: str, memo: dict | None = None) -> int:
+    if memo is None:
+        memo = {}
+    if batch_id in memo:
+        return memo[batch_id]
+    batch = _db_fetch_batch_chain_link(batch_id)
+    if not batch:
+        memo[batch_id] = 0
+        return 0
+    tidx = _pipeline_chain_type_index(batch.get("type"))
+    if tidx is None or tidx >= len(_PIPELINE_CHAIN_TYPES) - 1:
+        memo[batch_id] = 0
+        return 0
+    next_type = _PIPELINE_CHAIN_TYPES[tidx + 1]
+    children = _db_fetch_pipeline_child_rows(str(batch["id"]), next_type)
+    if not children:
+        memo[batch_id] = 0
+        return 0
+    depth = 1 + max(_pipeline_downstream_depth(str(c["id"]), memo) for c in children)
+    memo[batch_id] = depth
+    return depth
+
+def _pick_pipeline_child(children: list[dict]) -> dict:
+    if len(children) == 1:
+        return children[0]
+    memo: dict = {}
+
+    def _sort_key(child: dict) -> tuple:
+        cid = str(child["id"])
+        created = child.get("created_at")
+        created_ts = created.timestamp() if created else 0.0
+        return (_pipeline_downstream_depth(cid, memo), created_ts, cid)
+
+    return max(children, key=_sort_key)
+
+def db_get_pipeline_chain_ids(batch_id: str) -> list[str]:
+    """
+    Упорядоченная цепочка story → movie → planning → transcode → publish.
+    Пустой список, если батч вне цепочки или звено одно.
+    """
+    start = _db_fetch_batch_chain_link(batch_id)
+    if not start or _pipeline_chain_type_index(start.get("type")) is None:
+        return []
+
+    ancestors: list[dict] = []
+    seen = {str(start["id"])}
+    cur = start
+    while True:
+        source = cur.get("batch_id_source")
+        if not source:
+            break
+        source_id = str(source)
+        if source_id in seen:
+            break
+        seen.add(source_id)
+        parent = _db_fetch_batch_chain_link(source_id)
+        if not parent or _pipeline_chain_type_index(parent.get("type")) is None:
+            break
+        ancestors.insert(0, parent)
+        cur = parent
+
+    chain = ancestors + [start]
+    tail = start
+
+    while True:
+        tidx = _pipeline_chain_type_index(tail.get("type"))
+        if tidx is None or tidx >= len(_PIPELINE_CHAIN_TYPES) - 1:
+            break
+        next_type = _PIPELINE_CHAIN_TYPES[tidx + 1]
+        children = _db_fetch_pipeline_child_rows(str(tail["id"]), next_type)
+        if not children:
+            break
+        child = _pick_pipeline_child(children)
+        chain.append(child)
+        tail = child
+
+    ids = [str(b["id"]) for b in chain]
+    return ids if len(ids) >= 2 else []

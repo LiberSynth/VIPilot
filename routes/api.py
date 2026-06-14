@@ -54,6 +54,7 @@ from db import (
     db_delete_story,
     db_delete_movie,
     db_get_movie_pool_count,
+    db_get_pipeline_chain_ids,
 )
 from log import (
     db_get_monitor,
@@ -621,7 +622,10 @@ def api_monitor_batch_entries(batch_id):
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
     entries = db_get_batch_log_entries(batch_id)
-    return jsonify({"entries": entries})
+    return jsonify({
+        "entries": entries,
+        "pipeline_chain_ids": db_get_pipeline_chain_ids(batch_id),
+    })
 
 @bp.route("/monitor/log/<log_id>/entries")
 def api_monitor_log_entries(log_id):

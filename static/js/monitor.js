@@ -39,6 +39,8 @@
 
   const TYPE_RESTARTABLE = ['story', 'movie', 'transcode', 'publish'];
   const TYPE_LINKED_MEDIA = ['transcode', 'publish', 'planning'];
+  const PIPELINE_CHAIN_TYPES = ['story', 'movie', 'planning', 'transcode', 'publish'];
+  const CHAIN_COLORS = ['#8b7cf6', '#4ec9b0', '#d4a843', '#7eb8f7', '#e079c0', '#6bb6ff'];
   const TYPE_TO_RESET_PIPELINE = {
     story:     'story',
     movie:     'video',
@@ -55,6 +57,8 @@
   const MON_SVG_PLAY     = `<svg viewBox="0 0 16 16"><polygon points="4,2 13,8 4,14"/></svg>`;
   const MON_SVG_INFO     = `<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.2"/><line x1="8" y1="5.5" x2="8" y2="5.5"/><line x1="8" y1="7.5" x2="8" y2="11"/></svg>`;
   const MON_SVG_DELETE   = `<svg viewBox="0 0 16 16"><polyline points="2,4 14,4"/><path d="M5 4V2h6v2"/><rect x="3" y="4" width="10" height="10" rx="1.5"/><line x1="6" y1="7" x2="6" y2="11"/><line x1="10" y1="7" x2="10" y2="11"/></svg>`;
+  const MON_SVG_CHAIN_PREV = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="10,3 5,8 10,13"/></svg>`;
+  const MON_SVG_CHAIN_NEXT = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,3 11,8 6,13"/></svg>`;
 
   function translateStatus(s) {
     if (STATUS_LABELS[s]) return STATUS_LABELS[s];
@@ -187,8 +191,14 @@
         ' onclick="openVideoModal(\'' + esc(batch.batch_id) + '\',\'\')">' + MON_SVG_PLAY + '</button>'
       : '';
 
+    const chainNavBtns = PIPELINE_CHAIN_TYPES.indexOf(btype) >= 0
+      ? '<button class="cycle-float-btn monitor-chain-nav" data-dir="prev" title="Предыдущее звено цепочки" disabled onclick="monitorChainNav(event,\'prev\')">' + MON_SVG_CHAIN_PREV + '</button>' +
+        '<button class="cycle-float-btn monitor-chain-nav" data-dir="next" title="Следующее звено цепочки" disabled onclick="monitorChainNav(event,\'next\')">' + MON_SVG_CHAIN_NEXT + '</button>'
+      : '';
+
     const hdrActions =
       '<div class="monitor-hdr-actions-always" onclick="event.stopPropagation()">' +
+        chainNavBtns +
         restartBtn +
         batchStoryBtn +
         batchVideoBtn +
@@ -260,8 +270,10 @@
 
   var _openBid              = null;
   var _openSysLid           = null;
+  var _openChainIds         = null;
   var _activeBatchIds       = [];
   var _batchEntriesCache    = {};
+  var _batchChainCache      = {};
   var _batchEntriesFetching = {};
   var _sysLogEntriesCache   = {};
   var _sysLogFetching       = {};
@@ -270,6 +282,51 @@
   var _pubFrameVer          = {};
   var _lastRenderedHtml     = {};
   var _lastMonitorData      = null;
+
+  function _chainColorForRoot(rootId) {
+    var hash = 0;
+    for (var i = 0; i < rootId.length; i++) {
+      hash = ((hash << 5) - hash) + rootId.charCodeAt(i);
+      hash |= 0;
+    }
+    return CHAIN_COLORS[Math.abs(hash) % CHAIN_COLORS.length];
+  }
+
+  function applyChainHighlight() {
+    var timeline = document.getElementById('monitor-timeline');
+    if (!timeline) return;
+    document.querySelectorAll('.monitor-batch.chain-linked').forEach(function(el) {
+      el.classList.remove('chain-linked', 'chain-anchor');
+    });
+    timeline.style.removeProperty('--chain-color');
+    if (!_openBid || !_openChainIds || _openChainIds.length < 2) {
+      updateChainNavButtons();
+      return;
+    }
+    timeline.style.setProperty('--chain-color', _chainColorForRoot(_openChainIds[0]));
+    _openChainIds.forEach(function(id) {
+      var el = document.querySelector('.monitor-batch[data-bid="' + id + '"]');
+      if (!el) return;
+      el.classList.add('chain-linked');
+      if (id === _openBid) el.classList.add('chain-anchor');
+    });
+    updateChainNavButtons();
+  }
+
+  function updateChainNavButtons() {
+    if (!_openBid) return;
+    var openEl = document.querySelector('.monitor-batch.open[data-bid="' + _openBid + '"]');
+    if (!openEl) return;
+    var idx = _openChainIds ? _openChainIds.indexOf(_openBid) : -1;
+    var hasChain = idx >= 0 && _openChainIds && _openChainIds.length >= 2;
+    openEl.querySelectorAll('.monitor-chain-nav').forEach(function(btn) {
+      if (!hasChain) {
+        btn.disabled = true;
+        return;
+      }
+      btn.disabled = btn.dataset.dir === 'prev' ? idx <= 0 : idx >= _openChainIds.length - 1;
+    });
+  }
 
   function _groupKey(item) {
     if (item.type === 'batch') return 'batch:' + item.data.batch_id;
@@ -360,9 +417,12 @@
         delete _batchEntriesFetching[bid];
         if (_openBid !== bid) return;
         var entries = data.entries || [];
+        _openChainIds = Array.isArray(data.pipeline_chain_ids) ? data.pipeline_chain_ids : [];
         _batchEntriesCache[bid] = entries;
+        _batchChainCache[bid] = _openChainIds;
         var batchEl2 = document.querySelector('.monitor-batch[data-bid="' + bid + '"]');
         if (batchEl2) _injectBatchEntries(batchEl2, entries);
+        if (_openBid === bid) applyChainHighlight();
       })
       .catch(function() { delete _batchEntriesFetching[bid]; });
   }
@@ -540,6 +600,7 @@
     }
 
     restoreOpenState(prev);
+    applyChainHighlight();
   }
 
   function refreshMonitor() {
@@ -590,12 +651,19 @@
     });
     if (isOpen) {
       _openBid = null;
+      _openChainIds = null;
+      applyChainHighlight();
     } else {
       el.classList.add('open');
       _openBid = bid || null;
+      _openChainIds = _batchChainCache[_openBid] || null;
+      applyChainHighlight();
       if (_openBid) {
         if (_batchEntriesCache[_openBid]) {
           _applyBatchEntries(el, _batchEntriesCache[_openBid]);
+          if (!_batchChainCache.hasOwnProperty(_openBid)) {
+            _fetchAndInjectEntries(_openBid);
+          }
         } else {
           _fetchAndInjectEntries(_openBid);
         }
@@ -679,6 +747,32 @@
     _monitorCopyText(_batchInfoLines(btn.closest('.monitor-batch')).join('\n'), btn);
   };
 
+  window.monitorChainNav = function(e, dir) {
+    e.stopPropagation();
+    if (!_openChainIds || _openChainIds.length < 2 || !_openBid) return;
+    var idx = _openChainIds.indexOf(_openBid);
+    if (idx < 0) return;
+    var nextIdx = dir === 'prev' ? idx - 1 : idx + 1;
+    if (nextIdx < 0 || nextIdx >= _openChainIds.length) return;
+    var targetId = _openChainIds[nextIdx];
+    var targetEl = document.querySelector('.monitor-batch[data-bid="' + targetId + '"]');
+    if (!targetEl) return;
+    document.querySelectorAll('.monitor-batch.open').forEach(function(b) {
+      b.classList.remove('open');
+    });
+    targetEl.classList.add('open');
+    _openBid = targetId;
+    _openChainIds = _batchChainCache[_openBid] || _openChainIds;
+    if (_batchEntriesCache[_openBid]) {
+      _applyBatchEntries(targetEl, _batchEntriesCache[_openBid]);
+    } else {
+      _fetchAndInjectEntries(_openBid);
+    }
+    applyChainHighlight();
+    targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    _evictPubFrameCache();
+  };
+
   window.monitorPipelineRestart = function(btn) {
     var batchId  = btn.dataset.bid;
     var pipeline = btn.dataset.pip;
@@ -732,9 +826,14 @@
               dlg.close();
               if (data.ok) {
                 delete _batchEntriesCache[batchId];
+                delete _batchChainCache[batchId];
                 var batchEl = document.querySelector('.monitor-batch[data-bid="' + batchId + '"]');
                 if (batchEl) batchEl.remove();
-                if (_openBid === batchId) _openBid = null;
+                if (_openBid === batchId) {
+                  _openBid = null;
+                  _openChainIds = null;
+                  applyChainHighlight();
+                }
                 showToast('Батч удалён', 'success');
               } else {
                 showToast('Ошибка: ' + (data.error || 'неизвестная ошибка'), 'error');
