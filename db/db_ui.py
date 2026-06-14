@@ -156,20 +156,14 @@ def db_get_stories_list(show_used=True, show_bad=True, for_approval=False, pin_i
         for row in rows
     ]
 
-_MOVIES_PUBLISHED_CHECK = """EXISTS (
-        SELECT 1 FROM batches b2
-        WHERE b2.movie_id = m.id
-          AND b2.status LIKE '%%published%%'
-    )"""
-
 def _build_movies_where(show_published: bool, show_bad: bool, for_approval: bool, pin_id=None):
     filter_conditions = []
     if for_approval:
         filter_conditions.append("m.grade IS NULL")
-        filter_conditions.append(f"NOT ({_MOVIES_PUBLISHED_CHECK})")
+        filter_conditions.append("m.published = B'0'")
     else:
         if not show_published:
-            filter_conditions.append(f"NOT ({_MOVIES_PUBLISHED_CHECK})")
+            filter_conditions.append("m.published = B'0'")
         if not show_bad:
             filter_conditions.append("m.grade = 'good'")
     params = []
@@ -204,18 +198,12 @@ def db_get_movies_list(show_published=True, show_bad=True, for_approval=False, p
                     m.created_at,
                     s.title AS story_title,
                     vm.name AS model_name,
-                    (p.movie_id IS NOT NULL) AS published,
+                    (m.published = B'1') AS published,
                     ab.id::text AS active_batch_id,
                     s.id::text AS story_id
                 FROM movies m
                 LEFT JOIN ai_models vm ON vm.id = m.model_id
                 LEFT JOIN stories s ON s.id = m.story_id
-                LEFT JOIN LATERAL (
-                    SELECT bp.movie_id
-                    FROM batches bp
-                    WHERE bp.movie_id = m.id AND bp.status LIKE '%%published%%'
-                    LIMIT 1
-                ) p ON TRUE
                 LEFT JOIN LATERAL (
                     SELECT b2.id
                     FROM batches b2
