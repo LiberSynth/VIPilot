@@ -229,7 +229,6 @@ def db_create_transcode_batches() -> list[str]:
                 JOIN movies m ON m.id = pl.movie_id
                 WHERE pl.type = 'planning'
                   AND pl.status = 'ready'
-                  AND m.used = B'1'
                   AND m.transcoded = B'0'
                   AND NOT EXISTS (
                       SELECT 1
@@ -259,15 +258,9 @@ def db_create_publish_batches() -> list[str]:
                     tc.id,
                     pl.scheduled_at
                 FROM batches tc
-                JOIN LATERAL (
-                    SELECT pl.scheduled_at
-                    FROM batches pl
-                    WHERE pl.type = 'planning'
-                      AND pl.status = 'ready'
-                      AND pl.movie_id = tc.movie_id
-                    ORDER BY pl.created_at DESC, pl.id DESC
-                    LIMIT 1
-                ) pl ON TRUE
+                JOIN batches pl ON pl.id = tc.batch_id_source
+                                  AND pl.type = 'planning'
+                                  AND pl.status = 'ready'
                 WHERE tc.type = 'transcode'
                   AND tc.status NOT IN ('pending', 'processing')
                   AND (
