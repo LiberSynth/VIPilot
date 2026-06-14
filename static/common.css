@@ -475,24 +475,12 @@
     border: 1px solid #2a2a38;
     border-radius: 14px;
     overflow: hidden;
-    position: relative;
   }
-  .monitor-batch.chain-linked::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 3px;
-    background: var(--chain-color);
-    opacity: 0.65;
-    border-radius: 14px 0 0 14px;
-    pointer-events: none;
-    z-index: 1;
+  .monitor-batch.chain-linked .monitor-batch-header {
+    box-shadow: inset 4px 0 0 0 var(--chain-color, #8b7cf6);
   }
-  .monitor-batch.chain-linked.chain-anchor::before {
-    width: 5px;
-    opacity: 1;
+  .monitor-batch.chain-linked.chain-anchor .monitor-batch-header {
+    box-shadow: inset 5px 0 0 0 var(--chain-color, #8b7cf6);
   }
   .monitor-batch:not(.open) .monitor-chain-nav { display: none; }
   .monitor-batch.bs-pending             { border-color: #2a2a38; }

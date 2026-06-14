@@ -292,21 +292,83 @@
     return CHAIN_COLORS[Math.abs(hash) % CHAIN_COLORS.length];
   }
 
+  function _buildPipelineChainIds(focusBid, batches) {
+    if (!focusBid || !batches || !batches.length) return [];
+    var byId = {};
+    var children = {};
+    batches.forEach(function(b) {
+      byId[b.batch_id] = b;
+      if (b.batch_id_source) {
+        if (!children[b.batch_id_source]) children[b.batch_id_source] = [];
+        children[b.batch_id_source].push(b);
+      }
+    });
+    var focus = byId[focusBid];
+    if (!focus || PIPELINE_CHAIN_TYPES.indexOf(focus.type) < 0) return [];
+
+    var ancestors = [];
+    var seen = {};
+    var cur = focus;
+    while (cur) {
+      var src = cur.batch_id_source;
+      if (!src || seen[src]) break;
+      seen[src] = true;
+      var parent = byId[src];
+      if (!parent || PIPELINE_CHAIN_TYPES.indexOf(parent.type) < 0) break;
+      ancestors.unshift(parent);
+      cur = parent;
+    }
+
+    var chain = ancestors.concat([focus]);
+    var tail = focus;
+    while (true) {
+      var tidx = PIPELINE_CHAIN_TYPES.indexOf(tail.type);
+      if (tidx < 0 || tidx >= PIPELINE_CHAIN_TYPES.length - 1) break;
+      var nextType = PIPELINE_CHAIN_TYPES[tidx + 1];
+      var kids = (children[tail.batch_id] || []).filter(function(k) { return k.type === nextType; });
+      if (!kids.length) break;
+      kids.sort(function(a, b) {
+        return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+      });
+      tail = kids[0];
+      chain.push(tail);
+    }
+
+    return chain.length >= 2 ? chain.map(function(b) { return b.batch_id; }) : [];
+  }
+
+  function _resolveOpenChainIds(focusBid) {
+    if (_batchChainCache.hasOwnProperty(focusBid) && _batchChainCache[focusBid].length >= 2) {
+      return _batchChainCache[focusBid];
+    }
+    if (_lastMonitorData && _lastMonitorData.batches) {
+      return _buildPipelineChainIds(focusBid, _lastMonitorData.batches);
+    }
+    return null;
+  }
+
   function applyChainHighlight() {
-    var timeline = document.getElementById('monitor-timeline');
-    if (!timeline) return;
     document.querySelectorAll('.monitor-batch.chain-linked').forEach(function(el) {
       el.classList.remove('chain-linked', 'chain-anchor');
+      el.style.removeProperty('--chain-color');
     });
-    timeline.style.removeProperty('--chain-color');
-    if (!_openBid || !_openChainIds || _openChainIds.length < 2) {
+    if (!_openBid) {
+      _openChainIds = null;
       updateChainNavButtons();
       return;
     }
-    timeline.style.setProperty('--chain-color', _chainColorForRoot(_openChainIds[0]));
+    if (!_openChainIds || _openChainIds.length < 2) {
+      _openChainIds = _resolveOpenChainIds(_openBid);
+    }
+    if (!_openChainIds || _openChainIds.length < 2) {
+      updateChainNavButtons();
+      return;
+    }
+    var color = _chainColorForRoot(_openChainIds[0]);
     _openChainIds.forEach(function(id) {
       var el = document.querySelector('.monitor-batch[data-bid="' + id + '"]');
       if (!el) return;
+      el.style.setProperty('--chain-color', color);
       el.classList.add('chain-linked');
       if (id === _openBid) el.classList.add('chain-anchor');
     });
@@ -347,6 +409,9 @@
 
   function restoreOpenState(state) {
     if (_openBid) {
+      if (_batchChainCache.hasOwnProperty(_openBid)) {
+        _openChainIds = _batchChainCache[_openBid];
+      }
       var batchEl = document.querySelector('.monitor-batch[data-bid="' + _openBid + '"]');
       if (batchEl) {
         batchEl.classList.add('open');
@@ -418,6 +483,9 @@
         if (_openBid !== bid) return;
         var entries = data.entries || [];
         _openChainIds = Array.isArray(data.pipeline_chain_ids) ? data.pipeline_chain_ids : [];
+        if (_openChainIds.length < 2 && _lastMonitorData && _lastMonitorData.batches) {
+          _openChainIds = _buildPipelineChainIds(bid, _lastMonitorData.batches);
+        }
         _batchEntriesCache[bid] = entries;
         _batchChainCache[bid] = _openChainIds;
         var batchEl2 = document.querySelector('.monitor-batch[data-bid="' + bid + '"]');
@@ -656,7 +724,7 @@
     } else {
       el.classList.add('open');
       _openBid = bid || null;
-      _openChainIds = _batchChainCache[_openBid] || null;
+      _openChainIds = _resolveOpenChainIds(_openBid);
       applyChainHighlight();
       if (_openBid) {
         if (_batchEntriesCache[_openBid]) {

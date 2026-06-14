@@ -51,6 +51,7 @@ def db_get_monitor():
                     b.story_id,
                     b.movie_id,
                     b.title,
+                    b.batch_id_source,
                     (
                         SELECT l.id::text
                         FROM log l
@@ -93,8 +94,9 @@ def db_get_monitor():
             "story_id":       str(r[5]) if r[5] else None,
             "movie_id":       str(r[6]) if r[6] else None,
             "title":          r[7],
-            "log_id":         r[8] if r[8] else None,
-            "entry_count":    int(r[9] or 0),
+            "batch_id_source": str(r[8]) if r[8] else None,
+            "log_id":         r[9] if r[9] else None,
+            "entry_count":    int(r[10] or 0),
         }
         for r in batch_rows
     ]
