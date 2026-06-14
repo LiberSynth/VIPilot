@@ -5,6 +5,7 @@ import subprocess
 from urllib.parse import urlparse, unquote, parse_qsl
 
 from .connection import get_db
+from .db_pipeline import build_pipeline_chain_map
 from .db_media import db_delete_movie_video_files
 from common.statuses import FINAL_BATCH_STATUSES
 from log.log import write_log_entry
@@ -100,6 +101,9 @@ def db_get_monitor():
         }
         for r in batch_rows
     ]
+    chain_map = build_pipeline_chain_map(batches)
+    for batch in batches:
+        batch["pipeline_chain_ids"] = chain_map.get(batch["batch_id"], [])
     system = [
         {
             "id":           r[0],

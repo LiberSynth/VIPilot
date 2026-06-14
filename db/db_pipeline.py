@@ -631,6 +631,113 @@ def _pick_pipeline_child(children: list[dict]) -> dict:
 
     return max(children, key=_sort_key)
 
+def build_pipeline_chain_map(batches: list[dict]) -> dict[str, list[str]]:
+    """batch_id -> ordered chain ids (monitor batches, in-memory only)."""
+    links: list[dict] = []
+    for batch in batches:
+        batch_id = str(batch.get("batch_id") or batch.get("id") or "")
+        if not batch_id:
+            continue
+        source = batch.get("batch_id_source")
+        links.append({
+            "id": batch_id,
+            "type": batch.get("type"),
+            "batch_id_source": str(source) if source else None,
+            "created_at": batch.get("created_at"),
+        })
+
+    by_id = {link["id"]: link for link in links}
+    children_index: dict[str, list[dict]] = {}
+    for link in links:
+        src = link.get("batch_id_source")
+        if src and src in by_id:
+            children_index.setdefault(src, []).append(link)
+
+    def _child_depth(link_id: str, memo: dict | None = None) -> int:
+        if memo is None:
+            memo = {}
+        if link_id in memo:
+            return memo[link_id]
+        link = by_id.get(link_id)
+        if not link:
+            memo[link_id] = 0
+            return 0
+        tidx = _pipeline_chain_type_index(link.get("type"))
+        if tidx is None or tidx >= len(_PIPELINE_CHAIN_TYPES) - 1:
+            memo[link_id] = 0
+            return 0
+        next_type = _PIPELINE_CHAIN_TYPES[tidx + 1]
+        kids = [
+            row for row in children_index.get(link_id, [])
+            if row.get("type") == next_type
+        ]
+        if not kids:
+            memo[link_id] = 0
+            return 0
+        depth = 1 + max(_child_depth(row["id"], memo) for row in kids)
+        memo[link_id] = depth
+        return depth
+
+    def _pick_child(child_rows: list[dict]) -> dict:
+        if len(child_rows) == 1:
+            return child_rows[0]
+        memo: dict = {}
+
+        def _sort_key(row: dict) -> tuple:
+            created = row.get("created_at")
+            created_key = created if isinstance(created, str) else (
+                created.timestamp() if created else 0.0
+            )
+            return (_child_depth(row["id"], memo), created_key, row["id"])
+
+        return max(child_rows, key=_sort_key)
+
+    def _chain_for(focus_id: str) -> list[str]:
+        start = by_id.get(focus_id)
+        if not start or _pipeline_chain_type_index(start.get("type")) is None:
+            return []
+
+        ancestors: list[dict] = []
+        seen = {focus_id}
+        cur = start
+        while True:
+            src = cur.get("batch_id_source")
+            if not src or src in seen:
+                break
+            seen.add(src)
+            parent = by_id.get(src)
+            if not parent or _pipeline_chain_type_index(parent.get("type")) is None:
+                break
+            ancestors.insert(0, parent)
+            cur = parent
+
+        chain = ancestors + [start]
+        tail = start
+        while True:
+            tidx = _pipeline_chain_type_index(tail.get("type"))
+            if tidx is None or tidx >= len(_PIPELINE_CHAIN_TYPES) - 1:
+                break
+            next_type = _PIPELINE_CHAIN_TYPES[tidx + 1]
+            kids = [
+                row for row in children_index.get(tail["id"], [])
+                if row.get("type") == next_type
+            ]
+            if not kids:
+                break
+            child = _pick_child(kids)
+            chain.append(child)
+            tail = child
+
+        ids = [row["id"] for row in chain]
+        return ids if len(ids) >= 2 else []
+
+    result: dict[str, list[str]] = {}
+    for link in links:
+        if _pipeline_chain_type_index(link.get("type")) is None:
+            continue
+        result[link["id"]] = _chain_for(link["id"])
+    return result
+
 def db_get_pipeline_chain_ids(batch_id: str) -> list[str]:
     """
     Упорядоченная цепочка story → movie → planning → transcode → publish.
