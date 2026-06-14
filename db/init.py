@@ -151,6 +151,7 @@ def bootstrap():
                     grade           TEXT,
                     used            BIT(1) NOT NULL DEFAULT B'0',
                     transcoded      BIT(1) NOT NULL DEFAULT B'0',
+                    published       BIT(1) NOT NULL DEFAULT B'0',
                     created_at      TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
                 )
             """)

@@ -68,6 +68,7 @@ from .db_media import (
     db_save_generated_video_url,
     db_save_transcoded_data,
     db_set_movie_transcoded,
+    db_set_movie_published,
     db_get_batch_video_data_with_source,
     db_get_batch_video_data,
     db_get_movie_video_data,

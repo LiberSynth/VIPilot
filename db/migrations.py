@@ -319,6 +319,25 @@ def _m1011_buffer_hours_to_minutes(cur):
             "INSERT INTO settings (key, value) VALUES ('buffer_minutes', '60')"
         )
 
+def _m1012_add_movies_published(cur):
+    """Add movies.published; backfill from batch status LIKE '%published%' (Director UI checkmark)."""
+    cur.execute("ALTER TABLE movies ADD COLUMN IF NOT EXISTS published BIT(1)")
+    cur.execute(
+        """
+        UPDATE movies m
+        SET published = B'1'
+        WHERE EXISTS (
+            SELECT 1
+            FROM batches b2
+            WHERE b2.movie_id = m.id
+              AND b2.status LIKE '%published%'
+        )
+        """
+    )
+    cur.execute("UPDATE movies SET published = B'0' WHERE published IS NULL")
+    cur.execute("ALTER TABLE movies ALTER COLUMN published SET DEFAULT B'0'")
+    cur.execute("ALTER TABLE movies ALTER COLUMN published SET NOT NULL")
+
 MIGRATIONS = [
     (2026052901, _m1001_drop_targets_legacy_columns),
     (2026052902, _m1002_add_movies_transcoded),
@@ -331,6 +350,7 @@ MIGRATIONS = [
     (2026052909, _m1009_log_entries_channel),
     (2026052910, _m1010_drop_log_entries_category),
     (2026052911, _m1011_buffer_hours_to_minutes),
+    (2026052912, _m1012_add_movies_published),
 ]
 
 # ---------------------------------------------------------------------------

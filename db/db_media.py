@@ -146,6 +146,18 @@ def db_set_movie_transcoded(movie_id: str, conn=None):
         )
     conn.commit()
 
+def db_set_movie_published(movie_id: str, conn=None):
+    if conn is None:
+        with get_db() as _conn:
+            db_set_movie_published(movie_id, _conn)
+        return
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE movies SET published = B'1' WHERE id = %s::uuid",
+            (movie_id,),
+        )
+    conn.commit()
+
 def db_get_batch_video_data_with_source(batch_id) -> tuple[bytes | None, str | None]:
     with get_db() as conn:
         with conn.cursor() as cur:

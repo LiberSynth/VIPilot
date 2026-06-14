@@ -13,6 +13,7 @@ from db import (
     db_claim_batch_status,
     db_set_batch_title,
     db_get_batch_vkvideo_clip_url,
+    db_set_movie_published,
 )
 from log import db_get_batch_log_entries, write_log_entry
 from pipelines.base import ensure_playwright_chromium
@@ -143,6 +144,11 @@ def _fail_publish_config(batch_id, category, msg):
     write_log_entry(batch_id, category, msg, level='error')
     write_log_entry(batch_id, category, fmt_id_msg("[publish] {} (батч {})", msg, batch_id), level='silent')
 
+def _mark_movie_published(batch):
+    movie_id = batch.get('movie_id')
+    if movie_id:
+        db_set_movie_published(str(movie_id))
+
 def _build_steps(active_targets):
     """Строит список шагов публикации: [(slug, method, target), ...] по алфавиту метода внутри таргета."""
     steps = []
@@ -271,6 +277,7 @@ def run(batch_id, category):
                 write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} resume с шага {}.{}", batch_id, ns, nm), level='silent')
             else:
                 db_set_batch_status(batch_id, 'published')
+                _mark_movie_published(batch)
                 write_log_entry(batch_id, category, 'Опубликовано (возобновление — все шаги завершены)')
                 write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} опубликован (возобновление)", batch_id), level='silent')
                 return
@@ -364,6 +371,7 @@ def run(batch_id, category):
         if failed_steps:
             fail_list = ', '.join(failed_steps)
             db_set_batch_status(batch_id, 'published_partially')
+            _mark_movie_published(batch)
             write_log_entry(batch_id, category, f'Частично опубликовано; ошибки: {fail_list}')
             write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} частично опубликован (ошибки: {})", batch_id, fail_list), level='silent')
             entries = db_get_batch_log_entries(batch_id)
@@ -379,6 +387,7 @@ def run(batch_id, category):
             write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} — phase=run_done, status=published_partially", batch_id), level='silent')
         else:
             db_set_batch_status(batch_id, 'published')
+            _mark_movie_published(batch)
             write_log_entry(batch_id, category, f'Успешно опубликовано ({target_names})')
             write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} опубликован", batch_id), level='silent')
             entries = db_get_batch_log_entries(batch_id)
