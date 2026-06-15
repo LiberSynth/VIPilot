@@ -168,8 +168,8 @@ _VK_PUBLISH_ERROR_TEXTS = (
     "Клип не опубликован",
 )
 
-def _check_vk_publish_result(page) -> bool:
-    """True — на странице виден признак успешной публикации клипа."""
+def _check_vk_publish_result(page) -> tuple[bool, str | None]:
+    """(True, причина) — публикация клипа подтверждена."""
     try:
         body = page.locator("body").inner_text(timeout=800)
         body_lower = body.lower()
@@ -178,20 +178,50 @@ def _check_vk_publish_result(page) -> bool:
                 raise VkVideoApiError(f"VK Видео заблокировал публикацию: «{err}».")
         for ok_text in _VK_PUBLISH_SUCCESS_TEXTS:
             if ok_text.lower() in body_lower:
-                return True
+                return True, "тост"
     except VkVideoApiError:
         raise
     except Exception:
         pass
+    if _vk_publish_confirmed_by_page(page):
+        return True, "URL/форма"
+    return False, None
+
+def _vk_publish_form_visible(page) -> bool:
+    try:
+        return page.locator(
+            "textarea[placeholder*='клип'], "
+            "textarea[placeholder*='Клип'], "
+            "[placeholder*='клип']"
+        ).first.is_visible(timeout=300)
+    except Exception:
+        return False
+
+def _vk_publish_confirmed_by_page(page) -> bool:
+    """Признак успеха по URL или исчезновению формы публикации клипа."""
+    try:
+        url = page.url.lower()
+    except Exception:
+        return False
+    if "video_my_content_clips" in url:
+        return True
+    if (
+        "cabinet.vkvideo.ru/dashboard" in url
+        and "showuploader" not in url
+        and not _vk_publish_form_visible(page)
+    ):
+        return True
     return False
 
 def _click_vk_publish_button(pub_btn, page, category, batch_id) -> None:
     """Клик по «Опубликовать» без ожидания навигации после submit."""
-    if _check_vk_publish_result(page):
+    _ok, _ = _check_vk_publish_result(page)
+    if _ok:
         return
     _last_err = None
     for _attempt in range(1, 4):
-        if _check_vk_publish_result(page):
+        _ok, _ = _check_vk_publish_result(page)
+        if _ok:
             return
         try:
             pub_btn.click(timeout=5_000, no_wait_after=True)
@@ -391,15 +421,18 @@ def _publish_ui(
     write_log_entry(batch_id, category, "VK Видео: Проверяю результат публикации.")
 
     _deadline = _time.monotonic() + 15
-    _success = _check_vk_publish_result(page)
+    _success, _success_via = _check_vk_publish_result(page)
     while _time.monotonic() < _deadline and not _success:
         page.wait_for_timeout(400)
-        _success = _check_vk_publish_result(page)
+        _success, _success_via = _check_vk_publish_result(page)
 
     _snap(page, batch_id)
 
     if _success:
-        write_log_entry(batch_id, category, "VK Видео: Клип опубликован успешно.")
+        write_log_entry(
+            batch_id, category,
+            f"VK Видео: Клип опубликован успешно ({_success_via}).",
+        )
         write_log_entry(batch_id, category, f"URL: {page.url}", level="silent")
     else:
         write_log_entry(

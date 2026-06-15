@@ -246,6 +246,7 @@ def _publish_ui(page, video_path: str, category, batch_id=None):
 
     # ── Шаг 1: Переходим в студию ────────────────────────────────────────
     write_log_entry(batch_id, category, "Рутьюб: Переход в студию Рутьюба.")
+    _nav_started = _time.monotonic()
     _last_err = None
     for _attempt in range(1, 6):
         try:
@@ -265,6 +266,10 @@ def _publish_ui(page, video_path: str, category, batch_id=None):
         raise RutubeApiError(
             f"Не удалось перейти в студию Рутьюба после 5 попыток: {_last_err}"
         ) from _last_err
+    write_log_entry(
+        batch_id, category,
+        f"Рутьюб: domcontentloaded за {_time.monotonic() - _nav_started:.1f} с.",
+    )
     _snap(page, batch_id)
 
     cur = page.url

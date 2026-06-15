@@ -409,8 +409,30 @@ def _find_primary_publish_control(page):
             pass
     return None
 
-def _click_primary_publish_control(page, category, batch_id=None) -> bool:
+def _dzen_publish_confirmed(page, url_step7_start: str, url_before: str | None = None) -> bool:
+    """True если текущий URL подтверждает успешную публикацию."""
+    if _dzen_step7_success_without_click(page, url_step7_start):
+        return True
+    url_now = page.url
+    if url_before is not None and url_now == url_before:
+        return False
+    if "state=published" in url_now or "state=pending" in url_now:
+        return True
+    if re.search(r"/video/|/shorts/|/watch\?", url_now):
+        return True
+    if url_before is not None and "editor" not in url_now:
+        return True
+    return False
+
+def _click_primary_publish_control(page, category, batch_id=None, url_step7_start: str | None = None) -> bool:
     """Закрывает попапы и нажимает основную кнопку «Опубликовать». Возвращает True если кликнули."""
+    if url_step7_start and _dzen_publish_confirmed(page, url_step7_start):
+        write_log_entry(
+            batch_id, category,
+            "Дзен: Публикация уже подтверждена по URL — клик не нужен.",
+            level='silent',
+        )
+        return False
     _handle_popups(page, category, batch_id)
     pub_btn = _find_primary_publish_control(page)
     if pub_btn is None:
@@ -439,16 +461,18 @@ def _click_primary_publish_control(page, category, batch_id=None) -> bool:
             write_log_entry(batch_id, category, f"JS-клик тоже не прошёл: {_js_err}", level='silent')
             return False
     _snap(page, batch_id)
+    if url_step7_start and _dzen_publish_confirmed(page, url_step7_start):
+        return False
     return True
 
 def _retry_publish_if_button_visible(page, category, batch_id, url_step7_start, reason: str) -> bool:
     """Повторный клик, если публикация ещё не ушла, а CTA всё ещё на экране."""
-    if _dzen_step7_success_without_click(page, url_step7_start):
+    if _dzen_publish_confirmed(page, url_step7_start):
         return False
     if _find_primary_publish_control(page) is None:
         return False
     write_log_entry(batch_id, category, f"Дзен: {reason}")
-    return _click_primary_publish_control(page, category, batch_id)
+    return _click_primary_publish_control(page, category, batch_id, url_step7_start)
 
 _EXPECTED_ELEMENTS = [
     ("modal",   _modal_overlay_visible,   _handle_modal_overlay_element),
@@ -882,7 +906,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
         )
 
     if pub_btn is not None:
-        _click_primary_publish_control(page, category, batch_id)
+        _click_primary_publish_control(page, category, batch_id, url_step7_start)
 
     # Ждём диалог подтверждения или капчу; выходим раньше, если URL уже сменился.
     _CONFIRM_OR_CAPTCHA_SEL = (
@@ -973,7 +997,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
 
     # Перед шагом 9: закрываем хинты и повторяем клик, если CTA всё ещё на экране.
     _dismiss_unknown(page, category, batch_id)
-    if not _step8_done:
+    if not _step8_done and not _dzen_publish_confirmed(page, url_step7_start):
         _retry_publish_if_button_visible(
             page,
             category,
@@ -1031,6 +1055,17 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
         if _iter % _snap_every == 1:   # первый снимок сразу, потом каждые 6 сек
             _snap(page, batch_id)
 
+        if _dzen_publish_confirmed(page, url_step7_start, url_before):
+            confirmed = True
+            url_now = page.url
+            if "state=published" in url_now or "state=pending" in url_now:
+                state_label = "state=published" if "state=published" in url_now else "state=pending"
+                write_log_entry(batch_id, category, f"Дзен: URL → {state_label} — публикация подтверждена.")
+            else:
+                write_log_entry(batch_id, category, "Дзен: Публикация подтверждена (URL).")
+            write_log_entry(batch_id, category, f"URL: {url_now}", level='silent')
+            break
+
         # 1. CSS-проверка
         try:
             el = page.locator(css_success_selector).first
@@ -1062,6 +1097,17 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
         # 2c. Обрабатываем попапы/диалоги/хинты (капча может появиться и здесь)
         _handle_popups(page, category, batch_id)
 
+        if _dzen_publish_confirmed(page, url_step7_start, url_before):
+            confirmed = True
+            url_now = page.url
+            if "state=published" in url_now or "state=pending" in url_now:
+                state_label = "state=published" if "state=published" in url_now else "state=pending"
+                write_log_entry(batch_id, category, f"Дзен: URL → {state_label} — публикация подтверждена.")
+            else:
+                write_log_entry(batch_id, category, "Дзен: Публикация подтверждена (URL).")
+            write_log_entry(batch_id, category, f"URL: {url_now}", level='silent')
+            break
+
         if (
             not confirmed
             and _publish_retries < _PUBLISH_RETRY_MAX
@@ -1074,22 +1120,6 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
             )
         ):
             _publish_retries += 1
-
-        # 3. Проверка URL
-        url_now = page.url
-        if url_now != url_before:
-            # state=published / state=pending — Дзен подтвердил публикацию
-            if "state=published" in url_now or "state=pending" in url_now:
-                state_label = "state=published" if "state=published" in url_now else "state=pending"
-                confirmed = True
-                write_log_entry(batch_id, category, f"Дзен: URL → {state_label} — публикация подтверждена.")
-                break
-            video_match = re.search(r"/video/|/shorts/|/watch\?", url_now)
-            if video_match or "editor" not in url_now:
-                confirmed = True
-                write_log_entry(batch_id, category, "Дзен: Публикация подтверждена (смена URL).")
-                write_log_entry(batch_id, category, f"URL сменился: {url_now}", level='silent')
-                break
 
         page.wait_for_timeout(_CONFIRM_POLL)
 
