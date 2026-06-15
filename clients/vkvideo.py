@@ -156,6 +156,59 @@ def _read_clip_url(page) -> str:
         pass
     return ""
 
+_VK_PUBLISH_SUCCESS_TEXTS = ("Клип опубликован", "опубликован в канале")
+_VK_PUBLISH_ERROR_TEXTS = (
+    "Ошибка публикации",
+    "не удалось опубликовать",
+    "Произошла ошибка",
+    "Клип не опубликован",
+)
+
+def _check_vk_publish_result(page) -> bool:
+    """True — на странице виден признак успешной публикации клипа."""
+    try:
+        body = page.locator("body").inner_text(timeout=800)
+        body_lower = body.lower()
+        for err in _VK_PUBLISH_ERROR_TEXTS:
+            if err.lower() in body_lower:
+                raise VkVideoApiError(f"VK Видео заблокировал публикацию: «{err}».")
+        for ok_text in _VK_PUBLISH_SUCCESS_TEXTS:
+            if ok_text.lower() in body_lower:
+                return True
+    except VkVideoApiError:
+        raise
+    except Exception:
+        pass
+    return False
+
+def _click_vk_publish_button(pub_btn, page, category, batch_id) -> None:
+    """Клик по «Опубликовать» без ожидания навигации после submit."""
+    if _check_vk_publish_result(page):
+        return
+    _last_err = None
+    for _attempt in range(1, 4):
+        if _check_vk_publish_result(page):
+            return
+        try:
+            pub_btn.click(timeout=5_000, no_wait_after=True)
+            return
+        except Exception as _e:
+            _last_err = _e
+            try:
+                pub_btn.evaluate("el => el.click()")
+                return
+            except Exception as _js_e:
+                _last_err = _js_e
+            write_log_entry(
+                batch_id, category,
+                f"VK Видео: Клик «Опубликовать» не прошёл (попытка {_attempt}/3).",
+                level="warn",
+            )
+            page.wait_for_timeout(400)
+    raise VkVideoApiError(
+        f"Не удалось нажать «Опубликовать» в VK Видео: {_last_err}"
+    ) from _last_err
+
 def _wait_visible(locator, timeout_ms: int, page, batch_id, interval_ms: int = 2_000):
     """Ждёт видимости локатора, снимая скриншот каждые interval_ms мс.
     Playwright sync API нельзя вызывать из других потоков — поэтому
@@ -320,54 +373,24 @@ def _publish_ui(
     write_log_entry(batch_id, category, "VK Видео: Прокручиваю к кнопке «Опубликовать».")
     _snap(page, batch_id)
     try:
-        pub_btn.scroll_into_view_if_needed(timeout=10_000)
+        pub_btn.scroll_into_view_if_needed(timeout=3_000)
     except Exception:
         pass
     page.wait_for_timeout(300)
     _snap(page, batch_id)
 
     write_log_entry(batch_id, category, "VK Видео: Нажимаю «Опубликовать».")
-    try:
-        pub_btn.click(timeout=30_000)
-    except Exception as _click_err:
-        write_log_entry(
-            batch_id, category,
-            f"VK Видео: Обычный клик не прошёл — пробую JS-клик: {_click_err}",
-            level="silent",
-        )
-        pub_btn.evaluate("el => el.click()")
+    _click_vk_publish_button(pub_btn, page, category, batch_id)
     _snap(page, batch_id)
 
     # ── Шаг 9: Проверяем успех (тост «Клип опубликован») ────────────────
     write_log_entry(batch_id, category, "VK Видео: Проверяю результат публикации.")
 
-    _SUCCESS_TEXTS = ["Клип опубликован", "опубликован в канале"]
-    _ERROR_TEXTS = [
-        "Ошибка публикации",
-        "не удалось опубликовать",
-        "Произошла ошибка",
-        "Клип не опубликован",
-    ]
-
     _deadline = _time.monotonic() + 15
-    _success = False
-    while _time.monotonic() < _deadline:
-        try:
-            body = page.locator("body").inner_text(timeout=1500)
-            for err in _ERROR_TEXTS:
-                if err.lower() in body.lower():
-                    raise VkVideoApiError(f"VK Видео заблокировал публикацию: «{err}».")
-            for ok_text in _SUCCESS_TEXTS:
-                if ok_text.lower() in body.lower():
-                    _success = True
-                    break
-        except VkVideoApiError:
-            raise
-        except Exception:
-            pass
-        if _success:
-            break
-        page.wait_for_timeout(1000)
+    _success = _check_vk_publish_result(page)
+    while _time.monotonic() < _deadline and not _success:
+        page.wait_for_timeout(400)
+        _success = _check_vk_publish_result(page)
 
     _snap(page, batch_id)
 
