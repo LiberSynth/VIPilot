@@ -590,7 +590,7 @@
     aspect-ratio: 1280 / 720;
   }
   .monitor-batch.open .monitor-pub-frame { display: block; }
-  .monitor-pub-frame img {
+  .monitor-pub-frame canvas.monitor-pub-canvas {
     width: 100%;
     height: auto;
     display: block;
