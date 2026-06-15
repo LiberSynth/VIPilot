@@ -4,7 +4,7 @@ import threading
 import time
 import io
 from datetime import datetime, timezone, timedelta
-from flask import Blueprint, jsonify, request, Response, send_file
+from flask import Blueprint, jsonify, request, Response, send_file, stream_with_context
 
 from db import (
     db_get_schedule,
@@ -734,22 +734,33 @@ def api_batch_publish_frame(batch_id):
     """Возвращает последний JPEG-скриншот браузера публикации для батча."""
     if not is_authenticated():
         return Response("Unauthorized", status=401)
-    from services.browser_registry import get_browser as _get_browser, SLUGS
-    entries = [
-        _get_browser(s).get_frame_for_batch(batch_id)
-        for s in SLUGS
-    ]
-    entries = [e for e in entries if e]
-    if entries:
-        img = max(entries, key=lambda e: e[1])[0]
-    else:
-        img = None
+    from services.publish_frame_hub import get_hub
+    img = get_hub().get_frame(batch_id)
     if img is None:
         return Response("", status=204)
     return Response(
         img,
         mimetype="image/jpeg",
         headers={"Cache-Control": "no-store, no-cache"},
+    )
+
+@bp.route("/batch/<batch_id>/publish-stream")
+def api_batch_publish_stream(batch_id):
+    """SSE-поток JPEG-кадров публикации для Монитора."""
+    if not is_authenticated():
+        return Response("Unauthorized", status=401)
+    from services.publish_frame_hub import get_hub
+
+    def generate():
+        yield from get_hub().stream_generator(batch_id)
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
     )
 
 @bp.route("/import-update-package", methods=["POST"])

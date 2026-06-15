@@ -46,3 +46,5 @@ def clear_publish_frames_for_batch(batch_id: str) -> None:
     """Удаляет кадры публикации батча из буферов всех платформ."""
     for slug in SLUGS:
         _browsers[slug].clear_frame_for_batch(batch_id)
+    from services.publish_frame_hub import get_hub
+    get_hub().clear(batch_id)

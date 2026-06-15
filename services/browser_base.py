@@ -313,6 +313,8 @@ class PlatformBrowser:
             if len(self._batch_frames) > self._MAX_BATCH_FRAMES:
                 oldest = next(iter(self._batch_frames))
                 del self._batch_frames[oldest]
+        from services.publish_frame_hub import get_hub
+        get_hub().push(batch_id, img)
 
     def get_frame_for_batch(self, batch_id: str) -> Optional[tuple]:
         """Возвращает (JPEG bytes, monotonic timestamp) для батча или None."""

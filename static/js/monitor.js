@@ -48,7 +48,6 @@
   const TYPE_ERROR_STATUSES = ['error', 'video_error', 'transcode_error', 'publish_error', 'fatal_error'];
   const FINAL_BATCH_STATUSES = ['published', 'published_partially', 'ready', 'error', 'fatal_error', 'video_error', 'transcode_error', 'publish_error'];
   const MONITOR_POLL_MS = 200;
-  const PUBLISH_FRAME_POLL_MS = 200;
   const BATCH_ENTRIES_POLL_MS = 200;
   const SYSTEM_ENTRIES_POLL_MS = 200;
 
@@ -301,9 +300,7 @@
   var _batchEntriesFetching = {};
   var _sysLogEntriesCache   = {};
   var _sysLogFetching       = {};
-  var _pubFrameCache        = {};
-  var _pubFrameFetching     = {};
-  var _pubFrameVer          = {};
+  var _pubFrameStreams = {};
   var _lastRenderedHtml     = {};
   var _lastMonitorData      = null;
 
@@ -545,38 +542,19 @@
       .catch(function() { delete _sysLogFetching[lid]; });
   }
 
-  function _evictPubFrameCache() {
-    var alive = {};
-    document.querySelectorAll(
-      '.monitor-batch.open[data-type="publish"] .monitor-pub-frame img[data-bid]'
-    ).forEach(function(img) {
-      if (img.dataset.bid) alive[img.dataset.bid] = true;
-    });
-    var seen = {};
-    Object.keys(_pubFrameCache).forEach(function(b) { seen[b] = true; });
-    Object.keys(_pubFrameFetching).forEach(function(b) { seen[b] = true; });
-    Object.keys(_pubFrameVer).forEach(function(b) { seen[b] = true; });
-    Object.keys(seen).forEach(function(bid) {
-      if (!alive[bid]) {
-        _pubFrameVer[bid] = (_pubFrameVer[bid] || 0) + 1;
-        if (_pubFrameCache[bid]) URL.revokeObjectURL(_pubFrameCache[bid]);
-        delete _pubFrameCache[bid];
-        delete _pubFrameFetching[bid];
-        document.querySelectorAll('.monitor-pub-frame img[data-bid="' + bid + '"]')
-          .forEach(function(el) {
-            el.removeAttribute('src');
-            var frame = el.closest('.monitor-pub-frame');
-            if (frame) frame.classList.add('monitor-pub-frame-empty');
-          });
-      }
-    });
+  function _disconnectPubFrameStream(bid) {
+    var sse = _pubFrameStreams[bid];
+    if (!sse) return;
+    sse.close();
+    delete _pubFrameStreams[bid];
+  }
+
+  function _disconnectAllPubFrameStreams() {
+    Object.keys(_pubFrameStreams).forEach(_disconnectPubFrameStream);
   }
 
   function _clearPubFrameDisplay(bid) {
-    _pubFrameVer[bid] = (_pubFrameVer[bid] || 0) + 1;
-    if (_pubFrameCache[bid]) URL.revokeObjectURL(_pubFrameCache[bid]);
-    delete _pubFrameCache[bid];
-    delete _pubFrameFetching[bid];
+    _disconnectPubFrameStream(bid);
     document.querySelectorAll('.monitor-pub-frame img[data-bid="' + bid + '"]')
       .forEach(function(el) {
         el.removeAttribute('src');
@@ -601,66 +579,67 @@
     return bs === 'published' || bs === 'published_partially' || bs === 'publish_error';
   }
 
-  function refreshPublishFrames() {
-    _evictPubFrameCache();
-    if (!document.querySelector(
-      '.monitor-batch.open[data-type="publish"] .monitor-pub-frame img[data-bid]'
-    )) return;
+  function _applyPubFrameBase64(bid, b64) {
+    _showPubFrame(bid);
+    document.querySelectorAll('.monitor-pub-frame img[data-bid="' + bid + '"]')
+      .forEach(function(el) { el.src = 'data:image/jpeg;base64,' + b64; });
+  }
 
-    document.querySelectorAll(
-      '.monitor-batch.open[data-type="publish"] .monitor-pub-frame img[data-bid]'
-    ).forEach(function(img) {
-      var bid = img.dataset.bid;
-      if (!bid) return;
-      if (_shouldClearPubFrame(bid, img)) {
+  function _connectPubFrameStream(bid) {
+    if (_pubFrameStreams[bid]) return;
+    var img = document.querySelector(
+      '.monitor-batch.open[data-type="publish"] .monitor-pub-frame img[data-bid="' + bid + '"]'
+    );
+    if (!img) return;
+    if (_shouldClearPubFrame(bid, img)) {
+      _clearPubFrameDisplay(bid);
+      return;
+    }
+    var sse = new EventSource('/api/batch/' + encodeURIComponent(bid) + '/publish-stream');
+    _pubFrameStreams[bid] = sse;
+    sse.onmessage = function(e) {
+      var data = e.data;
+      if (data === 'STOPPED') {
         _clearPubFrameDisplay(bid);
         return;
       }
-      if (_pubFrameCache[bid] && !img.src) {
-        _showPubFrame(bid);
-        img.src = _pubFrameCache[bid];
+      if (!data || data.charAt(0) === ':') return;
+      if (!document.querySelector(
+        '.monitor-batch.open[data-type="publish"] .monitor-pub-frame img[data-bid="' + bid + '"]'
+      )) {
+        _disconnectPubFrameStream(bid);
+        return;
       }
-      if (_pubFrameFetching[bid]) return;
-      _pubFrameFetching[bid] = true;
-      var ver = (_pubFrameVer[bid] = (_pubFrameVer[bid] || 0) + 1);
-      fetch('/api/batch/' + bid + '/publish-frame?t=' + Date.now())
-        .then(function(r) {
-          if (!r.ok || r.status === 204) return null;
-          return r.blob();
-        })
-        .then(function(blob) {
-          _pubFrameFetching[bid] = false;
-          if (_pubFrameVer[bid] !== ver) return;
-          if (!blob) {
-            _clearPubFrameDisplay(bid);
-            return;
-          }
-          if (!document.querySelector(
-            '.monitor-batch.open[data-type="publish"] .monitor-pub-frame img[data-bid="' + bid + '"]'
-          )) return;
-          if (_pubFrameCache[bid]) URL.revokeObjectURL(_pubFrameCache[bid]);
-          var url = URL.createObjectURL(blob);
-          _pubFrameCache[bid] = url;
-          _showPubFrame(bid);
-          document.querySelectorAll('.monitor-pub-frame img[data-bid="' + bid + '"]')
-            .forEach(function(el) { el.src = url; });
-        })
-        .catch(function() { _pubFrameFetching[bid] = false; });
-    });
+      _applyPubFrameBase64(bid, data);
+    };
+    sse.onerror = function() {};
   }
 
-  window.addEventListener('beforeunload', function() {
-    Object.keys(_pubFrameCache).forEach(function(bid) {
-      URL.revokeObjectURL(_pubFrameCache[bid]);
+  function syncPubFrameStreams() {
+    var alive = {};
+    document.querySelectorAll(
+      '.monitor-batch.open[data-type="publish"] .monitor-pub-frame img[data-bid]'
+    ).forEach(function(el) {
+      var bid = el.dataset.bid;
+      if (!bid) return;
+      alive[bid] = true;
+      if (_shouldClearPubFrame(bid, el)) {
+        _clearPubFrameDisplay(bid);
+        return;
+      }
+      _connectPubFrameStream(bid);
     });
-  });
+    Object.keys(_pubFrameStreams).forEach(function(bid) {
+      if (!alive[bid]) _disconnectPubFrameStream(bid);
+    });
+  }
 
   function renderTimeline(data) {
     var el = document.getElementById('monitor-timeline');
     if (!el) return;
     _lastMonitorData = data;
     _activeBatchIds = Array.isArray(data.active_batch_ids) ? data.active_batch_ids : [];
-    refreshPublishFrames();
+    syncPubFrameStreams();
     var prev = getOpenState();
     var items = buildTimeline(data.batches, data.system);
     if (items.length === 0) {
@@ -815,7 +794,7 @@
         }
       }
     }
-    _evictPubFrameCache();
+    syncPubFrameStreams();
   };
 
   window.monitorToggleSystemBlock = function(e, el) {
@@ -917,7 +896,7 @@
     _refreshMonitorView();
     var scrolled = document.querySelector('.monitor-batch[data-bid="' + targetId + '"]');
     if (scrolled) scrolled.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    _evictPubFrameCache();
+    syncPubFrameStreams();
   };
 
   window.monitorPipelineRestart = function(btn) {
@@ -1001,33 +980,32 @@
   }
 
   var _timerMonitor           = null;
-  var _timerPublishFrames     = null;
   var _timerOpenBatchEntries  = null;
   var _timerOpenSystemEntries = null;
 
   if (!document.hidden) {
     refreshMonitor();
     _timerMonitor           = setInterval(refreshMonitor, MONITOR_POLL_MS);
-    _timerPublishFrames     = setInterval(refreshPublishFrames, PUBLISH_FRAME_POLL_MS);
     _timerOpenBatchEntries  = setInterval(refreshOpenBatchEntries, BATCH_ENTRIES_POLL_MS);
     _timerOpenSystemEntries = setInterval(refreshOpenSystemEntries, SYSTEM_ENTRIES_POLL_MS);
+    syncPubFrameStreams();
   }
 
   function _pauseMonitorPolling() {
     clearInterval(_timerMonitor);
-    clearInterval(_timerPublishFrames);
     clearInterval(_timerOpenBatchEntries);
     clearInterval(_timerOpenSystemEntries);
-    _timerMonitor = _timerPublishFrames = _timerOpenBatchEntries = _timerOpenSystemEntries = null;
+    _timerMonitor = _timerOpenBatchEntries = _timerOpenSystemEntries = null;
+    _disconnectAllPubFrameStreams();
   }
 
   function _resumeMonitorPolling() {
     if (_timerMonitor) return;
     refreshMonitor();
     _timerMonitor           = setInterval(refreshMonitor, MONITOR_POLL_MS);
-    _timerPublishFrames     = setInterval(refreshPublishFrames, PUBLISH_FRAME_POLL_MS);
     _timerOpenBatchEntries  = setInterval(refreshOpenBatchEntries, BATCH_ENTRIES_POLL_MS);
     _timerOpenSystemEntries = setInterval(refreshOpenSystemEntries, SYSTEM_ENTRIES_POLL_MS);
+    syncPubFrameStreams();
   }
 
   document.addEventListener('visibilitychange', function() {

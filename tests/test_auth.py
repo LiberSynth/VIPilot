@@ -133,6 +133,9 @@ class TestApiBlueprintAuth:
     def test_get_batch_publish_frame(self, client):
         _assert_401(client.get("/api/batch/some-batch/publish-frame"))
 
+    def test_get_batch_publish_stream(self, client):
+        _assert_401(client.get("/api/batch/some-batch/publish-stream"))
+
     def test_post_import_update_package(self, client):
         _assert_401(client.post("/api/import-update-package"))
 
