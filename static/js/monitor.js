@@ -565,6 +565,15 @@
     });
   }
 
+  function _clearPubFrameDisplay(bid) {
+    _pubFrameVer[bid] = (_pubFrameVer[bid] || 0) + 1;
+    if (_pubFrameCache[bid]) URL.revokeObjectURL(_pubFrameCache[bid]);
+    delete _pubFrameCache[bid];
+    delete _pubFrameFetching[bid];
+    document.querySelectorAll('.monitor-pub-frame img[data-bid="' + bid + '"]')
+      .forEach(function(el) { el.removeAttribute('src'); });
+  }
+
   function refreshPublishFrames() {
     _evictPubFrameCache();
     if (!document.querySelector(
@@ -576,8 +585,11 @@
     ).forEach(function(img) {
       var bid = img.dataset.bid;
       if (!bid) return;
+      if (_activeBatchIds.indexOf(bid) < 0) {
+        _clearPubFrameDisplay(bid);
+        return;
+      }
       if (_pubFrameCache[bid] && !img.src) img.src = _pubFrameCache[bid];
-      if (_activeBatchIds.indexOf(bid) < 0) return;
       if (_pubFrameFetching[bid]) return;
       _pubFrameFetching[bid] = true;
       var ver = (_pubFrameVer[bid] = (_pubFrameVer[bid] || 0) + 1);
@@ -614,6 +626,7 @@
     if (!el) return;
     _lastMonitorData = data;
     _activeBatchIds = Array.isArray(data.active_batch_ids) ? data.active_batch_ids : [];
+    refreshPublishFrames();
     var prev = getOpenState();
     var items = buildTimeline(data.batches, data.system);
     if (items.length === 0) {

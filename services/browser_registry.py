@@ -41,3 +41,8 @@ SLUGS: tuple[str, ...] = tuple(_CONFIGS.keys())
 def get_browser(slug: str) -> PlatformBrowser:
     """Возвращает экземпляр PlatformBrowser для указанного slug."""
     return _browsers[slug]
+
+def clear_publish_frames_for_batch(batch_id: str) -> None:
+    """Удаляет кадры публикации батча из буферов всех платформ."""
+    for slug in SLUGS:
+        _browsers[slug].clear_frame_for_batch(batch_id)

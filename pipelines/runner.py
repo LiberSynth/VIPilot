@@ -59,6 +59,8 @@ def run_batch(batch_id, pipeline, category):
         _handle_batch_error(e, batch_id, category)
     finally:
         environment.release_batch(batch_id)
+        from services.browser_registry import clear_publish_frames_for_batch
+        clear_publish_frames_for_batch(batch_id)
         environment.wakeup_loop()
         write_log_entry(
             batch_id,

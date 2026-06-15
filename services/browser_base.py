@@ -319,6 +319,11 @@ class PlatformBrowser:
         with self._batch_frames_lock:
             return self._batch_frames.get(batch_id)
 
+    def clear_frame_for_batch(self, batch_id: str) -> None:
+        """Удаляет сохранённый кадр батча из буфера монитора."""
+        with self._batch_frames_lock:
+            self._batch_frames.pop(batch_id, None)
+
     def run_pipeline_browser(self, fn, cookies: list, batch_id=None, category=None) -> dict:
         """
         Запускает fn(page, context) в новом браузере с куками из cookies.
@@ -366,6 +371,9 @@ class PlatformBrowser:
 
         except Exception as e:
             result = {"ok": False, "error": f"Playwright: {e}"}
+        finally:
+            if batch_id:
+                self.clear_frame_for_batch(batch_id)
 
         # Браузер пайплайна закрыт — сигнализируем SSE-стриму, чтобы виджет сбросился.
         # Если _browser_loop активен, он переопределит статус сам при следующей итерации
