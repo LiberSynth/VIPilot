@@ -477,10 +477,16 @@
     overflow: hidden;
   }
   .monitor-batch.chain-linked .monitor-batch-header {
-    background: linear-gradient(90deg, #1c2236 0 30px, rgba(255,255,255,.03) 30px);
+    background: linear-gradient(90deg, #1f3566 0px, rgba(255,255,255,.03) 80px);
   }
   .monitor-batch.chain-linked.chain-anchor .monitor-batch-header {
-    background: linear-gradient(90deg, #1f2740 0 30px, rgba(255,255,255,.08) 30px);
+    background: linear-gradient(90deg, #264278 0px, rgba(255,255,255,.08) 80px);
+  }
+  .monitor-batch.chain-linked .monitor-batch-header:active {
+    background: linear-gradient(90deg, #1f3566 0px, rgba(255,255,255,.06) 80px);
+  }
+  .monitor-batch.chain-linked.chain-anchor .monitor-batch-header:active {
+    background: linear-gradient(90deg, #264278 0px, rgba(255,255,255,.1) 80px);
   }
   .monitor-batch:not(.open) .monitor-chain-nav { display: none; }
   .monitor-batch.bs-pending             { border-color: #2a2a38; }
