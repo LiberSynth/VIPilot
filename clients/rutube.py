@@ -157,6 +157,38 @@ def _rutube_upload_ready(state: dict) -> bool:
         return True
     return False
 
+def _find_rutube_add_button(page):
+    """Возвращает видимую кнопку «+ Добавить» в студии или None."""
+    for loc in (
+        page.get_by_role("button", name="+ Добавить"),
+        page.get_by_role("button", name="Добавить"),
+        page.locator("header button:has-text('Добавить')"),
+        page.locator("button:has-text('+ Добавить')"),
+        page.locator("[aria-label*='Добавить']"),
+    ):
+        try:
+            candidate = loc.first
+            if candidate.is_visible(timeout=300):
+                return candidate
+        except Exception:
+            pass
+    return None
+
+def _wait_rutube_add_button(page, category, batch_id=None, timeout_ms=180_000):
+    """Ждёт готовность студии и видимую кнопку «+ Добавить»."""
+    deadline = _time.monotonic() + timeout_ms / 1000
+    last_snap_at = 0.0
+    while _time.monotonic() < deadline:
+        add_btn = _find_rutube_add_button(page)
+        if add_btn is not None:
+            return add_btn
+        now = _time.monotonic()
+        if now - last_snap_at >= 5:
+            _snap(page, batch_id)
+            last_snap_at = now
+        page.wait_for_timeout(500)
+    raise RutubeApiError("Не дождались кнопки «+ Добавить» в студии Рутьюба.")
+
 def _wait_rutube_upload(page, category, batch_id=None) -> bool:
     write_log_entry(batch_id, category, "Рутьюб: Жду завершения загрузки (до 3 минут).")
     deadline = _time.monotonic() + _UPLOAD_WAIT / 1000
@@ -238,8 +270,7 @@ def _publish_ui(page, video_path: str, category, batch_id=None):
 
     # ── Шаг 2: Кнопка «+ Добавить» ───────────────────────────────────────
     write_log_entry(batch_id, category, "Рутьюб: Ищу кнопку «+ Добавить».")
-    add_btn = page.locator("button:has-text('Добавить')").first
-    add_btn.wait_for(state="visible", timeout=180_000)
+    add_btn = _wait_rutube_add_button(page, category, batch_id=batch_id)
     add_btn.click()
     write_log_entry(batch_id, category, "Рутьюб: Кнопка «+ Добавить» нажата, жду меню.")
     _snap(page, batch_id)

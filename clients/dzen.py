@@ -683,18 +683,6 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
             "Сессия истекла — авторизуйтесь снова в браузере (вкладка «Публикация»)"
         )
 
-    # ── Закрываем модальный overlay если есть (онбординг, донаты и т.п.) ─
-    page.wait_for_timeout(1_500)
-    for _modal_attempt in range(3):
-        if _dismiss_modal_overlay(page, category, batch_id):
-            break
-        page.wait_for_timeout(500)
-
-    # Перед шагом 2: обрабатываем любые попапы/диалоги/хинты
-    _handle_popups(page, category, batch_id)
-
-    # ── Шаг 2: Кнопка «+» (плюсик) в правом верхнем углу ────────────────
-    write_log_entry(batch_id, category, "Дзен: Ищу кнопку «+» для создания публикации.")
     plus_btn = page.locator(
         "[class*='addButton'], "
         "[class*='author-studio-header__addButton'], "
@@ -704,7 +692,23 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
         "button[title*='Создать'], "
         "button[aria-label*='Create']"
     ).first
-    plus_btn.wait_for(state="visible", timeout=180_000)
+
+    # ── Шаг 2: Кнопка «+» — ждём готовность студии, закрываем модалки ───
+    write_log_entry(batch_id, category, "Дзен: Ищу кнопку «+» для создания публикации.")
+    _plus_deadline = _time.monotonic() + 180
+    _plus_ready = False
+    while _time.monotonic() < _plus_deadline:
+        _dismiss_modal_overlay(page, category, batch_id)
+        _handle_popups(page, category, batch_id)
+        try:
+            if plus_btn.is_visible(timeout=400):
+                _plus_ready = True
+                break
+        except Exception:
+            pass
+        page.wait_for_timeout(400)
+    if not _plus_ready:
+        plus_btn.wait_for(state="visible", timeout=1_000)
     _last_plus_err = None
     for _plus_attempt in range(1, 6):
         _handle_popups(page, category, batch_id)
@@ -874,26 +878,31 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
     if pub_btn is not None:
         _click_primary_publish_control(page, category, batch_id)
 
-    # Ждём появления диалога подтверждения или капчи до 12 секунд.
-    # Если за 12 сек ничего не появилось — продолжаем в шаг 8.
+    # Ждём диалог подтверждения или капчу; выходим раньше, если URL уже сменился.
     _CONFIRM_OR_CAPTCHA_SEL = (
         "button:has-text('Опубликовать после подтверждения'), "
         "button:has-text('Опубликовать после обработки'), "
         "iframe[src*='captcha'], iframe[src*='smartcaptcha'], "
         "[class*='captcha'], [class*='Captcha'], [id*='captcha']"
     )
-    try:
-        page.wait_for_selector(_CONFIRM_OR_CAPTCHA_SEL, timeout=12_000)
-    except Exception:
-        pass
+    _confirm_dialog_deadline = _time.monotonic() + 12
+    while _time.monotonic() < _confirm_dialog_deadline:
+        if _dzen_step7_success_without_click(page, url_step7_start):
+            break
+        try:
+            if page.locator(_CONFIRM_OR_CAPTCHA_SEL).first.is_visible(timeout=400):
+                break
+        except Exception:
+            pass
+        page.wait_for_timeout(400)
     _snap(page, batch_id)
 
-    # ── Шаг 8: Обрабатываем попапы, диалоги, хинты (25 секунд) ──────────
+    # ── Шаг 8: Обрабатываем попапы, диалоги, хинты (до 10 секунд) ───────
     # Каждую итерацию вызываем _handle_popups — он сверяет со списком
     # _EXPECTED_ELEMENTS (капча, диалог подтверждения, файловый input)
     # и либо обрабатывает известный элемент, либо закрывает неизвестный.
-    _DIALOG_WINDOW = 25_000  # ms
-    _DIALOG_POLL   = 2_000   # ms
+    _DIALOG_WINDOW = 10_000  # ms
+    _DIALOG_POLL   = 800     # ms
 
     # Тексты, которые Дзен показывает в тост-ошибках при неудаче публикации.
     _DZEN_ERROR_TEXTS = [
@@ -929,6 +938,14 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
         _handle_popups(page, category, batch_id)
 
         _check_error_toast()
+
+        if _dzen_step7_success_without_click(page, url_step7_start):
+            write_log_entry(
+                batch_id, category,
+                "Дзен: URL подтверждает публикацию в шаге 8.",
+            )
+            _step8_done = True
+            break
 
         # Проверяем финальное подтверждение публикации
         try:

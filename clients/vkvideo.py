@@ -214,19 +214,31 @@ def _publish_ui(
             "Сессия истекла — авторизуйтесь снова в браузере (вкладка «Публикация»)"
         )
 
-    # ── Шаг 1б: Обрабатываем CAPTCHA-диалог «Проверяем, что вы не робот» ──
-    try:
-        cont_btn = page.get_by_text("Продолжить", exact=False).first
-        cont_btn.wait_for(state="visible", timeout=10_000)
-        cont_btn.click()
-        write_log_entry(batch_id, category, "VK Видео: CAPTCHA-диалог закрыт («Продолжить» нажато).")
-        _snap(page, batch_id)
-    except Exception:
-        pass  # диалога нет — продолжаем в штатном режиме
+    # ── Шаг 1б: CAPTCHA «Проверяем, что вы не робот» или готовность модала ─
+    choose_btn = page.get_by_text("Выбрать файл", exact=False).first
+    _captcha_deadline = _time.monotonic() + 5
+    while _time.monotonic() < _captcha_deadline:
+        try:
+            if choose_btn.is_visible(timeout=300):
+                break
+        except Exception:
+            pass
+        try:
+            cont_btn = page.get_by_text("Продолжить", exact=False).first
+            if cont_btn.is_visible(timeout=300):
+                cont_btn.click()
+                write_log_entry(
+                    batch_id, category,
+                    "VK Видео: CAPTCHA-диалог закрыт («Продолжить» нажато).",
+                )
+                _snap(page, batch_id)
+                break
+        except Exception:
+            pass
+        page.wait_for_timeout(300)
 
     # ── Шаг 2: Ждём появления кнопки «Выбрать файл» ──────────────────────
     write_log_entry(batch_id, category, "VK Видео: Жду модал загрузки клипа.")
-    choose_btn = page.get_by_text("Выбрать файл", exact=False).first
     _snap(page, batch_id)
     _wait_visible(choose_btn, 180_000, page, batch_id)
     _snap(page, batch_id)
