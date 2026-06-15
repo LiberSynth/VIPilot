@@ -37,6 +37,22 @@
     font-size: 16px;
   }
   h1 { font-size: 16px; font-weight: 700; color: #fff; white-space: nowrap; }
+  .header-app-instance {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    color: #b8c4e8;
+    pointer-events: none;
+    max-width: 42%;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .header-app-instance:empty { display: none; }
   .header-right {
     display: flex;
     flex-direction: column;

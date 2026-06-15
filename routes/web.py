@@ -36,6 +36,10 @@ from utils.utils import (
 
 bp = Blueprint("web", __name__)
 
+@bp.context_processor
+def _inject_global_template_vars():
+    return {"app_instance": settings_get("app_instance", "VIPilot")}
+
 RESERVED_SLUGS = {"web", "save", "logout", "select-module", "favicon.ico", "icon-preview", "root", "production"}
 failed_logins = {}
 
@@ -396,6 +400,8 @@ def save():
         else:
             flash("Сроки хранения нарушают иерархию: подробный ≤ краткий ≤ история батчей", "error")
 
+    if "app_instance" in request.form:
+        settings_set("app_instance", request.form.get("app_instance", ""))
     if "notify_email" in request.form:
         settings_set("notify_email", request.form.get("notify_email", "").strip())
     if "notify_phone" in request.form:

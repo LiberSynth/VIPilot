@@ -131,6 +131,14 @@
   <div id="panel-service" class="tab-panel">
 
     <div class="card" style="margin-top:12px">
+      <div class="card-title">Экземпляр приложения</div>
+      <div class="hint">Имя текущего экземпляра. Отображается в шапке по центру.</div>
+      <div style="margin-top:14px">
+        <input type="text" name="app_instance" id="app_instance" value="{{ app_instance }}" placeholder="VIPilot" autocomplete="off">
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:12px">
       <div class="card-title">Движок</div>
       <div class="wf-row">
         <span class="wf-dot {{ 'running' if workflow_state == 'running' else 'pause' }}" id="wf-dot"></span>

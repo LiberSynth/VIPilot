@@ -44,6 +44,7 @@ function collectAllSettings(activeTab) {
   setIfExists('story_fails_to_next', 'story_fails_to_next');
   setIfExists('video_fails_to_next', 'video_fails_to_next');
   setIfExists('target_id',        'target_id');
+  setIfExists('app_instance',     'app_instance');
   setIfExists('notify_email',     'notify_email');
   setIfExists('notify_phone',     'notify_phone');
   setIfExists('entries_lifetime', 'entries_lifetime');
@@ -92,6 +93,12 @@ function scheduleServiceSave() {
   _serviceSaveTimer = setTimeout(saveServiceSettings, 800);
 }
 
+function updateHeaderAppInstance() {
+  const headerEl = document.getElementById('header-app-instance');
+  const inputEl  = document.getElementById('app_instance');
+  if (headerEl && inputEl) headerEl.textContent = inputEl.value;
+}
+
 function validateLifetimes() {
   const ll  = document.getElementById('entries_lifetime');
   const sll = document.getElementById('log_lifetime');
@@ -131,6 +138,7 @@ function validateLifetimes() {
   });
 
   const serviceFields = [
+    document.getElementById('app_instance'),
     document.getElementById('notify_email'),
     document.getElementById('notify_phone'),
     document.getElementById('buffer_minutes'),
@@ -138,8 +146,14 @@ function validateLifetimes() {
     document.getElementById('max_batch_threads'),
   ].filter(Boolean);
   serviceFields.forEach(f => {
-    f.addEventListener('input',  scheduleServiceSave);
-    f.addEventListener('change', scheduleServiceSave);
+    f.addEventListener('input',  function() {
+      if (f.id === 'app_instance') updateHeaderAppInstance();
+      scheduleServiceSave();
+    });
+    f.addEventListener('change', function() {
+      if (f.id === 'app_instance') updateHeaderAppInstance();
+      scheduleServiceSave();
+    });
   });
 
   ['entries_lifetime', 'log_lifetime', 'batch_lifetime'].forEach(id => {
