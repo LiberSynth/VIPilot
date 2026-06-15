@@ -560,7 +560,11 @@
         delete _pubFrameCache[bid];
         delete _pubFrameFetching[bid];
         document.querySelectorAll('.monitor-pub-frame img[data-bid="' + bid + '"]')
-          .forEach(function(el) { el.removeAttribute('src'); });
+          .forEach(function(el) {
+            el.removeAttribute('src');
+            var frame = el.closest('.monitor-pub-frame');
+            if (frame) frame.classList.add('monitor-pub-frame-empty');
+          });
       }
     });
   }
@@ -571,7 +575,27 @@
     delete _pubFrameCache[bid];
     delete _pubFrameFetching[bid];
     document.querySelectorAll('.monitor-pub-frame img[data-bid="' + bid + '"]')
-      .forEach(function(el) { el.removeAttribute('src'); });
+      .forEach(function(el) {
+        el.removeAttribute('src');
+        var frame = el.closest('.monitor-pub-frame');
+        if (frame) frame.classList.add('monitor-pub-frame-empty');
+      });
+  }
+
+  function _showPubFrame(bid) {
+    document.querySelectorAll('.monitor-pub-frame img[data-bid="' + bid + '"]')
+      .forEach(function(el) {
+        var frame = el.closest('.monitor-pub-frame');
+        if (frame) frame.classList.remove('monitor-pub-frame-empty');
+      });
+  }
+
+  function _shouldClearPubFrame(bid, img) {
+    if (_activeBatchIds.indexOf(bid) < 0) return true;
+    var batchEl = img.closest('.monitor-batch');
+    if (!batchEl) return false;
+    var bs = batchEl.dataset.bstatus || '';
+    return bs === 'published' || bs === 'published_partially' || bs === 'publish_error';
   }
 
   function refreshPublishFrames() {
@@ -585,11 +609,14 @@
     ).forEach(function(img) {
       var bid = img.dataset.bid;
       if (!bid) return;
-      if (_activeBatchIds.indexOf(bid) < 0) {
+      if (_shouldClearPubFrame(bid, img)) {
         _clearPubFrameDisplay(bid);
         return;
       }
-      if (_pubFrameCache[bid] && !img.src) img.src = _pubFrameCache[bid];
+      if (_pubFrameCache[bid] && !img.src) {
+        _showPubFrame(bid);
+        img.src = _pubFrameCache[bid];
+      }
       if (_pubFrameFetching[bid]) return;
       _pubFrameFetching[bid] = true;
       var ver = (_pubFrameVer[bid] = (_pubFrameVer[bid] || 0) + 1);
@@ -600,14 +627,18 @@
         })
         .then(function(blob) {
           _pubFrameFetching[bid] = false;
-          if (!blob) return;
           if (_pubFrameVer[bid] !== ver) return;
+          if (!blob) {
+            _clearPubFrameDisplay(bid);
+            return;
+          }
           if (!document.querySelector(
             '.monitor-batch.open[data-type="publish"] .monitor-pub-frame img[data-bid="' + bid + '"]'
           )) return;
           if (_pubFrameCache[bid]) URL.revokeObjectURL(_pubFrameCache[bid]);
           var url = URL.createObjectURL(blob);
           _pubFrameCache[bid] = url;
+          _showPubFrame(bid);
           document.querySelectorAll('.monitor-pub-frame img[data-bid="' + bid + '"]')
             .forEach(function(el) { el.src = url; });
         })
