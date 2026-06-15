@@ -301,6 +301,8 @@
   var _sysLogEntriesCache   = {};
   var _sysLogFetching       = {};
   var _pubFrameStreams = {};
+  var _pubFrameLastBase64 = {};
+  var _pubFrameStopped = {};
   var _lastRenderedHtml     = {};
   var _lastMonitorData      = null;
 
@@ -553,54 +555,49 @@
     Object.keys(_pubFrameStreams).forEach(_disconnectPubFrameStream);
   }
 
-  function _clearPubFrameDisplay(bid) {
+  function _emptyPubFrameImage(bid) {
+    document.querySelectorAll('.monitor-pub-frame img[data-bid="' + bid + '"]')
+      .forEach(function(el) { el.removeAttribute('src'); });
+  }
+
+  function _onPubFrameStopped(bid) {
+    _pubFrameStopped[bid] = true;
+    delete _pubFrameLastBase64[bid];
     _disconnectPubFrameStream(bid);
-    document.querySelectorAll('.monitor-pub-frame img[data-bid="' + bid + '"]')
-      .forEach(function(el) {
-        el.removeAttribute('src');
-        var frame = el.closest('.monitor-pub-frame');
-        if (frame) frame.classList.add('monitor-pub-frame-empty');
-      });
-  }
-
-  function _showPubFrame(bid) {
-    document.querySelectorAll('.monitor-pub-frame img[data-bid="' + bid + '"]')
-      .forEach(function(el) {
-        var frame = el.closest('.monitor-pub-frame');
-        if (frame) frame.classList.remove('monitor-pub-frame-empty');
-      });
-  }
-
-  function _shouldClearPubFrame(bid, img) {
-    if (_activeBatchIds.indexOf(bid) < 0) return true;
-    var batchEl = img.closest('.monitor-batch');
-    if (!batchEl) return false;
-    var bs = batchEl.dataset.bstatus || '';
-    return bs === 'published' || bs === 'published_partially' || bs === 'publish_error';
+    _emptyPubFrameImage(bid);
   }
 
   function _applyPubFrameBase64(bid, b64) {
-    _showPubFrame(bid);
+    if (!b64 || _pubFrameLastBase64[bid] === b64) return;
+    _pubFrameStopped[bid] = false;
+    _pubFrameLastBase64[bid] = b64;
+    var src = 'data:image/jpeg;base64,' + b64;
     document.querySelectorAll('.monitor-pub-frame img[data-bid="' + bid + '"]')
-      .forEach(function(el) { el.src = 'data:image/jpeg;base64,' + b64; });
+      .forEach(function(el) { el.src = src; });
+  }
+
+  function _restorePubFrameImage(bid) {
+    if (_pubFrameStopped[bid]) {
+      _emptyPubFrameImage(bid);
+      return;
+    }
+    var b64 = _pubFrameLastBase64[bid];
+    if (!b64) return;
+    _applyPubFrameBase64(bid, b64);
   }
 
   function _connectPubFrameStream(bid) {
-    if (_pubFrameStreams[bid]) return;
-    var img = document.querySelector(
+    if (_pubFrameStreams[bid] || _pubFrameStopped[bid]) return;
+    if (!document.querySelector(
       '.monitor-batch.open[data-type="publish"] .monitor-pub-frame img[data-bid="' + bid + '"]'
-    );
-    if (!img) return;
-    if (_shouldClearPubFrame(bid, img)) {
-      _clearPubFrameDisplay(bid);
-      return;
-    }
+    )) return;
+
     var sse = new EventSource('/api/batch/' + encodeURIComponent(bid) + '/publish-stream');
     _pubFrameStreams[bid] = sse;
     sse.onmessage = function(e) {
       var data = e.data;
       if (data === 'STOPPED') {
-        _clearPubFrameDisplay(bid);
+        _onPubFrameStopped(bid);
         return;
       }
       if (!data || data.charAt(0) === ':') return;
@@ -623,10 +620,7 @@
       var bid = el.dataset.bid;
       if (!bid) return;
       alive[bid] = true;
-      if (_shouldClearPubFrame(bid, el)) {
-        _clearPubFrameDisplay(bid);
-        return;
-      }
+      _restorePubFrameImage(bid);
       _connectPubFrameStream(bid);
     });
     Object.keys(_pubFrameStreams).forEach(function(bid) {
@@ -639,7 +633,6 @@
     if (!el) return;
     _lastMonitorData = data;
     _activeBatchIds = Array.isArray(data.active_batch_ids) ? data.active_batch_ids : [];
-    syncPubFrameStreams();
     var prev = getOpenState();
     var items = buildTimeline(data.batches, data.system);
     if (items.length === 0) {
@@ -725,6 +718,7 @@
 
     restoreOpenState(prev);
     applyChainHighlight();
+    syncPubFrameStreams();
   }
 
   function refreshMonitor() {
