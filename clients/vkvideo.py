@@ -46,6 +46,8 @@ def publish(
     category,
     target_id: str | None = None,
     pub_title: str = "",
+    batch_session=None,
+    keep_browser: bool = False,
 ) -> bool:
     """
     Публикует клип на VK Видео через веб-интерфейс кабинета автора.
@@ -102,7 +104,8 @@ def publish(
                 db_set_batch_vkvideo_clip_url(batch_id, _state["clip_url"])
 
         result = _get_browser("vkvideo").run_pipeline_browser(
-            _do_publish, saved_cookies, batch_id=batch_id, category=category
+            _do_publish, saved_cookies, batch_id=batch_id, category=category,
+            batch_session=batch_session, keep_browser=keep_browser,
         )
 
         if not result["ok"]:
@@ -113,10 +116,11 @@ def publish(
 
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
-        try:
-            _get_browser("vkvideo").stop(batch_id=batch_id, category=category)
-        except Exception:
-            pass
+        if not keep_browser:
+            try:
+                _get_browser("vkvideo").stop(batch_id=batch_id, category=category)
+            except Exception:
+                pass
 
     write_log_entry(batch_id, category, "VK Видео: клип опубликован успешно")
     return {"ok": True, "clip_url": _state["clip_url"]}

@@ -27,6 +27,12 @@ from clients import rutube as rutube_client
 from clients.rutube import RutubeCsrfExpired, RutubeSessionMissing
 from clients import vkvideo as vkvideo_client
 from clients.vkvideo import VkVideoCsrfExpired, VkVideoSessionMissing
+from services.publish_batch_browser import (
+    PW_PUBLISH_SLUGS,
+    PublishBatchBrowserSession,
+    finalize_publish_batch_browser,
+    pw_step_count,
+)
 
 def _get_video(batch_id, category):
     """Возвращает видеоданные батча (transcoded или original).
@@ -74,7 +80,7 @@ def _call_vk(slug, method, batch_id, category, target, pub_title):
         write_log_entry(batch_id, category, f'VK: неизвестный метод «{method}» — пропуск', level='warn')
         return False
 
-def _call_dzen(slug, method, batch_id, category, target, pub_title):
+def _call_dzen(slug, method, batch_id, category, target, pub_title, batch_session=None, keep_browser=False):
     cfg = target.get('config') or {}
     target_id = target.get('id')
     if not client_is_configured('dzen', cfg, target_id):
@@ -86,9 +92,13 @@ def _call_dzen(slug, method, batch_id, category, target, pub_title):
 
     video_data = _get_video(batch_id, category)
 
-    return dzen_client.publish(video_data, cfg, batch_id, category, target_id=target_id, pub_title=pub_title)
+    return dzen_client.publish(
+        video_data, cfg, batch_id, category,
+        target_id=target_id, pub_title=pub_title,
+        batch_session=batch_session, keep_browser=keep_browser,
+    )
 
-def _call_rutube(slug, method, batch_id, category, target, pub_title):
+def _call_rutube(slug, method, batch_id, category, target, pub_title, batch_session=None, keep_browser=False):
     cfg = target.get('config') or {}
     target_id = target.get('id')
     if not client_is_configured('rutube', cfg, target_id):
@@ -100,9 +110,13 @@ def _call_rutube(slug, method, batch_id, category, target, pub_title):
 
     video_data = _get_video(batch_id, category)
 
-    return rutube_client.publish(video_data, cfg, batch_id, category, target_id=target_id, pub_title=pub_title)
+    return rutube_client.publish(
+        video_data, cfg, batch_id, category,
+        target_id=target_id, pub_title=pub_title,
+        batch_session=batch_session, keep_browser=keep_browser,
+    )
 
-def _call_vkvideo(slug, method, batch_id, category, target, pub_title):
+def _call_vkvideo(slug, method, batch_id, category, target, pub_title, batch_session=None, keep_browser=False):
     cfg = target.get('config') or {}
     target_id = target.get('id')
     if not client_is_configured('vkvideo', cfg, target_id):
@@ -114,7 +128,11 @@ def _call_vkvideo(slug, method, batch_id, category, target, pub_title):
 
     video_data = _get_video(batch_id, category)
 
-    result = vkvideo_client.publish(video_data, cfg, batch_id, category, target_id=target_id, pub_title=pub_title)
+    result = vkvideo_client.publish(
+        video_data, cfg, batch_id, category,
+        target_id=target_id, pub_title=pub_title,
+        batch_session=batch_session, keep_browser=keep_browser,
+    )
     return result.get('ok', False)
 
 _CLIENTS = {
@@ -124,12 +142,17 @@ _CLIENTS = {
     'vkvideo': _call_vkvideo,
 }
 
-def _call_client(slug, method, batch_id, category, target, pub_title):
+def _call_client(slug, method, batch_id, category, target, pub_title, batch_session=None, keep_browser=False):
     """Диспетчеризует вызов клиента по реестру _CLIENTS. Возвращает True при успехе."""
     handler = _CLIENTS.get(slug)
     if handler is None:
         write_log_entry(batch_id, category, f'Платформа «{slug}» не поддерживается', level='warn')
         return False
+    if slug in PW_PUBLISH_SLUGS:
+        return handler(
+            slug, method, batch_id, category, target, pub_title,
+            batch_session=batch_session, keep_browser=keep_browser,
+        )
     return handler(slug, method, batch_id, category, target, pub_title)
 
 def _parse_composite_status(status: str):
@@ -304,68 +327,91 @@ def run(batch_id, category):
     any_ok = False
     failed_steps = []
     expected_from = status
-    for step_idx, (slug, method, target) in enumerate(steps):
-        if resume_from is not None:
-            if (slug, method) != resume_from:
+    batch_browser_session = (
+        PublishBatchBrowserSession(batch_id, category, steps)
+        if pw_step_count(steps) >= 2 else None
+    )
+    try:
+        for step_idx, (slug, method, target) in enumerate(steps):
+            if resume_from is not None:
+                if (slug, method) != resume_from:
+                    continue
+                resume_from = None
+
+            posting_status = f"{slug}.{method}.posting"
+            published_status = f"{slug}.{method}.published"
+            failed_status = f"{slug}.{method}.failed"
+            write_log_entry(
+                batch_id, category,
+                fmt_id_msg(
+                    "[publish] Батч {} — phase=step_prepare, index={}, step={}.{}, expected_from={}, posting_status={}",
+                    batch_id, step_idx + 1, slug, method, expected_from, posting_status,
+                ),
+                level='silent',
+            )
+
+            if not db_claim_batch_status(batch_id, expected_from, posting_status):
+                write_log_entry(batch_id, category, 'Батч уже захвачен другим процессом — пропуск')
+                write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} уже захвачен другим процессом для {} — пропуск", batch_id, posting_status), level='silent')
+                return
+
+            if not pub_title:
+                pub_title = build_publication_title()
+                db_set_batch_title(batch_id, pub_title)
+                write_log_entry(batch_id, category, f'Заголовок публикации: «{pub_title}»')
+                write_log_entry(batch_id, category, f"Заголовок публикации (новый): {pub_title}", level='silent')
+
+            write_log_entry(batch_id, category, f'Шаг {slug}.{method}: выполняю.')
+            write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {}: шаг {}.{} — начало", batch_id, slug, method), level='silent')
+
+            pw_session = None
+            keep_browser = False
+            if batch_browser_session is not None and slug in PW_PUBLISH_SLUGS:
+                batch_browser_session.set_step_index(step_idx)
+                pw_session = batch_browser_session
+                keep_browser = batch_browser_session.keep_browser_after_step()
+
+            step_error = None
+            try:
+                ok = _call_client(
+                    slug, method, batch_id, category, target, pub_title,
+                    batch_session=pw_session, keep_browser=keep_browser,
+                )
+            except (DzenSessionMissing, DzenCsrfExpired, RutubeSessionMissing, RutubeCsrfExpired, VkVideoSessionMissing, VkVideoCsrfExpired) as e:
+                ok = False
+                step_error = str(e)
+                write_log_entry(batch_id, category, f'{slug}.{method}: {e}', level='error')
+                write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} — phase=step_exception, step={}.{}, type={}, msg={}", batch_id, slug, method, type(e).__name__, step_error), level='silent')
+            except Exception as e:
+                ok = False
+                step_error = str(e)
+                write_log_entry(batch_id, category, f'{slug}.{method}: неожиданная ошибка: {e}', level='error')
+                write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} — phase=step_exception, step={}.{}, type={}, msg={}", batch_id, slug, method, type(e).__name__, step_error), level='silent')
+
+            if not ok:
+                failed_steps.append(f"{slug}.{method}")
+                err_msg = step_error or 'ошибка публикации'
+                write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} ошибка {}.{}: {}", batch_id, slug, method, err_msg), level='silent')
+                db_set_batch_status(batch_id, failed_status)
+                expected_from = failed_status
+                write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} — phase=step_failed, step={}.{}, next_expected_from={}", batch_id, slug, method, expected_from), level='silent')
+                if pw_session is not None and pw_session.is_open:
+                    pw_session.close()
+                    finalize_publish_batch_browser(batch_id, category)
+                    batch_browser_session = None
                 continue
-            resume_from = None
 
-        posting_status = f"{slug}.{method}.posting"
-        published_status = f"{slug}.{method}.published"
-        failed_status = f"{slug}.{method}.failed"
-        write_log_entry(
-            batch_id, category,
-            fmt_id_msg(
-                "[publish] Батч {} — phase=step_prepare, index={}, step={}.{}, expected_from={}, posting_status={}",
-                batch_id, step_idx + 1, slug, method, expected_from, posting_status,
-            ),
-            level='silent',
-        )
+            any_ok = True
 
-        if not db_claim_batch_status(batch_id, expected_from, posting_status):
-            write_log_entry(batch_id, category, 'Батч уже захвачен другим процессом — пропуск')
-            write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} уже захвачен другим процессом для {} — пропуск", batch_id, posting_status), level='silent')
-            return
-
-        if not pub_title:
-            pub_title = build_publication_title()
-            db_set_batch_title(batch_id, pub_title)
-            write_log_entry(batch_id, category, f'Заголовок публикации: «{pub_title}»')
-            write_log_entry(batch_id, category, f"Заголовок публикации (новый): {pub_title}", level='silent')
-
-        write_log_entry(batch_id, category, f'Шаг {slug}.{method}: выполняю.')
-        write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {}: шаг {}.{} — начало", batch_id, slug, method), level='silent')
-
-        step_error = None
-        try:
-            ok = _call_client(slug, method, batch_id, category, target, pub_title)
-        except (DzenSessionMissing, DzenCsrfExpired, RutubeSessionMissing, RutubeCsrfExpired, VkVideoSessionMissing, VkVideoCsrfExpired) as e:
-            ok = False
-            step_error = str(e)
-            write_log_entry(batch_id, category, f'{slug}.{method}: {e}', level='error')
-            write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} — phase=step_exception, step={}.{}, type={}, msg={}", batch_id, slug, method, type(e).__name__, step_error), level='silent')
-        except Exception as e:
-            ok = False
-            step_error = str(e)
-            write_log_entry(batch_id, category, f'{slug}.{method}: неожиданная ошибка: {e}', level='error')
-            write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} — phase=step_exception, step={}.{}, type={}, msg={}", batch_id, slug, method, type(e).__name__, step_error), level='silent')
-
-        if not ok:
-            failed_steps.append(f"{slug}.{method}")
-            err_msg = step_error or 'ошибка публикации'
-            write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} ошибка {}.{}: {}", batch_id, slug, method, err_msg), level='silent')
-            db_set_batch_status(batch_id, failed_status)
-            expected_from = failed_status
-            write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} — phase=step_failed, step={}.{}, next_expected_from={}", batch_id, slug, method, expected_from), level='silent')
-            continue
-
-        any_ok = True
-
-        db_set_batch_status(batch_id, published_status)
-        write_log_entry(batch_id, category, f'Шаг {slug}.{method}: опубликовано')
-        write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {}: шаг {}.{} — завершено успешно", batch_id, slug, method), level='silent')
-        expected_from = published_status
-        write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} — phase=step_success, step={}.{}, next_expected_from={}", batch_id, slug, method, expected_from), level='silent')
+            db_set_batch_status(batch_id, published_status)
+            write_log_entry(batch_id, category, f'Шаг {slug}.{method}: опубликовано')
+            write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {}: шаг {}.{} — завершено успешно", batch_id, slug, method), level='silent')
+            expected_from = published_status
+            write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} — phase=step_success, step={}.{}, next_expected_from={}", batch_id, slug, method, expected_from), level='silent')
+    finally:
+        if batch_browser_session is not None and batch_browser_session.is_open:
+            batch_browser_session.close()
+            finalize_publish_batch_browser(batch_id, category)
 
     if any_ok:
         if failed_steps:

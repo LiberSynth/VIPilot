@@ -326,12 +326,32 @@ class PlatformBrowser:
         with self._batch_frames_lock:
             self._batch_frames.pop(batch_id, None)
 
-    def run_pipeline_browser(self, fn, cookies: list, batch_id=None, category=None) -> dict:
+    def run_pipeline_browser(
+        self,
+        fn,
+        cookies: list,
+        batch_id=None,
+        category=None,
+        batch_session=None,
+        keep_browser: bool = False,
+    ) -> dict:
         """
-        Запускает fn(page, context) в новом браузере с куками из cookies.
+        Запускает fn(page, context) в браузере с куками из cookies.
         БЛОКИРУЕТ вызывающий поток — вызывать из фонового потока пайплайна.
         Возвращает {"ok": bool, "result": ..., "error": str|None}.
+
+        batch_session — общий Chromium на несколько PW-шагов батча;
+        keep_browser — не закрывать batch_session после шага (есть ещё PW-шаги).
         """
+        if batch_session is not None:
+            try:
+                return batch_session.run_step(self, fn, cookies, batch_id, category)
+            finally:
+                if not keep_browser:
+                    from services.publish_batch_browser import finalize_publish_batch_browser
+                    batch_session.close()
+                    finalize_publish_batch_browser(batch_id, category)
+
         result: dict = {"ok": False, "error": "Неизвестная ошибка"}
 
         try:

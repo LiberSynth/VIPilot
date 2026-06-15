@@ -40,6 +40,8 @@ def publish(
     category,
     target_id: str | None = None,
     pub_title: str = "",
+    batch_session=None,
+    keep_browser: bool = False,
 ) -> bool:
     """
     Публикует видео на Рутьюб через веб-интерфейс.
@@ -81,7 +83,10 @@ def publish(
         def _do_publish(page, _ctx):
             _publish_ui(page, video_path, category, batch_id=batch_id)
 
-        result = _get_browser("rutube").run_pipeline_browser(_do_publish, saved_cookies, batch_id=batch_id, category=category)
+        result = _get_browser("rutube").run_pipeline_browser(
+            _do_publish, saved_cookies, batch_id=batch_id, category=category,
+            batch_session=batch_session, keep_browser=keep_browser,
+        )
 
         if not result["ok"]:
             err = result.get("error", "Неизвестная ошибка")
@@ -91,10 +96,11 @@ def publish(
 
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
-        try:
-            _get_browser("rutube").stop(batch_id=batch_id, category=category)
-        except Exception:
-            pass
+        if not keep_browser:
+            try:
+                _get_browser("rutube").stop(batch_id=batch_id, category=category)
+            except Exception:
+                pass
 
     write_log_entry(batch_id, category, "Рутьюб: видео опубликовано успешно")
     return True
