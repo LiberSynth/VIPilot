@@ -115,6 +115,94 @@ def _snap(page, batch_id=None) -> None:
     except Exception as _e:
         write_log_entry(None, 'rutube', f'_snap: {_e}', level='silent')
 
+def _rutube_upload_state(page) -> dict:
+    """Проверяет видимые признаки загрузки и готовности формы публикации."""
+    state = {
+        "moderation": False,
+        "publish_btn": False,
+        "category_trigger": False,
+        "uploading": False,
+    }
+    try:
+        state["moderation"] = page.get_by_text("Модерация", exact=False).first.is_visible(timeout=300)
+    except Exception:
+        pass
+    try:
+        state["publish_btn"] = page.locator("button:has-text('Опубликовать')").last.is_visible(timeout=300)
+    except Exception:
+        pass
+    try:
+        state["category_trigger"] = page.locator("text=Выберите категорию").first.is_visible(timeout=300)
+    except Exception:
+        pass
+    try:
+        body = page.locator("body").inner_text(timeout=1000).lower()
+        for marker in (
+            "загружается", "загрузка файла", "загрузка видео",
+            "идёт загрузка", "идет загрузка", "uploading",
+        ):
+            if marker in body:
+                state["uploading"] = True
+                break
+    except Exception:
+        pass
+    return state
+
+def _rutube_upload_ready(state: dict) -> bool:
+    if state["moderation"]:
+        return True
+    if state["publish_btn"] and state["category_trigger"]:
+        return True
+    if state["publish_btn"] and not state["uploading"]:
+        return True
+    return False
+
+def _wait_rutube_upload(page, category, batch_id=None) -> bool:
+    write_log_entry(batch_id, category, "Рутьюб: Жду завершения загрузки (до 3 минут).")
+    deadline = _time.monotonic() + _UPLOAD_WAIT / 1000
+    last_log_at = 0.0
+    last_snap_at = 0.0
+    while _time.monotonic() < deadline:
+        state = _rutube_upload_state(page)
+        if _rutube_upload_ready(state):
+            parts = []
+            if state["moderation"]:
+                parts.append("Модерация")
+            if state["publish_btn"]:
+                parts.append("Опубликовать")
+            if state["category_trigger"]:
+                parts.append("категория")
+            write_log_entry(
+                batch_id, category,
+                "Рутьюб: Загрузка завершена"
+                + (f" ({', '.join(parts)})" if parts else "")
+                + ", перехожу к публикации.",
+            )
+            return True
+
+        now = _time.monotonic()
+        if now - last_log_at >= 8:
+            hint = []
+            if state["uploading"]:
+                hint.append("идёт загрузка")
+            if state["publish_btn"]:
+                hint.append("кнопка «Опубликовать» видна")
+            if state["moderation"]:
+                hint.append("«Модерация» видна")
+            if state["category_trigger"]:
+                hint.append("поле категории видно")
+            msg = ", ".join(hint) if hint else "жду признаки готовности формы"
+            write_log_entry(batch_id, category, f"Рутьюб: Загрузка в процессе — {msg}.")
+            last_log_at = now
+        if now - last_snap_at >= 5:
+            _snap(page, batch_id)
+            last_snap_at = now
+
+        page.wait_for_timeout(800)
+
+    write_log_entry(batch_id, category, "Рутьюб: Ожидание загрузки истекло — продолжаю.", level="warn")
+    return False
+
 def _publish_ui(page, video_path: str, category, batch_id=None):
     """Управляет браузером для публикации видео через UI Рутьюба."""
 
@@ -182,16 +270,8 @@ def _publish_ui(page, video_path: str, category, batch_id=None):
     write_log_entry(batch_id, category, f"Файл: {os.path.basename(video_path)}", level='silent')
     _snap(page, batch_id)
 
-    # ── Шаг 5: Ждём завершения загрузки (появление «Модерация») ─────────
-    write_log_entry(batch_id, category, "Рутьюб: Жду завершения загрузки (до 3 минут).")
-    _upload_ok = False
-    try:
-        page.wait_for_selector("text=Модерация", timeout=_UPLOAD_WAIT)
-        _upload_ok = True
-        write_log_entry(batch_id, category, "Рутьюб: Загрузка завершена, перехожу к публикации.")
-    except Exception:
-        write_log_entry(batch_id, category, "Рутьюб: Ожидание загрузки истекло — продолжаю.")
-        page.wait_for_timeout(5000)
+    # ── Шаг 5: Ждём завершения загрузки ───────────────────────────────────
+    _upload_ok = _wait_rutube_upload(page, category, batch_id=batch_id)
     _snap(page, batch_id)
 
     # ── Шаг 6: Выбираем категорию ─────────────────────────────────────────

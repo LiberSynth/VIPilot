@@ -228,6 +228,69 @@ def _has_publish_confirm_dialog(page) -> bool:
             pass
     return False
 
+def _modal_overlay_visible(page) -> bool:
+    try:
+        return page.locator("[data-testid='modal-overlay']").first.is_visible(timeout=400)
+    except Exception:
+        return False
+
+def _dismiss_modal_overlay(page, category=None, batch_id=None) -> bool:
+    """Закрывает модальное окно студии Дзена. True — оверлея нет или закрыли."""
+    if not _modal_overlay_visible(page):
+        return True
+
+    write_log_entry(batch_id, category, "Дзен: Закрываю модальное окно.")
+    overlay = page.locator("[data-testid='modal-overlay']").first
+    close_selectors = (
+        "[class*='modal__rootElement'] button[class*='close']",
+        "[class*='modal__rootElement'] [class*='Close']",
+        "[class*='modal__rootElement'] button[aria-label*='lose']",
+        "[class*='modal__rootElement'] button[aria-label*='закр']",
+        "[class*='modal__rootElement'] button[aria-label*='Закр']",
+        "button[aria-label*='Закрыть']",
+        "button[aria-label*='закрыть']",
+        "button[aria-label*='Close']",
+        "[class*='modal'] button:has-text('Понятно')",
+        "[class*='modal'] button:has-text('Не сейчас')",
+        "[class*='modal'] button:has-text('Пропустить')",
+        "[class*='modal'] button:has-text('Позже')",
+    )
+    for sel in close_selectors:
+        try:
+            btn = page.locator(sel).first
+            if btn.is_visible(timeout=300):
+                btn.click(timeout=5_000)
+                page.wait_for_timeout(400)
+                if not _modal_overlay_visible(page):
+                    _snap(page, batch_id)
+                    return True
+        except Exception:
+            pass
+
+    for _ in range(2):
+        try:
+            page.keyboard.press("Escape")
+            page.wait_for_timeout(400)
+            if not _modal_overlay_visible(page):
+                _snap(page, batch_id)
+                return True
+        except Exception:
+            pass
+
+    try:
+        overlay.click(force=True, timeout=3_000)
+        page.wait_for_timeout(400)
+    except Exception:
+        pass
+
+    if not _modal_overlay_visible(page):
+        _snap(page, batch_id)
+        return True
+    return False
+
+def _handle_modal_overlay_element(page, category, batch_id) -> None:
+    _dismiss_modal_overlay(page, category, batch_id)
+
 # ---------------------------------------------------------------------------
 # Известные ожидаемые элементы — список признаков и действий
 #
@@ -382,6 +445,7 @@ def _retry_publish_if_button_visible(page, category, batch_id, url_step7_start, 
     return _click_primary_publish_control(page, category, batch_id)
 
 _EXPECTED_ELEMENTS = [
+    ("modal",   _modal_overlay_visible,   _handle_modal_overlay_element),
     ("captcha", _detect_captcha,        _handle_captcha_element),
     ("confirm", _detect_confirm_dialog, _handle_confirm_element),
     # file_input НЕ ДОБАВЛЯТЬ сюда — после set_files() input[type=file] остаётся в DOM
@@ -620,34 +684,11 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
         )
 
     # ── Закрываем модальный overlay если есть (онбординг, донаты и т.п.) ─
-    try:
-        overlay = page.locator("[data-testid='modal-overlay']").first
-        if overlay.is_visible():
-            write_log_entry(batch_id, category, "Дзен: Закрываю модальное окно.")
-            # Сначала пробуем кнопку ×, затем клик по оверлею
-            close_x = page.locator(
-                "[data-testid='modal-overlay'] ~ * button, "
-                "dialog button[aria-label*='lose'], "
-                "dialog button[aria-label*='закр'], "
-                "[class*='close'], [class*='Close']"
-            ).first
-            try:
-                if close_x.is_visible():
-                    close_x.click()
-                else:
-                    overlay.click()
-            except Exception:
-                overlay.click()
-            page.wait_for_timeout(500)
-            _snap(page, batch_id)
-    except Exception:
-        pass
-    # На всякий случай — Escape
-    try:
-        page.keyboard.press("Escape")
-        page.wait_for_timeout(300)
-    except Exception:
-        pass
+    page.wait_for_timeout(1_500)
+    for _modal_attempt in range(3):
+        if _dismiss_modal_overlay(page, category, batch_id):
+            break
+        page.wait_for_timeout(500)
 
     # Перед шагом 2: обрабатываем любые попапы/диалоги/хинты
     _handle_popups(page, category, batch_id)
@@ -664,7 +705,27 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
         "button[aria-label*='Create']"
     ).first
     plus_btn.wait_for(state="visible", timeout=180_000)
-    plus_btn.click()
+    _last_plus_err = None
+    for _plus_attempt in range(1, 6):
+        _handle_popups(page, category, batch_id)
+        _dismiss_modal_overlay(page, category, batch_id)
+        try:
+            plus_btn.click(timeout=30_000)
+            _last_plus_err = None
+            break
+        except Exception as _e:
+            _last_plus_err = _e
+            write_log_entry(
+                batch_id, category,
+                f"Дзен: Клик по «+» заблокирован (попытка {_plus_attempt}/5), закрываю попапы.",
+                level="warn",
+            )
+            _snap(page, batch_id)
+            page.wait_for_timeout(500)
+    if _last_plus_err is not None:
+        raise DzenApiError(
+            f"Не удалось нажать «+» в студии Дзена: {_last_plus_err}"
+        ) from _last_plus_err
     write_log_entry(batch_id, category, "Дзен: Кнопка «+» нажата, жду меню.")
     _snap(page, batch_id)
 
