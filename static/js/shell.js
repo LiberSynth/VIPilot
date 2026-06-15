@@ -103,10 +103,10 @@ function monitorClockStart() {
     const t1 = Date.now();
     _monitorClockOffset = d.utc_ms - Math.round((t0 + t1) / 2);
     monitorClockTick();
-    if (!_monitorClockTimer) _monitorClockTimer = setInterval(monitorClockTick, 1000);
+    if (!_monitorClockTimer) _monitorClockTimer = setInterval(monitorClockTick, 200);
   }).catch(() => {
     monitorClockTick();
-    if (!_monitorClockTimer) _monitorClockTimer = setInterval(monitorClockTick, 1000);
+    if (!_monitorClockTimer) _monitorClockTimer = setInterval(monitorClockTick, 200);
   });
 }
 
@@ -152,7 +152,7 @@ function refreshGoodPoolCount() {
     }
   }
   loadGoodPoolCount();
-  setInterval(refreshGoodPoolCount, 10000);
+  setInterval(refreshGoodPoolCount, 200);
   var btnHamburger = document.getElementById('btn-hamburger');
   if (btnHamburger) btnHamburger.addEventListener('click', openSidebar);
 })();

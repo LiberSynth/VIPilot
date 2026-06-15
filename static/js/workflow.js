@@ -35,7 +35,7 @@ function refreshWorkflowState() {
 
 (function() {
   refreshWorkflowState();
-  setInterval(refreshWorkflowState, 5000);
+  setInterval(refreshWorkflowState, 200);
 })();
 
 function wfStart() {
@@ -118,7 +118,7 @@ function refreshMoviePoolCount() {
 
 (function() {
   refreshMoviePoolCount();
-  setInterval(refreshMoviePoolCount, 10000);
+  setInterval(refreshMoviePoolCount, 200);
 })();
 
 function openClearHistoryDialog() {

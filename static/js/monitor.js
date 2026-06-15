@@ -47,7 +47,10 @@
   };
   const TYPE_ERROR_STATUSES = ['error', 'video_error', 'transcode_error', 'publish_error', 'fatal_error'];
   const FINAL_BATCH_STATUSES = ['published', 'published_partially', 'ready', 'error', 'fatal_error', 'video_error', 'transcode_error', 'publish_error'];
-  const PUBLISH_FRAME_POLL_MS = 700;
+  const MONITOR_POLL_MS = 200;
+  const PUBLISH_FRAME_POLL_MS = 200;
+  const BATCH_ENTRIES_POLL_MS = 200;
+  const SYSTEM_ENTRIES_POLL_MS = 200;
 
   const MON_SVG_COPY     = `<svg viewBox="0 0 16 16"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11V3a1 1 0 0 1 1-1h8"/></svg>`;
   const MON_SVG_RESTART  = `<svg viewBox="0 0 16 16" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="15.3,2.7 15.3,6.7 11.3,6.7"/><path d="M13.66 10a6 6 0 1 1-.08-5"/></svg>`;
@@ -763,7 +766,7 @@
   function _monitorCopyText(text, btn) {
     window.clipboardWrite(text, function() {
       btn.classList.add('copied');
-      setTimeout(function() { btn.classList.remove('copied'); }, 2000);
+      setTimeout(function() { btn.classList.remove('copied'); }, 200);
     });
   }
 
@@ -932,7 +935,7 @@
           setTimeout(function() {
             btn.classList.remove('copied');
             refreshMonitor();
-          }, 1200);
+          }, 200);
         } else {
           btn.disabled = false;
           alert(data.error || 'Ошибка');
@@ -1004,10 +1007,10 @@
 
   if (!document.hidden) {
     refreshMonitor();
-    _timerMonitor           = setInterval(refreshMonitor, 5000);
+    _timerMonitor           = setInterval(refreshMonitor, MONITOR_POLL_MS);
     _timerPublishFrames     = setInterval(refreshPublishFrames, PUBLISH_FRAME_POLL_MS);
-    _timerOpenBatchEntries  = setInterval(refreshOpenBatchEntries, 5000);
-    _timerOpenSystemEntries = setInterval(refreshOpenSystemEntries, 5000);
+    _timerOpenBatchEntries  = setInterval(refreshOpenBatchEntries, BATCH_ENTRIES_POLL_MS);
+    _timerOpenSystemEntries = setInterval(refreshOpenSystemEntries, SYSTEM_ENTRIES_POLL_MS);
   }
 
   function _pauseMonitorPolling() {
@@ -1021,10 +1024,10 @@
   function _resumeMonitorPolling() {
     if (_timerMonitor) return;
     refreshMonitor();
-    _timerMonitor           = setInterval(refreshMonitor, 5000);
+    _timerMonitor           = setInterval(refreshMonitor, MONITOR_POLL_MS);
     _timerPublishFrames     = setInterval(refreshPublishFrames, PUBLISH_FRAME_POLL_MS);
-    _timerOpenBatchEntries  = setInterval(refreshOpenBatchEntries, 5000);
-    _timerOpenSystemEntries = setInterval(refreshOpenSystemEntries, 5000);
+    _timerOpenBatchEntries  = setInterval(refreshOpenBatchEntries, BATCH_ENTRIES_POLL_MS);
+    _timerOpenSystemEntries = setInterval(refreshOpenSystemEntries, SYSTEM_ENTRIES_POLL_MS);
   }
 
   document.addEventListener('visibilitychange', function() {
