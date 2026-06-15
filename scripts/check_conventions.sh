@@ -103,6 +103,11 @@ FOUND=$(grep -rn --include="*.py" "INSERT INTO batches" $PROJECT_DIRS \
     | grep "\bstatus\b")
 [ -n "$FOUND" ] && fail "Конвенция: INSERT INTO batches с явным полем status (убрать, DB default = 'pending')" "$FOUND"
 
+# ── main.py: сигнал несанкционированного изменения ───────────────────────────
+if ! bash scripts/check_main_py.sh; then
+    ERRORS=$((ERRORS + 1))
+fi
+
 # ── Итог ──────────────────────────────────────────────────────────────────────
 echo ""
 if [ "$ERRORS" -eq 0 ]; then
