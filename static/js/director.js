@@ -6,7 +6,7 @@
   var _FINAL_STATUSES = [
     'published', 'published_partially', 'ready',
     'error', 'fatal_error',
-    'video_error', 'transcode_error', 'publish_error', 'donated',
+    'video_error', 'transcode_error', 'publish_error',
   ];
   var _HINT_DEFAULT = 'Вы можете сгенерировать контент при помощи AI-модели.';
 

@@ -20,7 +20,6 @@
     published:            'опубликовано',
     published_partially:  'частично опубликовано',
     publish_error:        'публикация: ошибка',
-    donated:          'использовано',
   };
 
   const COMPOSITE_PHASE_LABELS = {
@@ -47,7 +46,7 @@
     publish:   'publish',
   };
   const TYPE_ERROR_STATUSES = ['error', 'video_error', 'transcode_error', 'publish_error', 'fatal_error'];
-  const FINAL_BATCH_STATUSES = ['published', 'published_partially', 'ready', 'error', 'fatal_error', 'video_error', 'transcode_error', 'publish_error', 'donated'];
+  const FINAL_BATCH_STATUSES = ['published', 'published_partially', 'ready', 'error', 'fatal_error', 'video_error', 'transcode_error', 'publish_error'];
   const PUBLISH_FRAME_POLL_MS = 700;
 
   const MON_SVG_COPY     = `<svg viewBox="0 0 16 16"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11V3a1 1 0 0 1 1-1h8"/></svg>`;
@@ -109,7 +108,7 @@
     const partialStatuses = ['published_partially'];
     const waitStatuses    = ['story_ready', 'video_pending', 'video_ready', 'pending', 'generating'];
     const errorStatuses   = ['error', 'video_error', 'transcode_error', 'publish_error', 'fatal_error'];
-    const finalStatuses   = doneStatuses.concat(partialStatuses).concat(errorStatuses).concat(['donated', 'reserved']);
+    const finalStatuses   = doneStatuses.concat(partialStatuses).concat(errorStatuses);
     const isFinal         = finalStatuses.indexOf(bs) >= 0;
     const isActive        = !isFinal && _activeBatchIds.indexOf(batchId) >= 0;
     if (isActive) return 'md-active';
@@ -117,7 +116,6 @@
     if (partialStatuses.indexOf(bs) >= 0) return 'md-partial';
     if (errorStatuses.indexOf(bs) >= 0) return 'md-error';
     if (waitStatuses.indexOf(bs) >= 0) return 'md-wait';
-    if (bs === 'donated') return 'md-white';
     return 'md-warn';
   }
 

@@ -738,6 +738,31 @@ def build_pipeline_chain_map(batches: list[dict]) -> dict[str, list[str]]:
         result[link["id"]] = _chain_for(link["id"])
     return result
 
+def build_connected_batch_components(by_id: dict[str, dict]) -> list[list[str]]:
+    """Связные компоненты графа batch_id_source (неориентированный)."""
+    parent = {bid: bid for bid in by_id}
+
+    def find(x: str) -> str:
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(a: str, b: str) -> None:
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[rb] = ra
+
+    for bid, info in by_id.items():
+        source = info.get("source")
+        if source and source in by_id:
+            union(bid, source)
+
+    grouped: dict[str, list[str]] = {}
+    for bid in by_id:
+        grouped.setdefault(find(bid), []).append(bid)
+    return list(grouped.values())
+
 def db_get_pipeline_chain_ids(batch_id: str) -> list[str]:
     """
     Упорядоченная цепочка story → movie → planning → transcode → publish.

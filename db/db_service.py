@@ -5,9 +5,9 @@ import subprocess
 from urllib.parse import urlparse, unquote, parse_qsl
 
 from .connection import get_db
-from .db_pipeline import build_pipeline_chain_map
+from .db_pipeline import build_connected_batch_components, build_pipeline_chain_map
 from .db_media import db_delete_movie_video_files
-from common.statuses import FINAL_BATCH_STATUSES
+from common.statuses import FINAL_BATCH_STATUSES, batch_is_active
 from log.log import write_log_entry
 from utils.utils import fmt_id_msg
 
@@ -675,36 +675,52 @@ def db_delete_movie(movie_id: str) -> dict:
 def db_cleanup_batches(batch_lifetime_days: int) -> int:
     with get_db() as conn:
         with conn.cursor() as cur:
-            cur.execute("""
-                SELECT id FROM batches
-                WHERE (
-                    status IN ('published', 'cancelled')
-                    OR (type = 'movie' AND status = 'ready')
-                    OR (type = 'planning' AND status = 'ready')
-                    OR (type = 'transcode' AND status = 'ready')
-                    OR (type = 'publish' AND status IN ('published', 'published_partially'))
-                    OR (type = 'story' AND status = 'ready')
-                )
-                  AND created_at < now() - make_interval(days => %s)
-            """, (batch_lifetime_days,))
+            cur.execute(
+                "SELECT id, status, created_at, batch_id_source FROM batches"
+            )
             rows = cur.fetchall()
             if not rows:
                 return 0
-            batch_ids = [str(r[0]) for r in rows]
 
-            fmt = ','.join(['%s'] * len(batch_ids))
+            by_id: dict[str, dict] = {}
+            for batch_id, status, created_at, batch_id_source in rows:
+                bid = str(batch_id)
+                by_id[bid] = {
+                    "status": status,
+                    "created_at": created_at,
+                    "source": str(batch_id_source) if batch_id_source else None,
+                }
+
+            cur.execute(
+                "SELECT now() - make_interval(days => %s) AS cutoff",
+                (batch_lifetime_days,),
+            )
+            cutoff = cur.fetchone()[0]
+
+            to_delete: list[str] = []
+            for component in build_connected_batch_components(by_id):
+                if any(batch_is_active(by_id[bid]["status"]) for bid in component):
+                    continue
+                for bid in component:
+                    if by_id[bid]["created_at"] < cutoff:
+                        to_delete.append(bid)
+
+            if not to_delete:
+                return 0
+
+            fmt = ','.join(['%s'] * len(to_delete))
 
             cur.execute(f"""
                 DELETE FROM log_entries
                 WHERE log_id IN (
                     SELECT id FROM log WHERE batch_id IN ({fmt})
                 )
-            """, batch_ids)
+            """, to_delete)
 
-            cur.execute(f"DELETE FROM log WHERE batch_id IN ({fmt})", batch_ids)
+            cur.execute(f"DELETE FROM log WHERE batch_id IN ({fmt})", to_delete)
 
-            cur.execute(f"DELETE FROM batches WHERE id IN ({fmt})", batch_ids)
+            cur.execute(f"DELETE FROM batches WHERE id IN ({fmt})", to_delete)
 
         conn.commit()
-    return len(batch_ids)
+    return len(to_delete)
 
