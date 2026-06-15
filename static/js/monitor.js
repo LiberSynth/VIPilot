@@ -40,7 +40,6 @@
   const TYPE_RESTARTABLE = ['story', 'movie', 'transcode', 'publish'];
   const TYPE_LINKED_MEDIA = ['transcode', 'publish', 'planning'];
   const PIPELINE_CHAIN_TYPES = ['story', 'movie', 'planning', 'transcode', 'publish'];
-  const CHAIN_COLORS = ['#8b7cf6', '#4ec9b0', '#d4a843', '#7eb8f7', '#e079c0', '#6bb6ff'];
   const TYPE_TO_RESET_PIPELINE = {
     story:     'story',
     movie:     'video',
@@ -57,8 +56,8 @@
   const MON_SVG_PLAY     = `<svg viewBox="0 0 16 16"><polygon points="4,2 13,8 4,14"/></svg>`;
   const MON_SVG_INFO     = `<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.2"/><line x1="8" y1="5.5" x2="8" y2="5.5"/><line x1="8" y1="7.5" x2="8" y2="11"/></svg>`;
   const MON_SVG_DELETE   = `<svg viewBox="0 0 16 16"><polyline points="2,4 14,4"/><path d="M5 4V2h6v2"/><rect x="3" y="4" width="10" height="10" rx="1.5"/><line x1="6" y1="7" x2="6" y2="11"/><line x1="10" y1="7" x2="10" y2="11"/></svg>`;
-  const MON_SVG_CHAIN_PREV = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="10,3 5,8 10,13"/></svg>`;
-  const MON_SVG_CHAIN_NEXT = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,3 11,8 6,13"/></svg>`;
+  const MON_SVG_CHAIN_PREV = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3,6 8,11 13,6"/></svg>`;
+  const MON_SVG_CHAIN_NEXT = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3,10 8,5 13,10"/></svg>`;
 
   function translateStatus(s) {
     if (STATUS_LABELS[s]) return STATUS_LABELS[s];
@@ -192,8 +191,8 @@
       : '';
 
     const chainNavBtns = PIPELINE_CHAIN_TYPES.indexOf(btype) >= 0
-      ? '<button class="cycle-float-btn monitor-chain-nav" data-dir="prev" title="Предыдущее звено цепочки" disabled onclick="monitorChainNav(event,\'prev\')">' + MON_SVG_CHAIN_PREV + '</button>' +
-        '<button class="cycle-float-btn monitor-chain-nav" data-dir="next" title="Следующее звено цепочки" disabled onclick="monitorChainNav(event,\'next\')">' + MON_SVG_CHAIN_NEXT + '</button>'
+      ? '<button class="cycle-float-btn monitor-chain-nav" data-dir="prev" title="Предыдущий батч" disabled onclick="monitorChainNav(event,\'prev\')">' + MON_SVG_CHAIN_PREV + '</button>' +
+        '<button class="cycle-float-btn monitor-chain-nav" data-dir="next" title="Следующий батч" disabled onclick="monitorChainNav(event,\'next\')">' + MON_SVG_CHAIN_NEXT + '</button>'
       : '';
 
     const hdrActions =
@@ -216,13 +215,11 @@
       : '';
 
     var chainClass = '';
-    var chainStyle = '';
     if (_openChainIds && _openChainIds.length >= 2 && _openChainIds.indexOf(batch.batch_id) >= 0) {
       chainClass = ' chain-linked' + (batch.batch_id === _openBid ? ' chain-anchor' : '');
-      chainStyle = ' style="--chain-color:' + _chainColorForRoot(_openChainIds[0]) + '"';
     }
 
-    return '<div class="monitor-batch bs-' + esc(bs) + chainClass + '"' + chainStyle + ' data-bid="' + esc(batch.batch_id) +
+    return '<div class="monitor-batch bs-' + esc(bs) + chainClass + '" data-bid="' + esc(batch.batch_id) +
       '" data-log-id="'   + esc(batch.log_id || '') +
       '" data-type="'       + esc(btype) +
       '" data-scheduled="'  + esc(isScheduledPlanning ? fmtMsk(batch.scheduled_at) : 'сейчас') +
@@ -289,15 +286,6 @@
   var _pubFrameVer          = {};
   var _lastRenderedHtml     = {};
   var _lastMonitorData      = null;
-
-  function _chainColorForRoot(rootId) {
-    var hash = 0;
-    for (var i = 0; i < rootId.length; i++) {
-      hash = ((hash << 5) - hash) + rootId.charCodeAt(i);
-      hash |= 0;
-    }
-    return CHAIN_COLORS[Math.abs(hash) % CHAIN_COLORS.length];
-  }
 
   function _buildPipelineChainIds(focusBid, batches) {
     if (!focusBid || !batches || !batches.length) return [];
@@ -378,7 +366,6 @@
   function applyChainHighlight() {
     document.querySelectorAll('.monitor-batch.chain-linked').forEach(function(el) {
       el.classList.remove('chain-linked', 'chain-anchor');
-      el.style.removeProperty('--chain-color');
     });
     if (!_openBid) {
       _openChainIds = null;
@@ -392,11 +379,9 @@
       updateChainNavButtons();
       return;
     }
-    var color = _chainColorForRoot(_openChainIds[0]);
     _openChainIds.forEach(function(id) {
       var el = document.querySelector('.monitor-batch[data-bid="' + id + '"]');
       if (!el) return;
-      el.style.setProperty('--chain-color', color);
       el.classList.add('chain-linked');
       if (id === _openBid) el.classList.add('chain-anchor');
     });
