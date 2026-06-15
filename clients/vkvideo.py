@@ -122,7 +122,6 @@ def publish(
             except Exception:
                 pass
 
-    write_log_entry(batch_id, category, "VK Видео: клип опубликован успешно")
     return {"ok": True, "clip_url": _state["clip_url"]}
 
 # ---------------------------------------------------------------------------
