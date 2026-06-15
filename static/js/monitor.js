@@ -148,13 +148,32 @@
     return capitalizeFirst(translateStatus(bs)) + ' · ' + entryCnt;
   }
 
+  function fmtMskSlotTime(iso) {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleString('ru-RU', {
+      hour: '2-digit', minute: '2-digit',
+      timeZone: 'Europe/Moscow',
+    });
+  }
+
+  function formatPublishTimeLabel(batch) {
+    return batch.scheduled_at ? fmtMskSlotTime(batch.scheduled_at) : 'сейчас';
+  }
+
   function renderBatch(batch) {
     const bs = batch.batch_status || 'pending';
     const btype = batch.type || '';
     const headTime = batch.created_at;
     const isScheduledPlanning = btype === 'planning' && !!batch.scheduled_at;
     const fixedBatchTitle = FIXED_BATCH_TITLES[btype];
-    const headTitle = fixedBatchTitle || fmtMsk(headTime);
+    var headTitle;
+    if (fixedBatchTitle) {
+      headTitle = (btype === 'planning' || btype === 'publish')
+        ? fixedBatchTitle + ' (' + formatPublishTimeLabel(batch) + ')'
+        : fixedBatchTitle;
+    } else {
+      headTitle = fmtMsk(headTime);
+    }
     const entryCnt = formatEntryCount(batch.entry_count);
     var sub;
     if (fixedBatchTitle) {
