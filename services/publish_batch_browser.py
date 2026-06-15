@@ -136,9 +136,10 @@ def finalize_publish_batch_browser(batch_id: str, category) -> None:
     """Сбрасывает превью и статус после закрытия общего браузера пайплайна."""
     from services.browser_registry import clear_publish_frames_for_batch, get_browser
 
+    write_log_entry(batch_id, category, "Остановка браузера запрошена.", level="info")
     for slug in PW_PUBLISH_SLUGS:
         try:
-            get_browser(slug).stop(batch_id=batch_id, category=category)
+            get_browser(slug).stop(batch_id=batch_id, category=category, log=False)
         except Exception:
             pass
     if batch_id:

@@ -270,10 +270,11 @@ class PlatformBrowser:
 
         return {"ok": True, "already": False}
 
-    def stop(self, batch_id=None, category=None) -> dict:
+    def stop(self, batch_id=None, category=None, log: bool = True) -> dict:
         with self._lock:
             self._running = False
-        write_log_entry(batch_id, category, "Остановка браузера запрошена.", level="info")
+        if log:
+            write_log_entry(batch_id, category, "Остановка браузера запрошена.", level="info")
         return {"ok": True}
 
     def send_event(self, ev: dict) -> bool:

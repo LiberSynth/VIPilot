@@ -96,7 +96,7 @@ def publish(
 
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
-        if not keep_browser:
+        if not keep_browser and batch_session is None:
             try:
                 _get_browser("rutube").stop(batch_id=batch_id, category=category)
             except Exception:
