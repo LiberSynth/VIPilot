@@ -1,4 +1,5 @@
 import threading
+import time
 
 from utils.runtime_bootstrap import ensure_required_software, ensure_single_instance, run_foreground
 ensure_single_instance()
@@ -31,7 +32,7 @@ import db.upgrade as _db_upgrade
 def main_loop():
     while True:
         try:
-            write_log_entry(None, 'main_loop', 'phase=tick', level='info')
+            _t = time.monotonic()
 
             environment.refresh_environment()
             planning.tick()
@@ -58,6 +59,14 @@ def main_loop():
                     start_batch_thread(bid, pipeline_module, pipeline_name)
 
             cleanup.tick()
+            _work_sec = time.monotonic() - _t
+            if _work_sec > 5:
+                write_log_entry(
+                    None,
+                    'main',
+                    f'Рабочая фаза главного цикла заняла {_work_sec:.1f} с — дольше порога 5 с',
+                    level='info',
+                )
 
         except AppException as e:
             if e.batch_id:
