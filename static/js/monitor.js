@@ -951,8 +951,8 @@
       new ConfirmDialog({
         title:        'Удалить батч?',
         text:
-          'Батч и все связанные данные (логи, видео) будут удалены без возможности восстановления.<br><br>' +
-          'Сюжеты (stories) не затрагиваются.',
+          'Батч и его лог будут удалены без возможности восстановления.<br><br>' +
+          'Видео (movies), сюжеты (stories) и файлы в video/ не затрагиваются.',
         confirmLabel: 'Удалить',
         onConfirm: function(confirmBtn, dlg) {
           confirmBtn.disabled    = true;

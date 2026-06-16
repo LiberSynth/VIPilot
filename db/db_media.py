@@ -22,6 +22,7 @@ def _read_video_file_or_none(movie_id: str, field: str) -> bytes | None:
         return None
 
 def db_delete_movie_video_files(movie_id: str) -> None:
+    """Только через db_delete_movie / db_delete_bad_movies."""
     movie_id = str(movie_id)
     for field in (_RAW_FIELD, _TRANSCODED_FIELD):
         try:

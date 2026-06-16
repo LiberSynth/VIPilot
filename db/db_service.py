@@ -454,6 +454,7 @@ def db_clear_all_history():
     return {"log_entries": le, "logs": ll, "batches": bl}
 
 def db_purge_unused_stories() -> dict:
+    """Удаление stories — только UI «Сценарист → Очистить»."""
     with get_db() as conn:
         with conn.cursor() as cur:
             final_statuses_sql = ', '.join(f"'{s}'" for s in FINAL_BATCH_STATUSES)
@@ -508,6 +509,7 @@ def db_purge_unused_stories() -> dict:
     return {"stories": sl_count, "batches": bl_count, "logs": ll_count, "log_entries": le_count}
 
 def db_delete_bad_movies() -> dict:
+    """Удаление movies и видеофайлов — только UI «Режиссёр → Удалить неудачные»."""
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute("SELECT id FROM movies WHERE grade = 'bad'")
@@ -564,7 +566,7 @@ def db_get_batch_status(batch_id: str) -> str | None:
             return row[0] if row else None
 
 def db_delete_batch(batch_id: str) -> bool:
-    deleted_movie_id = None
+    """Удаляет батч и его лог. movies, stories и видеофайлы не затрагивает."""
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -577,24 +579,13 @@ def db_delete_batch(batch_id: str) -> bool:
                 (batch_id,),
             )
             cur.execute("DELETE FROM log WHERE batch_id = %s", (batch_id,))
-            cur.execute(
-                "SELECT movie_id FROM batches WHERE id = %s AND movie_id IS NOT NULL",
-                (batch_id,),
-            )
-            row = cur.fetchone()
-            movie_id = row[0] if row else None
             cur.execute("DELETE FROM batches WHERE id = %s", (batch_id,))
             deleted = cur.rowcount
-            if movie_id:
-                cur.execute("DELETE FROM movies WHERE id = %s", (movie_id,))
-                if cur.rowcount:
-                    deleted_movie_id = str(movie_id)
         conn.commit()
-    if deleted_movie_id:
-        db_delete_movie_video_files(deleted_movie_id)
     return deleted > 0
 
 def db_delete_story(story_id: str) -> dict:
+    """Удаление stories — только UI «Сценарист → Удалить»."""
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute("SELECT id FROM batches WHERE story_id = %s", (story_id,))
@@ -629,6 +620,7 @@ def db_delete_story(story_id: str) -> dict:
     return {"stories": sl_count, "batches": bl_count, "logs": ll_count, "log_entries": le_count}
 
 def db_delete_movie(movie_id: str) -> dict:
+    """Удаление movies и видеофайлов — только UI «Режиссёр → Удалить»."""
     deleted_movie_id = None
     with get_db() as conn:
         with conn.cursor() as cur:
