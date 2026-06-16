@@ -789,6 +789,10 @@
       _openChainIds = null;
       _refreshMonitorView();
     } else {
+      document.querySelectorAll('.monitor-system-block.open').forEach(function(b) {
+        b.classList.remove('open');
+      });
+      _openSysLid = null;
       el.classList.add('open');
       _openBid = bid || null;
       _openChainIds = _resolveOpenChainIds(_openBid);
@@ -818,6 +822,12 @@
     if (isOpen) {
       _openSysLid = null;
     } else {
+      document.querySelectorAll('.monitor-batch.open').forEach(function(b) {
+        b.classList.remove('open');
+      });
+      _openBid = null;
+      _openChainIds = null;
+      _refreshMonitorView();
       el.classList.add('open');
       _openSysLid = lid || null;
       if (_openSysLid) {
@@ -827,6 +837,7 @@
         _fetchSystemEntries(_openSysLid);
       }
     }
+    syncPubFrameStreams();
   };
 
   window.monitorSystemCopyInfo = function(btn) {
