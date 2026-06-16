@@ -18,11 +18,15 @@ function createBrowserWidget(slug) {
 
   var canvas   = document.getElementById(slug + '-browser-canvas');
   var overlay  = document.getElementById(slug + '-browser-overlay');
+  var wrap     = document.getElementById(slug + '-browser-wrap');
+  var wrapHome = document.getElementById(slug + '-browser-wrap-home');
   var btnStart = document.getElementById(slug + '-btn-start');
   var btnSave  = document.getElementById(slug + '-btn-save');
   var btnStop  = document.getElementById(slug + '-btn-stop');
+  var btnFullscreen = document.getElementById(slug + '-btn-fullscreen');
+  var btnLoupe = document.getElementById(slug + '-btn-loupe');
 
-  if (!canvas) return;
+  if (!canvas || !wrap || !wrapHome) return;
 
   var ctx = canvas.getContext('2d');
   canvas.width  = VIEWPORT_W;
@@ -38,8 +42,79 @@ function createBrowserWidget(slug) {
   var _lastMoveSentAt = 0;
   var _pendingMove = null;
   var _moveTimer = null;
+  var _viewMode = null;
+  var _viewOverlay = null;
 
   var API = '/api/' + slug + '-browser/';
+
+  function resetCanvasDisplay() {
+    canvas.style.width = '';
+    canvas.style.height = '';
+    canvas.style.maxWidth = '';
+  }
+
+  function updateViewButtons() {
+    var canView = (state === STATE.OPEN && !_viewMode);
+    if (btnFullscreen) btnFullscreen.disabled = !canView;
+    if (btnLoupe) btnLoupe.disabled = !canView;
+  }
+
+  function exitViewMode() {
+    if (!_viewMode) return;
+    if (_viewOverlay) {
+      _viewOverlay.remove();
+      _viewOverlay = null;
+    }
+    wrapHome.appendChild(wrap);
+    resetCanvasDisplay();
+    document.body.style.overflow = '';
+    _viewMode = null;
+    updateViewButtons();
+  }
+
+  function enterViewMode(mode) {
+    if (state !== STATE.OPEN || _viewMode) return;
+    if (mode !== 'fullscreen' && mode !== 'loupe') return;
+
+    _viewMode = mode;
+    _viewOverlay = document.createElement('div');
+    _viewOverlay.className = 'browser-view-overlay';
+    _viewOverlay.innerHTML =
+      '<div class="browser-view-shell">' +
+        '<div class="browser-view-head">' +
+          '<span class="browser-view-title">' +
+            (mode === 'fullscreen' ? 'Full screen' : 'Лупа 100%') +
+          '</span>' +
+          '<button type="button" class="btn-run-now browser-view-exit">Обычный вид</button>' +
+        '</div>' +
+        '<div class="browser-view-body browser-view-body--' + mode + '"></div>' +
+      '</div>';
+
+    var body = _viewOverlay.querySelector('.browser-view-body');
+    body.appendChild(wrap);
+
+    if (mode === 'loupe') {
+      canvas.style.width  = VIEWPORT_W + 'px';
+      canvas.style.height = VIEWPORT_H + 'px';
+    } else {
+      canvas.style.width    = '100%';
+      canvas.style.maxWidth = VIEWPORT_W + 'px';
+      canvas.style.height   = 'auto';
+    }
+
+    _viewOverlay.querySelector('.browser-view-exit').addEventListener('click', exitViewMode);
+    document.body.appendChild(_viewOverlay);
+    document.body.style.overflow = 'hidden';
+    updateViewButtons();
+    canvas.focus();
+  }
+
+  if (btnFullscreen) {
+    btnFullscreen.addEventListener('click', function () { enterViewMode('fullscreen'); });
+  }
+  if (btnLoupe) {
+    btnLoupe.addEventListener('click', function () { enterViewMode('loupe'); });
+  }
 
   function getTargetId() {
     var el = document.getElementById(slug + '_target_id');
@@ -174,9 +249,11 @@ function createBrowserWidget(slug) {
     if (btnStart) btnStart.disabled = (s !== STATE.IDLE);
     if (btnSave)  btnSave.disabled  = (s !== STATE.OPEN);
     if (btnStop)  btnStop.disabled  = (s === STATE.IDLE || s === STATE.STOPPING);
+    updateViewButtons();
   }
 
   function handleStopped() {
+    exitViewMode();
     active = false;
     firstFrame = false;
     if (_moveTimer) {
@@ -241,6 +318,7 @@ function createBrowserWidget(slug) {
 
   function browserStop() {
     if (state === STATE.IDLE || state === STATE.STOPPING) return;
+    exitViewMode();
     active = false;
     applyState(STATE.STOPPING);
     overlay.style.display = 'flex';
