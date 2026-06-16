@@ -454,7 +454,7 @@ def db_clear_all_history():
     return {"log_entries": le, "logs": ll, "batches": bl}
 
 def db_purge_unused_stories() -> dict:
-    """Удаление stories — только UI «Сценарист → Очистить»."""
+    """Удаление stories — только UI «Сценарист → Удалить лишние»."""
     with get_db() as conn:
         with conn.cursor() as cur:
             final_statuses_sql = ', '.join(f"'{s}'" for s in FINAL_BATCH_STATUSES)

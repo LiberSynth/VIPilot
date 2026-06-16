@@ -414,7 +414,7 @@ var setDraftStoryFromRecord;
   function _openDeleteStoryDialog(storyId, storyTitle, triggerBtn) {
     new ConfirmDialog({
       title:        'Удалить сюжет?',
-      text:         'Сюжет «' + AccordionList.escapeHtml(storyTitle) + '» и все связанные батчи, лог и записи лога будут удалены безвозвратно.',
+      text:         'Сюжет «' + AccordionList.escapeHtml(storyTitle) + '» и все связанные батчи, лог и записи лога будут удалены безвозвратно.<br>Видеоролики (movies) и файлы в video/ не затрагиваются.',
       confirmLabel: 'Удалить',
       triggerBtn:   triggerBtn,
       onConfirm: function(btn, dlg) {
@@ -744,12 +744,12 @@ var setDraftStoryFromRecord;
   }
 })();
 
-/* ── Кнопка «Очистить» сюжеты ── */
+/* ── Кнопка «Удалить лишние» (сюжеты) ── */
 (function() {
   function _openDeleteBadDialog(btn) {
     new ConfirmDialog({
-      title:        'Очистить сюжеты?',
-      text:         'Будут удалены все незакреплённые сюжеты без оценки или с оценкой «плохо», по которым не создавалось видео и нет незавершённых батчей,<br>а также связанные с ними батчи и записи лога.',
+      title:        'Удалить лишние?',
+      text:         'Будут удалены незакреплённые сюжеты без оценки или с оценкой «плохо», по которым не создавалось видео и нет незавершённых батчей,<br>а также связанные с ними батчи и записи лога.<br>Видеоролики (movies) и файлы в video/ не затрагиваются.',
       confirmLabel: 'Удалить',
       triggerBtn:   btn,
       onConfirm: function(confirmBtn, dlg) {
