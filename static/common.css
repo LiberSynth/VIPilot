@@ -961,6 +961,12 @@
     overflow: hidden;
     border: 1px solid var(--border, rgba(255,255,255,.12));
   }
+  .browser-auth-wrap canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+    cursor: pointer;
+  }
   .browser-view-overlay {
     position: fixed;
     inset: 0;

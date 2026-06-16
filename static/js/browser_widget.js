@@ -48,9 +48,9 @@ function createBrowserWidget(slug) {
   var API = '/api/' + slug + '-browser/';
 
   function resetCanvasDisplay() {
-    canvas.style.width = '';
-    canvas.style.height = '';
-    canvas.style.maxWidth = '';
+    canvas.style.removeProperty('width');
+    canvas.style.removeProperty('height');
+    canvas.style.removeProperty('max-width');
   }
 
   function updateViewButtons() {
