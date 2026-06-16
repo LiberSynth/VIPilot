@@ -9,7 +9,7 @@ from db import db_claim_batch_status
 
 # (type, status на входе) -> (from_status, to_status) для db_claim_batch_status
 _CLAIM_AT_DISPATCH: dict[tuple[str, str], tuple[str, str]] = {
-    ("story", "pending"): ("pending", "generating"),
+    ("story", "pending"): ("pending", "processing"),
     ("transcode", "pending"): ("pending", "processing"),
 }
 

@@ -5,26 +5,19 @@
 
   const STATUS_LABELS = {
     pending:          'ожидание',
-    generating:       'генерация',
-    generated:        'сгенерировано',
-    story_generating: 'генерация сюжета',
+    processed:        'обработано',
+    processing:       'в работе',
     running:          'выполняется',
     ok:               'готово',
     error:            'ошибка',
     ready:            'готово',
-    story_ready:      'сюжет готов',
-    video_pending:    'видео: ожидание',
-    video_ready:      'видео готово',
-    video_error:      'видео: ошибка',
-    transcode_error:  'транскод: ошибка',
-    published:            'опубликовано',
-    published_partially:  'частично опубликовано',
-    publish_error:        'публикация: ошибка',
+    completed:            'опубликовано',
+    partially:              'частично опубликовано',
   };
 
   const COMPOSITE_PHASE_LABELS = {
     posting:   'публикуется',
-    published: 'опубликовано',
+    completed: 'опубликовано',
     pending:   'ожидание публикации',
     failed:    'ошибка публикации',
   };
@@ -45,8 +38,8 @@
     transcode: 'transcode',
     publish:   'publish',
   };
-  const TYPE_ERROR_STATUSES = ['error', 'video_error', 'transcode_error', 'publish_error', 'fatal_error'];
-  const FINAL_BATCH_STATUSES = ['published', 'published_partially', 'ready', 'error', 'fatal_error', 'video_error', 'transcode_error', 'publish_error'];
+  const TYPE_ERROR_STATUSES = ['error', 'fatal_error'];
+  const FINAL_BATCH_STATUSES = ['completed', 'partially', 'ready', 'error', 'fatal_error'];
   const MONITOR_POLL_MS = 200;
   const BATCH_ENTRIES_POLL_MS = 200;
   const SYSTEM_ENTRIES_POLL_MS = 200;
@@ -106,10 +99,10 @@
   }
 
   function _batchDotClass(bs, batchId) {
-    const doneStatuses    = ['published', 'ready'];
-    const partialStatuses = ['published_partially'];
-    const waitStatuses    = ['story_ready', 'video_pending', 'video_ready', 'pending', 'generating'];
-    const errorStatuses   = ['error', 'video_error', 'transcode_error', 'publish_error', 'fatal_error'];
+    const doneStatuses    = ['completed', 'ready'];
+    const partialStatuses = ['partially'];
+    const waitStatuses    = ['pending', 'processing', 'processed'];
+    const errorStatuses   = ['error', 'fatal_error'];
     const finalStatuses   = doneStatuses.concat(partialStatuses).concat(errorStatuses);
     const isFinal         = finalStatuses.indexOf(bs) >= 0;
     const isActive        = !isFinal && _activeBatchIds.indexOf(batchId) >= 0;

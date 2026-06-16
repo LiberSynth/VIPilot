@@ -606,9 +606,8 @@ var setDraftStoryFromRecord;
 (function() {
   var _DEFAULT_HINT = 'Вы можете сгенерировать контент при помощи AI-модели.';
   var _FINAL_STATUSES = [
-    'published', 'published_partially', 'ready',
+    'completed', 'partially', 'ready',
     'error', 'fatal_error',
-    'video_error', 'transcode_error', 'publish_error',
   ];
   var _controller = null;
   var _isCreating = false;

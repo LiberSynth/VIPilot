@@ -5,16 +5,11 @@ _TYPE_STATUS_TO_PIPELINE = {
     ('planning', 'pending'): planning,
     ('story', 'pending'):    story,
     ('movie', 'pending'):    video,
-    ('movie', 'generating'): video,
-    ('movie', 'generated'):  video,
+    ('movie', 'processing'): video,
+    ('movie', 'processed'):  video,
     ('transcode', 'pending'): transcode,
     ('transcode', 'processing'): transcode,
     ('publish', 'pending'): publish,
-}
-
-_LEGACY_STATUS_TO_PIPELINE = {
-    'video_generating': video,
-    'video_pending':    video,
 }
 
 def get_pipeline(batch_type: str, status: str):
@@ -23,13 +18,9 @@ def get_pipeline(batch_type: str, status: str):
     if pipeline is not None:
         return pipeline
 
-    # Общие pending/generating обрабатываются только stage-маршрутизацией.
-    if status in ('pending', 'generating'):
+    # Общие pending/processing обрабатываются только stage-маршрутизацией.
+    if status in ('pending', 'processing'):
         return None
-
-    pipeline = _LEGACY_STATUS_TO_PIPELINE.get(status)
-    if pipeline is not None:
-        return pipeline
 
     if any(status.endswith(sfx) for sfx in PUBLISH_ROUTING_SUFFIXES):
         return publish

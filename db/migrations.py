@@ -338,6 +338,51 @@ def _m1012_add_movies_published(cur):
     cur.execute("ALTER TABLE movies ALTER COLUMN published SET DEFAULT B'0'")
     cur.execute("ALTER TABLE movies ALTER COLUMN published SET NOT NULL")
 
+def _m1013_rename_generating_to_processing(cur):
+    """Rename batch status generating -> processing (unified in-progress status)."""
+    cur.execute(
+        """
+        UPDATE batches
+        SET status = %s
+        WHERE status = %s
+        """,
+        ('processing', 'generating'),
+    )
+
+def _m1014_rename_generated_to_processed(cur):
+    """Rename batch status generated -> processed (movie stage after provider poll)."""
+    cur.execute(
+        """
+        UPDATE batches
+        SET status = %s
+        WHERE status = %s
+        """,
+        ('processed', 'generated'),
+    )
+
+def _m1015_rename_publish_and_transcoding_statuses(cur):
+    """Unify batch status names: transcoding->processing, published*->completed/partially, .published->.completed."""
+    cur.execute(
+        "UPDATE batches SET status = %s WHERE status = %s",
+        ('processing', 'transcoding'),
+    )
+    cur.execute(
+        "UPDATE batches SET status = %s WHERE status = %s",
+        ('partially', 'published_partially'),
+    )
+    cur.execute(
+        "UPDATE batches SET status = %s WHERE status = %s",
+        ('completed', 'published'),
+    )
+    cur.execute(
+        """
+        UPDATE batches
+        SET status = REPLACE(status, %s, %s)
+        WHERE status LIKE %s
+        """,
+        ('.published', '.completed', '%.published'),
+    )
+
 MIGRATIONS = [
     (2026052901, _m1001_drop_targets_legacy_columns),
     (2026052902, _m1002_add_movies_transcoded),
@@ -351,6 +396,9 @@ MIGRATIONS = [
     (2026052910, _m1010_drop_log_entries_category),
     (2026052911, _m1011_buffer_hours_to_minutes),
     (2026052912, _m1012_add_movies_published),
+    (2026052913, _m1013_rename_generating_to_processing),
+    (2026052914, _m1014_rename_generated_to_processed),
+    (2026052915, _m1015_rename_publish_and_transcoding_statuses),
 ]
 
 # ---------------------------------------------------------------------------

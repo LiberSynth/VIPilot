@@ -3,7 +3,9 @@ import psycopg2
 import psycopg2.extras
 
 from .connection import get_db
-from common.statuses import _assert_known_status, PIPELINE_RESET_STATUS
+from common.statuses import _assert_known_status
+
+_RESETTABLE_PIPELINES = frozenset({'story', 'video', 'transcode', 'publish'})
 
 def _get_story_source_batch_id(cur, story_id: str | None) -> str | None:
     if not story_id:
@@ -290,11 +292,10 @@ def db_get_actionable_batches():
                 SELECT id, type, status, created_at, scheduled_at
                 FROM batches
                 WHERE status = 'pending'
-                   OR status = 'generated'
-                   OR (type = 'movie' AND status = 'generating')
-                   OR status IN ('video_generating', 'video_pending')
+                   OR status = 'processed'
+                   OR (type = 'movie' AND status = 'processing')
                    OR status LIKE '%.pending'
-                   OR status LIKE '%.published'
+                   OR status LIKE '%.completed'
                 ORDER BY created_at ASC, id ASC
             """)
             rows = cur.fetchall()
@@ -320,7 +321,7 @@ def db_get_batch_by_id(batch_id):
 
 def db_reset_stalled_batches() -> list[dict]:
     typed_resets = [
-        ("story", "generating", "pending"),
+        ("story", "processing", "pending"),
         ("transcode", "processing", "pending"),
     ]
     affected = []
@@ -367,19 +368,19 @@ def db_reset_stalled_batches() -> list[dict]:
 def _video_reset_status(batch_data) -> str:
     """Статус для перезапуска video: подхват URL/handshake вместо нового submit."""
     if not isinstance(batch_data, dict):
-        return PIPELINE_RESET_STATUS['video']
+        return 'pending'
     if batch_data.get('generated_video_url'):
-        return 'generated'
+        return 'processed'
     if (
         batch_data.get('request_id')
         and batch_data.get('status_url')
         and batch_data.get('response_url')
     ):
-        return 'generating'
-    return PIPELINE_RESET_STATUS['video']
+        return 'processing'
+    return 'pending'
 
 def db_reset_batch_pipeline(batch_id: str, pipeline: str) -> bool:
-    if pipeline not in PIPELINE_RESET_STATUS:
+    if pipeline not in _RESETTABLE_PIPELINES:
         return False
     batch = db_get_batch_by_id(batch_id)
     if not batch:
@@ -387,7 +388,7 @@ def db_reset_batch_pipeline(batch_id: str, pipeline: str) -> bool:
     if pipeline == 'video':
         target_status = _video_reset_status(batch.get('data') or {})
     else:
-        target_status = PIPELINE_RESET_STATUS[pipeline]
+        target_status = 'pending'
     db_set_batch_status(batch_id, target_status)
     return True
 

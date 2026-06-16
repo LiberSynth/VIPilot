@@ -507,7 +507,7 @@
   .monitor-batch:not(.open) .monitor-chain-nav { display: none; }
   .monitor-batch.bs-pending             { border-color: #2a2a38; }
   .monitor-batch.bs-ok                  { border-color: rgba(62,207,142,.25); }
-  .monitor-batch.bs-published_partially { border-color: rgba(62,207,142,.2); }
+  .monitor-batch.bs-partially { border-color: rgba(62,207,142,.2); }
   .monitor-batch.bs-error               { border-color: rgba(255,80,80,.3); }
   .monitor-batch.bs-running             { border-color: rgba(245,166,35,.35); }
 

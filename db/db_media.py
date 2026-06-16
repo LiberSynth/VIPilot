@@ -92,7 +92,7 @@ def db_save_video_job_and_set_pending(batch_id, job_data):
             )
         db_set_batch_status(batch_id, 'pending', conn)
 
-def db_save_video_job_and_set_generating(batch_id, job_data):
+def db_save_video_job_and_set_processing(batch_id, job_data):
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -101,7 +101,7 @@ def db_save_video_job_and_set_generating(batch_id, job_data):
                    WHERE id = %s""",
                 (json.dumps(job_data), batch_id),
             )
-        db_set_batch_status(batch_id, 'generating', conn)
+        db_set_batch_status(batch_id, 'processing', conn)
 
 def db_save_generated_video_url(batch_id, video_url: str):
     with get_db() as conn:
@@ -113,7 +113,7 @@ def db_save_generated_video_url(batch_id, video_url: str):
                    WHERE id = %s""",
                 (json.dumps({"generated_video_url": video_url}), batch_id),
             )
-        db_set_batch_status(batch_id, 'generated', conn)
+        db_set_batch_status(batch_id, 'processed', conn)
 
 def db_save_transcoded_data(batch_id, video_data: bytes):
     with get_db() as conn:

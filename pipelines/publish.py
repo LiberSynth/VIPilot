@@ -163,7 +163,7 @@ def _parse_composite_status(status: str):
     return None
 
 def _fail_publish_config(batch_id, category, msg):
-    db_set_batch_status(batch_id, 'publish_error')
+    db_set_batch_status(batch_id, 'error')
     write_log_entry(batch_id, category, msg, level='error')
     write_log_entry(batch_id, category, fmt_id_msg("[publish] {} (батч {})", msg, batch_id), level='silent')
 
@@ -281,7 +281,7 @@ def run(batch_id, category):
                 write_log_entry(batch_id, category, f'Шаг {cur_slug}.{cur_method} более не активен в конфиге — перевожу в ошибку', level='error')
                 write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} шаг {}.{} не найден в текущем конфиге", batch_id, cur_slug, cur_method), level='silent')
                 raise AppException(batch_id, 'publish', msg)
-        elif cur_phase in ('published', 'failed'):
+        elif cur_phase in ('completed', 'failed'):
             found_idx = None
             for i, (slug, method, _) in enumerate(steps):
                 if slug == cur_slug and method == cur_method:
@@ -299,7 +299,7 @@ def run(batch_id, category):
                 write_log_entry(batch_id, category, fmt_id_msg("Продолжаю с шага {}.{}", ns, nm))
                 write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} resume с шага {}.{}", batch_id, ns, nm), level='silent')
             else:
-                db_set_batch_status(batch_id, 'published')
+                db_set_batch_status(batch_id, 'completed')
                 _mark_movie_published(batch)
                 write_log_entry(batch_id, category, 'Опубликовано (возобновление — все шаги завершены)')
                 write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} опубликован (возобновление)", batch_id), level='silent')
@@ -339,7 +339,7 @@ def run(batch_id, category):
                 resume_from = None
 
             posting_status = f"{slug}.{method}.posting"
-            published_status = f"{slug}.{method}.published"
+            completed_status = f"{slug}.{method}.completed"
             failed_status = f"{slug}.{method}.failed"
             write_log_entry(
                 batch_id, category,
@@ -403,10 +403,10 @@ def run(batch_id, category):
 
             any_ok = True
 
-            db_set_batch_status(batch_id, published_status)
+            db_set_batch_status(batch_id, completed_status)
             write_log_entry(batch_id, category, f'Шаг {slug}.{method}: опубликовано')
             write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {}: шаг {}.{} — завершено успешно", batch_id, slug, method), level='silent')
-            expected_from = published_status
+            expected_from = completed_status
             write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} — phase=step_success, step={}.{}, next_expected_from={}", batch_id, slug, method, expected_from), level='silent')
     finally:
         if batch_browser_session is not None and batch_browser_session.is_open:
@@ -416,7 +416,7 @@ def run(batch_id, category):
     if any_ok:
         if failed_steps:
             fail_list = ', '.join(failed_steps)
-            db_set_batch_status(batch_id, 'published_partially')
+            db_set_batch_status(batch_id, 'partially')
             _mark_movie_published(batch)
             write_log_entry(batch_id, category, f'Частично опубликовано; ошибки: {fail_list}')
             write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} частично опубликован (ошибки: {})", batch_id, fail_list), level='silent')
@@ -430,9 +430,9 @@ def run(batch_id, category):
                 log_entries=err_entries,
                 partial=True,
             )
-            write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} — phase=run_done, status=published_partially", batch_id), level='silent')
+            write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} — phase=run_done, status=partially", batch_id), level='silent')
         else:
-            db_set_batch_status(batch_id, 'published')
+            db_set_batch_status(batch_id, 'completed')
             _mark_movie_published(batch)
             write_log_entry(batch_id, category, f'Успешно опубликовано ({target_names})')
             write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} опубликован", batch_id), level='silent')
@@ -447,7 +447,7 @@ def run(batch_id, category):
                     log_entries=warn_entries,
                     partial=True,
                 )
-            write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} — phase=run_done, status=published", batch_id), level='silent')
+            write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} — phase=run_done, status=completed", batch_id), level='silent')
     else:
         abt_msg = f'Ошибка публикации батча в {target_names}'
         write_log_entry(batch_id, category, f'Ошибка публикации батча в {target_names}', level='error')

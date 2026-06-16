@@ -238,8 +238,8 @@ def bootstrap():
                         FROM batches b2
                         WHERE b2.movie_id = m.id
                           AND (
-                              b2.status IN ('published', 'published_partially')
-                              OR b2.status LIKE '%.published'
+                              b2.status IN ('completed', 'partially')
+                              OR b2.status LIKE '%.completed'
                           )
                     )
                     THEN B'1'

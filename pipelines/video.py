@@ -3,8 +3,8 @@ Pipeline 3 — Генерация видео.
 
 stage-batch type=movie:
   pending    -> submit запроса провайдеру
-  generating -> polling статуса у провайдера
-  generated  -> загрузка/сохранение видео
+  processing -> polling статуса у провайдера
+  processed  -> загрузка/сохранение видео
   ready      -> финал
 """
 
@@ -18,7 +18,7 @@ from db import (
     db_get_story_title,
     db_get_video_model_by_id,
     db_save_video_job_and_set_pending,
-    db_save_video_job_and_set_generating,
+    db_save_video_job_and_set_processing,
     db_save_generated_video_url,
     db_get_batch_original_video,
     db_set_batch_status,
@@ -51,18 +51,18 @@ def _clear_handshake_payload() -> dict:
         'generated_video_url': None,
     }
 
-def _video_pending_resume_target(batch_data) -> str | None:
+def _movie_pending_resume_target(batch_data) -> str | None:
     """Если pending, но в data есть прогресс — куда подхватить без нового submit."""
     if not isinstance(batch_data, dict):
         return None
     if batch_data.get('generated_video_url'):
-        return 'generated'
+        return 'processed'
     if (
         batch_data.get('request_id')
         and batch_data.get('status_url')
         and batch_data.get('response_url')
     ):
-        return 'generating'
+        return 'processing'
     return None
 
 def _download_and_finalize(batch_id, batch, category, batch_data, used_model, used_model_id):
@@ -83,7 +83,7 @@ def _download_and_finalize(batch_id, batch, category, batch_data, used_model, us
 
     video_url = batch_data.get('generated_video_url') if isinstance(batch_data, dict) else None
     if not video_url:
-        msg = 'Для статуса generated отсутствует generated_video_url — невозможна загрузка видео'
+        msg = 'Для статуса processed отсутствует generated_video_url — невозможна загрузка видео'
         write_log_entry(batch_id, category, msg, level='error')
         raise AppException(batch_id, 'video', msg)
 
@@ -130,14 +130,14 @@ def run(batch_id, category):
             write_log_entry(batch_id, category, msg, level='error')
             raise AppException(batch_id, 'video', msg)
 
-        if status not in ('pending', 'generating', 'generated'):
+        if status not in ('pending', 'processing', 'processed'):
             return
 
         batch_data = batch.get('data') or {}
         if status == 'pending':
-            resume_target = _video_pending_resume_target(batch_data)
+            resume_target = _movie_pending_resume_target(batch_data)
             if resume_target:
-                if resume_target == 'generated':
+                if resume_target == 'processed':
                     write_log_entry(batch_id, category, 'Подхват: готовый URL — загрузка без нового запроса.')
                 else:
                     write_log_entry(batch_id, category, 'Подхват: возобновление опроса предыдущего запроса.')
@@ -178,7 +178,7 @@ def run(batch_id, category):
             raise RuntimeError('story_id отсутствует у батча movie — ошибка логики')
         story_id = str(story_id)
 
-        if status == 'generated':
+        if status == 'processed':
             _download_and_finalize(batch_id, batch, category, batch_data, model_name, model_id)
             return
 
@@ -188,14 +188,14 @@ def run(batch_id, category):
             write_log_entry(batch_id, category, f"{msg}", level='silent')
             raise AppException(batch_id, 'video', msg)
 
-        # generating: строго polling уже существующего запроса (без submit).
-        if status == 'generating':
+        # processing: строго polling уже существующего запроса (без submit).
+        if status == 'processing':
             request_id = batch_data.get('request_id') if isinstance(batch_data, dict) else None
             status_url = batch_data.get('status_url') if isinstance(batch_data, dict) else None
             response_url = batch_data.get('response_url') if isinstance(batch_data, dict) else None
 
             if not request_id or not status_url or not response_url:
-                write_log_entry(batch_id, category, 'Для статуса generating отсутствует handshake, сбрасываю в pending.', level='warn')
+                write_log_entry(batch_id, category, 'Для статуса processing отсутствует handshake, сбрасываю в pending.', level='warn')
                 db_save_video_job_and_set_pending(batch_id, _clear_handshake_payload())
                 return
             write_log_entry(
@@ -208,7 +208,7 @@ def run(batch_id, category):
             video_url, poll_err = client.poll(batch_id, category, status_url, response_url)
             if video_url:
                 db_save_generated_video_url(batch_id, video_url)
-                write_log_entry(batch_id, category, "Провайдер сообщил: видео готово (batch → generated).")
+                write_log_entry(batch_id, category, "Провайдер сообщил: видео готово (batch → processed).")
                 write_log_entry(
                     batch_id, category,
                     fmt_id_msg("[video] Батч {} — phase=poll_resume_success, request_id={}", batch_id, request_id),
@@ -244,7 +244,7 @@ def run(batch_id, category):
                 db_save_video_job_and_set_pending(batch_id, _clear_handshake_payload())
                 return
 
-            write_log_entry(batch_id, category, "Провайдер ещё не завершил генерацию, оставляю статус generating.", level='silent')
+            write_log_entry(batch_id, category, "Провайдер ещё не завершил генерацию, оставляю статус processing.", level='silent')
             return
 
         # pending: новый submit одной конкретной модели.
@@ -298,7 +298,7 @@ def run(batch_id, category):
             s_url = sr['status_url']
             r_url = sr['response_url']
 
-            db_save_video_job_and_set_generating(
+            db_save_video_job_and_set_processing(
                 batch_id,
                 {
                     'request_id': req_id,
@@ -313,7 +313,7 @@ def run(batch_id, category):
             video_url, poll_err = client.poll(batch_id, category, s_url, r_url)
             if video_url:
                 db_save_generated_video_url(batch_id, video_url)
-                write_log_entry(batch_id, category, "Провайдер сообщил: видео готово (batch → generated).")
+                write_log_entry(batch_id, category, "Провайдер сообщил: видео готово (batch → processed).")
                 batch = db_get_batch_by_id(batch_id)
                 _download_and_finalize(
                     batch_id,
@@ -335,7 +335,7 @@ def run(batch_id, category):
                 db_save_video_job_and_set_pending(batch_id, _clear_handshake_payload())
                 continue
 
-            # Запрос активен, продолжаем ждать в generating.
+            # Запрос активен, продолжаем ждать в processing.
             write_log_entry(batch_id, category, 'Провайдер ещё не завершил генерацию, продолжаю ожидание.', level='silent')
             return
 

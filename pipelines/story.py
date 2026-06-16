@@ -1,6 +1,6 @@
 """
 Pipeline story — генерация сюжета.
-Принимает batch_id в статусе generating (CAS при dispatch в main_loop),
+Принимает batch_id в статусе processing (CAS при dispatch в main_loop),
 перебирает активные text-модели по порядку (с retry на каждую),
 генерирует текст через OpenRouter и сохраняет результат.
 """
@@ -38,7 +38,7 @@ def run(batch_id, category):
         level='silent',
     )
 
-    if batch["status"] != "generating":
+    if batch["status"] != "processing":
         return
 
     if batch.get("type") != "story":
