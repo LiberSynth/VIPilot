@@ -104,6 +104,16 @@ class PublishBatchBrowserSession:
             fn_result = fn(page, ctx)
             result = {"ok": True, "result": fn_result}
         except Exception as e:
+            from services.publish_error_dump import save_publish_error_dump
+
+            save_publish_error_dump(
+                page,
+                batch_id=batch_id,
+                category=category,
+                platform=platform_browser._platform,
+                error=str(e),
+                platform_browser=platform_browser,
+            )
             result = {"ok": False, "error": str(e)}
         finally:
             try:
