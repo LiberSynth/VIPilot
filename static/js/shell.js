@@ -33,6 +33,9 @@ function switchPanel(name) {
   var activePanel = document.querySelector('.tab-panel.active');
   if (activePanel && activePanel.id === 'panel-log') {
     localStorage.setItem(_MONITOR_SCROLL_KEY, String(window.scrollY || 0));
+    if (name !== 'log' && typeof window.monitorPausePolling === 'function') {
+      window.monitorPausePolling();
+    }
   }
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.sidebar-item').forEach(b => b.classList.remove('active'));
@@ -49,7 +52,8 @@ function switchPanel(name) {
       var savedScroll = parseInt(_rawScroll, 10) || 0;
       requestAnimationFrame(function() { window.scrollTo(0, savedScroll); });
     }
-    if (typeof window.monitorRefresh === 'function') window.monitorRefresh();
+    if (typeof window.monitorResumePolling === 'function') window.monitorResumePolling();
+    else if (typeof window.monitorRefresh === 'function') window.monitorRefresh();
   }
   if (name === 'service') {
     if (typeof refreshWorkflowState === 'function') refreshWorkflowState();

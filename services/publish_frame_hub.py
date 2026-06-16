@@ -45,6 +45,11 @@ class PublishFrameHub:
             entry = self._frames.get(batch_id)
             return entry[0] if entry else None
 
+    def is_stopped(self, batch_id: str) -> bool:
+        """True если трансляция батча завершена (clear вызван)."""
+        with self._lock:
+            return batch_id in self._stopped
+
     def stream_generator(self, batch_id: str):
         """
         SSE-генератор: выдаёт кадры как base64-encoded JPEG.
@@ -58,16 +63,16 @@ class PublishFrameHub:
                 stopped = batch_id in self._stopped
                 event = self._events.setdefault(batch_id, threading.Event())
 
+            if stopped:
+                yield "data: STOPPED\n\n"
+                break
+
             if entry is not None:
                 img, _, counter = entry
                 if counter != last_counter:
                     last_counter = counter
                     b64 = base64.b64encode(img).decode()
                     yield f"data: {b64}\n\n"
-
-            if stopped and entry is None:
-                yield "data: STOPPED\n\n"
-                break
 
             event.wait(timeout=1.0)
             event.clear()

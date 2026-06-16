@@ -578,26 +578,22 @@
     if (!canvas) return;
 
     var v = _pubViewers[bid];
-    if (v && v.canvas === canvas && v.sse) return;
-    if (v && v.sse) { v.sse.close(); v.sse = null; }
-
-    if (_activeBatchIds.indexOf(bid) >= 0) {
-      if (!v) v = {};
-      v.stopped = false;
-    } else if (v && v.stopped) {
+    if (_activeBatchIds.indexOf(bid) < 0) {
+      if (v && v.sse) { v.sse.close(); v.sse = null; }
       return;
     }
 
+    if (v && v.canvas === canvas && v.sse) return;
+    if (v && v.sse) { v.sse.close(); v.sse = null; }
+
     if (!v) v = {};
+    v.stopped = false;
+
     if (v.canvas !== canvas) {
       canvas.width = PUB_VIEWPORT_W;
       canvas.height = PUB_VIEWPORT_H;
       v.ctx = canvas.getContext('2d');
       v.canvas = canvas;
-    }
-    if (v.stopped) {
-      _pubViewers[bid] = v;
-      return;
     }
 
     var sse = new EventSource('/api/batch/' + encodeURIComponent(bid) + '/publish-stream');
@@ -1005,12 +1001,13 @@
   var _timerOpenBatchEntries  = null;
   var _timerOpenSystemEntries = null;
 
-  if (!document.hidden) {
-    refreshMonitor();
-    _timerMonitor           = setInterval(refreshMonitor, MONITOR_POLL_MS);
-    _timerOpenBatchEntries  = setInterval(refreshOpenBatchEntries, BATCH_ENTRIES_POLL_MS);
-    _timerOpenSystemEntries = setInterval(refreshOpenSystemEntries, SYSTEM_ENTRIES_POLL_MS);
-    syncPubFrameStreams();
+  function _monitorPanelActive() {
+    var panel = document.getElementById('panel-log');
+    return panel && panel.classList.contains('active');
+  }
+
+  if (!document.hidden && _monitorPanelActive()) {
+    _resumeMonitorPolling();
   }
 
   function _pauseMonitorPolling() {
@@ -1033,8 +1030,11 @@
   document.addEventListener('visibilitychange', function() {
     if (document.hidden) {
       _pauseMonitorPolling();
-    } else {
+    } else if (_monitorPanelActive()) {
       _resumeMonitorPolling();
     }
   });
+
+  window.monitorPausePolling = _pauseMonitorPolling;
+  window.monitorResumePolling = _resumeMonitorPolling;
 })();

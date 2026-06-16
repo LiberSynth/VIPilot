@@ -751,8 +751,23 @@ def api_batch_publish_stream(batch_id):
         return Response("Unauthorized", status=401)
     from services.publish_frame_hub import get_hub
 
+    hub = get_hub()
+    if batch_id not in environment.get_active_batch_ids() and hub.is_stopped(batch_id):
+
+        def stopped_once():
+            yield "data: STOPPED\n\n"
+
+        return Response(
+            stream_with_context(stopped_once()),
+            mimetype="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "X-Accel-Buffering": "no",
+            },
+        )
+
     def generate():
-        yield from get_hub().stream_generator(batch_id)
+        yield from hub.stream_generator(batch_id)
 
     return Response(
         stream_with_context(generate()),
