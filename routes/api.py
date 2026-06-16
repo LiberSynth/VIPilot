@@ -228,13 +228,13 @@ def client_is_configured(slug: str, cfg: dict = None, target_id: str = None) -> 
     if slug == "vk":
         return bool(os.environ.get("VK_USER_TOKEN", ""))
     if slug == "dzen":
-        from services.browser_registry import get_browser as _get_browser
+        from services.browser_registry import get_auth_browser as _get_browser
         return bool(cfg.get("publisher_id")) and _get_browser("dzen").profile_exists(target_id)
     if slug == "rutube":
-        from services.browser_registry import get_browser as _get_browser
+        from services.browser_registry import get_auth_browser as _get_browser
         return bool(cfg.get("person_id")) and _get_browser("rutube").profile_exists(target_id)
     if slug == "vkvideo":
-        from services.browser_registry import get_browser as _get_browser
+        from services.browser_registry import get_auth_browser as _get_browser
         return bool(cfg.get("club_id")) and _get_browser("vkvideo").profile_exists(target_id)
     if slug == "grok":
         return bool(os.environ.get("XAI_API_KEY", ""))

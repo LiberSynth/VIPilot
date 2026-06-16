@@ -37,6 +37,12 @@ function switchPanel(name) {
       window.monitorPausePolling();
     }
   }
+  if (activePanel && activePanel.id === 'panel-publish' && name !== 'publish') {
+    var registry = window._browserWidgetRegistry;
+    if (registry) {
+      Object.keys(registry).forEach(function(key) { registry[key](); });
+    }
+  }
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.sidebar-item').forEach(b => b.classList.remove('active'));
   const panel = document.getElementById('panel-' + name);

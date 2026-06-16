@@ -13,7 +13,7 @@ Endpoints (slug = dzen | rutube | vkvideo):
 from flask import Blueprint, Response, jsonify, request, stream_with_context
 
 from utils.auth import is_authenticated
-from services.browser_registry import get_browser, SLUGS
+from services.browser_registry import get_auth_browser, SLUGS
 
 bp = Blueprint("browser_widget", __name__, url_prefix="/api")
 
@@ -26,7 +26,7 @@ def _resolve(slug):
     """Возвращает (browser, None) или (None, error_response)."""
     if slug not in SLUGS:
         return None, (jsonify({"ok": False, "error": f"Unknown platform: {slug}"}), 404)
-    return get_browser(slug), None
+    return get_auth_browser(slug), None
 
 @bp.route("/<slug>-browser/start", methods=["POST"])
 def start(slug):

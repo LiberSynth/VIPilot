@@ -244,6 +244,15 @@ class PlatformBrowser:
             if self._running:
                 write_log_entry(None, 'browser', f'platform={self._platform}, Старт запрошен — браузер уже запущен.', level='info')
                 return {"ok": True, "already": True}
+            prev_thread = self._thread
+
+        if prev_thread is not None and prev_thread.is_alive():
+            prev_thread.join(timeout=120)
+
+        with self._lock:
+            if self._running:
+                write_log_entry(None, 'browser', f'platform={self._platform}, Старт запрошен — браузер уже запущен.', level='info')
+                return {"ok": True, "already": True}
 
             self._running           = True
             self._current_target_id = target_id
