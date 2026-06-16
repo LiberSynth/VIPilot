@@ -418,7 +418,7 @@ def _publish_ui(
     # ── Шаг 9: Проверяем успех (тост «Клип опубликован») ────────────────
     write_log_entry(batch_id, category, "VK Видео: Проверяю результат публикации.")
 
-    _deadline = _time.monotonic() + 30
+    _deadline = _time.monotonic() + 60
     _success, _success_via = _check_vk_publish_result(page, after_submit=True)
     while _time.monotonic() < _deadline and not _success:
         page.wait_for_timeout(400)
