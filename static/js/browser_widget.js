@@ -12,6 +12,10 @@
 
 window._browserWidgetRegistry = window._browserWidgetRegistry || {};
 
+var BROWSER_SVG_FULLSCREEN = '<svg viewBox="0 0 16 16"><polyline points="6,2 2,2 2,6"/><polyline points="10,2 14,2 14,6"/><polyline points="10,14 14,14 14,10"/><polyline points="6,14 2,14 2,10"/></svg>';
+var BROWSER_SVG_LOUPE      = '<svg viewBox="0 0 16 16"><circle cx="6.5" cy="6.5" r="3.5"/><line x1="9" y1="9" x2="13" y2="13"/></svg>';
+var BROWSER_SVG_NORMAL     = '<svg viewBox="0 0 16 16"><polyline points="6,6 2,6 2,2"/><polyline points="10,6 14,6 14,2"/><polyline points="10,10 14,10 14,14"/><polyline points="6,10 2,10 2,14"/></svg>';
+
 function createBrowserWidget(slug) {
   var VIEWPORT_W = 1280;
   var VIEWPORT_H = 720;
@@ -86,7 +90,9 @@ function createBrowserWidget(slug) {
             (mode === 'fullscreen' ? 'Полный экран' : 'Лупа 100%') +
           '</span>' +
           '<div class="monitor-hdr-actions-always browser-auth-view-actions">' +
-            '<button type="button" class="cycle-float-btn cycle-float-btn-label browser-view-exit" title="Обычный вид">Обычный вид</button>' +
+            '<button type="button" class="cycle-float-btn browser-view-exit" title="Обычный вид">' +
+              BROWSER_SVG_NORMAL +
+            '</button>' +
           '</div>' +
         '</div>' +
         '<div class="browser-view-body browser-view-body--' + mode + '"></div>' +
