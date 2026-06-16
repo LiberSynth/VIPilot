@@ -593,6 +593,17 @@
   .cycle-float-btn.pending svg * { stroke: #ffb400; }
   .cycle-float-btn:disabled { opacity: .35; cursor: not-allowed; pointer-events: auto; }
   .cycle-float-btn.btn-blocked { opacity: .35; }
+  .cycle-float-btn.cycle-float-btn-label {
+    width: auto;
+    height: auto;
+    min-height: 26px;
+    padding: 4px 9px;
+    font-size: 11px;
+    line-height: 1.2;
+    color: #8888b0;
+    white-space: nowrap;
+  }
+  .cycle-float-btn.cycle-float-btn-label:hover { color: #c8c8e8; }
   @keyframes btn-pending-pulse { 0%,100% { opacity:1; } 50% { opacity:.4; } }
   @keyframes bar-indeterminate { 0%{left:-40%;width:40%} 60%{left:60%;width:40%} 100%{left:100%;width:0} }
 
@@ -955,6 +966,9 @@
   .search-clear-btn[hidden] { display: none; }
 
   /* ── Browser auth view modes (fullscreen / loupe) ── */
+  .browser-auth-panel { position: relative; }
+  .browser-auth-view-actions { padding: 0 0 6px; }
+  .browser-view-head .browser-auth-view-actions { padding: 0; }
   .browser-auth-wrap {
     position: relative;
     border-radius: 6px;
@@ -995,12 +1009,11 @@
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    padding: 10px 14px;
+    padding: 10px 8px;
     border-bottom: 1px solid #1c1a2e;
     flex-shrink: 0;
   }
   .browser-view-title { font-size: 13px; font-weight: 600; color: #c8c0e8; }
-  .browser-view-exit { font-size: 13px; padding: 7px 14px; white-space: nowrap; }
   .browser-view-body {
     flex: 1;
     min-height: 0;

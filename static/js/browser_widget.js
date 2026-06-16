@@ -83,9 +83,11 @@ function createBrowserWidget(slug) {
       '<div class="browser-view-shell">' +
         '<div class="browser-view-head">' +
           '<span class="browser-view-title">' +
-            (mode === 'fullscreen' ? 'Full screen' : 'Лупа 100%') +
+            (mode === 'fullscreen' ? 'Полный экран' : 'Лупа 100%') +
           '</span>' +
-          '<button type="button" class="btn-run-now browser-view-exit">Обычный вид</button>' +
+          '<div class="monitor-hdr-actions-always browser-auth-view-actions">' +
+            '<button type="button" class="cycle-float-btn cycle-float-btn-label browser-view-exit" title="Обычный вид">Обычный вид</button>' +
+          '</div>' +
         '</div>' +
         '<div class="browser-view-body browser-view-body--' + mode + '"></div>' +
       '</div>';

@@ -30,20 +30,22 @@
                 onclick="{{ t.slug }}BrowserStop()"
                 disabled
                 style="font-size:13px;padding:7px 14px;white-space:nowrap">Отмена</button>
-        <button type="button" class="btn-run-now" id="{{ t.slug }}-btn-fullscreen"
-                disabled
-                style="font-size:13px;padding:7px 14px;white-space:nowrap">Full screen</button>
-        <button type="button" class="btn-run-now" id="{{ t.slug }}-btn-loupe"
-                disabled
-                style="font-size:13px;padding:7px 14px;white-space:nowrap">Лупа</button>
       </div>
     </div>
-    <div id="{{ t.slug }}-browser-wrap-home">
+    <div class="browser-auth-panel">
+      <div class="monitor-hdr-actions-always browser-auth-view-actions">
+        <button type="button" class="cycle-float-btn cycle-float-btn-label" id="{{ t.slug }}-btn-fullscreen"
+                disabled title="Полный экран">Полный экран</button>
+        <button type="button" class="cycle-float-btn cycle-float-btn-label" id="{{ t.slug }}-btn-loupe"
+                disabled title="Лупа 100%">Лупа</button>
+      </div>
+      <div id="{{ t.slug }}-browser-wrap-home">
     <div id="{{ t.slug }}-browser-wrap" class="browser-auth-wrap">
       <canvas id="{{ t.slug }}-browser-canvas" tabindex="0"></canvas>
       <div id="{{ t.slug }}-browser-overlay"
            style="position:absolute;inset:0;background:rgba(10,10,20,.85);display:none;align-items:center;justify-content:center;color:#aaa;font-size:14px">
       </div>
+    </div>
     </div>
     </div>
     <div style="margin-top:14px">
