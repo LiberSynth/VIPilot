@@ -167,7 +167,38 @@ _VK_PUBLISH_ERROR_TEXTS = (
     "Клип не опубликован",
 )
 
-def _check_vk_publish_result(page) -> tuple[bool, str | None]:
+def _vk_publish_form_visible(page) -> bool:
+    try:
+        return page.locator(
+            "textarea[placeholder*='клип'], "
+            "textarea[placeholder*='Клип'], "
+            "[placeholder*='клип']"
+        ).first.is_visible(timeout=300)
+    except Exception:
+        return False
+
+def _vk_publish_button_visible(page) -> bool:
+    try:
+        return page.locator("button:has-text('Опубликовать')").last.is_visible(timeout=300)
+    except Exception:
+        return False
+
+def _vk_publish_confirmed_after_submit(page) -> bool:
+    """Признак успеха после клика «Опубликовать»: форма и кнопка submit исчезли."""
+    if _vk_publish_form_visible(page) or _vk_publish_button_visible(page):
+        return False
+    try:
+        url = page.url.lower()
+    except Exception:
+        return False
+    if "video_my_content_clips" in url:
+        return True
+    return (
+        "cabinet.vkvideo.ru/dashboard" in url
+        and "showuploader" not in url
+    )
+
+def _check_vk_publish_result(page, *, after_submit: bool = False) -> tuple[bool, str | None]:
     """(True, причина) — публикация клипа подтверждена."""
     try:
         body = page.locator("body").inner_text(timeout=800)
@@ -182,46 +213,14 @@ def _check_vk_publish_result(page) -> tuple[bool, str | None]:
         raise
     except Exception:
         pass
-    if _vk_publish_confirmed_by_page(page):
+    if after_submit and _vk_publish_confirmed_after_submit(page):
         return True, "URL/форма"
     return False, None
 
-def _vk_publish_form_visible(page) -> bool:
-    try:
-        return page.locator(
-            "textarea[placeholder*='клип'], "
-            "textarea[placeholder*='Клип'], "
-            "[placeholder*='клип']"
-        ).first.is_visible(timeout=300)
-    except Exception:
-        return False
-
-def _vk_publish_confirmed_by_page(page) -> bool:
-    """Признак успеха по URL или исчезновению формы публикации клипа."""
-    try:
-        url = page.url.lower()
-    except Exception:
-        return False
-    if "video_my_content_clips" in url:
-        return True
-    if (
-        "cabinet.vkvideo.ru/dashboard" in url
-        and "showuploader" not in url
-        and not _vk_publish_form_visible(page)
-    ):
-        return True
-    return False
-
 def _click_vk_publish_button(pub_btn, page, category, batch_id) -> None:
     """Клик по «Опубликовать» без ожидания навигации после submit."""
-    _ok, _ = _check_vk_publish_result(page)
-    if _ok:
-        return
     _last_err = None
     for _attempt in range(1, 4):
-        _ok, _ = _check_vk_publish_result(page)
-        if _ok:
-            return
         try:
             pub_btn.click(timeout=5_000, no_wait_after=True)
             return
@@ -419,11 +418,11 @@ def _publish_ui(
     # ── Шаг 9: Проверяем успех (тост «Клип опубликован») ────────────────
     write_log_entry(batch_id, category, "VK Видео: Проверяю результат публикации.")
 
-    _deadline = _time.monotonic() + 15
-    _success, _success_via = _check_vk_publish_result(page)
+    _deadline = _time.monotonic() + 30
+    _success, _success_via = _check_vk_publish_result(page, after_submit=True)
     while _time.monotonic() < _deadline and not _success:
         page.wait_for_timeout(400)
-        _success, _success_via = _check_vk_publish_result(page)
+        _success, _success_via = _check_vk_publish_result(page, after_submit=True)
 
     _snap(page, batch_id)
 
@@ -433,16 +432,20 @@ def _publish_ui(
             f"VK Видео: Клип опубликован успешно ({_success_via}).",
         )
         write_log_entry(batch_id, category, f"URL: {page.url}", level="silent")
+    elif not _form_ok:
+        raise VkVideoApiError(
+            "VK Видео: форма публикации не открылась и успех не подтверждён — "
+            "вероятно, сессия устарела или изменился интерфейс"
+        )
     else:
         write_log_entry(
-            batch_id, category, "VK Видео: Публикация завершена (тост не обнаружен, ошибок нет)"
+            batch_id, category,
+            "VK Видео: Публикация не подтверждена после клика «Опубликовать».",
+            level="warn",
         )
         write_log_entry(batch_id, category, f"URL: {page.url}", level="silent")
-
-    if not _form_ok and not _success:
         raise VkVideoApiError(
-            "VK Видео: форма публикации не открылась и тост успеха не найден — "
-            "вероятно, сессия устарела или изменился интерфейс"
+            "VK Видео: публикация не подтверждена после клика «Опубликовать»"
         )
 
     return clip_url
