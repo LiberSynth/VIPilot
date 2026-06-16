@@ -106,7 +106,7 @@ def stop(slug):
     if err:
         return err
 
-    return jsonify(svc.stop())
+    return jsonify(svc.stop(category='browser'))
 
 @bp.route("/<slug>-browser/status")
 def status(slug):

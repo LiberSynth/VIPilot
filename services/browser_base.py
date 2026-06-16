@@ -279,7 +279,7 @@ class PlatformBrowser:
 
         return {"ok": True, "already": False}
 
-    def stop(self, batch_id=None, category=None, log: bool = True) -> dict:
+    def stop(self, batch_id=None, category='browser', log: bool = True) -> dict:
         with self._lock:
             self._running = False
         if log:
