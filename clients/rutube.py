@@ -182,9 +182,12 @@ def _find_rutube_add_button(page):
 
 def _wait_rutube_add_button(page, category, batch_id=None, timeout_ms=180_000):
     """Ждёт готовность студии и видимую кнопку «+ Добавить»."""
+    from services.publish_auth_check import raise_if_login_required
+
     deadline = _time.monotonic() + timeout_ms / 1000
     last_snap_at = 0.0
     while _time.monotonic() < deadline:
+        raise_if_login_required(page, "rutube")
         add_btn = _find_rutube_add_button(page)
         if add_btn is not None:
             return add_btn
@@ -193,6 +196,7 @@ def _wait_rutube_add_button(page, category, batch_id=None, timeout_ms=180_000):
             _snap(page, batch_id)
             last_snap_at = now
         page.wait_for_timeout(500)
+    raise_if_login_required(page, "rutube")
     raise RutubeApiError("Не дождались кнопки «+ Добавить» в студии Рутьюба.")
 
 def _wait_rutube_upload(page, category, batch_id=None) -> bool:
@@ -274,10 +278,9 @@ def _publish_ui(page, video_path: str, category, batch_id=None):
 
     cur = page.url
     write_log_entry(batch_id, category, f"URL после перехода: {cur}", level='silent')
-    if "rutube.ru/login" in cur or "/auth" in cur or "passport" in cur:
-        raise RutubeCsrfExpired(
-            "Сессия истекла — авторизуйтесь снова в браузере (вкладка «Публикация»)"
-        )
+    from services.publish_auth_check import raise_if_login_required
+
+    raise_if_login_required(page, "rutube")
 
     # ── Шаг 2: Кнопка «+ Добавить» ───────────────────────────────────────
     write_log_entry(batch_id, category, "Рутьюб: Ищу кнопку «+ Добавить».")

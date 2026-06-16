@@ -245,10 +245,14 @@ def _wait_visible(locator, timeout_ms: int, page, batch_id, interval_ms: int = 2
     """Ждёт видимости локатора, снимая скриншот каждые interval_ms мс.
     Playwright sync API нельзя вызывать из других потоков — поэтому
     скриншоты делаем прямо здесь, в главном потоке Playwright."""
+    from services.publish_auth_check import raise_if_login_required
+
     deadline = _time.monotonic() + timeout_ms / 1000
     while True:
+        raise_if_login_required(page, "vkvideo")
         remaining = deadline - _time.monotonic()
         if remaining <= 0:
+            raise_if_login_required(page, "vkvideo")
             locator.wait_for(state="visible", timeout=1_000)  # бросит TimeoutError
             return
         poll = min(interval_ms, max(500, int(remaining * 1000)))
@@ -294,15 +298,15 @@ def _publish_ui(
 
     cur = page.url
     write_log_entry(batch_id, category, f"URL после перехода: {cur}", level="silent")
-    if "vk.com/login" in cur or "/auth" in cur or "passport" in cur:
-        raise VkVideoCsrfExpired(
-            "Сессия истекла — авторизуйтесь снова в браузере (вкладка «Публикация»)"
-        )
+    from services.publish_auth_check import raise_if_login_required
+
+    raise_if_login_required(page, "vkvideo")
 
     # ── Шаг 1б: CAPTCHA «Проверяем, что вы не робот» или готовность модала ─
     choose_btn = page.get_by_text("Выбрать файл", exact=False).first
     _captcha_deadline = _time.monotonic() + 5
     while _time.monotonic() < _captcha_deadline:
+        raise_if_login_required(page, "vkvideo")
         try:
             if choose_btn.is_visible(timeout=300):
                 break
