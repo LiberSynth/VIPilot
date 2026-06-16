@@ -125,11 +125,6 @@ _CAPTCHA_URL_KEYWORDS = (
     "captcha.yandex", "recaptcha", "id.vk.com",
 )
 
-_CAPTCHA_DOM_KEYWORDS = (
-    "не робот", "not a robot", "подтвердите", "я не робот",
-    "captcha", "капча",
-)
-
 def _has_captcha_frame(page) -> bool:
     """Возвращает True если в page есть активный iframe капчи (по URL)."""
     try:
@@ -141,36 +136,10 @@ def _has_captcha_frame(page) -> bool:
         pass
     return False
 
-def _has_captcha_dom(page) -> bool:
-    """Резервная проверка: капча обнаружена по тексту страницы или DOM-классам."""
-    try:
-        body = page.locator("body").inner_text(timeout=1000)
-        body_lc = body.lower()
-        if any(kw in body_lc for kw in _CAPTCHA_DOM_KEYWORDS):
-            return True
-    except Exception:
-        pass
-    try:
-        for sel in (
-            "[class*='captcha']",
-            "[class*='Captcha']",
-            "[id*='captcha']",
-            "iframe[src*='captcha']",
-            "iframe[src*='smartcaptcha']",
-        ):
-            try:
-                if page.locator(sel).first.is_visible(timeout=300):
-                    return True
-            except Exception:
-                pass
-    except Exception:
-        pass
-    return False
-
 def _try_click_captcha_checkbox(page, category, batch_id=None) -> bool:
     """
-    Пытается кликнуть чекбокс капчи «Я не робот» во всех фреймах и в основном.
-    Возвращает True если клик выполнен хотя бы в одном месте.
+    Пытается кликнуть чекбокс капчи «Я не робот» только во фреймах капчи.
+    Возвращает True если клик выполнен хотя бы в одном captcha-iframe.
     """
     checkbox_selectors = [
         'input[type="checkbox"]',
@@ -198,22 +167,21 @@ def _try_click_captcha_checkbox(page, category, batch_id=None) -> bool:
                         break
                 except Exception:
                     pass
+            if not clicked:
+                for sel in checkbox_selectors:
+                    try:
+                        el = frame.locator(sel).first
+                        if el.is_visible(timeout=300):
+                            el.click(force=True, timeout=2000)
+                            write_log_entry(batch_id, category, f"Капча: Playwright-клик {sel!r} в фрейме {furl}", level='silent')
+                            clicked = True
+                            break
+                    except Exception:
+                        pass
             if clicked:
                 break
     except Exception:
         pass
-
-    if not clicked:
-        for sel in checkbox_selectors:
-            try:
-                el = page.locator(sel).first
-                if el.is_visible(timeout=300):
-                    el.click(force=True, timeout=2000)
-                    write_log_entry(batch_id, category, f"Капча: Playwright-клик {sel!r} в основном фрейме", level='silent')
-                    clicked = True
-                    break
-            except Exception:
-                pass
 
     return clicked
 
@@ -306,7 +274,7 @@ def _handle_modal_overlay_element(page, category, batch_id) -> None:
 # ---------------------------------------------------------------------------
 
 def _detect_captcha(page) -> bool:
-    return _has_captcha_frame(page) or _has_captcha_dom(page)
+    return _has_captcha_frame(page)
 
 def _detect_confirm_dialog(page) -> bool:
     return _has_publish_confirm_dialog(page)
@@ -433,6 +401,7 @@ def _click_primary_publish_control(page, category, batch_id=None, url_step7_star
             level='silent',
         )
         return False
+    _dismiss_unknown(page, category, batch_id)
     _handle_popups(page, category, batch_id)
     pub_btn = _find_primary_publish_control(page)
     if pub_btn is None:
@@ -913,8 +882,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
     _CONFIRM_OR_CAPTCHA_SEL = (
         "button:has-text('Опубликовать после подтверждения'), "
         "button:has-text('Опубликовать после обработки'), "
-        "iframe[src*='captcha'], iframe[src*='smartcaptcha'], "
-        "[class*='captcha'], [class*='Captcha'], [id*='captcha']"
+        "iframe[src*='captcha'], iframe[src*='smartcaptcha']"
     )
     _confirm_dialog_deadline = _time.monotonic() + 12
     while _time.monotonic() < _confirm_dialog_deadline:
@@ -932,7 +900,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
     # Каждую итерацию вызываем _handle_popups — он сверяет со списком
     # _EXPECTED_ELEMENTS (капча, диалог подтверждения, файловый input)
     # и либо обрабатывает известный элемент, либо закрывает неизвестный.
-    _DIALOG_WINDOW = 10_000  # ms
+    _DIALOG_WINDOW = 15_000  # ms
     _DIALOG_POLL   = 800     # ms
 
     # Тексты, которые Дзен показывает в тост-ошибках при неудаче публикации.
