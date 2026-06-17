@@ -32,7 +32,6 @@ def db_create_planning_batch(scheduled_at):
                     SELECT id FROM batches
                     WHERE scheduled_at = %s
                       AND type        = 'planning'
-                      AND status      IN ('pending', 'ready')
                     LIMIT 1
                     """,
                     (scheduled_at,),
