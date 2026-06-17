@@ -4,7 +4,7 @@ from common.exceptions import AppException
 from db import (
     settings_get,
     db_get_schedule, db_get_active_targets, db_create_planning_batch,
-    db_get_batch_by_id, db_claim_unused_movie_for_batch,
+    db_get_batch_by_id, db_claim_unused_movie_for_batch, db_get_story_title,
 )
 from log import write_log_entry
 from utils.consts import MSK
@@ -47,7 +47,8 @@ def run(batch_id, category):
 
     source_batch_id = claimed.get("batch_id_source")
     source_label = source_batch_id or "NULL"
-    write_log_entry(batch_id, category, fmt_id_msg("Захвачено видео {} из пула.", claimed["movie_id"]))
+    story_title = db_get_story_title(claimed["story_id"]) or "(без названия)"
+    write_log_entry(batch_id, category, f"Захвачено видео «{story_title}» из пула.")
     write_log_entry(batch_id, category, fmt_id_msg("Передающий батч: {}", source_label))
     write_log_entry(
         batch_id, category,
