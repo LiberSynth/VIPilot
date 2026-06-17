@@ -241,6 +241,30 @@ def _click_vk_publish_button(pub_btn, page, category, batch_id) -> None:
         f"Не удалось нажать «Опубликовать» в VK Видео: {_last_err}"
     ) from _last_err
 
+def _vk_publish_button_ready(pub_btn) -> bool:
+    try:
+        if not pub_btn.is_visible(timeout=300):
+            return False
+        return not pub_btn.is_disabled(timeout=300)
+    except Exception:
+        return False
+
+def _submit_vk_clip_publish(page, category, batch_id, pub_btn=None) -> None:
+    """Прокручивает к кнопке, ждёт enabled и нажимает «Опубликовать»."""
+    if pub_btn is None:
+        pub_btn = page.locator("button:has-text('Опубликовать')").last
+    try:
+        pub_btn.scroll_into_view_if_needed(timeout=3_000)
+    except Exception:
+        pass
+    page.wait_for_timeout(300)
+    _ready_deadline = _time.monotonic() + 8
+    while _time.monotonic() < _ready_deadline:
+        if _vk_publish_button_ready(pub_btn):
+            break
+        page.wait_for_timeout(400)
+    _click_vk_publish_button(pub_btn, page, category, batch_id)
+
 def _wait_visible(locator, timeout_ms: int, page, batch_id, interval_ms: int = 2_000):
     """Ждёт видимости локатора, снимая скриншот каждые interval_ms мс.
     Playwright sync API нельзя вызывать из других потоков — поэтому
@@ -408,25 +432,40 @@ def _publish_ui(
     # Playwright висит на click() до таймаута, ожидая actionability.
     write_log_entry(batch_id, category, "VK Видео: Прокручиваю к кнопке «Опубликовать».")
     _snap(page, batch_id)
-    try:
-        pub_btn.scroll_into_view_if_needed(timeout=3_000)
-    except Exception:
-        pass
-    page.wait_for_timeout(300)
-    _snap(page, batch_id)
 
     write_log_entry(batch_id, category, "VK Видео: Нажимаю «Опубликовать».")
-    _click_vk_publish_button(pub_btn, page, category, batch_id)
+    _submit_vk_clip_publish(page, category, batch_id, pub_btn)
     _snap(page, batch_id)
 
     # ── Шаг 9: Проверяем успех (тост «Клип опубликован») ────────────────
     write_log_entry(batch_id, category, "VK Видео: Проверяю результат публикации.")
 
     _deadline = _time.monotonic() + 60
+    _publish_retries = 0
+    _PUBLISH_RETRY_MAX = 3
+    _RETRY_INTERVAL = 15
+    _last_retry_at = _time.monotonic()
     _success, _success_via = _check_vk_publish_result(page, after_submit=True)
     while _time.monotonic() < _deadline and not _success:
         page.wait_for_timeout(400)
         _success, _success_via = _check_vk_publish_result(page, after_submit=True)
+        if _success:
+            break
+        if (
+            _publish_retries < _PUBLISH_RETRY_MAX
+            and _vk_publish_form_visible(page)
+            and _vk_publish_button_visible(page)
+            and _time.monotonic() - _last_retry_at >= _RETRY_INTERVAL
+        ):
+            _publish_retries += 1
+            _last_retry_at = _time.monotonic()
+            write_log_entry(
+                batch_id, category,
+                "VK Видео: Форма всё ещё открыта — повторный клик "
+                f"«Опубликовать» ({_publish_retries}/{_PUBLISH_RETRY_MAX}).",
+            )
+            _submit_vk_clip_publish(page, category, batch_id)
+            _snap(page, batch_id)
 
     _snap(page, batch_id)
 
