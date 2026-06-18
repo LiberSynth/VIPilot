@@ -1,0 +1,124 @@
+{% macro product_evolution() %}
+<div class="cp-card" style="margin-top:12px" id="product-evolution-card">
+  <div class="cp-header" onclick="this.closest('.cp-card').classList.toggle('open')">
+    <div class="cp-header-left">
+      <span class="cp-title">Развитие продукта</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <button class="cycle-float-btn" title="Развернуть все" onclick="event.stopPropagation();productEvolutionExpandAll()"><svg viewBox="0 0 16 16"><polyline points="2,6 2,2 6,2"/><polyline points="10,2 14,2 14,6"/><polyline points="14,10 14,14 10,14"/><polyline points="6,14 2,14 2,10"/></svg></button>
+      <button class="cycle-float-btn" title="Свернуть все" onclick="event.stopPropagation();productEvolutionCollapseAll()"><svg viewBox="0 0 16 16"><polyline points="6,2 6,6 2,6"/><polyline points="10,2 10,6 14,6"/><polyline points="14,10 10,10 10,14"/><polyline points="2,10 6,10 6,14"/></svg></button>
+      <span class="cp-arrow">▾</span>
+    </div>
+  </div>
+  <div class="cp-body">
+
+    <div class="dev-sub">
+      <div class="dev-sub-header" onclick="this.parentElement.classList.toggle('open')">
+        <span class="dev-sub-title">2.0.0</span>
+        <span class="dev-sub-arrow">▾</span>
+      </div>
+      <div class="dev-sub-body">
+        <ol style="margin:0 0 0 18px;padding:0;font-size:13px;color:#c0c0d8;line-height:1.8">
+          <li>Унификация логирования на <code>write_log_entry</code>: канал в <code>log_entries.channel</code>, одна строка лога на батч.</li>
+          <li>Монитор: плоские блоки батчей, фиксированные заголовки по типам, счётчики записей, копирование info-блока и логов.</li>
+          <li>Монитор: подсветка цепочки связанных батчей пайплайна, время публикации в заголовках planning и publish.</li>
+          <li>Монитор: превью публикации на canvas через SSE; общий Chromium на все шаги publish в одном батче.</li>
+          <li>Флаг <code>movies.published</code> и фильтрация опубликованных роликов в Director.</li>
+          <li>Рефакторинг запуска: <code>runtime_bootstrap</code>, <code>start_application</code>, перенос shutdown hooks и single-instance lock из main.py.</li>
+          <li>Браузер авторизации: полноэкранный и «лупа» режимы; отдельные экземпляры PlatformBrowser для auth и pipeline.</li>
+          <li>Настраиваемое имя экземпляра приложения в settings и заголовке интерфейса.</li>
+          <li>Импорт резервных копий с прогрессом и backfill-миграциями данных upgrade.</li>
+          <li>горизонт планирования в минутах; publish привязан к ready planning, возврат роликов в пул при отмене цепочки.</li>
+          <li>Нормализация словаря статусов батчей; удалён статус cancelled и логика отмены слотов.</li>
+          <li>Pre-commit проверка неизменности размера main.py; AST-проверка запрета logging-обёрток.</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="dev-sub" style="margin-top:10px">
+      <div class="dev-sub-header" onclick="this.parentElement.classList.toggle('open')">
+        <span class="dev-sub-title">1.0.4</span>
+        <span class="dev-sub-arrow">▾</span>
+      </div>
+      <div class="dev-sub-body">
+        <ol style="margin:0 0 0 18px;padding:0;font-size:13px;color:#c0c0d8;line-height:1.8">
+          <li>Stage-batch workflow для story и movie generation с уточнённой машиной состояний movie-батчей.</li>
+          <li>Transcode и publish переведены на stage-batch модель со сканерами и схемной миграцией.</li>
+          <li>Planning batches: унифицированный pool-claim flow вместо разрозненной логики назначения видео.</li>
+          <li>Единая консоль прогресса генерации на панелях Producer с сохранением ошибок и footer завершения.</li>
+          <li>Удалены режимы approve_stories, approve_movies и use_donor; оставлен только approved-only pool flow.</li>
+          <li>Очистка migration registry: все DB migrations удалены из реестра upgrade.</li>
+          <li>Сводный файл conventions в корне репозитория; обновлена панель «Разработчику».</li>
+          <li>Усиление deploy-скриптов Windows против блокировок git pack-файлов.</li>
+          <li>Возобновление video pipeline после ошибки скачивания без повторной отправки провайдеру.</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="dev-sub" style="margin-top:10px">
+      <div class="dev-sub-header" onclick="this.parentElement.classList.toggle('open')">
+        <span class="dev-sub-title">1.0.3</span>
+        <span class="dev-sub-arrow">▾</span>
+      </div>
+      <div class="dev-sub-body">
+        <ol style="margin:0 0 0 18px;padding:0;font-size:13px;color:#c0c0d8;line-height:1.8">
+          <li>Миграция хранения видео: payload из BYTEA PostgreSQL в файлы на диске.</li>
+          <li>Publish и transcode переведены на выбор файлового источника; удалены legacy backup-video API.</li>
+          <li>Удалён режим эмуляции и legacy probe-потоки UI/API.</li>
+          <li>Экспорт и импорт резервных копий БД с прогресс-диалогом и выгрузкой видеофайлов.</li>
+          <li>Единый browser widget для Dzen, VK Video и Rutube: ручной старт авторизации, save/cancel сессии.</li>
+          <li>Управление активностью платформ публикации; восстановлен модуль Operator.</li>
+          <li>Клиентский поиск и фильтрация списков сценариев и роликов.</li>
+          <li>Автоустановка зависимостей при старте: ffmpeg, pg_repack, Playwright/Chromium.</li>
+          <li>Скрипты деплоя Windows в отдельной папке; build-only режим для номера сборки.</li>
+          <li>Блокировка входа после трёх неверных паролей.</li>
+          <li>Превью публикации в мониторе; continuous screenshots при upload/publish.</li>
+          <li>Restart батчей со статусом fatal_error; vacuum/defrag БД с pg_repack.</li>
+          <li>AccordionList для AI-моделей с 5-grade, drag-and-drop и inline-редактированием.</li>
+          <li>Lazy-load log_entries в мониторе; заголовок публикации в карточке батча.</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="dev-sub" style="margin-top:10px">
+      <div class="dev-sub-header" onclick="this.parentElement.classList.toggle('open')">
+        <span class="dev-sub-title">1.0.1</span>
+        <span class="dev-sub-arrow">▾</span>
+      </div>
+      <div class="dev-sub-body">
+        <ol style="margin:0 0 0 18px;padding:0;font-size:13px;color:#c0c0d8;line-height:1.8">
+          <li>Базовая архитектура VIPilot: Flask + сервисный слой + PostgreSQL, версия X.Y.Z.BUILD из git.</li>
+          <li>Модули ROOT, PRODUCTION (Screenwriter, Director), Monitor, Settings.</li>
+          <li>Цепочка пайплайнов planning → story → movie → transcode → publish с машиной состояний батчей.</li>
+          <li>Главный цикл: планировщик, диспетчеризация в потоки, pause/running, лимит max_batch_threads.</li>
+          <li>Генерация сценариев через LLM с retry по моделям и grade fallback; поле stories.title.</li>
+          <li>Генерация видео через внешние провайдеры с polling, скачиванием и post-prompt.</li>
+          <li>Публикация в VK (клипы, stories, wall) и VK Video через Playwright browser automation.</li>
+          <li>Публикация в Dzen: studio upload, captcha handling, publisher ID в target config JSONB.</li>
+          <li>Target-конфигурация платформ; составные статусы publish-батчей по slug.method.</li>
+          <li>Monitor: логи батчей, restart/retry, просмотр story/video в модалках, copy batch info.</li>
+          <li>Расписание слотов публикации; catchup-логика planning; partial/completed статусы.</li>
+          <li>Probe/test запросы к текстовым и видео моделям; экспорт сценариев и логов.</li>
+          <li>Donor mode; транскодирование с сохранением оригинала; DeepSeek как прямая платформа.</li>
+          <li>Миграции и seeding БД; connection pooling; экспорт таблиц; auth-тесты и rate limiting login.</li>
+          <li>Панели «О программе» и «Разработчику» с описанием архитектуры и главного цикла.</li>
+        </ol>
+      </div>
+    </div>
+
+  </div>
+</div>
+<script>
+function productEvolutionExpandAll() {
+  var card = document.getElementById('product-evolution-card');
+  if (!card) return;
+  card.classList.add('open');
+  card.querySelectorAll('.dev-sub').forEach(function(s) { s.classList.add('open'); });
+}
+function productEvolutionCollapseAll() {
+  var card = document.getElementById('product-evolution-card');
+  if (!card) return;
+  card.querySelectorAll('.dev-sub').forEach(function(s) { s.classList.remove('open'); });
+}
+</script>
+{% endmacro %}

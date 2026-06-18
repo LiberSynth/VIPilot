@@ -1,3 +1,4 @@
+{% from 'common/product_evolution.html' import product_evolution %}
 {% macro info_panel(caption, description, show_developer=False, app_version='') %}
 <div class="card" style="margin-top:12px">
   <div class="card-title">О программе</div>
@@ -23,6 +24,8 @@
     </div>
   </div>
 </div>
+
+{{ product_evolution() }}
 
 {% if show_developer %}
 <div class="cp-card" style="margin-top:12px" id="dev-info-card">
