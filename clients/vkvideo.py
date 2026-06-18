@@ -25,6 +25,7 @@ from routes.api import publication_file_name, hashtags
 
 _NAV_TIMEOUT = 60_000  # ms — таймаут одной попытки навигации (1 минута; до 5 попыток подряд)
 _UPLOAD_WAIT = 180_000  # ms — ожидание завершения загрузки (до 3 минут)
+_PUBLISH_WAIT = 300_000  # ms — готовность превью/кнопки и подтверждение (до 5 минут)
 
 class VkVideoSessionMissing(RuntimeError):
     """Браузерная сессия VK Видео не сохранена — требуется авторизация."""
@@ -254,7 +255,7 @@ def _vk_publish_button_clickable(pub_btn) -> bool:
     except Exception:
         return False
 
-def _wait_vk_clip_publish_ready(page, pub_btn, batch_id, category, timeout_ms=_UPLOAD_WAIT):
+def _wait_vk_clip_publish_ready(page, pub_btn, batch_id, category, timeout_ms=_PUBLISH_WAIT):
     """Ждёт появления превью и доступности кнопки «Опубликовать»."""
     from services.publish_auth_check import raise_if_login_required
 
@@ -527,7 +528,7 @@ def _publish_ui(
     write_log_entry(batch_id, category, "VK Видео: Жду кнопку «Опубликовать».")
     pub_btn = page.locator("button:has-text('Опубликовать')").last
     _snap(page, batch_id)
-    pub_btn.wait_for(state="visible", timeout=_UPLOAD_WAIT)
+    pub_btn.wait_for(state="visible", timeout=_PUBLISH_WAIT)
     _snap(page, batch_id)
     _wait_vk_clip_publish_ready(page, pub_btn, batch_id, category)
 
@@ -544,7 +545,7 @@ def _publish_ui(
     # ── Шаг 9: Проверяем успех (тост «Клип опубликован») ────────────────
     write_log_entry(batch_id, category, "VK Видео: Проверяю результат публикации.")
 
-    _deadline = _time.monotonic() + _UPLOAD_WAIT / 1000
+    _deadline = _time.monotonic() + _PUBLISH_WAIT / 1000
     _last_click_at = _time.monotonic()
     _success, _success_via = _check_vk_publish_result(page, after_submit=True)
     while _time.monotonic() < _deadline and not _success:
