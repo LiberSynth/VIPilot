@@ -167,15 +167,34 @@ _VK_PUBLISH_ERROR_TEXTS = (
     "Клип не опубликован",
 )
 
+_VK_PUBLISH_FORM_SELECTORS = (
+    "textarea[placeholder*='клип']",
+    "textarea[placeholder*='Клип']",
+    "[placeholder*='клип']",
+    "[contenteditable='true']",
+    "[role='textbox']",
+)
+
 def _vk_publish_form_visible(page) -> bool:
-    try:
-        return page.locator(
-            "textarea[placeholder*='клип'], "
-            "textarea[placeholder*='Клип'], "
-            "[placeholder*='клип']"
-        ).first.is_visible(timeout=300)
-    except Exception:
-        return False
+    for _sel in _VK_PUBLISH_FORM_SELECTORS:
+        try:
+            if page.locator(_sel).first.is_visible(timeout=200):
+                return True
+        except Exception:
+            continue
+    return False
+
+def _vk_publish_modal_visible(page) -> bool:
+    """Модалка «Публикация клипа» открыта (поле описания или заголовок модала)."""
+    if _vk_publish_form_visible(page):
+        return True
+    for _text in ("Публикация клипа", "Ссылка на клип", "Название файла"):
+        try:
+            if page.get_by_text(_text, exact=False).first.is_visible(timeout=200):
+                return True
+        except Exception:
+            continue
+    return False
 
 def _vk_publish_button_visible(page) -> bool:
     try:
@@ -184,8 +203,8 @@ def _vk_publish_button_visible(page) -> bool:
         return False
 
 def _vk_publish_confirmed_after_submit(page) -> bool:
-    """Признак успеха после клика «Опубликовать»: форма и кнопка submit исчезли."""
-    if _vk_publish_form_visible(page) or _vk_publish_button_visible(page):
+    """Признак успеха после клика «Опубликовать»: модалка и кнопка submit исчезли."""
+    if _vk_publish_modal_visible(page) or _vk_publish_button_visible(page):
         return False
     try:
         url = page.url.lower()
@@ -217,12 +236,12 @@ def _check_vk_publish_result(page, *, after_submit: bool = False) -> tuple[bool,
         return True, "URL/форма"
     return False, None
 
-def _click_vk_publish_button(pub_btn, page, category, batch_id) -> None:
+def _click_vk_publish_button(pub_btn, page, category, batch_id, *, force: bool = False) -> None:
     """Клик по «Опубликовать» без ожидания навигации после submit."""
     _last_err = None
     for _attempt in range(1, 4):
         try:
-            pub_btn.click(timeout=5_000, no_wait_after=True)
+            pub_btn.click(timeout=5_000, no_wait_after=True, force=force)
             return
         except Exception as _e:
             _last_err = _e
@@ -249,7 +268,9 @@ def _vk_publish_button_ready(pub_btn) -> bool:
     except Exception:
         return False
 
-def _submit_vk_clip_publish(page, category, batch_id, pub_btn=None) -> None:
+def _submit_vk_clip_publish(
+    page, category, batch_id, pub_btn=None, *, force_click: bool = False,
+) -> None:
     """Прокручивает к кнопке, ждёт enabled и нажимает «Опубликовать»."""
     if pub_btn is None:
         pub_btn = page.locator("button:has-text('Опубликовать')").last
@@ -263,7 +284,7 @@ def _submit_vk_clip_publish(page, category, batch_id, pub_btn=None) -> None:
         if _vk_publish_button_ready(pub_btn):
             break
         page.wait_for_timeout(400)
-    _click_vk_publish_button(pub_btn, page, category, batch_id)
+    _click_vk_publish_button(pub_btn, page, category, batch_id, force=force_click)
 
 def _wait_visible(locator, timeout_ms: int, page, batch_id, interval_ms: int = 2_000):
     """Ждёт видимости локатора, снимая скриншот каждые interval_ms мс.
@@ -453,7 +474,6 @@ def _publish_ui(
             break
         if (
             _publish_retries < _PUBLISH_RETRY_MAX
-            and _vk_publish_form_visible(page)
             and _vk_publish_button_visible(page)
             and _time.monotonic() - _last_retry_at >= _RETRY_INTERVAL
         ):
@@ -461,10 +481,10 @@ def _publish_ui(
             _last_retry_at = _time.monotonic()
             write_log_entry(
                 batch_id, category,
-                "VK Видео: Форма всё ещё открыта — повторный клик "
-                f"«Опубликовать» ({_publish_retries}/{_PUBLISH_RETRY_MAX}).",
+                "VK Видео: Кнопка «Опубликовать» всё ещё видна — повторный клик "
+                f"({_publish_retries}/{_PUBLISH_RETRY_MAX}).",
             )
-            _submit_vk_clip_publish(page, category, batch_id)
+            _submit_vk_clip_publish(page, category, batch_id, force_click=True)
             _snap(page, batch_id)
 
     _snap(page, batch_id)
@@ -481,12 +501,15 @@ def _publish_ui(
             "вероятно, сессия устарела или изменился интерфейс"
         )
     else:
+        _form_vis = _vk_publish_form_visible(page)
+        _modal_vis = _vk_publish_modal_visible(page)
+        _btn_vis = _vk_publish_button_visible(page)
         write_log_entry(
             batch_id, category,
-            "VK Видео: Публикация не подтверждена после клика «Опубликовать».",
+            "VK Видео: Публикация не подтверждена после клика «Опубликовать». "
+            f"URL={page.url}, form={_form_vis}, modal={_modal_vis}, button={_btn_vis}",
             level="warn",
         )
-        write_log_entry(batch_id, category, f"URL: {page.url}", level="silent")
         raise VkVideoApiError(
             "VK Видео: публикация не подтверждена после клика «Опубликовать»"
         )
