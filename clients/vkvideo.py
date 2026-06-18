@@ -202,6 +202,94 @@ def _vk_publish_button_visible(page) -> bool:
     except Exception:
         return False
 
+_VK_PREVIEW_IMG_SELECTORS = (
+    "img[src*='userapi']",
+    "img[src*='vkuserphoto']",
+    "img[src*='mycdn']",
+    "img[src*='okcdn']",
+    "img[src^='blob:']",
+)
+
+def _vk_clip_preview_ready(page) -> bool:
+    """Превью клипа обработано: в панели есть кадр видео или обложка."""
+    try:
+        vid = page.locator("video").first
+        if vid.is_visible(timeout=200):
+            if vid.evaluate(
+                "el => el.readyState >= 2 || !!(el.poster && el.poster.length)"
+            ):
+                return True
+    except Exception:
+        pass
+    for _sel in _VK_PREVIEW_IMG_SELECTORS:
+        try:
+            imgs = page.locator(_sel)
+            for _i in range(min(imgs.count(), 8)):
+                img = imgs.nth(_i)
+                if not img.is_visible(timeout=100):
+                    continue
+                box = img.bounding_box()
+                if box and box.get("width", 0) >= 48 and box.get("height", 0) >= 48:
+                    return True
+        except Exception:
+            continue
+    return False
+
+def _vk_publish_button_clickable(pub_btn) -> bool:
+    """Кнопка «Опубликовать» реально доступна (не серая/disabled)."""
+    try:
+        if not pub_btn.is_visible(timeout=300):
+            return False
+        return pub_btn.evaluate("""el => {
+            if (el.disabled) return false;
+            if (el.getAttribute('aria-disabled') === 'true') return false;
+            const st = window.getComputedStyle(el);
+            if (st.pointerEvents === 'none') return false;
+            if (parseFloat(st.opacity) < 0.55) return false;
+            if (st.visibility === 'hidden' || st.display === 'none') return false;
+            const r = el.getBoundingClientRect();
+            if (r.width < 8 || r.height < 8) return false;
+            return true;
+        }""")
+    except Exception:
+        return False
+
+def _wait_vk_clip_publish_ready(page, pub_btn, batch_id, category, timeout_ms=_UPLOAD_WAIT):
+    """Ждёт появления превью и доступности кнопки «Опубликовать»."""
+    from services.publish_auth_check import raise_if_login_required
+
+    write_log_entry(
+        batch_id, category,
+        "VK Видео: Жду обработку видео и готовность кнопки «Опубликовать».",
+    )
+    deadline = _time.monotonic() + timeout_ms / 1000
+    _logged_preview = False
+    _next_snap = _time.monotonic()
+    while _time.monotonic() < deadline:
+        raise_if_login_required(page, "vkvideo")
+        preview = _vk_clip_preview_ready(page)
+        clickable = _vk_publish_button_clickable(pub_btn)
+        if preview and clickable:
+            write_log_entry(
+                batch_id, category,
+                "VK Видео: Превью готово, кнопка «Опубликовать» доступна.",
+            )
+            return
+        if preview and not _logged_preview:
+            write_log_entry(
+                batch_id, category,
+                "VK Видео: Превью клипа появилось, жду доступности кнопки.",
+            )
+            _logged_preview = True
+        if _time.monotonic() >= _next_snap:
+            _snap(page, batch_id)
+            _next_snap = _time.monotonic() + 2
+        page.wait_for_timeout(500)
+    raise VkVideoApiError(
+        "VK Видео: таймаут ожидания готовности к публикации "
+        "(превью или кнопка «Опубликовать»)"
+    )
+
 def _vk_publish_confirmed_after_submit(page) -> bool:
     """Признак успеха после клика «Опубликовать»: модалка и кнопка submit исчезли."""
     if _vk_publish_modal_visible(page) or _vk_publish_button_visible(page):
@@ -236,20 +324,25 @@ def _check_vk_publish_result(page, *, after_submit: bool = False) -> tuple[bool,
         return True, "URL/форма"
     return False, None
 
-def _click_vk_publish_button(pub_btn, page, category, batch_id, *, force: bool = False) -> None:
-    """Клик по «Опубликовать» без ожидания навигации после submit."""
+def _click_vk_publish_button(pub_btn, page, category, batch_id) -> None:
+    """Клик по доступной кнопке «Опубликовать» без ожидания навигации после submit."""
+    if not _vk_publish_button_clickable(pub_btn):
+        raise VkVideoApiError(
+            "VK Видео: кнопка «Опубликовать» недоступна — клик пропущен"
+        )
     _last_err = None
     for _attempt in range(1, 4):
         try:
-            pub_btn.click(timeout=5_000, no_wait_after=True, force=force)
+            pub_btn.click(timeout=5_000, no_wait_after=True)
             return
         except Exception as _e:
             _last_err = _e
-            try:
-                pub_btn.evaluate("el => el.click()")
-                return
-            except Exception as _js_e:
-                _last_err = _js_e
+            if _vk_publish_button_clickable(pub_btn):
+                try:
+                    pub_btn.evaluate("el => el.click()")
+                    return
+                except Exception as _js_e:
+                    _last_err = _js_e
             write_log_entry(
                 batch_id, category,
                 f"VK Видео: Клик «Опубликовать» не прошёл (попытка {_attempt}/3).",
@@ -260,18 +353,8 @@ def _click_vk_publish_button(pub_btn, page, category, batch_id, *, force: bool =
         f"Не удалось нажать «Опубликовать» в VK Видео: {_last_err}"
     ) from _last_err
 
-def _vk_publish_button_ready(pub_btn) -> bool:
-    try:
-        if not pub_btn.is_visible(timeout=300):
-            return False
-        return not pub_btn.is_disabled(timeout=300)
-    except Exception:
-        return False
-
-def _submit_vk_clip_publish(
-    page, category, batch_id, pub_btn=None, *, force_click: bool = False,
-) -> None:
-    """Прокручивает к кнопке, ждёт enabled и нажимает «Опубликовать»."""
+def _submit_vk_clip_publish(page, category, batch_id, pub_btn=None) -> None:
+    """Прокручивает к доступной кнопке и нажимает «Опубликовать»."""
     if pub_btn is None:
         pub_btn = page.locator("button:has-text('Опубликовать')").last
     try:
@@ -279,12 +362,11 @@ def _submit_vk_clip_publish(
     except Exception:
         pass
     page.wait_for_timeout(300)
-    _ready_deadline = _time.monotonic() + 8
-    while _time.monotonic() < _ready_deadline:
-        if _vk_publish_button_ready(pub_btn):
-            break
-        page.wait_for_timeout(400)
-    _click_vk_publish_button(pub_btn, page, category, batch_id, force=force_click)
+    if not _vk_publish_button_clickable(pub_btn):
+        raise VkVideoApiError(
+            "VK Видео: кнопка «Опубликовать» недоступна перед кликом"
+        )
+    _click_vk_publish_button(pub_btn, page, category, batch_id)
 
 def _wait_visible(locator, timeout_ms: int, page, batch_id, interval_ms: int = 2_000):
     """Ждёт видимости локатора, снимая скриншот каждые interval_ms мс.
@@ -441,12 +523,13 @@ def _publish_ui(
         write_log_entry(batch_id, category, "VK Видео: Не удалось заполнить описание — продолжаю.")
         write_log_entry(batch_id, category, f"Ошибка описания: {_e}", level="silent")
 
-    # ── Шаг 7: Ждём кнопку «Опубликовать» ─────────────────────────────────
+    # ── Шаг 7: Ждём кнопку и готовность превью ───────────────────────────
     write_log_entry(batch_id, category, "VK Видео: Жду кнопку «Опубликовать».")
     pub_btn = page.locator("button:has-text('Опубликовать')").last
     _snap(page, batch_id)
     pub_btn.wait_for(state="visible", timeout=_UPLOAD_WAIT)
     _snap(page, batch_id)
+    _wait_vk_clip_publish_ready(page, pub_btn, batch_id, category)
 
     # ── Шаг 8: Нажимаем «Опубликовать» ───────────────────────────────────
     # Кнопка внизу модалки — часто за пределами viewport; без прокрутки
@@ -475,16 +558,20 @@ def _publish_ui(
         if (
             _publish_retries < _PUBLISH_RETRY_MAX
             and _vk_publish_button_visible(page)
+            and _vk_clip_preview_ready(page)
+            and _vk_publish_button_clickable(
+                page.locator("button:has-text('Опубликовать')").last
+            )
             and _time.monotonic() - _last_retry_at >= _RETRY_INTERVAL
         ):
             _publish_retries += 1
             _last_retry_at = _time.monotonic()
             write_log_entry(
                 batch_id, category,
-                "VK Видео: Кнопка «Опубликовать» всё ещё видна — повторный клик "
+                "VK Видео: Кнопка «Опубликовать» доступна — повторный клик "
                 f"({_publish_retries}/{_PUBLISH_RETRY_MAX}).",
             )
-            _submit_vk_clip_publish(page, category, batch_id, force_click=True)
+            _submit_vk_clip_publish(page, category, batch_id)
             _snap(page, batch_id)
 
     _snap(page, batch_id)
@@ -504,10 +591,17 @@ def _publish_ui(
         _form_vis = _vk_publish_form_visible(page)
         _modal_vis = _vk_publish_modal_visible(page)
         _btn_vis = _vk_publish_button_visible(page)
+        _preview_vis = _vk_clip_preview_ready(page)
+        _btn_clickable = False
+        if _btn_vis:
+            _btn_clickable = _vk_publish_button_clickable(
+                page.locator("button:has-text('Опубликовать')").last
+            )
         write_log_entry(
             batch_id, category,
             "VK Видео: Публикация не подтверждена после клика «Опубликовать». "
-            f"URL={page.url}, form={_form_vis}, modal={_modal_vis}, button={_btn_vis}",
+            f"URL={page.url}, form={_form_vis}, modal={_modal_vis}, "
+            f"preview={_preview_vis}, button={_btn_vis}, clickable={_btn_clickable}",
             level="warn",
         )
         raise VkVideoApiError(
