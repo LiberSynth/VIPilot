@@ -37,7 +37,7 @@ def main_loop():
             environment.refresh_environment()
             planning.tick()
             db_create_transcode_batches()
-            db_create_publish_batches()
+            db_create_publish_batches(environment.loop_interval)
 
             if environment.get_active_threads() < environment.max_threads:
                 batches = db_get_actionable_batches()

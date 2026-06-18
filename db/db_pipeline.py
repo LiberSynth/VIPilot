@@ -246,7 +246,7 @@ def db_create_transcode_batches() -> list[str]:
         conn.commit()
     return [str(row[0]) for row in rows]
 
-def db_create_publish_batches() -> list[str]:
+def db_create_publish_batches(lead_seconds: int = 0) -> list[str]:
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -266,7 +266,7 @@ def db_create_publish_batches() -> list[str]:
                   AND tc.status NOT IN ('pending', 'processing')
                   AND (
                       pl.scheduled_at IS NULL
-                      OR pl.scheduled_at <= clock_timestamp()
+                      OR pl.scheduled_at <= clock_timestamp() + make_interval(secs => %s)
                   )
                   AND NOT EXISTS (
                       SELECT 1
@@ -275,7 +275,8 @@ def db_create_publish_batches() -> list[str]:
                         AND pb.batch_id_source = tc.id
                   )
                 RETURNING id::text
-                """
+                """,
+                (lead_seconds,),
             )
             rows = [str(r[0]) for r in cur.fetchall()]
 

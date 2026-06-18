@@ -113,7 +113,7 @@
             <li><strong>story</strong>, <code>pending</code> → <code>processing</code> → <code>ready</code> → <code>story.py</code>: генерация текстового сценария через LLM.</li>
             <li><strong>movie</strong>, <code>pending</code> → <code>processing</code> → <code>processed</code> → <code>ready</code> → <code>video.py</code>: отправка сценария провайдеру (fal.ai и др.), опрос задачи, скачивание и сохранение видео.</li>
             <li><strong>transcode</strong>, <code>pending</code> → <code>processing</code> → <code>ready</code> → <code>transcode.py</code>: перекодирование через ffmpeg. Если транскодирование отключено — батч сразу переводится в <code>ready</code>.</li>
-            <li><strong>publish</strong>, <code>pending</code> → <code>{slug}.{method}.pending</code> / <code>{slug}.{method}.completed</code> → <code>completed</code> или <code>partially</code> → <code>publish.py</code>: публикация в настроенные каналы (ВКонтакте, Дзен). Дожидается наступления <code>scheduled_at</code>, если время ещё не пришло.</li>
+            <li><strong>publish</strong>, <code>pending</code> → <code>{slug}.{method}.pending</code> / <code>{slug}.{method}.completed</code> → <code>completed</code> или <code>partially</code> → <code>publish.py</code>: публикация в настроенные каналы (ВКонтакте, Дзен). Батч создаётся, когда <code>scheduled_at ≤ now + loop_interval</code> (упреждение на один тик цикла).</li>
           </ol>
 
           <p style="margin:0 0 12px"><strong style="color:#e0e0f0">Захват батча и защита от дублирования</strong><br>
