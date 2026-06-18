@@ -544,34 +544,22 @@ def _publish_ui(
     # ── Шаг 9: Проверяем успех (тост «Клип опубликован») ────────────────
     write_log_entry(batch_id, category, "VK Видео: Проверяю результат публикации.")
 
-    _deadline = _time.monotonic() + 60
-    _publish_retries = 0
-    _PUBLISH_RETRY_MAX = 3
-    _RETRY_INTERVAL = 15
-    _last_retry_at = _time.monotonic()
+    _deadline = _time.monotonic() + _UPLOAD_WAIT / 1000
+    _last_click_at = _time.monotonic()
     _success, _success_via = _check_vk_publish_result(page, after_submit=True)
     while _time.monotonic() < _deadline and not _success:
-        page.wait_for_timeout(400)
+        page.wait_for_timeout(1_000)
         _success, _success_via = _check_vk_publish_result(page, after_submit=True)
         if _success:
             break
+        _pub_btn = page.locator("button:has-text('Опубликовать')").last
         if (
-            _publish_retries < _PUBLISH_RETRY_MAX
-            and _vk_publish_button_visible(page)
-            and _vk_clip_preview_ready(page)
-            and _vk_publish_button_clickable(
-                page.locator("button:has-text('Опубликовать')").last
-            )
-            and _time.monotonic() - _last_retry_at >= _RETRY_INTERVAL
+            _vk_clip_preview_ready(page)
+            and _vk_publish_button_clickable(_pub_btn)
+            and _time.monotonic() - _last_click_at >= 1.0
         ):
-            _publish_retries += 1
-            _last_retry_at = _time.monotonic()
-            write_log_entry(
-                batch_id, category,
-                "VK Видео: Кнопка «Опубликовать» доступна — повторный клик "
-                f"({_publish_retries}/{_PUBLISH_RETRY_MAX}).",
-            )
-            _submit_vk_clip_publish(page, category, batch_id)
+            _last_click_at = _time.monotonic()
+            _submit_vk_clip_publish(page, category, batch_id, _pub_btn)
             _snap(page, batch_id)
 
     _snap(page, batch_id)
