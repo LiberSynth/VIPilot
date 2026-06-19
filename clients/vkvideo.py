@@ -236,6 +236,12 @@ def _vk_clip_preview_ready(page) -> bool:
             continue
     return False
 
+def _scroll_vk_publish_button(pub_btn) -> None:
+    try:
+        pub_btn.scroll_into_view_if_needed(timeout=3_000)
+    except Exception:
+        pass
+
 def _vk_publish_button_clickable(pub_btn) -> bool:
     """Кнопка «Опубликовать» реально доступна (не серая/disabled)."""
     try:
@@ -256,39 +262,27 @@ def _vk_publish_button_clickable(pub_btn) -> bool:
         return False
 
 def _wait_vk_clip_publish_ready(page, pub_btn, batch_id, category, timeout_ms=_PUBLISH_WAIT):
-    """Ждёт появления превью и доступности кнопки «Опубликовать»."""
+    """Ждёт, пока кнопка «Опубликовать» станет доступной (enabled)."""
     from services.publish_auth_check import raise_if_login_required
 
     write_log_entry(
         batch_id, category,
-        "VK Видео: Жду обработку видео и готовность кнопки «Опубликовать».",
+        "VK Видео: Жду доступности кнопки «Опубликовать» (обработка видео).",
     )
     deadline = _time.monotonic() + timeout_ms / 1000
-    _logged_preview = False
     _next_snap = _time.monotonic()
     while _time.monotonic() < deadline:
         raise_if_login_required(page, "vkvideo")
-        preview = _vk_clip_preview_ready(page)
-        clickable = _vk_publish_button_clickable(pub_btn)
-        if preview and clickable:
-            write_log_entry(
-                batch_id, category,
-                "VK Видео: Превью готово, кнопка «Опубликовать» доступна.",
-            )
+        _scroll_vk_publish_button(pub_btn)
+        if _vk_publish_button_clickable(pub_btn):
+            write_log_entry(batch_id, category, "VK Видео: Кнопка «Опубликовать» доступна.")
             return
-        if preview and not _logged_preview:
-            write_log_entry(
-                batch_id, category,
-                "VK Видео: Превью клипа появилось, жду доступности кнопки.",
-            )
-            _logged_preview = True
         if _time.monotonic() >= _next_snap:
             _snap(page, batch_id)
             _next_snap = _time.monotonic() + 2
-        page.wait_for_timeout(500)
+        page.wait_for_timeout(1_000)
     raise VkVideoApiError(
-        "VK Видео: таймаут ожидания готовности к публикации "
-        "(превью или кнопка «Опубликовать»)"
+        "VK Видео: таймаут ожидания доступности кнопки «Опубликовать»"
     )
 
 def _vk_publish_confirmed_after_submit(page) -> bool:
@@ -358,10 +352,7 @@ def _submit_vk_clip_publish(page, category, batch_id, pub_btn=None) -> None:
     """Прокручивает к доступной кнопке и нажимает «Опубликовать»."""
     if pub_btn is None:
         pub_btn = page.locator("button:has-text('Опубликовать')").last
-    try:
-        pub_btn.scroll_into_view_if_needed(timeout=3_000)
-    except Exception:
-        pass
+    _scroll_vk_publish_button(pub_btn)
     page.wait_for_timeout(300)
     if not _vk_publish_button_clickable(pub_btn):
         raise VkVideoApiError(
@@ -554,9 +545,9 @@ def _publish_ui(
         if _success:
             break
         _pub_btn = page.locator("button:has-text('Опубликовать')").last
+        _scroll_vk_publish_button(_pub_btn)
         if (
-            _vk_clip_preview_ready(page)
-            and _vk_publish_button_clickable(_pub_btn)
+            _vk_publish_button_clickable(_pub_btn)
             and _time.monotonic() - _last_click_at >= 1.0
         ):
             _last_click_at = _time.monotonic()
