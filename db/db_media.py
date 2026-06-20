@@ -183,6 +183,16 @@ def db_get_batch_video_data(batch_id) -> bytes | None:
     video_data, _source = db_get_batch_video_data_with_source(batch_id)
     return video_data
 
+def _resolve_movie_video_path(movie_id: str) -> Path | None:
+    movie_id = str(movie_id)
+    transcoded_path = _video_file_path(movie_id, _TRANSCODED_FIELD)
+    if transcoded_path.exists():
+        return transcoded_path
+    raw_path = _video_file_path(movie_id, _RAW_FIELD)
+    if raw_path.exists():
+        return raw_path
+    return None
+
 def db_get_movie_video_data(movie_id) -> bytes | None:
     """Возвращает видеоданные ролика по id.
     Предпочитает transcoded_data; при отсутствии возвращает raw_data.
@@ -196,11 +206,36 @@ def db_get_movie_video_data(movie_id) -> bytes | None:
             row = cur.fetchone()
     if not row:
         return None
-    movie_id = str(row[0])
-    transcoded = _read_video_file_or_none(movie_id, _TRANSCODED_FIELD)
-    if transcoded is not None:
-        return transcoded
-    return _read_video_file_or_none(movie_id, _RAW_FIELD)
+    path = _resolve_movie_video_path(str(row[0]))
+    if path is None:
+        return None
+    return path.read_bytes()
+
+def db_get_movie_video_path(movie_id) -> Path | None:
+    """Путь к mp4 ролика (transcoded_data, иначе raw_data)."""
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id::text FROM movies WHERE id = %s",
+                (movie_id,),
+            )
+            row = cur.fetchone()
+    if not row:
+        return None
+    return _resolve_movie_video_path(str(row[0]))
+
+def db_get_batch_video_path(batch_id) -> Path | None:
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT m.id::text FROM batches b
+                JOIN movies m ON m.id = b.movie_id
+                WHERE b.id = %s
+            """, (batch_id,))
+            row = cur.fetchone()
+    if not row:
+        return None
+    return _resolve_movie_video_path(str(row[0]))
 
 def db_create_manual_movie(title: str, video_data: bytes) -> str:
     """Создаёт сюжет, батч movie (ready) и ролик из файла в одной транзакции.

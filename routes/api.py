@@ -24,8 +24,8 @@ from db import (
     db_create_planning_batch,
     db_reset_batch_pipeline,
     db_get_story_export_data,
-    db_get_batch_video_data,
-    db_get_movie_video_data,
+    db_get_batch_video_path,
+    db_get_movie_video_path,
     db_create_video_batch,
     db_create_story_batch,
     db_get_video_model_by_id,
@@ -249,30 +249,15 @@ def client_is_configured(slug: str, cfg: dict = None, target_id: str = None) -> 
         return bool(os.environ.get("FAL_API_KEY", ""))
     return False
 
-def _build_video_response(data: bytes) -> Response:
-    """Формирует ответ для видео с поддержкой HTTP Range-запросов."""
-    total = len(data)
-    range_header = request.headers.get("Range")
-    if range_header:
-        try:
-            ranges = range_header.strip().replace("bytes=", "").split("-")
-            start = int(ranges[0])
-            end = int(ranges[1]) if ranges[1] else total - 1
-        except (IndexError, ValueError):
-            start, end = 0, total - 1
-        end = min(end, total - 1)
-        chunk = data[start : end + 1]
-        resp = Response(
-            chunk, status=206, mimetype="video/mp4", direct_passthrough=True
-        )
-        resp.headers["Content-Range"] = f"bytes {start}-{end}/{total}"
-        resp.headers["Accept-Ranges"] = "bytes"
-        resp.headers["Content-Length"] = str(len(chunk))
-    else:
-        resp = Response(data, status=200, mimetype="video/mp4")
-        resp.headers["Accept-Ranges"] = "bytes"
-        resp.headers["Content-Length"] = str(total)
-    resp.headers["Cache-Control"] = "no-store"
+def _send_video_file(path) -> Response:
+    """Отдаёт mp4 с диска: ETag, условные запросы, кэш на час."""
+    resp = send_file(
+        path,
+        mimetype="video/mp4",
+        conditional=True,
+        max_age=3600,
+    )
+    resp.headers["Cache-Control"] = "private, max-age=3600"
     return resp
 
 @bp.route("/time")
@@ -700,10 +685,10 @@ def api_workflow_restart():
 def api_get_batch_video(batch_id):
     if not is_authenticated():
         return Response("Unauthorized", status=401)
-    data = db_get_batch_video_data(batch_id)
-    if data is None:
+    path = db_get_batch_video_path(batch_id)
+    if path is None:
         return Response("Not found", status=404)
-    return _build_video_response(bytes(data))
+    return _send_video_file(path)
 
 @bp.route("/story/<story_id>", methods=["GET"])
 def api_get_story(story_id):
@@ -988,10 +973,10 @@ def api_production_movie_video(movie_id):
     err = _production_auth_check()
     if err:
         return err
-    data = db_get_movie_video_data(movie_id)
-    if data is None:
+    path = db_get_movie_video_path(movie_id)
+    if path is None:
         return Response("Not found", status=404)
-    return _build_video_response(bytes(data))
+    return _send_video_file(path)
 
 @production_bp.route("/production/movie/<movie_id>/grade", methods=["POST"])
 def api_production_movie_grade(movie_id):

@@ -74,6 +74,8 @@ from .db_media import (
     db_get_batch_video_data_with_source,
     db_get_batch_video_data,
     db_get_movie_video_data,
+    db_get_movie_video_path,
+    db_get_batch_video_path,
     db_create_manual_movie,
 )
 from .db_ui import (

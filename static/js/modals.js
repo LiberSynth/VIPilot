@@ -1,14 +1,27 @@
 (function() {
-  function revokeBlobUrl(url) {
-    if (url) URL.revokeObjectURL(url);
+  var _videoBlobCache = Object.create(null);
+
+  function renderVideo(container, blobUrl, options) {
+    var attrs = ['<video'];
+    if (options.videoClass) attrs.push(' class="' + options.videoClass + '"');
+    if (options.controls !== false) attrs.push(' controls');
+    if (options.autoplay) attrs.push(' autoplay');
+    attrs.push(' src="' + blobUrl + '"></video>');
+    container.innerHTML = attrs.join('');
   }
 
   function loadVideoIntoContainer(container, url, options) {
     if (!container) return;
     options = options || {};
-    if (typeof options.revokeBlobUrl === 'function') options.revokeBlobUrl();
-    container.innerHTML = options.loadingHtml || '<span class="story-modal-loading">Загрузка…</span>';
+    var cacheKey = options.cacheKey || url;
     var loadToken = options.loadToken;
+    var cachedUrl = _videoBlobCache[cacheKey];
+    if (cachedUrl) {
+      renderVideo(container, cachedUrl, options);
+      if (typeof options.setBlobUrl === 'function') options.setBlobUrl(cachedUrl);
+      return;
+    }
+    container.innerHTML = options.loadingHtml || '<span class="story-modal-loading">Загрузка…</span>';
     fetch(url)
       .then(function(r) {
         if (!r.ok) throw new Error(String(r.status));
@@ -17,13 +30,9 @@
       .then(function(blob) {
         if (loadToken && loadToken.cancelled) return;
         var blobUrl = URL.createObjectURL(blob);
+        _videoBlobCache[cacheKey] = blobUrl;
         if (typeof options.setBlobUrl === 'function') options.setBlobUrl(blobUrl);
-        var attrs = ['<video'];
-        if (options.videoClass) attrs.push(' class="' + options.videoClass + '"');
-        if (options.controls !== false) attrs.push(' controls');
-        if (options.autoplay) attrs.push(' autoplay');
-        attrs.push(' src="' + blobUrl + '"></video>');
-        container.innerHTML = attrs.join('');
+        renderVideo(container, blobUrl, options);
       })
       .catch(function() {
         if (loadToken && loadToken.cancelled) return;
@@ -42,7 +51,6 @@
       var existing = document.getElementById(this.overlayId());
       if (existing) existing.remove();
 
-      this._blobUrl = null;
       this._loadToken = { cancelled: false };
       this._el = document.createElement('div');
       this._el.id        = this.overlayId();
@@ -69,10 +77,9 @@
         body,
         '/api/batch/' + encodeURIComponent(batchId) + '/video',
         {
+          cacheKey: 'batch:' + batchId,
           loadToken: this._loadToken,
           autoplay: true,
-          revokeBlobUrl: function() { self._revokeBlobUrl(); },
-          setBlobUrl: function(url) { self._blobUrl = url; },
         }
       );
 
@@ -90,14 +97,8 @@
 
     closeInner() {
       if (this._loadToken) this._loadToken.cancelled = true;
-      this._revokeBlobUrl();
       document.body.style.overflow = '';
       this._removeEl();
-    }
-
-    _revokeBlobUrl() {
-      revokeBlobUrl(this._blobUrl);
-      this._blobUrl = null;
     }
   }
 
