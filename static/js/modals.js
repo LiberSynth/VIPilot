@@ -1,4 +1,38 @@
 (function() {
+  function revokeBlobUrl(url) {
+    if (url) URL.revokeObjectURL(url);
+  }
+
+  function loadVideoIntoContainer(container, url, options) {
+    if (!container) return;
+    options = options || {};
+    if (typeof options.revokeBlobUrl === 'function') options.revokeBlobUrl();
+    container.innerHTML = options.loadingHtml || '<span class="story-modal-loading">Загрузка…</span>';
+    var loadToken = options.loadToken;
+    fetch(url)
+      .then(function(r) {
+        if (!r.ok) throw new Error(String(r.status));
+        return r.blob();
+      })
+      .then(function(blob) {
+        if (loadToken && loadToken.cancelled) return;
+        var blobUrl = URL.createObjectURL(blob);
+        if (typeof options.setBlobUrl === 'function') options.setBlobUrl(blobUrl);
+        var attrs = ['<video'];
+        if (options.videoClass) attrs.push(' class="' + options.videoClass + '"');
+        if (options.controls !== false) attrs.push(' controls');
+        if (options.autoplay) attrs.push(' autoplay');
+        attrs.push(' src="' + blobUrl + '"></video>');
+        container.innerHTML = attrs.join('');
+      })
+      .catch(function() {
+        if (loadToken && loadToken.cancelled) return;
+        container.innerHTML = options.errorHtml || '<span class="story-modal-loading">Ошибка загрузки видео</span>';
+      });
+  }
+
+  window.loadVideoIntoContainer = loadVideoIntoContainer;
+
   // ── VideoModal ─────────────────────────────────────────────────────────────
   class VideoModal extends Dialog {
     overlayClass() { return 'video-modal-overlay'; }
@@ -8,6 +42,8 @@
       var existing = document.getElementById(this.overlayId());
       if (existing) existing.remove();
 
+      this._blobUrl = null;
+      this._loadToken = { cancelled: false };
       this._el = document.createElement('div');
       this._el.id        = this.overlayId();
       this._el.className = this.overlayClass() + ' open';
@@ -28,9 +64,18 @@
       if (!body) return this;
       document.body.style.overflow = 'hidden';
       history.pushState({ modal: 'video' }, '');
-      body.innerHTML = '<video controls autoplay src="/api/batch/' + encodeURIComponent(batchId) + '/video"></video>';
-
       var self = this;
+      loadVideoIntoContainer(
+        body,
+        '/api/batch/' + encodeURIComponent(batchId) + '/video',
+        {
+          loadToken: this._loadToken,
+          autoplay: true,
+          revokeBlobUrl: function() { self._revokeBlobUrl(); },
+          setBlobUrl: function(url) { self._blobUrl = url; },
+        }
+      );
+
       this._el.addEventListener('click', function(e) {
         if (e.target === self._el) self.close();
       });
@@ -44,8 +89,15 @@
     }
 
     closeInner() {
+      if (this._loadToken) this._loadToken.cancelled = true;
+      this._revokeBlobUrl();
       document.body.style.overflow = '';
       this._removeEl();
+    }
+
+    _revokeBlobUrl() {
+      revokeBlobUrl(this._blobUrl);
+      this._blobUrl = null;
     }
   }
 

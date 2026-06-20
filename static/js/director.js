@@ -52,17 +52,36 @@
   window._getMovieFilterParams = getFilterParams;
 
   /* ── плеер ── */
+  var _playerBlobUrl = null;
+  var _playerLoadToken = { cancelled: false };
+
+  function _revokePlayerBlobUrl() {
+    if (_playerBlobUrl) {
+      URL.revokeObjectURL(_playerBlobUrl);
+      _playerBlobUrl = null;
+    }
+  }
+
   function loadMovieInPlayer(movieId, forceNoAutoplay) {
     var wrap = document.getElementById('director-video-wrap');
     if (!wrap) return;
+    _playerLoadToken.cancelled = true;
+    _playerLoadToken = { cancelled: false };
+    var loadToken = _playerLoadToken;
+    _revokePlayerBlobUrl();
     if (!movieId) {
       wrap.innerHTML = '<video class="movie-video" controls></video>';
       return;
     }
     var src = '/production/movie/' + encodeURIComponent(movieId) + '/video';
     var autoplayChk = document.getElementById('director-autoplay-check');
-    var autoplayAttr = (!forceNoAutoplay && autoplayChk && autoplayChk.checked) ? ' autoplay' : '';
-    wrap.innerHTML = '<video class="movie-video" controls' + autoplayAttr + ' src="' + src + '"></video>';
+    var autoplay = !forceNoAutoplay && autoplayChk && autoplayChk.checked;
+    window.loadVideoIntoContainer(wrap, src, {
+      loadToken: loadToken,
+      videoClass: 'movie-video',
+      autoplay: autoplay,
+      setBlobUrl: function(url) { _playerBlobUrl = url; },
+    });
   }
 
   /* ── кнопки роликов ── */
@@ -132,8 +151,10 @@
     },
     onCollapse: function() {
       _expandedMovieId = null;
+      _playerLoadToken.cancelled = true;
       var wrap = document.getElementById('director-video-wrap');
       if (wrap) { var vid = wrap.querySelector('video'); if (vid) vid.pause(); }
+      _revokePlayerBlobUrl();
     },
     canAddNew: false,
     emptyHtml: '<div class="stories-empty">Нет видео</div>',
