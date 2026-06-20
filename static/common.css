@@ -81,6 +81,36 @@
   }
   .header-nav-btn svg { width: 16px; height: 16px; }
 
+  @media (max-width: 640px) {
+    .header-top {
+      flex-wrap: wrap;
+      row-gap: 2px;
+    }
+    .header-left {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+    .header-left h1 {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
+    }
+    .header-right {
+      flex-shrink: 0;
+    }
+    .header-app-instance {
+      position: static;
+      transform: none;
+      order: 2;
+      flex: 1 1 100%;
+      max-width: none;
+      text-align: center;
+      font-size: 12px;
+      line-height: 1.2;
+      padding-bottom: 2px;
+    }
+  }
+
   .hamburger {
     display: flex; flex-direction: column; justify-content: center;
     align-items: center; gap: 5px;
