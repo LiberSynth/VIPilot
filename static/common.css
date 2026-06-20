@@ -594,10 +594,14 @@
   .monitor-batch.open .monitor-hdr-actions,
   .monitor-sysgroup.open .monitor-hdr-actions { display: flex; }
 
+  .monitor-header-tools {
+    display: flex; align-items: center; gap: 4px; flex-shrink: 0;
+  }
+
   .monitor-hdr-actions-always {
     display: flex; flex-wrap: wrap; gap: 4px; align-items: center;
-    justify-content: flex-end; padding: 10px 8px;
-    max-width: calc(4 * 26px + 3 * 4px); /* не более 4 cycle-float-btn в ряд */
+    justify-content: flex-end;
+    max-width: calc(4 * 26px + 3 * 4px); /* 4 cycle-float-btn в ряд, шеврон снаружи */
   }
 
   .cycle-float-btn {

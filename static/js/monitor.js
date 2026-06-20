@@ -207,17 +207,21 @@
         '<button class="cycle-float-btn monitor-chain-nav" data-dir="next" title="Следующий батч" disabled onclick="monitorChainNav(event,\'next\')">' + MON_SVG_CHAIN_NEXT + '</button>'
       : '';
 
-    const hdrActions =
-      '<div class="monitor-hdr-actions-always" onclick="event.stopPropagation()">' +
-        chainNavBtns +
-        restartBtn +
-        batchStoryBtn +
-        batchVideoBtn +
-        '<button class="cycle-float-btn" title="Скопировать логи" onclick="monitorCopy(this)">'          + MON_SVG_COPY + '</button>' +
-        '<button class="cycle-float-btn" title="Скопировать инфо" onclick="monitorBatchCopyInfo(this)">' + MON_SVG_INFO + '</button>' +
-        (isActive || FINAL_BATCH_STATUSES.indexOf(bs) === -1
-          ? '<button class="cycle-float-btn btn-blocked" title="Удалить батч" data-warn="1" onclick="monitorDeleteBatch(\'' + esc(batch.batch_id) + '\',this)">' + MON_SVG_DELETE + '</button>'
-          : '<button class="cycle-float-btn" title="Удалить батч" onclick="monitorDeleteBatch(\'' + esc(batch.batch_id) + '\',this)">' + MON_SVG_DELETE + '</button>') +
+    const hdrActionBtns =
+      chainNavBtns +
+      restartBtn +
+      batchStoryBtn +
+      batchVideoBtn +
+      '<button class="cycle-float-btn" title="Скопировать логи" onclick="monitorCopy(this)">'          + MON_SVG_COPY + '</button>' +
+      '<button class="cycle-float-btn" title="Скопировать инфо" onclick="monitorBatchCopyInfo(this)">' + MON_SVG_INFO + '</button>' +
+      (isActive || FINAL_BATCH_STATUSES.indexOf(bs) === -1
+        ? '<button class="cycle-float-btn btn-blocked" title="Удалить батч" data-warn="1" onclick="monitorDeleteBatch(\'' + esc(batch.batch_id) + '\',this)">' + MON_SVG_DELETE + '</button>'
+        : '<button class="cycle-float-btn" title="Удалить батч" onclick="monitorDeleteBatch(\'' + esc(batch.batch_id) + '\',this)">' + MON_SVG_DELETE + '</button>');
+
+    const hdrTools =
+      '<div class="monitor-header-tools" onclick="event.stopPropagation()">' +
+        '<div class="monitor-hdr-actions-always">' + hdrActionBtns + '</div>' +
+        '<span class="monitor-batch-arrow">▼</span>' +
       '</div>';
 
     const frameHtml = (btype === 'publish' && batch.batch_id)
@@ -244,8 +248,7 @@
           '<div class="monitor-batch-title">' + esc(headTitle) + '</div>' +
           '<div class="monitor-batch-sub">'   + esc(sub)         + '</div>' +
         '</div>' +
-        hdrActions +
-        '<span class="monitor-batch-arrow">▼</span>' +
+        hdrTools +
       '</div>' +
       '<div class="monitor-batch-body">' + frameHtml + '</div>' +
     '</div>';
