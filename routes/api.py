@@ -28,6 +28,7 @@ from db import (
     db_get_movie_video_data,
     db_create_video_batch,
     db_create_story_batch,
+    db_get_video_model_by_id,
     db_get_batch_logs,
     cycle_config_get,
     cycle_config_set,
@@ -1159,8 +1160,9 @@ def api_production_video_generate():
     if not batch_id:
         return jsonify({"error": "db_error"}), 500
     environment.wakeup_loop()
-    write_log_entry(batch_id, 'api', 'Генерация видео вручную')
-    write_log_entry(batch_id, 'api', 'Запуск по запросу пользователя')
+    model = db_get_video_model_by_id(model_id)
+    model_name = model['name'] if model else model_id
+    write_log_entry(batch_id, 'api', f'Запуск генерации видео, модель {model_name}')
     return jsonify({"batch_id": batch_id})
 
 @production_bp.route("/production/story/generate", methods=["POST"])
