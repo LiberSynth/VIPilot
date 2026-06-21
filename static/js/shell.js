@@ -169,9 +169,11 @@ function refreshGoodPoolCount() {
     var savedPanel = localStorage.getItem(_activePanelStorageKey());
     if (savedPanel) initialPanel = _resolvePanelName(savedPanel);
   }
-  if (initialPanel && document.getElementById('panel-' + initialPanel)) {
-    switchPanel(initialPanel);
-  } else {
+  function restoreInitialPanel() {
+    if (initialPanel && document.getElementById('panel-' + initialPanel)) {
+      switchPanel(initialPanel);
+      return;
+    }
     var activePanel = document.querySelector('.tab-panel.active');
     if (!activePanel) {
       var firstBtn = document.querySelector('.sidebar-item[data-panel]');
@@ -184,6 +186,7 @@ function refreshGoodPoolCount() {
       }
     }
   }
+  setTimeout(restoreInitialPanel, 0);
   loadGoodPoolCount();
   setInterval(refreshGoodPoolCount, 200);
   var btnHamburger = document.getElementById('btn-hamburger');
