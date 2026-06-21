@@ -352,11 +352,11 @@
       });
   }
 
-  var _origSwitchPanel = window.switchPanel;
-  window.switchPanel = function(name) {
-    if (_origSwitchPanel) _origSwitchPanel(name);
-    if (name === 'director') { loadDirectorStoryPool(); loadDirectorVideoModels(); if (typeof window.loadMovieList === 'function') window.loadMovieList(); }
-  };
+  registerPanelEnterHook('director', function() {
+    loadDirectorStoryPool();
+    loadDirectorVideoModels();
+    if (typeof window.loadMovieList === 'function') window.loadMovieList();
+  });
 
   var btn = document.getElementById('director-story-btn');
   if (btn) {
