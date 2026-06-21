@@ -29,7 +29,17 @@ function closeSidebar() {
 
 var _MONITOR_SCROLL_KEY = 'memo_pageScroll_panel-log';
 
+function _activePanelStorageKey() {
+  return 'vip_active_panel_' + window.location.pathname;
+}
+
+function _resolvePanelName(name) {
+  if (name === 'pipeline') return 'workflow';
+  return name;
+}
+
 function switchPanel(name) {
+  name = _resolvePanelName(name);
   var activePanel = document.querySelector('.tab-panel.active');
   if (activePanel && activePanel.id === 'panel-log') {
     localStorage.setItem(_MONITOR_SCROLL_KEY, String(window.scrollY || 0));
@@ -46,7 +56,10 @@ function switchPanel(name) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.sidebar-item').forEach(b => b.classList.remove('active'));
   const panel = document.getElementById('panel-' + name);
-  if (panel) panel.classList.add('active');
+  if (panel) {
+    panel.classList.add('active');
+    localStorage.setItem(_activePanelStorageKey(), name);
+  }
   const btn = document.querySelector('.sidebar-item[data-panel="' + name + '"]');
   if (btn) btn.classList.add('active');
   const titleEl = document.getElementById('page-title');
@@ -147,13 +160,23 @@ function refreshGoodPoolCount() {
 
 (function() {
   monitorClockStart();
-  const tab = new URLSearchParams(window.location.search).get('tab');
-  if (tab && document.getElementById('panel-' + tab)) {
-    switchPanel(tab);
+  var initialPanel = null;
+  var tabParam = new URLSearchParams(window.location.search).get('tab');
+  if (tabParam) {
+    initialPanel = _resolvePanelName(tabParam);
     history.replaceState(null, '', window.location.pathname);
   } else {
+    var savedPanel = localStorage.getItem(_activePanelStorageKey());
+    if (savedPanel) initialPanel = _resolvePanelName(savedPanel);
+  }
+  if (initialPanel && document.getElementById('panel-' + initialPanel)) {
+    switchPanel(initialPanel);
+  } else {
     var activePanel = document.querySelector('.tab-panel.active');
-    if (activePanel && activePanel.id === 'panel-log') {
+    if (!activePanel) {
+      var firstBtn = document.querySelector('.sidebar-item[data-panel]');
+      if (firstBtn) switchPanel(firstBtn.dataset.panel);
+    } else if (activePanel.id === 'panel-log') {
       var _rawScroll = localStorage.getItem(_MONITOR_SCROLL_KEY);
       if (_rawScroll !== null) {
         var savedScroll = parseInt(_rawScroll, 10) || 0;
