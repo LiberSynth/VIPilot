@@ -617,9 +617,14 @@
   .cycle-float-btn:hover { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.2); }
   .cycle-float-btn:active { background: rgba(255,255,255,.14); }
   .cycle-float-btn svg { width: 13px; height: 13px; }
+  .cycle-float-btn.header-nav-btn svg { width: 16px; height: 16px; }
   .cycle-float-btn svg * {
     stroke: #8888b0; fill: none;
     stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .cycle-float-btn.header-nav-btn[href="/web"] svg * {
+    stroke: #a8a8cc;
+    stroke-width: 1.75;
   }
   .cycle-float-btn:hover svg * { stroke: #c8c8e8; }
   .cycle-float-btn.copied { border-color: rgba(62,207,142,.5); }
