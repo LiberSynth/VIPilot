@@ -445,17 +445,28 @@
         if (_batchEntriesCache[_openBid]) {
           _applyBatchEntries(batchEl, _batchEntriesCache[_openBid]);
         }
-      } else {
-        _openBid = null;
       }
+    } else if (state && state.openBids) {
+      Object.keys(state.openBids).forEach(function(bid) {
+        var batchEl = document.querySelector('.monitor-batch[data-bid="' + bid + '"]');
+        if (batchEl) batchEl.classList.add('open');
+      });
     }
-    document.querySelectorAll('.monitor-system-block').forEach(function(el) {
-      var lid = el.dataset.lid;
-      if (lid && state.openSys[lid]) {
-        el.classList.add('open');
-        if (_sysLogEntriesCache[lid]) _applySystemEntries(el, _sysLogEntriesCache[lid]);
+    if (_openSysLid) {
+      var sysEl = document.querySelector('.monitor-system-block[data-lid="' + _openSysLid + '"]');
+      if (sysEl) {
+        sysEl.classList.add('open');
+        if (_sysLogEntriesCache[_openSysLid]) _applySystemEntries(sysEl, _sysLogEntriesCache[_openSysLid]);
       }
-    });
+    } else if (state && state.openSys) {
+      document.querySelectorAll('.monitor-system-block').forEach(function(el) {
+        var lid = el.dataset.lid;
+        if (lid && state.openSys[lid]) {
+          el.classList.add('open');
+          if (_sysLogEntriesCache[lid]) _applySystemEntries(el, _sysLogEntriesCache[lid]);
+        }
+      });
+    }
   }
 
   function _buildEntryRow(en) {
@@ -791,6 +802,7 @@
       _refreshMonitorView();
       if (_openBid) {
         var openEl = document.querySelector('.monitor-batch[data-bid="' + _openBid + '"]');
+        if (openEl) openEl.classList.add('open');
         if (_batchEntriesCache[_openBid]) {
           if (openEl) _applyBatchEntries(openEl, _batchEntriesCache[_openBid]);
           if (!_batchChainCache.hasOwnProperty(_openBid)) {
@@ -819,12 +831,14 @@
       });
       _openBid = null;
       _openChainIds = null;
-      _refreshMonitorView();
-      el.classList.add('open');
       _openSysLid = lid || null;
+      el.classList.add('open');
+      _refreshMonitorView();
       if (_openSysLid) {
+        var sysEl = document.querySelector('.monitor-system-block[data-lid="' + _openSysLid + '"]') || el;
+        sysEl.classList.add('open');
         if (_sysLogEntriesCache[_openSysLid]) {
-          _applySystemEntries(el, _sysLogEntriesCache[_openSysLid]);
+          _applySystemEntries(sysEl, _sysLogEntriesCache[_openSysLid]);
         }
         _fetchSystemEntries(_openSysLid);
       }

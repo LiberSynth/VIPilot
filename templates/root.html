@@ -316,7 +316,13 @@
   createBrowserWidget('dzen');
   createBrowserWidget('rutube');
   createBrowserWidget('vkvideo');
-  switchPanel(getInitialPanelName() || 'workflow');
+  (function() {
+    var p = getInitialPanelName();
+    if (!p) return;
+    var active = document.querySelector('.tab-panel.active');
+    var activeName = active ? active.id.replace(/^panel-/, '') : '';
+    if (p !== activeName) switchPanel(p);
+  })();
 </script>
 
 </body>
