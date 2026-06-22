@@ -29,11 +29,6 @@ function closeSidebar() {
 
 var _MONITOR_SCROLL_KEY = 'memo_pageScroll_panel-log';
 
-window._vipPanelEnterHooks = Object.create(null);
-window.registerPanelEnterHook = function(name, fn) {
-  window._vipPanelEnterHooks[name] = fn;
-};
-
 function _activePanelStorageKey() {
   return 'vip_active_panel_' + window.location.pathname;
 }
@@ -41,6 +36,19 @@ function _activePanelStorageKey() {
 function _resolvePanelName(name) {
   if (name === 'pipeline') return 'workflow';
   return name;
+}
+
+function getInitialPanelName() {
+  var tabParam = new URLSearchParams(window.location.search).get('tab');
+  if (tabParam) {
+    tabParam = _resolvePanelName(tabParam);
+    history.replaceState(null, '', window.location.pathname);
+    if (document.getElementById('panel-' + tabParam)) return tabParam;
+  }
+  var saved = localStorage.getItem(_activePanelStorageKey());
+  if (!saved) return null;
+  saved = _resolvePanelName(saved);
+  return document.getElementById('panel-' + saved) ? saved : null;
 }
 
 function switchPanel(name) {
@@ -103,8 +111,6 @@ function switchPanel(name) {
     if (draftCard) draftCard.classList.remove('card--editing-new', 'card--editing-existing');
     if (typeof loadStoryList === 'function') loadStoryList();
   }
-  var enterHook = window._vipPanelEnterHooks[name];
-  if (enterHook) enterHook();
 }
 
 let _monitorClockTimer = null;
@@ -167,42 +173,6 @@ function refreshGoodPoolCount() {
 
 (function() {
   monitorClockStart();
-  var initialPanel = null;
-  var tabParam = new URLSearchParams(window.location.search).get('tab');
-  if (tabParam) {
-    initialPanel = _resolvePanelName(tabParam);
-    history.replaceState(null, '', window.location.pathname);
-  } else {
-    var savedPanel = localStorage.getItem(_activePanelStorageKey());
-    if (savedPanel) initialPanel = _resolvePanelName(savedPanel);
-  }
-  var _panelRestoreDone = false;
-  function restoreInitialPanel() {
-    if (_panelRestoreDone) return;
-    if (initialPanel && document.getElementById('panel-' + initialPanel)) {
-      _panelRestoreDone = true;
-      switchPanel(initialPanel);
-      return;
-    }
-    var activePanel = document.querySelector('.tab-panel.active');
-    if (!activePanel) {
-      var firstBtn = document.querySelector('.sidebar-item[data-panel]');
-      if (firstBtn) {
-        _panelRestoreDone = true;
-        switchPanel(firstBtn.dataset.panel);
-      }
-      return;
-    }
-    _panelRestoreDone = true;
-    var defaultName = activePanel.id.replace(/^panel-/, '');
-    if (defaultName) switchPanel(defaultName);
-  }
-  window.restoreSavedPanel = restoreInitialPanel;
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', restoreInitialPanel, { once: true });
-  } else {
-    restoreInitialPanel();
-  }
   loadGoodPoolCount();
   setInterval(refreshGoodPoolCount, 200);
   var btnHamburger = document.getElementById('btn-hamburger');
