@@ -21,8 +21,10 @@ var setDraftStoryFromRecord;
   setDraftStoryFromRecord = function(story) {
     var titleEl = document.getElementById('draft-story-title');
     var contentEl = document.getElementById('draft-story-content');
+    var promptEl = document.getElementById('draft-story-prompt');
     if (titleEl) titleEl.value = story.title || '';
     if (contentEl) contentEl.value = story.content || '';
+    if (promptEl) promptEl.value = story.prompt || '';
     _activeStoryId = story.id;
     _inflight = null;
     _pendingRetry = false;
@@ -32,12 +34,14 @@ var setDraftStoryFromRecord;
   function _doPost() {
     var titleEl = document.getElementById('draft-story-title');
     var contentEl = document.getElementById('draft-story-content');
+    var promptEl = document.getElementById('draft-story-prompt');
     var title = titleEl ? titleEl.value : '';
     var content = contentEl ? contentEl.value : '';
+    var prompt = promptEl ? promptEl.value : '';
     return fetch('/production/story/draft', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ story_id: _activeStoryId, title: title, content: content }),
+      body: JSON.stringify({ story_id: _activeStoryId, title: title, content: content, prompt: prompt }),
     })
     .then(function(r) { return r.ok ? r.json() : null; })
     .then(function(d) {
@@ -57,10 +61,12 @@ var setDraftStoryFromRecord;
   function _postDraft(force) {
     var titleEl = document.getElementById('draft-story-title');
     var contentEl = document.getElementById('draft-story-content');
+    var promptEl = document.getElementById('draft-story-prompt');
     if (!titleEl || !contentEl) return Promise.resolve(null);
     var title = titleEl.value;
     var content = contentEl.value;
-    if (!force && !title && !content) return Promise.resolve(null);
+    var prompt = promptEl ? promptEl.value : '';
+    if (!force && !_activeStoryId && !title && !content) return Promise.resolve(null);
     if (_inflight) {
       if (force) {
         return _inflight.then(function() {
@@ -109,9 +115,11 @@ var setDraftStoryFromRecord;
   function initDraftAutosave() {
     var titleEl = document.getElementById('draft-story-title');
     var contentEl = document.getElementById('draft-story-content');
+    var promptEl = document.getElementById('draft-story-prompt');
     if (!titleEl || !contentEl) return;
     titleEl.addEventListener('input', onDraftInput);
     contentEl.addEventListener('input', onDraftInput);
+    if (promptEl) promptEl.addEventListener('input', onDraftInput);
   }
 
   if (document.readyState === 'loading') {
@@ -135,6 +143,16 @@ var setDraftStoryFromRecord;
 
   function _renderStoryIcons(s) {
     var icons = '';
+    if (s.id !== '__new__') {
+      var promptTitle = s.has_prompt ? 'T2V-промпт заполнен' : 'T2V-промпт не задан';
+      icons += '<span class="story-icon story-icon-prompt' + (s.has_prompt ? ' story-icon-prompt--filled' : '')
+        + '" title="' + promptTitle + '">'
+        + '<svg viewBox="0 0 16 16" fill="' + (s.has_prompt ? 'currentColor' : 'none')
+        + '" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">'
+        + '<rect x="2" y="2" width="12" height="12" rx="1.5"/>'
+        + '<path d="M5 5h6M5 8h6M5 11h4"/>'
+        + '</svg></span>';
+    }
     if (s.used) {
       icons += '<span class="story-icon story-icon-used" title="Использован в производстве">'
         + '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">'
@@ -234,7 +252,8 @@ var setDraftStoryFromRecord;
     newRowItem: {
       id: '__new__', grade: null, pinned: false,
       ai_generated: false, manual_changed: true, used: false,
-      has_movie: false, has_active_batch: false, title: '', content: '',
+      has_prompt: false, has_movie: false, has_active_batch: false,
+      title: '', content: '', prompt: '',
     },
     onNewRowReady: function(_expandEl, fakeRow) {
       if (fakeRow) _bindFakeRowButtons(fakeRow);
@@ -577,8 +596,10 @@ var setDraftStoryFromRecord;
       if (typeof resetDraftStoryId === 'function') resetDraftStoryId();
       var titleEl = document.getElementById('draft-story-title');
       var contentEl = document.getElementById('draft-story-content');
+      var promptEl = document.getElementById('draft-story-prompt');
       if (titleEl) titleEl.value = '';
       if (contentEl) contentEl.value = '';
+      if (promptEl) promptEl.value = '';
       if (typeof window.updateDraftWordCount === 'function') window.updateDraftWordCount();
       _accordionList.insertFakeRow(true);
     });
@@ -1006,7 +1027,7 @@ var setDraftStoryFromRecord;
   }
 
   function updateWordCount() {
-    var textarea = document.getElementById('draft-story-content');
+    var textarea = document.getElementById('draft-story-prompt');
     var wrap = document.getElementById('draft-story-wc-wrap');
     var numEl = document.getElementById('draft-story-wc-num');
     if (!textarea || !wrap || !numEl) return;
@@ -1055,7 +1076,7 @@ var setDraftStoryFromRecord;
 
   function initWordCount() {
     _readConfig();
-    var textarea = document.getElementById('draft-story-content');
+    var textarea = document.getElementById('draft-story-prompt');
     if (textarea) {
       textarea.addEventListener('input', updateWordCount);
       updateWordCount();

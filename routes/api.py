@@ -1082,8 +1082,9 @@ def api_production_story_draft():
     data = request.get_json(silent=True) or {}
     title = data.get("title", "")
     content = data.get("content", "")
+    prompt = data.get("prompt", "")
     story_id = data.get("story_id") or None
-    new_id = db_upsert_story_draft(story_id, title, content)
+    new_id = db_upsert_story_draft(story_id, title, content, prompt)
     if new_id is None:
         return jsonify({"error": "db_error"}), 500
     return jsonify({"story_id": new_id})

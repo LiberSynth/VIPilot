@@ -383,6 +383,10 @@ def _m1015_rename_publish_and_transcoding_statuses(cur):
         ('.published', '.completed', '%.published'),
     )
 
+def _m1016_add_stories_prompt(cur):
+    """Add stories.prompt for T2V prompt text (NULL when unset)."""
+    cur.execute("ALTER TABLE stories ADD COLUMN IF NOT EXISTS prompt TEXT")
+
 MIGRATIONS = [
     (2026052901, _m1001_drop_targets_legacy_columns),
     (2026052902, _m1002_add_movies_transcoded),
@@ -399,6 +403,7 @@ MIGRATIONS = [
     (2026052913, _m1013_rename_generating_to_processing),
     (2026052914, _m1014_rename_generated_to_processed),
     (2026052915, _m1015_rename_publish_and_transcoding_statuses),
+    (2026062201, _m1016_add_stories_prompt),
 ]
 
 # ---------------------------------------------------------------------------

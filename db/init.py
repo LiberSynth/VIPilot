@@ -173,6 +173,7 @@ def bootstrap():
                     id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                     title          TEXT,
                     content        TEXT,
+                    prompt         TEXT,
                     model_id       UUID,
                     grade          TEXT,
                     manual_changed BOOLEAN NOT NULL DEFAULT FALSE,
@@ -254,6 +255,10 @@ def bootstrap():
             cur.execute("""
                 ALTER TABLE movies
                 ALTER COLUMN used SET NOT NULL
+            """)
+            cur.execute("""
+                ALTER TABLE stories
+                ADD COLUMN IF NOT EXISTS prompt TEXT
             """)
 
             # ------------------------------------------------------------------

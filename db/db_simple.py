@@ -346,29 +346,31 @@ def db_update_story_content(story_id, content):
         conn.commit()
     return str(row[0]) if row else None
 
-def db_upsert_story_draft(story_id, title, content):
+def db_upsert_story_draft(story_id, title, content, prompt=None):
+    prompt_val = prompt.strip() if isinstance(prompt, str) and prompt.strip() else None
     with get_db() as conn:
         with conn.cursor() as cur:
             if story_id:
                 cur.execute(
                     """
-                    INSERT INTO stories (id, model_id, title, content, grade, manual_changed)
-                    VALUES (%s::uuid, NULL, %s, %s, 'good', TRUE)
+                    INSERT INTO stories (id, model_id, title, content, prompt, grade, manual_changed)
+                    VALUES (%s::uuid, NULL, %s, %s, %s, 'good', TRUE)
                     ON CONFLICT (id) DO UPDATE
                         SET title = EXCLUDED.title,
                             content = EXCLUDED.content,
+                            prompt = EXCLUDED.prompt,
                             manual_changed = TRUE
                     RETURNING id
                     """,
-                    (story_id, title, content),
+                    (story_id, title, content, prompt_val),
                 )
                 row = cur.fetchone()
                 if row:
                     conn.commit()
                     return str(row[0])
             cur.execute(
-                "INSERT INTO stories (model_id, title, content, grade, manual_changed) VALUES (NULL, %s, %s, 'good', TRUE) RETURNING id",
-                (title, content),
+                "INSERT INTO stories (model_id, title, content, prompt, grade, manual_changed) VALUES (NULL, %s, %s, %s, 'good', TRUE) RETURNING id",
+                (title, content, prompt_val),
             )
             row = cur.fetchone()
         conn.commit()

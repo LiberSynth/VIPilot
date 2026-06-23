@@ -899,6 +899,9 @@
   .story-icon-manual    svg { stroke: #f5a623; opacity: .8; }
   .story-icon-ai-manual svg { opacity: 1; }
   .story-icon-used      svg { stroke: #3ecf8e; opacity: .8; }
+  .story-icon-prompt    svg { stroke: #888; opacity: .55; }
+  .story-icon-prompt--filled { color: #7eb8ff; }
+  .story-icon-prompt--filled svg { stroke: #7eb8ff; opacity: .9; }
   .story-pin-btn {
     background: none; border: none; padding: 0; cursor: pointer;
     color: #aaa; opacity: .55; transition: opacity .15s, color .15s;
