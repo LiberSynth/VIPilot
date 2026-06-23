@@ -1,4 +1,4 @@
-{% macro panel_story(format_prompt, text_prompt, video_post_prompt, story_fails_to_next, words_per_second, good_samples_count) %}
+{% macro panel_story(format_prompt, text_prompt, prompt_metaprompt, video_post_prompt, story_fails_to_next, words_per_second, good_samples_count) %}
   <div id="panel-story" class="tab-panel">
     <form id="story-form" style="margin-top:0">
       <div class="card" style="margin-top:12px">
@@ -12,6 +12,12 @@
         <div class="hint">Стиль, тема и характер сценария. Описание для формирования раскадровки.</div>
         <textarea name="text_prompt" id="ta" spellcheck="true" autocomplete="off">{{ text_prompt }}</textarea>
         <div class="char-count" id="charcount"></div>
+      </div>
+      <div class="card" style="margin-top:12px">
+        <div class="card-title">Метапромпт T2V</div>
+        <div class="hint">Инструкция для преобразования утверждённого сюжета в T2V-промпт (пайплайн prompt).</div>
+        <textarea name="prompt_metaprompt" id="ta_prompt_metaprompt" spellcheck="true" autocomplete="off">{{ prompt_metaprompt }}</textarea>
+        <div class="char-count" id="charcount_prompt_metaprompt"></div>
       </div>
       <div class="card" style="margin-top:12px">
         <div class="card-title">Суффикс видео-промпта</div>

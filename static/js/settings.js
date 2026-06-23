@@ -2,16 +2,23 @@ const ta    = document.getElementById('ta');
 const cc    = document.getElementById('charcount');
 const taSys = document.getElementById('ta_formatprompt');
 const ccSys = document.getElementById('charcount_formatprompt');
+const taPromptMeta = document.getElementById('ta_prompt_metaprompt');
+const ccPromptMeta = document.getElementById('charcount_prompt_metaprompt');
 
 function updateCount()    { if (ta    && cc)    cc.textContent    = ta.value.length    + ' символов'; }
 function updateSysCount() { if (taSys && ccSys) ccSys.textContent = taSys.value.length + ' символов'; }
+function updatePromptMetaCount() {
+  if (taPromptMeta && ccPromptMeta) ccPromptMeta.textContent = taPromptMeta.value.length + ' символов';
+}
 
 if (ta)    { ta.addEventListener('input',    updateCount);    updateCount(); }
 if (taSys) { taSys.addEventListener('input', updateSysCount); updateSysCount(); }
+if (taPromptMeta) { taPromptMeta.addEventListener('input', updatePromptMetaCount); updatePromptMetaCount(); }
 
 (function() {
   var KEY_SYS  = 'rbc_format_prompt_h';
   var KEY_META = 'rbc_text_prompt_h';
+  var KEY_PROMPT_META = 'rbc_prompt_metaprompt_h';
 
   function applyHeight(el, key, defaultPx) {
     var saved = parseInt(localStorage.getItem(key), 10);
@@ -31,6 +38,7 @@ if (taSys) { taSys.addEventListener('input', updateSysCount); updateSysCount(); 
 
   if (taSys) { applyHeight(taSys, KEY_SYS,  100); watchHeight(taSys, KEY_SYS); }
   if (ta)    { applyHeight(ta,    KEY_META, 300); watchHeight(ta,    KEY_META); }
+  if (taPromptMeta) { applyHeight(taPromptMeta, KEY_PROMPT_META, 200); watchHeight(taPromptMeta, KEY_PROMPT_META); }
 })();
 
 function collectAllSettings(activeTab) {
@@ -39,6 +47,7 @@ function collectAllSettings(activeTab) {
   const setIfExists = (key, id) => { const el = document.getElementById(id); if (el) data.set(key, el.value); };
   if (ta)    data.set('text_prompt',   ta.value);
   if (taSys) data.set('format_prompt', taSys.value);
+  if (taPromptMeta) data.set('prompt_metaprompt', taPromptMeta.value);
   setIfExists('video_duration',      'video_duration');
   setIfExists('video_post_prompt',   'ta_postprompt');
   setIfExists('story_fails_to_next', 'story_fails_to_next');
@@ -130,6 +139,7 @@ function validateLifetimes() {
   const storyFields = [
     ta,
     taSys,
+    taPromptMeta,
     document.getElementById('story_fails_to_next'),
   ].filter(Boolean);
   storyFields.forEach(f => {
