@@ -53,7 +53,13 @@ function getInitialPanelName() {
 
 function switchPanel(name) {
   name = _resolvePanelName(name);
+  var panel = document.getElementById('panel-' + name);
+  if (!panel) return;
+
   var activePanel = document.querySelector('.tab-panel.active');
+  var alreadyActive = panel.classList.contains('active')
+    && !!document.querySelector('.sidebar-item.active[data-panel="' + name + '"]');
+
   if (activePanel && activePanel.id === 'panel-log') {
     localStorage.setItem(_MONITOR_SCROLL_KEY, String(window.scrollY || 0));
     if (name !== 'log' && typeof window.monitorPausePolling === 'function') {
@@ -66,18 +72,27 @@ function switchPanel(name) {
       Object.keys(registry).forEach(function(key) { registry[key](); });
     }
   }
+
+  if (alreadyActive) {
+    localStorage.setItem(_activePanelStorageKey(), name);
+    closeSidebar();
+    _runPanelEnterEffects(name);
+    return;
+  }
+
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.sidebar-item').forEach(b => b.classList.remove('active'));
-  const panel = document.getElementById('panel-' + name);
-  if (panel) {
-    panel.classList.add('active');
-    localStorage.setItem(_activePanelStorageKey(), name);
-  }
+  panel.classList.add('active');
+  localStorage.setItem(_activePanelStorageKey(), name);
   const btn = document.querySelector('.sidebar-item[data-panel="' + name + '"]');
   if (btn) btn.classList.add('active');
   const titleEl = document.getElementById('page-title');
   if (titleEl) titleEl.textContent = PANEL_TITLES[name] || name;
   closeSidebar();
+  _runPanelEnterEffects(name);
+}
+
+function _runPanelEnterEffects(name) {
   if (name === 'log') {
     var _rawScroll = localStorage.getItem(_MONITOR_SCROLL_KEY);
     if (_rawScroll !== null) {
@@ -172,6 +187,7 @@ function refreshGoodPoolCount() {
 }
 
 (function() {
+  document.documentElement.classList.remove('vip-panels-pending');
   monitorClockStart();
   loadGoodPoolCount();
   setInterval(refreshGoodPoolCount, 200);

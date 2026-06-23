@@ -37,6 +37,82 @@ def _consolidate_log_entries_channel(cur) -> None:
         """)
     cur.execute("DROP INDEX IF EXISTS idx_log_entries_category")
 
+def _cleanup_legacy_schema(cur) -> None:
+    """Удаляет устаревшие колонки/индексы (ранее — отдельные миграции)."""
+    cur.execute("ALTER TABLE targets DROP COLUMN IF EXISTS aspect_ratio_x")
+    cur.execute("ALTER TABLE targets DROP COLUMN IF EXISTS aspect_ratio_y")
+    cur.execute("ALTER TABLE targets DROP COLUMN IF EXISTS transcode")
+    cur.execute("ALTER TABLE log DROP COLUMN IF EXISTS message")
+    cur.execute("ALTER TABLE log DROP COLUMN IF EXISTS status")
+    cur.execute("ALTER TABLE log DROP COLUMN IF EXISTS category")
+    cur.execute("ALTER TABLE log DROP COLUMN IF EXISTS pipeline")
+    cur.execute("DROP INDEX IF EXISTS idx_log_pipeline")
+    cur.execute("DROP INDEX IF EXISTS idx_log_status")
+    cur.execute("DROP INDEX IF EXISTS idx_log_category")
+    cur.execute("DELETE FROM settings WHERE key = 'buffer_hours'")
+
+def _ensure_movies_bit_columns(cur) -> None:
+    """Колонки movies.used/transcoded/published: ADD IF NOT EXISTS + NOT NULL для старых БД."""
+    cur.execute("""
+        ALTER TABLE movies
+        ADD COLUMN IF NOT EXISTS story_id UUID
+    """)
+    cur.execute("""
+        ALTER TABLE movies
+        ADD COLUMN IF NOT EXISTS used BIT(1)
+    """)
+    cur.execute("""
+        ALTER TABLE movies
+        ADD COLUMN IF NOT EXISTS transcoded BIT(1)
+    """)
+    cur.execute("""
+        ALTER TABLE movies
+        ADD COLUMN IF NOT EXISTS published BIT(1)
+    """)
+    cur.execute("""
+        UPDATE movies m
+        SET used = CASE
+            WHEN EXISTS (
+                SELECT 1
+                FROM batches b2
+                WHERE b2.movie_id = m.id
+                  AND (
+                      b2.status IN ('completed', 'partially')
+                      OR b2.status LIKE '%.completed'
+                  )
+            )
+            THEN B'1'
+            ELSE B'0'
+        END
+        WHERE m.used IS NULL
+    """)
+    cur.execute("UPDATE movies SET transcoded = B'0' WHERE transcoded IS NULL")
+    cur.execute("UPDATE movies SET published = B'0' WHERE published IS NULL")
+    cur.execute("""
+        ALTER TABLE movies
+        ALTER COLUMN used SET DEFAULT B'0'
+    """)
+    cur.execute("""
+        ALTER TABLE movies
+        ALTER COLUMN used SET NOT NULL
+    """)
+    cur.execute("""
+        ALTER TABLE movies
+        ALTER COLUMN transcoded SET DEFAULT B'0'
+    """)
+    cur.execute("""
+        ALTER TABLE movies
+        ALTER COLUMN transcoded SET NOT NULL
+    """)
+    cur.execute("""
+        ALTER TABLE movies
+        ALTER COLUMN published SET DEFAULT B'0'
+    """)
+    cur.execute("""
+        ALTER TABLE movies
+        ALTER COLUMN published SET NOT NULL
+    """)
+
 def _ensure_log_indexes(cur) -> None:
     """Индексы log / log_entries по фактической схеме."""
     cur.execute("""
@@ -217,45 +293,13 @@ def bootstrap():
             """)
 
             # ------------------------------------------------------------------
-            # Additive migrations (idempotent, no FK)
+            # Additive schema (idempotent, no FK)
             # ------------------------------------------------------------------
             cur.execute("""
                 ALTER TABLE batches
                 ADD COLUMN IF NOT EXISTS batch_id_source UUID
             """)
-            cur.execute("""
-                ALTER TABLE movies
-                ADD COLUMN IF NOT EXISTS story_id UUID
-            """)
-            cur.execute("""
-                ALTER TABLE movies
-                ADD COLUMN IF NOT EXISTS used BIT(1)
-            """)
-            cur.execute("""
-                UPDATE movies m
-                SET used = CASE
-                    WHEN EXISTS (
-                        SELECT 1
-                        FROM batches b2
-                        WHERE b2.movie_id = m.id
-                          AND (
-                              b2.status IN ('completed', 'partially')
-                              OR b2.status LIKE '%.completed'
-                          )
-                    )
-                    THEN B'1'
-                    ELSE B'0'
-                END
-                WHERE m.used IS NULL
-            """)
-            cur.execute("""
-                ALTER TABLE movies
-                ALTER COLUMN used SET DEFAULT B'0'
-            """)
-            cur.execute("""
-                ALTER TABLE movies
-                ALTER COLUMN used SET NOT NULL
-            """)
+            _ensure_movies_bit_columns(cur)
             cur.execute("""
                 ALTER TABLE stories
                 ADD COLUMN IF NOT EXISTS prompt TEXT
@@ -264,6 +308,7 @@ def bootstrap():
             # ------------------------------------------------------------------
             # Legacy cleanup
             # ------------------------------------------------------------------
+            _cleanup_legacy_schema(cur)
             cur.execute("DELETE FROM cycle_config WHERE key = 'approve_stories'")
             cur.execute("DELETE FROM cycle_config WHERE key = 'approve_movies'")
             cur.execute("DELETE FROM environment WHERE key = 'use_donor'")
@@ -377,6 +422,14 @@ def bootstrap():
             cur.execute("""
                 CREATE INDEX IF NOT EXISTS idx_movies_used
                     ON movies (used)
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_movies_transcoded
+                    ON movies (transcoded)
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_movies_transcode_pick
+                    ON movies (used, transcoded, created_at, id)
             """)
             cur.execute("""
                 CREATE INDEX IF NOT EXISTS idx_movies_pool_pick

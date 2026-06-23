@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>VIPilot</title>
 <link rel="stylesheet" href="/static/common.css?v={{ app_version }}">
+<script>document.documentElement.classList.add('vip-panels-pending');</script>
 </head>
 <body>
 
@@ -295,6 +296,7 @@
 
 </div>
 
+<script src="/static/js/panel-boot.js"></script>
 <script src="/static/js/shell.js"></script>
 <script src="/static/js/controls/toast.js"></script>
 <script src="/static/js/controls/tooltip.js"></script>
@@ -319,10 +321,7 @@
   createBrowserWidget('vkvideo');
   (function() {
     var p = getInitialPanelName();
-    if (!p) return;
-    var active = document.querySelector('.tab-panel.active');
-    var activeName = active ? active.id.replace(/^panel-/, '') : '';
-    if (p !== activeName) switchPanel(p);
+    if (p) switchPanel(p);
   })();
 </script>
 
