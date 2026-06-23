@@ -234,76 +234,6 @@
     });
   }
 
-  function makeDragHandler(container, saveOrderFn, rowSelector) {
-    var dragSrcId = null;
-
-    container.addEventListener('pointerdown', function(e) {
-      var handle = e.target.closest('.model-drag-handle');
-      if (!handle) return;
-      var row = handle.closest(rowSelector);
-      if (!row) return;
-      row.setAttribute('draggable', 'true');
-      var releaseHandler = function() {
-        row.setAttribute('draggable', 'false');
-        document.removeEventListener('pointerup', releaseHandler);
-      };
-      document.addEventListener('pointerup', releaseHandler, { once: true });
-    });
-
-    container.addEventListener('dragstart', function(e) {
-      var row = e.target.closest(rowSelector);
-      if (!row || row.getAttribute('draggable') !== 'true') return;
-      dragSrcId = row.getAttribute('data-id');
-      row.classList.add('dragging');
-      e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData('text/plain', dragSrcId);
-    });
-    container.addEventListener('dragend', function(e) {
-      var row = e.target.closest(rowSelector);
-      if (row) {
-        row.classList.remove('dragging');
-        row.setAttribute('draggable', 'false');
-      }
-      container.querySelectorAll(rowSelector).forEach(function(r) {
-        r.classList.remove('drag-over-top', 'drag-over-bottom');
-      });
-    });
-    container.addEventListener('dragover', function(e) {
-      var row = e.target.closest(rowSelector);
-      if (!row || !dragSrcId) return;
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-      if (dragSrcId === row.getAttribute('data-id')) return;
-      container.querySelectorAll(rowSelector).forEach(function(r) {
-        r.classList.remove('drag-over-top', 'drag-over-bottom');
-      });
-      var rect = row.getBoundingClientRect();
-      if (e.clientY < rect.top + rect.height / 2) row.classList.add('drag-over-top');
-      else row.classList.add('drag-over-bottom');
-    });
-    container.addEventListener('dragleave', function(e) {
-      var row = e.target.closest(rowSelector);
-      if (row) row.classList.remove('drag-over-top', 'drag-over-bottom');
-    });
-    container.addEventListener('drop', function(e) {
-      var row = e.target.closest(rowSelector);
-      if (!row || !dragSrcId || dragSrcId === row.getAttribute('data-id')) return;
-      e.preventDefault();
-      container.querySelectorAll(rowSelector).forEach(function(r) {
-        r.classList.remove('drag-over-top', 'drag-over-bottom');
-      });
-      var srcEl = container.querySelector(rowSelector + '[data-id="' + dragSrcId + '"]');
-      if (srcEl) {
-        var rect = row.getBoundingClientRect();
-        if (e.clientY < rect.top + rect.height / 2) container.insertBefore(srcEl, row);
-        else container.insertBefore(srcEl, row.nextSibling);
-      }
-      var ids = Array.from(container.querySelectorAll(rowSelector)).map(function(r) { return r.getAttribute('data-id'); });
-      dragSrcId = null;
-      saveOrderFn(ids);
-    });
-  }
-
   function bindActivateBtn(container, activateFn, activeClass) {
     container.addEventListener('click', function(e) {
       var btn = e.target.closest('[data-role="activate-btn"]');
@@ -381,7 +311,7 @@
         html += (dur || '');
         html += '<div class="model-radio-widget' + radioActive + '" data-role="activate-btn" data-model-id="' + item.id + '" title="Активировать/деактивировать">'
           + '<div class="model-radio-dot"></div></div>';
-        html += '<div class="model-drag-handle" title="Перетащить">⠿</div>';
+        html += ListDragReorder.handleHtml();
         return html;
       },
       onExpand: function(item, expandEl) {
@@ -400,7 +330,9 @@
     var container = document.getElementById('model-list');
     bindExpandSave(container, _videoAccordion);
     bindActivateBtn(container, activateVideoModel, 'story-row--model-active');
-    makeDragHandler(container, saveVideoOrder, '.story-row');
+    ListDragReorder.bind(container, {
+      onReorder: function(ids) { saveVideoOrder(ids); },
+    });
   }
 
   function refreshDurationIndicators() {
@@ -498,7 +430,7 @@
         var radioActive = item.active ? ' model-radio-widget--active' : '';
         var html = '<div class="model-radio-widget' + radioActive + '" data-role="activate-btn" data-model-id="' + item.id + '" title="Активировать/деактивировать">'
           + '<div class="model-radio-dot"></div></div>';
-        html += '<div class="model-drag-handle" title="Перетащить">⠿</div>';
+        html += ListDragReorder.handleHtml();
         return html;
       },
       onExpand: function(item, expandEl) {
@@ -517,7 +449,9 @@
     var container = document.getElementById('text-model-list');
     bindExpandSave(container, _textAccordion);
     bindActivateBtn(container, activateTextModelFn, 'story-row--model-active');
-    makeDragHandler(container, saveTextOrder, '.story-row');
+    ListDragReorder.bind(container, {
+      onReorder: function(ids) { saveTextOrder(ids); },
+    });
   }
 
   function loadTextModels() {

@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 import psycopg2.extras
 
 from .connection import get_db
@@ -232,6 +234,58 @@ def db_get_movies_list(show_published=True, show_bad=True, for_approval=False, p
         }
         for row in rows
     ]
+
+def db_reorder_movie(movie_id: str, prev_id=None, next_id=None) -> bool:
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1 FROM movies WHERE id = %s::uuid", (movie_id,))
+            if not cur.fetchone():
+                return False
+
+            new_ts = None
+            if prev_id and next_id:
+                cur.execute(
+                    "SELECT created_at FROM movies WHERE id = %s::uuid",
+                    (prev_id,),
+                )
+                prev_row = cur.fetchone()
+                cur.execute(
+                    "SELECT created_at FROM movies WHERE id = %s::uuid",
+                    (next_id,),
+                )
+                next_row = cur.fetchone()
+                if not prev_row or not next_row:
+                    return False
+                prev_ts, next_ts = prev_row[0], next_row[0]
+                new_ts = prev_ts + (next_ts - prev_ts) / 2
+            elif next_id:
+                cur.execute(
+                    "SELECT created_at FROM movies WHERE id = %s::uuid",
+                    (next_id,),
+                )
+                row = cur.fetchone()
+                if not row:
+                    return False
+                new_ts = row[0] + timedelta(hours=1)
+            elif prev_id:
+                cur.execute(
+                    "SELECT created_at FROM movies WHERE id = %s::uuid",
+                    (prev_id,),
+                )
+                row = cur.fetchone()
+                if not row:
+                    return False
+                new_ts = row[0] - timedelta(hours=1)
+            else:
+                return False
+
+            cur.execute(
+                "UPDATE movies SET created_at = %s WHERE id = %s::uuid",
+                (new_ts, movie_id),
+            )
+            updated = cur.rowcount
+        conn.commit()
+    return updated > 0
 
 def db_get_stories_pool() -> list:
     with get_db() as conn:

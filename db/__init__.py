@@ -89,6 +89,7 @@ from .db_ui import (
     db_get_role_modules,
     db_get_movies_list,
     db_get_movie_ids_by_filter,
+    db_reorder_movie,
 )
 
 from .db_service import (

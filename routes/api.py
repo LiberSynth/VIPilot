@@ -40,6 +40,7 @@ from db import (
     db_set_story_pinned,
     db_get_movies_list,
     db_get_movie_ids_by_filter,
+    db_reorder_movie,
     db_set_movie_grade,
     db_upsert_story_draft,
     db_update_story_content,
@@ -991,6 +992,21 @@ def api_production_movie_grade(movie_id):
     if not ok:
         return jsonify({"error": "not_found"}), 404
     return jsonify({"ok": True, "grade": grade})
+
+@production_bp.route("/production/movie/<movie_id>/reorder", methods=["POST"])
+def api_production_movie_reorder(movie_id):
+    err = _production_auth_check()
+    if err:
+        return err
+    data = request.get_json(silent=True) or {}
+    prev_id = data.get("prev_id") or None
+    next_id = data.get("next_id") or None
+    if not prev_id and not next_id:
+        return jsonify({"error": "prev_id or next_id required"}), 400
+    ok = db_reorder_movie(movie_id, prev_id=prev_id, next_id=next_id)
+    if not ok:
+        return jsonify({"error": "not_found"}), 404
+    return jsonify({"ok": True})
 
 @production_bp.route("/production/story/<story_id>/grade", methods=["POST"])
 def api_production_story_grade(story_id):

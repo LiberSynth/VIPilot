@@ -127,7 +127,8 @@
       return titleHtml + modelLabel;
     },
     renderButtons: function(item) {
-      return _renderPublishedIcon(item) + _renderGoToStoryBtn(item) + _renderInfoBtn(item) + _renderMovieDeleteBtn(item);
+      return _renderPublishedIcon(item) + _renderGoToStoryBtn(item) + _renderInfoBtn(item)
+        + _renderMovieDeleteBtn(item) + ListDragReorder.handleHtml();
     },
     onExpand: function(item) {
       _expandedMovieId = item ? String(item.id) : null;
@@ -179,6 +180,50 @@
         var movieTitle = btn.getAttribute('data-title') || '(без названия)';
         _openDeleteMovieDialog(movieId, movieTitle, btn);
       });
+    });
+  }
+
+  function _syncMovieDataOrder(ids, movedId) {
+    var data = _accordionList.getData();
+    var moved = null;
+    for (var i = 0; i < data.length; i++) {
+      if (String(data[i].id) === String(movedId)) {
+        moved = data.splice(i, 1)[0];
+        break;
+      }
+    }
+    if (!moved) return;
+    var insertAt = ids.indexOf(String(movedId));
+    if (insertAt < 0) insertAt = data.length;
+    data.splice(insertAt, 0, moved);
+  }
+
+  function saveMovieReorder(ids, movedId) {
+    var idx = ids.indexOf(String(movedId));
+    if (idx < 0) return;
+    var prevId = idx > 0 ? ids[idx - 1] : null;
+    var nextId = idx < ids.length - 1 ? ids[idx + 1] : null;
+    fetch('/production/movie/' + encodeURIComponent(movedId) + '/reorder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prev_id: prevId, next_id: nextId }),
+    })
+      .then(function(r) {
+        if (!r.ok) throw new Error('reorder failed');
+        _syncMovieDataOrder(ids, movedId);
+      })
+      .catch(function(e) {
+        console.error('movie reorder error', e);
+        window.loadMovieList();
+      });
+  }
+
+  function initMovieListDrag() {
+    var container = document.getElementById('movies-list');
+    if (!container || container.getAttribute('data-drag-bound') === '1') return;
+    container.setAttribute('data-drag-bound', '1');
+    ListDragReorder.bind(container, {
+      onReorder: function(ids, movedId) { saveMovieReorder(ids, movedId); },
     });
   }
 
@@ -376,6 +421,7 @@
     initDeleteBadMoviesButton();
     initImportMovieButton();
     initAutoplayToggle();
+    initMovieListDrag();
     updateVideoWrapHeight();
     window.addEventListener('resize', updateVideoWrapHeight);
   }
