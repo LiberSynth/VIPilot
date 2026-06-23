@@ -5,7 +5,7 @@ import psycopg2.extras
 from .connection import get_db
 from common.statuses import _assert_known_status
 
-_RESETTABLE_PIPELINES = frozenset({'story', 'video', 'transcode', 'publish'})
+_RESETTABLE_PIPELINES = frozenset({'story', 'prompt', 'video', 'transcode', 'publish'})
 
 def _get_story_source_batch_id(cur, story_id: str | None) -> str | None:
     if not story_id:
@@ -89,6 +89,39 @@ def db_create_story_batch(text_model_id: str | None = None):
                 RETURNING id
                 """,
                 (data,),
+            )
+            row = cur.fetchone()
+        batch_id = str(row[0])
+        db_set_batch_status(batch_id, 'pending', conn)
+    return batch_id
+
+def db_create_prompt_batch(story_id: str) -> str | None:
+    from common.statuses import FINAL_BATCH_STATUSES
+    final_statuses_sql = ', '.join(f"'{s}'" for s in FINAL_BATCH_STATUSES)
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM stories WHERE id = %s::uuid", (story_id,))
+            if not cur.fetchone():
+                return None
+            cur.execute(
+                f"""
+                SELECT 1 FROM batches
+                WHERE story_id = %s::uuid
+                  AND type = 'prompt'
+                  AND status NOT IN ({final_statuses_sql})
+                LIMIT 1
+                """,
+                (story_id,),
+            )
+            if cur.fetchone():
+                return None
+            cur.execute(
+                """
+                INSERT INTO batches (type, story_id)
+                VALUES ('prompt', %s::uuid)
+                RETURNING id
+                """,
+                (story_id,),
             )
             row = cur.fetchone()
         batch_id = str(row[0])
@@ -294,6 +327,7 @@ def db_get_actionable_batches():
                 WHERE status = 'pending'
                    OR status = 'processed'
                    OR (type = 'movie' AND status = 'processing')
+                   OR (type = 'prompt' AND status = 'processing')
                    OR status LIKE '%.pending'
                    OR status LIKE '%.completed'
                 ORDER BY created_at ASC, id ASC
@@ -322,6 +356,7 @@ def db_get_batch_by_id(batch_id):
 def db_reset_stalled_batches() -> list[dict]:
     typed_resets = [
         ("story", "processing", "pending"),
+        ("prompt", "processing", "pending"),
         ("transcode", "processing", "pending"),
     ]
     affected = []

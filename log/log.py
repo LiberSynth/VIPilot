@@ -10,6 +10,7 @@ ALLOWED_LOG_CHANNELS = frozenset({
     "api",
     "planning",
     "story",
+    "prompt",
     "video",
     "transcode",
     "publish",

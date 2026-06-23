@@ -42,6 +42,7 @@ from .db_pipeline import (
     db_create_planning_batch,
     db_create_video_batch,
     db_create_story_batch,
+    db_create_prompt_batch,
     db_set_batch_story,
     db_set_batch_status,
     db_claim_batch_status,

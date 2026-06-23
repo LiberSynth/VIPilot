@@ -902,6 +902,19 @@
   .story-icon-prompt    svg { stroke: #888; opacity: .55; }
   .story-icon-prompt--filled { color: #7eb8ff; }
   .story-icon-prompt--filled svg { stroke: #7eb8ff; opacity: .9; }
+  .story-icon-prompt--waiting { color: #c9a227; }
+  .story-icon-prompt--waiting svg { stroke: #c9a227; opacity: .85; animation: story-prompt-pulse 1.2s ease-in-out infinite; }
+  .story-icon-prompt--error { color: #ff6060; }
+  .story-icon-prompt--error svg { stroke: #ff6060; opacity: .9; }
+  .story-prompt-gen-btn {
+    background: none; border: none; padding: 0; cursor: pointer;
+  }
+  .story-prompt-gen-btn:hover { opacity: 1; }
+  .story-prompt-gen-btn.story-prompt-gen-btn--busy { opacity: .45; cursor: wait; }
+  @keyframes story-prompt-pulse {
+    0%, 100% { opacity: .45; }
+    50% { opacity: 1; }
+  }
   .story-pin-btn {
     background: none; border: none; padding: 0; cursor: pointer;
     color: #aaa; opacity: .55; transition: opacity .15s, color .15s;

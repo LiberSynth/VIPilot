@@ -208,3 +208,6 @@ class TestProductionBlueprintAuth:
 
     def test_post_story_generate(self, client):
         _assert_401(client.post("/production/story/generate"))
+
+    def test_post_story_prompt_generate(self, client):
+        _assert_401(client.post("/production/story/some-id/prompt/generate"))

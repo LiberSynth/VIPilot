@@ -28,6 +28,7 @@ from db import (
     db_get_movie_video_path,
     db_create_video_batch,
     db_create_story_batch,
+    db_create_prompt_batch,
     db_get_video_model_by_id,
     db_get_batch_logs,
     cycle_config_get,
@@ -1113,6 +1114,18 @@ def api_production_story_prompt(story_id):
     if updated_id is None:
         return jsonify({"error": "not_found"}), 404
     return jsonify({"ok": True})
+
+@production_bp.route("/production/story/<story_id>/prompt/generate", methods=["POST"])
+def api_production_story_prompt_generate(story_id):
+    err = _production_auth_check()
+    if err:
+        return err
+    batch_id = db_create_prompt_batch(story_id)
+    if batch_id is None:
+        return jsonify({"error": "busy_or_not_found"}), 409
+    environment.wakeup_loop()
+    write_log_entry(batch_id, 'api', 'Генерация T2V-промпта по запросу пользователя')
+    return jsonify({"batch_id": batch_id})
 
 @production_bp.route("/production/stories/delete_bad", methods=["POST"])
 def api_production_delete_bad_stories():

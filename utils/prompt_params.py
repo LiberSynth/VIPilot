@@ -49,7 +49,9 @@ _PARAMS = [
     ('{использованные_сюжеты}', _get_used_plots),
 ]
 
-def apply_prompt_params(text: str) -> str:
+def apply_prompt_params(text: str, *, story_content: str | None = None) -> str:
+    if story_content is not None and '{сюжет}' in text:
+        text = text.replace('{сюжет}', story_content)
     for param, getter in _PARAMS:
         if param in text:
             text = text.replace(param, getter())

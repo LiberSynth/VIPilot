@@ -1,9 +1,11 @@
-from pipelines import planning, story, video, transcode, publish
+from pipelines import planning, story, prompt, video, transcode, publish
 from common.statuses import PUBLISH_ROUTING_SUFFIXES
 
 _TYPE_STATUS_TO_PIPELINE = {
     ('planning', 'pending'): planning,
     ('story', 'pending'):    story,
+    ('prompt', 'pending'):   prompt,
+    ('prompt', 'processing'): prompt,
     ('movie', 'pending'):    video,
     ('movie', 'processing'): video,
     ('movie', 'processed'):  video,

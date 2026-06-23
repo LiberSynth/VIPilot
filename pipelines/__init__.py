@@ -16,6 +16,7 @@ _GUARDED_MODULES = frozenset({
     'pipelines.planning',
     'pipelines.cleanup',
     'pipelines.story',
+    'pipelines.prompt',
     'pipelines.video',
     'pipelines.transcode',
     'pipelines.publish',

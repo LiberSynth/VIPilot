@@ -29,11 +29,12 @@
     vkvideo: 'VK Видео',
   };
 
-  const TYPE_RESTARTABLE = ['story', 'movie', 'transcode', 'publish'];
+  const TYPE_RESTARTABLE = ['story', 'prompt', 'movie', 'transcode', 'publish'];
   const TYPE_LINKED_MEDIA = ['transcode', 'publish', 'planning'];
   const PIPELINE_CHAIN_TYPES = ['story', 'movie', 'planning', 'transcode', 'publish'];
   const TYPE_TO_RESET_PIPELINE = {
     story:     'story',
+    prompt:    'prompt',
     movie:     'video',
     transcode: 'transcode',
     publish:   'publish',
@@ -132,6 +133,7 @@
   const FIXED_BATCH_TITLES = {
     planning:  'Планирование',
     story:     'Генерация сюжета',
+    prompt:    'Генерация промпта',
     movie:     'Генерация видео',
     transcode: 'Транскодирование',
     publish:   'Публикация',

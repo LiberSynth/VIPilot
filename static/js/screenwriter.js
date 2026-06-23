@@ -119,7 +119,14 @@ var setDraftStoryFromRecord;
     if (!titleEl || !contentEl) return;
     titleEl.addEventListener('input', onDraftInput);
     contentEl.addEventListener('input', onDraftInput);
-    if (promptEl) promptEl.addEventListener('input', onDraftInput);
+    if (promptEl) {
+      promptEl.addEventListener('input', onDraftInput);
+      promptEl.addEventListener('input', function() {
+        if (typeof window.syncActiveStoryPromptIcon === 'function') {
+          window.syncActiveStoryPromptIcon();
+        }
+      });
+    }
   }
 
   if (document.readyState === 'loading') {
@@ -141,18 +148,154 @@ var setDraftStoryFromRecord;
     }
   }
 
-  function _renderStoryIcons(s) {
-    var icons = '';
-    if (s.id !== '__new__') {
-      var promptTitle = s.has_prompt ? 'T2V-промпт заполнен' : 'T2V-промпт не задан';
-      icons += '<span class="story-icon story-icon-prompt' + (s.has_prompt ? ' story-icon-prompt--filled' : '')
-        + '" title="' + promptTitle + '">'
-        + '<svg viewBox="0 0 16 16" fill="' + (s.has_prompt ? 'currentColor' : 'none')
-        + '" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">'
-        + '<rect x="2" y="2" width="12" height="12" rx="1.5"/>'
-        + '<path d="M5 5h6M5 8h6M5 11h4"/>'
-        + '</svg></span>';
+  function _promptIconSvg(filled) {
+    return '<svg viewBox="0 0 16 16" fill="' + (filled ? 'currentColor' : 'none')
+      + '" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">'
+      + '<rect x="2" y="2" width="12" height="12" rx="1.5"/>'
+      + '<path d="M5 5h6M5 8h6M5 11h4"/>'
+      + '</svg>';
+  }
+
+  function _hasPromptText(val) {
+    return !!(val && String(val).trim());
+  }
+
+  function _renderPromptIcon(s) {
+    if (s.id === '__new__') return '';
+    if (s.has_prompt) {
+      return '<span class="story-icon story-icon-prompt story-icon-prompt--filled" title="T2V-промпт заполнен">'
+        + _promptIconSvg(true) + '</span>';
     }
+    if (s.has_active_prompt_batch) {
+      return '<span class="story-icon story-icon-prompt story-icon-prompt--waiting" title="Генерация T2V-промпта…">'
+        + _promptIconSvg(false) + '</span>';
+    }
+    if (s.prompt_gen_error) {
+      return '<button type="button" class="story-icon story-prompt-gen-btn story-icon-prompt story-icon-prompt--error"'
+        + ' data-id="' + s.id + '" title="Ошибка генерации — нажмите для повтора">'
+        + _promptIconSvg(false) + '</button>';
+    }
+    return '<button type="button" class="story-icon story-prompt-gen-btn story-icon-prompt"'
+      + ' data-id="' + s.id + '" title="Сгенерировать T2V-промпт">'
+      + _promptIconSvg(false) + '</button>';
+  }
+
+  function _mergedPromptIconState(storyId, promptText) {
+    var item = (window._currentStoriesList || []).find(function(s) {
+      return String(s.id) === String(storyId);
+    });
+    var base = item || {
+      id: storyId,
+      has_prompt: false,
+      has_active_prompt_batch: false,
+      prompt_gen_error: false,
+    };
+    if (base.has_active_prompt_batch) {
+      return {
+        id: storyId,
+        has_active_prompt_batch: true,
+        has_prompt: false,
+        prompt_gen_error: false,
+      };
+    }
+    var filled = _hasPromptText(promptText);
+    return {
+      id: storyId,
+      has_active_prompt_batch: false,
+      has_prompt: filled,
+      prompt_gen_error: !filled && base.prompt_gen_error,
+    };
+  }
+
+  function _bindSinglePromptGenBtn(btn) {
+    if (!btn || btn.dataset.promptGenBound === '1') return;
+    btn.dataset.promptGenBound = '1';
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (btn.classList.contains('story-prompt-gen-btn--busy')) return;
+      var storyId = btn.getAttribute('data-id');
+      if (!storyId) return;
+      btn.classList.add('story-prompt-gen-btn--busy');
+      fetch('/production/story/' + encodeURIComponent(storyId) + '/prompt/generate', {
+        method: 'POST',
+      })
+        .then(function(r) {
+          return r.json().then(function(d) { return { ok: r.ok, data: d || {} }; });
+        })
+        .then(function(res) {
+          btn.classList.remove('story-prompt-gen-btn--busy');
+          if (res.ok && res.data.batch_id) {
+            if (typeof window.loadStoryList === 'function') window.loadStoryList();
+          }
+        })
+        .catch(function() {
+          btn.classList.remove('story-prompt-gen-btn--busy');
+        });
+    });
+  }
+
+  function _updatePromptIconInRow(storyId, promptText) {
+    if (!storyId || storyId === '__new__') return;
+    var row = document.querySelector('.story-row[data-id="' + storyId + '"]');
+    if (!row) return;
+    var existing = row.querySelector('.story-icon-prompt, .story-prompt-gen-btn');
+    if (!existing) return;
+    var state = _mergedPromptIconState(storyId, promptText);
+    var wrapper = document.createElement('span');
+    wrapper.innerHTML = _renderPromptIcon(state);
+    var newEl = wrapper.firstChild;
+    if (!newEl) return;
+    existing.replaceWith(newEl);
+    if (newEl.classList.contains('story-prompt-gen-btn')) {
+      _bindSinglePromptGenBtn(newEl);
+    }
+    var item = (window._currentStoriesList || []).find(function(s) {
+      return String(s.id) === String(storyId);
+    });
+    if (item) {
+      item.prompt = promptText;
+      item.has_prompt = state.has_prompt;
+    }
+  }
+
+  window.syncActiveStoryPromptIcon = function() {
+    if (!_activeStoryId || _activeStoryId === '__new__') return;
+    var promptEl = document.getElementById('draft-story-prompt');
+    _updatePromptIconInRow(_activeStoryId, promptEl ? promptEl.value : '');
+  };
+
+  var _promptPollTimer = null;
+
+  function _syncOpenStoryPromptFromList(stories) {
+    if (!_activeStoryId || !stories) return;
+    var item = stories.find(function(s) { return String(s.id) === String(_activeStoryId); });
+    if (!item || !item.has_prompt) return;
+    var promptEl = document.getElementById('draft-story-prompt');
+    if (promptEl && item.prompt && promptEl.value !== item.prompt) {
+      promptEl.value = item.prompt;
+      if (typeof window.updateDraftWordCount === 'function') window.updateDraftWordCount();
+    }
+  }
+
+  function _syncPromptPoll(stories) {
+    var active = stories && stories.some(function(s) { return s.has_active_prompt_batch; });
+    if (active) {
+      if (!_promptPollTimer) {
+        _promptPollTimer = setInterval(function() {
+          if (typeof window.loadStoryList === 'function') window.loadStoryList();
+        }, 1500);
+      }
+    } else {
+      if (_promptPollTimer) {
+        clearInterval(_promptPollTimer);
+        _promptPollTimer = null;
+      }
+      _syncOpenStoryPromptFromList(stories);
+    }
+  }
+
+  function _renderStoryIcons(s) {
+    var icons = _renderPromptIcon(s);
     if (s.used) {
       icons += '<span class="story-icon story-icon-used" title="Использован в производстве">'
         + '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">'
@@ -252,7 +395,8 @@ var setDraftStoryFromRecord;
     newRowItem: {
       id: '__new__', grade: null, pinned: false,
       ai_generated: false, manual_changed: true, used: false,
-      has_prompt: false, has_movie: false, has_active_batch: false,
+      has_prompt: false, has_active_prompt_batch: false, prompt_gen_error: false,
+      has_movie: false, has_active_batch: false,
       title: '', content: '', prompt: '',
     },
     onNewRowReady: function(_expandEl, fakeRow) {
@@ -390,6 +534,7 @@ var setDraftStoryFromRecord;
   };
 
   function _bindListButtons(container) {
+    container.querySelectorAll('.story-prompt-gen-btn').forEach(_bindSinglePromptGenBtn);
     container.querySelectorAll('.story-pin-btn:not([data-id="__new__"])').forEach(function(btn) {
       btn.addEventListener('click', function(e) {
         e.stopPropagation();
@@ -467,6 +612,7 @@ var setDraftStoryFromRecord;
       _setExportStoriesBtnEnabled(false);
       if (!_accordionList.getActiveId()) _activeStoryId = null;
       _accordionList.render([]);
+      _syncPromptPoll([]);
       return;
     }
 
@@ -474,6 +620,7 @@ var setDraftStoryFromRecord;
     _setExportStoriesBtnEnabled(true);
     _accordionList.render(stories);
     _bindListButtons(container);
+    _syncPromptPoll(stories);
   }
 
   function getFilterParams() {
@@ -1107,6 +1254,9 @@ var setDraftStoryFromRecord;
   window.setDraftStoryFromRecord = function(story) {
     if (_origSetDraft) _origSetDraft(story);
     updateWordCount();
+    if (typeof window.syncActiveStoryPromptIcon === 'function') {
+      window.syncActiveStoryPromptIcon();
+    }
   };
 
   var _origResetDraft = window.resetDraftStoryId;

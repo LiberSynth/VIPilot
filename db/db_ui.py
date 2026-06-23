@@ -135,7 +135,20 @@ def db_get_stories_list(show_used=True, show_bad=True, for_approval=False, pin_i
                     EXISTS (
                         SELECT 1 FROM movies m
                         WHERE m.story_id = s.id
-                    ) AS has_movie
+                    ) AS has_movie,
+                    EXISTS (
+                        SELECT 1 FROM batches b
+                        WHERE b.story_id = s.id
+                          AND b.type = 'prompt'
+                          AND b.status NOT IN ({final_statuses_sql})
+                    ) AS has_active_prompt_batch,
+                    (
+                        SELECT b.status FROM batches b
+                        WHERE b.story_id = s.id
+                          AND b.type = 'prompt'
+                        ORDER BY b.created_at DESC, b.id DESC
+                        LIMIT 1
+                    ) AS last_prompt_batch_status
                 FROM stories s
                 LEFT JOIN ai_models am ON am.id = s.model_id
                 {where_clause}
@@ -157,6 +170,11 @@ def db_get_stories_list(show_used=True, show_bad=True, for_approval=False, pin_i
             "pinned": bool(row[9]),
             "has_active_batch": bool(row[10]),
             "has_movie": bool(row[11]),
+            "has_active_prompt_batch": bool(row[12]),
+            "prompt_gen_error": (
+                not (row[3] and str(row[3]).strip())
+                and row[13] in ('error', 'fatal_error')
+            ),
         }
         for row in rows
     ]
