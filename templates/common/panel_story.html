@@ -3,13 +3,13 @@
     <form id="story-form" style="margin-top:0">
       <div class="card" style="margin-top:12px">
         <div class="card-title">Форматный промпт</div>
-        <div class="hint">Инструкция для текстовой модели: формат ответа, стиль, ограничения. Модель получает этот промпт как системное сообщение перед текстовым промптом.</div>
+        <div class="hint">Системное сообщение для генерации сюжета: формат ответа, стиль, ограничения. Передаётся текстовой модели перед промптом генерации сюжета.</div>
         <textarea name="format_prompt" id="ta_formatprompt" spellcheck="true" autocomplete="off">{{ format_prompt }}</textarea>
         <div class="char-count" id="charcount_formatprompt"></div>
       </div>
       <div class="card" style="margin-top:12px">
-        <div class="card-title">Текстовый промпт</div>
-        <div class="hint">Стиль, тема и характер сценария. Описание для формирования раскадровки.</div>
+        <div class="card-title">Промпт генерации сюжета</div>
+        <div class="hint">Стиль, тема и задача для LLM при создании литературного сюжета (поле «Сюжет» в карточке Сценариста).</div>
         <textarea name="text_prompt" id="ta" spellcheck="true" autocomplete="off">{{ text_prompt }}</textarea>
         <div class="char-count" id="charcount"></div>
       </div>
@@ -21,7 +21,7 @@
       </div>
       <div class="card" style="margin-top:12px">
         <div class="card-title">Суффикс видео-промпта</div>
-        <div class="hint">Текст, добавляемый к сюжету через два переноса строки перед отправкой в видео-модель. Поддерживает тег <code>{продолжительность}</code> — подставляет длительность видео в секундах. Например: «Ролик длится {продолжительность} секунд. Делай конец плавным.»</div>
+        <div class="hint">Текст, добавляемый к T2V-промпту через два переноса строки перед отправкой в видео-модель. Поддерживает тег <code>{продолжительность}</code> — подставляет длительность видео в секундах. Например: «Ролик длится {продолжительность} секунд. Делай конец плавным.»</div>
         <textarea name="video_post_prompt" id="ta_postprompt" spellcheck="true" autocomplete="off">{{ video_post_prompt }}</textarea>
       </div>
     </form>
@@ -31,7 +31,7 @@
       <div style="margin-top:14px">
         <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block" for="words-per-second-input">Слов на секунду</label>
         <input type="number" id="words-per-second-input" min="1" max="100" step="1" value="{{ words_per_second | int }}" style="width:80px" autocomplete="off">
-        <div class="hint" style="margin-top:5px">Используется для управления объёмом T2V промпта. Параметр {количество_слов} в промптах вычисляется как произведение длительности ролика (сек) на это значение.</div>
+        <div class="hint" style="margin-top:5px">Используется для счётчика слов в поле «Промпт» карточки сюжета. Параметр {количество_слов} в промптах вычисляется как произведение длительности ролика (сек) на это значение.</div>
       </div>
       <div style="margin-top:14px">
         <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block" for="story_fails_to_next">Попыток на модель</label>
@@ -39,9 +39,9 @@
         <div class="hint" style="margin-top:5px">Число неудачных попыток перед переходом к следующей модели.</div>
       </div>
       <div style="margin-top:14px">
-        <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block" for="good-samples-count-input">Хороших образцов в промпте</label>
+        <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block" for="good-samples-count-input">Хороших образцов сюжета</label>
         <input type="number" id="good-samples-count-input" min="1" max="999" step="1" value="{{ good_samples_count }}" style="width:80px" autocomplete="off">
-        <div class="hint" style="margin-top:5px">Сколько закреплённых историй с оценкой «Хорошо» подаётся в промпт как положительные примеры. Список формируется случайным образом из всех доступных закреплённых историй с этой оценкой.</div>
+        <div class="hint" style="margin-top:5px">Сколько сюжетов с оценкой «Хорошо» подставляется в промпт генерации сюжета как положительные примеры (текст поля «Сюжет»). Список формируется случайным образом из всех доступных с этой оценкой.</div>
       </div>
     </div>
 

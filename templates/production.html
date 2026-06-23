@@ -143,7 +143,7 @@
 
     <div class="card" style="margin-top:0">
       <div class="card-title">Ролик</div>
-      <div class="hint" style="margin-bottom:4px">Сюжет</div>
+      <div class="hint" style="margin-bottom:4px">Выбор сюжета</div>
       <div class="cust-select" id="director-story-wrap">
         <button type="button" class="cust-select-btn" id="director-story-btn">
           <span id="director-story-label">Выберите сюжет</span>
@@ -155,8 +155,9 @@
         </div>
       </div>
       <input type="hidden" id="director-story-id" value="">
-      <textarea id="director-story-content" style="width:100%; box-sizing:border-box; resize:vertical"></textarea>
-      <div class="hint" style="margin-top:8px;margin-bottom:4px">Промпт</div>
+      <label class="setting-label" style="font-size:12px;margin-top:8px;margin-bottom:4px;display:block">Сюжет</label>
+      <textarea id="director-story-content" style="width:100%; box-sizing:border-box; resize:vertical" placeholder="Литературный текст сюжета" spellcheck="true" autocomplete="off"></textarea>
+      <label class="setting-label" style="font-size:12px;margin-top:8px;margin-bottom:4px;display:block">Промпт</label>
       <textarea id="director-story-prompt" style="width:100%; box-sizing:border-box; resize:vertical" placeholder="T2V-промпт для генерации видео"></textarea>
       <div style="margin-top:8px">
         <div style="display:flex; align-items:center; gap:10px; margin-bottom:4px">

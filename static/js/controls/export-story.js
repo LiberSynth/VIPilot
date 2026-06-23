@@ -91,11 +91,11 @@
             if (configLines.length) {
               modelBlock += '\n' + window.wrapBlock('Конфиг модели', configLines.join('\n'));
             }
-            var answerBlock = window.wrapBlock('Ответ текстовой модели', answer);
+            var answerBlock = window.wrapBlock('Сюжет', answer);
             var tail = modelBlock + '\n' + answerBlock;
             if (isFirst) {
-              var promptBlock = window.wrapBlock('Системный промпт', d.format_prompt || '');
-              promptBlock += '\n\n' + window.wrapBlock('Промпт', d.user_prompt || '');
+              var promptBlock = window.wrapBlock('Форматный промпт', d.format_prompt || '');
+              promptBlock += '\n\n' + window.wrapBlock('Промпт генерации сюжета', d.user_prompt || '');
               return promptBlock + '\n\n' + tail;
             }
             return tail;
