@@ -285,6 +285,16 @@ def db_get_story_text(story_id):
             row = cur.fetchone()
     return row[0] if row else None
 
+def db_get_story_prompt(story_id):
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT NULLIF(TRIM(prompt), '') FROM stories WHERE id = %s",
+                (story_id,),
+            )
+            row = cur.fetchone()
+    return row[0] if row else None
+
 def db_get_story_title(story_id):
     with get_db() as conn:
         with conn.cursor() as cur:

@@ -14,7 +14,7 @@ from db import (
     settings_get,
     cycle_config_get,
     db_get_batch_by_id,
-    db_get_story_text,
+    db_get_story_prompt,
     db_get_story_title,
     db_get_video_model_by_id,
     db_save_video_job_and_set_pending,
@@ -253,9 +253,9 @@ def run(batch_id, category):
         except (ValueError, TypeError):
             max_attempts_per_model = 3
 
-        story_text = db_get_story_text(story_id)
-        if not story_text:
-            msg = fmt_id_msg('Не найден сюжет story_id={}', story_id)
+        video_prompt = db_get_story_prompt(story_id)
+        if not video_prompt:
+            msg = fmt_id_msg('T2V-промпт не задан для story_id={}', story_id)
             write_log_entry(batch_id, category, msg, level='error')
             write_log_entry(batch_id, category, f"{msg}", level='silent')
             raise AppException(batch_id, 'video', msg)
@@ -264,7 +264,7 @@ def run(batch_id, category):
         video_post_prompt = cycle_config_get('video_post_prompt').strip()
         if video_post_prompt:
             video_post_prompt = apply_prompt_params(video_post_prompt)
-            story_text = story_text + '\n\n' + video_post_prompt
+            video_prompt = video_prompt + '\n\n' + video_post_prompt
 
         video_duration = max(1, min(60, cycle_config_get('video_duration')))
         allowed = model.get('allowed_durations') or [0]
@@ -288,7 +288,7 @@ def run(batch_id, category):
 
             sr = client.submit(
                 batch_id, category, model_name, model['submit_url'], model['platform_url'],
-                model['body_tpl'], story_text, ar_x, ar_y, actual_duration,
+                model['body_tpl'], video_prompt, ar_x, ar_y, actual_duration,
             )
             if not sr:
                 write_log_entry(batch_id, category, "Провайдер не принял запрос — переход к следующей попытке.", level='warn')

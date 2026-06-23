@@ -337,11 +337,11 @@ def db_get_stories_pool() -> list:
 def db_count_good_pool() -> int:
     with get_db() as conn:
         with conn.cursor() as cur:
-            cur.execute(f"""
+            cur.execute("""
                 SELECT COUNT(*) FROM stories
                 WHERE grade = 'good'
-                  AND
-                  NOT EXISTS (
+                  AND NULLIF(TRIM(prompt), '') IS NOT NULL
+                  AND NOT EXISTS (
                       SELECT 1 FROM movies m
                       WHERE m.story_id = stories.id
                         AND m.grade = 'good'

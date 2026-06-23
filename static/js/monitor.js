@@ -31,7 +31,7 @@
 
   const TYPE_RESTARTABLE = ['story', 'prompt', 'movie', 'transcode', 'publish'];
   const TYPE_LINKED_MEDIA = ['transcode', 'publish', 'planning'];
-  const PIPELINE_CHAIN_TYPES = ['story', 'movie', 'planning', 'transcode', 'publish'];
+  const PIPELINE_CHAIN_TYPES = ['story', 'prompt', 'movie', 'planning', 'transcode', 'publish'];
   const TYPE_TO_RESET_PIPELINE = {
     story:     'story',
     prompt:    'prompt',

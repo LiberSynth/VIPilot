@@ -23,6 +23,25 @@ def _get_story_source_batch_id(cur, story_id: str | None) -> str | None:
     row = cur.fetchone()
     return row[0] if row else None
 
+def _get_prompt_source_batch_id(cur, story_id: str | None) -> str | None:
+    if not story_id:
+        return None
+    cur.execute(
+        """
+        SELECT id::text
+        FROM batches
+        WHERE type = 'prompt' AND story_id = %s::uuid
+        ORDER BY created_at DESC, id DESC
+        LIMIT 1
+        """,
+        (story_id,),
+    )
+    row = cur.fetchone()
+    return row[0] if row else None
+
+def _get_video_source_batch_id(cur, story_id: str | None) -> str | None:
+    return _get_prompt_source_batch_id(cur, story_id) or _get_story_source_batch_id(cur, story_id)
+
 def db_create_planning_batch(scheduled_at):
     with get_db() as conn:
         with conn.cursor() as cur:
@@ -60,7 +79,7 @@ def db_create_video_batch(batch_type, model_id=None, story_id=None):
             resolved_story_id = str(story_id) if story_id else None
             if batch_type == "movie" and not resolved_story_id:
                 return None
-            batch_id_source = _get_story_source_batch_id(cur, resolved_story_id)
+            batch_id_source = _get_video_source_batch_id(cur, resolved_story_id)
             cur.execute(
                 """
                 INSERT INTO batches (type, story_id, batch_id_source, data)
@@ -115,13 +134,14 @@ def db_create_prompt_batch(story_id: str) -> str | None:
             )
             if cur.fetchone():
                 return None
+            batch_id_source = _get_story_source_batch_id(cur, story_id)
             cur.execute(
                 """
-                INSERT INTO batches (type, story_id)
-                VALUES ('prompt', %s::uuid)
+                INSERT INTO batches (type, story_id, batch_id_source)
+                VALUES ('prompt', %s::uuid, %s)
                 RETURNING id
                 """,
-                (story_id,),
+                (story_id, batch_id_source),
             )
             row = cur.fetchone()
         batch_id = str(row[0])
@@ -593,7 +613,7 @@ def db_get_batch_vkvideo_clip_url(batch_id: str) -> str:
             row = cur.fetchone()
     return (row[0] or '') if row else ''
 
-_PIPELINE_CHAIN_TYPES = ("story", "movie", "planning", "transcode", "publish")
+_PIPELINE_CHAIN_TYPES = ("story", "prompt", "movie", "planning", "transcode", "publish")
 
 def _pipeline_chain_type_index(batch_type: str | None) -> int | None:
     if not batch_type:
