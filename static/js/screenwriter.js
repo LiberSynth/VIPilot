@@ -414,7 +414,7 @@ var setDraftStoryFromRecord;
   function _openDeleteStoryDialog(storyId, storyTitle, triggerBtn) {
     new ConfirmDialog({
       title:        'Удалить сюжет?',
-      text:         'Сюжет «' + AccordionList.escapeHtml(storyTitle) + '» и все связанные батчи, лог и записи лога будут удалены безвозвратно.<br>Видеоролики (movies) и файлы в video/ не затрагиваются.',
+      text:         'Сюжет «' + AccordionList.escapeHtml(storyTitle) + '» и связанные батчи генерации (story), их лог и записи лога будут удалены безвозвратно.<br>Видеоролики (movies) и файлы в video/ не затрагиваются.',
       confirmLabel: 'Удалить',
       triggerBtn:   triggerBtn,
       onConfirm: function(btn, dlg) {

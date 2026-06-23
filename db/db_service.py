@@ -453,20 +453,50 @@ def db_clear_all_history():
     write_log_entry(None, 'db', f'Очистка истории: log_entries={le}, log={ll}, batches={bl}', level='silent')
     return {"log_entries": le, "logs": ll, "batches": bl}
 
+def _delete_story_type_batches_and_logs(cur, story_ids) -> tuple[int, int, int]:
+    """Удаляет батчи type='story' для сюжетов и их log / log_entries."""
+    if not story_ids:
+        return 0, 0, 0
+    fmt = ','.join(['%s'] * len(story_ids))
+    cur.execute(
+        f"SELECT id FROM batches WHERE story_id IN ({fmt}) AND type = 'story'",
+        story_ids,
+    )
+    batch_ids = [r[0] for r in cur.fetchall()]
+    if not batch_ids:
+        return 0, 0, 0
+    bfmt = ','.join(['%s'] * len(batch_ids))
+    cur.execute(f"""
+        DELETE FROM log_entries
+        WHERE log_id IN (
+            SELECT id FROM log WHERE batch_id IN ({bfmt})
+        )
+    """, batch_ids)
+    le_count = cur.rowcount
+    cur.execute(f"DELETE FROM log WHERE batch_id IN ({bfmt})", batch_ids)
+    ll_count = cur.rowcount
+    cur.execute(f"DELETE FROM batches WHERE id IN ({bfmt})", batch_ids)
+    bl_count = cur.rowcount
+    return bl_count, ll_count, le_count
+
 def db_purge_unused_stories() -> dict:
     """Удаление stories — только UI «Сценарист → Удалить лишние»."""
     with get_db() as conn:
         with conn.cursor() as cur:
             final_statuses_sql = ', '.join(f"'{s}'" for s in FINAL_BATCH_STATUSES)
             cur.execute(f"""
-                SELECT DISTINCT s.id
+                SELECT s.id
                 FROM stories s
-                LEFT JOIN batches b
-                       ON b.story_id = s.id
-                      AND (b.movie_id IS NOT NULL OR b.status NOT IN ({final_statuses_sql}))
                 WHERE (s.grade IS NULL OR s.grade = 'bad')
                   AND NOT s.pinned
-                  AND b.id IS NULL
+                  AND NOT EXISTS (
+                      SELECT 1 FROM movies m WHERE m.story_id = s.id
+                  )
+                  AND NOT EXISTS (
+                      SELECT 1 FROM batches b
+                      WHERE b.story_id = s.id
+                        AND b.status NOT IN ({final_statuses_sql})
+                  )
             """)
             story_ids = [r[0] for r in cur.fetchall()]
 
@@ -475,31 +505,9 @@ def db_purge_unused_stories() -> dict:
                 write_log_entry(None, 'db', 'Очистка сюжетов: stories=0, batches=0, log=0, log_entries=0', level='silent')
                 return {"stories": 0, "batches": 0, "logs": 0, "log_entries": 0}
 
+            bl_count, ll_count, le_count = _delete_story_type_batches_and_logs(cur, story_ids)
+
             fmt = ','.join(['%s'] * len(story_ids))
-
-            cur.execute(f"SELECT id FROM batches WHERE story_id IN ({fmt})", story_ids)
-            batch_ids = [r[0] for r in cur.fetchall()]
-
-            le_count = 0
-            ll_count = 0
-            bl_count = 0
-
-            if batch_ids:
-                bfmt = ','.join(['%s'] * len(batch_ids))
-                cur.execute(f"""
-                    DELETE FROM log_entries
-                    WHERE log_id IN (
-                        SELECT id FROM log WHERE batch_id IN ({bfmt})
-                    )
-                """, batch_ids)
-                le_count = cur.rowcount
-
-                cur.execute(f"DELETE FROM log WHERE batch_id IN ({bfmt})", batch_ids)
-                ll_count = cur.rowcount
-
-                cur.execute(f"DELETE FROM batches WHERE id IN ({bfmt})", batch_ids)
-                bl_count = cur.rowcount
-
             cur.execute(f"DELETE FROM stories WHERE id IN ({fmt})", story_ids)
             sl_count = cur.rowcount
 
@@ -588,28 +596,7 @@ def db_delete_story(story_id: str) -> dict:
     """Удаление stories — только UI «Сценарист → Удалить»."""
     with get_db() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT id FROM batches WHERE story_id = %s", (story_id,))
-            batch_ids = [r[0] for r in cur.fetchall()]
-
-            le_count = 0
-            ll_count = 0
-            bl_count = 0
-
-            if batch_ids:
-                bfmt = ','.join(['%s'] * len(batch_ids))
-                cur.execute(f"""
-                    DELETE FROM log_entries
-                    WHERE log_id IN (
-                        SELECT id FROM log WHERE batch_id IN ({bfmt})
-                    )
-                """, batch_ids)
-                le_count = cur.rowcount
-
-                cur.execute(f"DELETE FROM log WHERE batch_id IN ({bfmt})", batch_ids)
-                ll_count = cur.rowcount
-
-                cur.execute(f"DELETE FROM batches WHERE id IN ({bfmt})", batch_ids)
-                bl_count = cur.rowcount
+            bl_count, ll_count, le_count = _delete_story_type_batches_and_logs(cur, [story_id])
 
             cur.execute("DELETE FROM stories WHERE id = %s", (story_id,))
             sl_count = cur.rowcount

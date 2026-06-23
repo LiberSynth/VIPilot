@@ -1043,7 +1043,7 @@ def api_production_story_delete(story_id):
                 conflict_error = "Сюжет закреплён и не может быть удалён"
             else:
                 cur.execute(
-                    "SELECT 1 FROM batches WHERE story_id = %s AND movie_id IS NOT NULL LIMIT 1",
+                    "SELECT 1 FROM movies WHERE story_id = %s LIMIT 1",
                     (story_id,),
                 )
                 if cur.fetchone():
@@ -1139,9 +1139,9 @@ def api_production_movies_upload():
     video_data = f.read()
     from db import db_create_manual_movie
 
-    batch_id = db_create_manual_movie(title, video_data)
+    movie_id = db_create_manual_movie(title, video_data)
     environment.wakeup_loop()
-    return jsonify({"ok": True, "batch_id": batch_id})
+    return jsonify({"ok": True, "movie_id": movie_id})
 
 @production_bp.route("/production/video/generate", methods=["POST"])
 def api_production_video_generate():
