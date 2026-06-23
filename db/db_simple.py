@@ -335,6 +335,18 @@ def db_set_story_model(story_id, model_id):
         conn.commit()
     return True
 
+def db_update_story_prompt(story_id, prompt):
+    prompt_val = prompt.strip() if isinstance(prompt, str) and prompt.strip() else None
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE stories SET prompt = %s WHERE id = %s::uuid RETURNING id",
+                (prompt_val, story_id),
+            )
+            row = cur.fetchone()
+        conn.commit()
+    return str(row[0]) if row else None
+
 def db_update_story_content(story_id, content):
     with get_db() as conn:
         with conn.cursor() as cur:

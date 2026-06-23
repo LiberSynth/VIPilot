@@ -294,9 +294,10 @@ def db_get_stories_pool() -> list:
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(f"""
-                SELECT id::text, title, content
+                SELECT id::text, title, content, prompt
                 FROM stories
                 WHERE grade = 'good'
+                  AND NULLIF(TRIM(prompt), '') IS NOT NULL
                   AND NOT EXISTS (
                       SELECT 1 FROM movies m
                       WHERE m.story_id = stories.id
@@ -305,7 +306,15 @@ def db_get_stories_pool() -> list:
                 ORDER BY created_at DESC, id DESC
             """)
             rows = cur.fetchall()
-    return [{"id": row[0], "title": row[1] or "", "content": row[2] or ""} for row in rows]
+    return [
+        {
+            "id": row[0],
+            "title": row[1] or "",
+            "content": row[2] or "",
+            "prompt": row[3] or "",
+        }
+        for row in rows
+    ]
 
 def db_count_good_pool() -> int:
     with get_db() as conn:

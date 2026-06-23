@@ -156,6 +156,8 @@
       </div>
       <input type="hidden" id="director-story-id" value="">
       <textarea id="director-story-content" style="width:100%; box-sizing:border-box; resize:vertical"></textarea>
+      <div class="hint" style="margin-top:8px;margin-bottom:4px">Промпт</div>
+      <textarea id="director-story-prompt" style="width:100%; box-sizing:border-box; resize:vertical" placeholder="T2V-промпт для генерации видео"></textarea>
       <div style="margin-top:8px">
         <div style="display:flex; align-items:center; gap:10px; margin-bottom:4px">
           <div class="hint" style="margin-bottom:0">Модель</div>
@@ -286,6 +288,7 @@
     var lbl = document.getElementById('director-story-label');
     var hid = document.getElementById('director-story-id');
     var ta  = document.getElementById('director-story-content');
+    var promptTa = document.getElementById('director-story-prompt');
     if (lbl) lbl.textContent = label;
     if (hid) hid.value = id;
     document.querySelectorAll('#director-story-list .cust-select-option').forEach(function(o) {
@@ -297,6 +300,14 @@
       } else {
         var story = _storyPoolData.find(function(s) { return s.id === id; });
         ta.value = story ? (story.content || '') : '';
+      }
+    }
+    if (promptTa) {
+      if (!id) {
+        promptTa.value = '';
+      } else {
+        var storyPrompt = _storyPoolData.find(function(s) { return s.id === id; });
+        promptTa.value = storyPrompt ? (storyPrompt.prompt || '') : '';
       }
     }
     _syncDirectorGenerateButtonState();
@@ -392,6 +403,24 @@
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ content: _contentSaveEl.value }),
+        });
+      }, 800);
+    });
+  }
+
+  /* ── Сохранение промпта ── */
+  var _promptSaveTimer = null;
+  var _promptSaveEl = document.getElementById('director-story-prompt');
+  if (_promptSaveEl) {
+    _promptSaveEl.addEventListener('input', function() {
+      var storyId = document.getElementById('director-story-id').value;
+      if (!storyId) return;
+      clearTimeout(_promptSaveTimer);
+      _promptSaveTimer = setTimeout(function() {
+        fetch('/production/story/' + storyId + '/prompt', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: _promptSaveEl.value }),
         });
       }, 800);
     });
@@ -802,6 +831,17 @@
     var ta = document.getElementById('director-story-content');
     if (!ta) return;
     var LS_KEY = 'vip_director_story_ta_h';
+    var saved = localStorage.getItem(LS_KEY);
+    if (saved) ta.style.height = saved;
+    ta.addEventListener('mouseup', function() {
+      if (ta.style.height) localStorage.setItem(LS_KEY, ta.style.height);
+    });
+  })();
+
+  (function() {
+    var ta = document.getElementById('director-story-prompt');
+    if (!ta) return;
+    var LS_KEY = 'vip_director_prompt_ta_h';
     var saved = localStorage.getItem(LS_KEY);
     if (saved) ta.style.height = saved;
     ta.addEventListener('mouseup', function() {

@@ -44,6 +44,7 @@ from db import (
     db_set_movie_grade,
     db_upsert_story_draft,
     db_update_story_content,
+    db_update_story_prompt,
     db_purge_unused_stories,
     db_delete_bad_movies,
     db_set_model_grade,
@@ -1097,6 +1098,18 @@ def api_production_story_content(story_id):
     data = request.get_json(silent=True) or {}
     content = data.get("content", "")
     updated_id = db_update_story_content(story_id, content)
+    if updated_id is None:
+        return jsonify({"error": "not_found"}), 404
+    return jsonify({"ok": True})
+
+@production_bp.route("/production/story/<story_id>/prompt", methods=["POST"])
+def api_production_story_prompt(story_id):
+    err = _production_auth_check()
+    if err:
+        return err
+    data = request.get_json(silent=True) or {}
+    prompt = data.get("prompt", "")
+    updated_id = db_update_story_prompt(story_id, prompt)
     if updated_id is None:
         return jsonify({"error": "not_found"}), 404
     return jsonify({"ok": True})
