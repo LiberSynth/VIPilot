@@ -3,7 +3,7 @@ from .connection import get_db
 _DEFAULTS = {
     "text_prompt":       "",
     "format_prompt":     "",
-    "prompt_metaprompt": "",
+    "t2v_conversion_prompt": "",
     "video_post_prompt": "",
     "video_duration":    6,
     "words_per_second":    8.0,

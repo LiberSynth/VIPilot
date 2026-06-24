@@ -2,23 +2,23 @@ const ta    = document.getElementById('ta');
 const cc    = document.getElementById('charcount');
 const taSys = document.getElementById('ta_formatprompt');
 const ccSys = document.getElementById('charcount_formatprompt');
-const taPromptMeta = document.getElementById('ta_prompt_metaprompt');
-const ccPromptMeta = document.getElementById('charcount_prompt_metaprompt');
+const taT2v = document.getElementById('ta_t2v_conversion_prompt');
+const ccT2v = document.getElementById('charcount_t2v_conversion_prompt');
 
 function updateCount()    { if (ta    && cc)    cc.textContent    = ta.value.length    + ' символов'; }
 function updateSysCount() { if (taSys && ccSys) ccSys.textContent = taSys.value.length + ' символов'; }
-function updatePromptMetaCount() {
-  if (taPromptMeta && ccPromptMeta) ccPromptMeta.textContent = taPromptMeta.value.length + ' символов';
+function updateT2vCount() {
+  if (taT2v && ccT2v) ccT2v.textContent = taT2v.value.length + ' символов';
 }
 
 if (ta)    { ta.addEventListener('input',    updateCount);    updateCount(); }
 if (taSys) { taSys.addEventListener('input', updateSysCount); updateSysCount(); }
-if (taPromptMeta) { taPromptMeta.addEventListener('input', updatePromptMetaCount); updatePromptMetaCount(); }
+if (taT2v) { taT2v.addEventListener('input', updateT2vCount); updateT2vCount(); }
 
 (function() {
   var KEY_SYS  = 'rbc_format_prompt_h';
   var KEY_META = 'rbc_text_prompt_h';
-  var KEY_PROMPT_META = 'rbc_prompt_metaprompt_h';
+  var KEY_T2V  = 'rbc_t2v_conversion_prompt_h';
 
   function applyHeight(el, key, defaultPx) {
     var saved = parseInt(localStorage.getItem(key), 10);
@@ -38,31 +38,40 @@ if (taPromptMeta) { taPromptMeta.addEventListener('input', updatePromptMetaCount
 
   if (taSys) { applyHeight(taSys, KEY_SYS,  100); watchHeight(taSys, KEY_SYS); }
   if (ta)    { applyHeight(ta,    KEY_META, 300); watchHeight(ta,    KEY_META); }
-  if (taPromptMeta) { applyHeight(taPromptMeta, KEY_PROMPT_META, 200); watchHeight(taPromptMeta, KEY_PROMPT_META); }
+  if (taT2v) { applyHeight(taT2v, KEY_T2V,  200); watchHeight(taT2v, KEY_T2V); }
 })();
 
 function collectAllSettings(activeTab) {
   const data = new FormData();
   data.set('active_tab', activeTab || 'pipeline');
-  const setIfExists = (key, id) => { const el = document.getElementById(id); if (el) data.set(key, el.value); };
-  if (ta)    data.set('text_prompt',   ta.value);
-  if (taSys) data.set('format_prompt', taSys.value);
-  if (taPromptMeta) data.set('prompt_metaprompt', taPromptMeta.value);
-  setIfExists('video_duration',      'video_duration');
-  setIfExists('video_post_prompt',   'ta_postprompt');
-  setIfExists('story_fails_to_next', 'story_fails_to_next');
-  setIfExists('video_fails_to_next', 'video_fails_to_next');
-  setIfExists('target_id',        'target_id');
-  setIfExists('app_instance',     'app_instance');
-  setIfExists('notify_email',     'notify_email');
-  setIfExists('notify_phone',     'notify_phone');
-  setIfExists('entries_lifetime', 'entries_lifetime');
-  setIfExists('log_lifetime',     'log_lifetime');
-  setIfExists('batch_lifetime',   'batch_lifetime');
-  setIfExists('buffer_minutes',    'buffer_minutes');
-  setIfExists('loop_interval',    'loop_interval');
-  setIfExists('max_batch_threads', 'max_batch_threads');
-  setIfExists('max_model_passes',  'max_model_passes');
+  const setIfExists = (key, id) => {
+    const el = document.getElementById(id);
+    if (el) data.set(key, el.value);
+  };
+
+  if (activeTab === 'story') {
+    setIfExists('text_prompt', 'ta');
+    setIfExists('format_prompt', 'ta_formatprompt');
+    setIfExists('t2v_conversion_prompt', 'ta_t2v_conversion_prompt');
+    setIfExists('video_post_prompt', 'ta_postprompt');
+    setIfExists('story_fails_to_next', 'story_fails_to_next');
+  } else if (activeTab === 'request') {
+    setIfExists('video_duration', 'video_duration');
+    setIfExists('video_fails_to_next', 'video_fails_to_next');
+  } else if (activeTab === 'service') {
+    setIfExists('app_instance', 'app_instance');
+    setIfExists('notify_email', 'notify_email');
+    setIfExists('notify_phone', 'notify_phone');
+    setIfExists('buffer_minutes', 'buffer_minutes');
+    setIfExists('loop_interval', 'loop_interval');
+    setIfExists('max_batch_threads', 'max_batch_threads');
+    setIfExists('max_model_passes', 'max_model_passes');
+    setIfExists('entries_lifetime', 'entries_lifetime');
+    setIfExists('log_lifetime', 'log_lifetime');
+    setIfExists('batch_lifetime', 'batch_lifetime');
+  } else if (activeTab === 'publish') {
+    setIfExists('target_id', 'target_id');
+  }
   return data;
 }
 
@@ -129,7 +138,6 @@ function validateLifetimes() {
   const requestFields = [
     document.getElementById('video_duration'),
     document.getElementById('video_fails_to_next'),
-    document.getElementById('ta_postprompt'),
   ].filter(Boolean);
   requestFields.forEach(f => {
     f.addEventListener('input',  scheduleRequestSave);
@@ -139,12 +147,18 @@ function validateLifetimes() {
   const storyFields = [
     ta,
     taSys,
-    taPromptMeta,
+    taT2v,
+    document.getElementById('ta_postprompt'),
     document.getElementById('story_fails_to_next'),
   ].filter(Boolean);
+  function flushStorySave() {
+    clearTimeout(_storySaveTimer);
+    saveStorySettings();
+  }
   storyFields.forEach(f => {
     f.addEventListener('input',  scheduleStorySave);
     f.addEventListener('change', scheduleStorySave);
+    f.addEventListener('blur',   flushStorySave);
   });
 
   const serviceFields = [

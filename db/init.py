@@ -50,6 +50,11 @@ def _cleanup_legacy_schema(cur) -> None:
     cur.execute("DROP INDEX IF EXISTS idx_log_status")
     cur.execute("DROP INDEX IF EXISTS idx_log_category")
     cur.execute("DELETE FROM settings WHERE key = 'buffer_hours'")
+    cur.execute("""
+        UPDATE cycle_config
+        SET key = 't2v_conversion_prompt'
+        WHERE key = 'prompt_metaprompt'
+    """)
 
 def _ensure_movies_bit_columns(cur) -> None:
     """Колонки movies.used/transcoded/published: ADD IF NOT EXISTS + NOT NULL для старых БД."""

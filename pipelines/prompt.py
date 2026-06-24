@@ -72,7 +72,7 @@ def run(batch_id, category):
     except (ValueError, TypeError):
         max_attempts_per_model = 3
 
-    user_prompt = cycle_config_get("prompt_metaprompt") or ""
+    user_prompt = cycle_config_get("t2v_conversion_prompt") or ""
     user_prompt = apply_prompt_params(user_prompt, story_content=story_content)
 
     write_log_entry(
