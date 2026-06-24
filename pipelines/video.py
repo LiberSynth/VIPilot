@@ -261,11 +261,6 @@ def run(batch_id, category):
             raise AppException(batch_id, 'video', msg)
 
         story_title = db_get_story_title(story_id) or '(без названия)'
-        video_post_prompt = cycle_config_get('video_post_prompt').strip()
-        if video_post_prompt:
-            video_post_prompt = apply_prompt_params(video_post_prompt)
-            video_prompt = video_prompt + '\n\n' + video_post_prompt
-
         video_duration = max(1, min(60, cycle_config_get('video_duration')))
         allowed = model.get('allowed_durations') or [0]
         actual_duration = nearest_allowed_duration(video_duration, allowed)
@@ -275,6 +270,14 @@ def run(batch_id, category):
                 f"Длительность скорректирована: {video_duration}с → {actual_duration}с (модель поддерживает: {allowed})",
                 level='warn',
             )
+        video_post_prompt = cycle_config_get('video_post_prompt').strip()
+        if video_post_prompt:
+            video_post_prompt = apply_prompt_params(
+                video_post_prompt,
+                duration_seconds=actual_duration,
+            )
+            video_prompt = video_prompt + '\n\n' + video_post_prompt
+
         write_log_entry(batch_id, category, f"Начало генерации видео, сюжет {story_title}, модель {model_name}.")
         write_log_entry(batch_id, category, f"Соотношение сторон: {ar_x}:{ar_y}", level='silent')
         write_log_entry(batch_id, category, f"Ручная модель: {model_name}, попыток: {max_attempts_per_model}", level='silent')

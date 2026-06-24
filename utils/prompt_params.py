@@ -49,10 +49,19 @@ _PARAMS = [
     ('{использованные_сюжеты}', _get_used_plots),
 ]
 
-def apply_prompt_params(text: str, *, story_content: str | None = None) -> str:
+def apply_prompt_params(
+    text: str,
+    *,
+    story_content: str | None = None,
+    duration_seconds: int | None = None,
+) -> str:
     if story_content is not None and '{сюжет}' in text:
         text = text.replace('{сюжет}', story_content)
+    if duration_seconds is not None and '{продолжительность}' in text:
+        text = text.replace('{продолжительность}', str(duration_seconds))
     for param, getter in _PARAMS:
+        if param == '{продолжительность}' and duration_seconds is not None:
+            continue
         if param in text:
             text = text.replace(param, getter())
     return text
