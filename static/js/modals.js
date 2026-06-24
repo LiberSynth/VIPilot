@@ -1,5 +1,6 @@
 (function() {
   var _videoBlobCache = Object.create(null);
+  var VIDEO_CACHE_NAME = 'flaskapp-videos-v1';
 
   function renderVideo(container, blobUrl, options) {
     var attrs = ['<video'];
@@ -8,6 +9,40 @@
     if (options.autoplay) attrs.push(' autoplay');
     attrs.push(' src="' + blobUrl + '"></video>');
     container.innerHTML = attrs.join('');
+  }
+
+  function _videoCachesSupported() {
+    return typeof caches !== 'undefined';
+  }
+
+  function _openVideoCache() {
+    return caches.open(VIDEO_CACHE_NAME);
+  }
+
+  function _readVideoBlobFromPersistentCache(url) {
+    if (!_videoCachesSupported()) return Promise.resolve(null);
+    return _openVideoCache()
+      .then(function(cache) { return cache.match(url); })
+      .then(function(response) {
+        if (!response || !response.ok) return null;
+        return response.blob();
+      })
+      .catch(function() { return null; });
+  }
+
+  function _saveVideoToPersistentCache(url, response) {
+    if (!_videoCachesSupported()) return Promise.resolve();
+    return _openVideoCache()
+      .then(function(cache) { return cache.put(url, response.clone()); })
+      .catch(function() {});
+  }
+
+  function _showVideoBlob(container, blob, cacheKey, options, loadToken) {
+    if (loadToken && loadToken.cancelled) return;
+    var blobUrl = URL.createObjectURL(blob);
+    _videoBlobCache[cacheKey] = blobUrl;
+    if (typeof options.setBlobUrl === 'function') options.setBlobUrl(blobUrl);
+    renderVideo(container, blobUrl, options);
   }
 
   function loadVideoIntoContainer(container, url, options) {
@@ -22,17 +57,19 @@
       return;
     }
     container.innerHTML = options.loadingHtml || '<span class="story-modal-loading">Загрузка…</span>';
-    fetch(url)
-      .then(function(r) {
-        if (!r.ok) throw new Error(String(r.status));
-        return r.blob();
+    _readVideoBlobFromPersistentCache(url)
+      .then(function(blob) {
+        if (loadToken && loadToken.cancelled) return null;
+        if (blob) return blob;
+        return fetch(url).then(function(r) {
+          if (!r.ok) throw new Error(String(r.status));
+          _saveVideoToPersistentCache(url, r);
+          return r.blob();
+        });
       })
       .then(function(blob) {
-        if (loadToken && loadToken.cancelled) return;
-        var blobUrl = URL.createObjectURL(blob);
-        _videoBlobCache[cacheKey] = blobUrl;
-        if (typeof options.setBlobUrl === 'function') options.setBlobUrl(blobUrl);
-        renderVideo(container, blobUrl, options);
+        if (!blob) return;
+        _showVideoBlob(container, blob, cacheKey, options, loadToken);
       })
       .catch(function() {
         if (loadToken && loadToken.cancelled) return;

@@ -252,15 +252,17 @@ def client_is_configured(slug: str, cfg: dict = None, target_id: str = None) -> 
         return bool(os.environ.get("FAL_API_KEY", ""))
     return False
 
+_VIDEO_CACHE_MAX_AGE = 30 * 24 * 3600
+
 def _send_video_file(path) -> Response:
-    """Отдаёт mp4 с диска: ETag, условные запросы, кэш на час."""
+    """Отдаёт mp4 с диска: ETag, условные запросы, кэш на 30 суток."""
     resp = send_file(
         path,
         mimetype="video/mp4",
         conditional=True,
-        max_age=3600,
+        max_age=_VIDEO_CACHE_MAX_AGE,
     )
-    resp.headers["Cache-Control"] = "private, max-age=3600"
+    resp.headers["Cache-Control"] = f"private, max-age={_VIDEO_CACHE_MAX_AGE}"
     return resp
 
 @bp.route("/time")
