@@ -380,24 +380,14 @@ def save():
     if format_prompt_val is not None:
         cycle_config_set("format_prompt", format_prompt_val)
 
-    t2v_val = request.form.get("t2v_conversion_prompt")
-    if t2v_val is not None:
-        cycle_config_set("t2v_conversion_prompt", t2v_val)
-
-    video_post_prompt_val = request.form.get("video_post_prompt")
-    if video_post_prompt_val is not None:
-        cycle_config_set("video_post_prompt", video_post_prompt_val)
-
+    text_prompt = request.form.get("text_prompt", "").strip()
     active_tab = request.form.get("active_tab", "pipeline")
-
-    text_prompt = request.form.get("text_prompt")
-    if text_prompt is not None:
-        text_prompt = text_prompt.strip()
-        if not text_prompt:
-            if active_tab == "story":
-                flash("Текстовый промпт не может быть пустым", "error")
-        else:
-            cycle_config_set("text_prompt", text_prompt)
+    if not text_prompt:
+        if active_tab == "story":
+            flash("Текстовый промпт не может быть пустым", "error")
+            return redirect(url_for("web.root_page"))
+    else:
+        cycle_config_set("text_prompt", text_prompt)
 
     entries_lifetime_raw = request.form.get("entries_lifetime", "").strip()
     log_lifetime_raw     = request.form.get("log_lifetime",     "").strip()
@@ -428,6 +418,14 @@ def save():
         except (ValueError, TypeError):
             vid_dur = 6
         cycle_config_set("video_duration", vid_dur)
+
+    video_post_prompt_val = request.form.get("video_post_prompt")
+    if video_post_prompt_val is not None:
+        cycle_config_set("video_post_prompt", video_post_prompt_val)
+
+    t2v_val = request.form.get("t2v_conversion_prompt")
+    if t2v_val is not None:
+        cycle_config_set("t2v_conversion_prompt", t2v_val)
 
     buf_str = request.form.get("buffer_minutes", "").strip()
     if buf_str:

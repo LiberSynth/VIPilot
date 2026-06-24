@@ -44,34 +44,25 @@ if (taT2v) { taT2v.addEventListener('input', updateT2vCount); updateT2vCount(); 
 function collectAllSettings(activeTab) {
   const data = new FormData();
   data.set('active_tab', activeTab || 'pipeline');
-  const setIfExists = (key, id) => {
-    const el = document.getElementById(id);
-    if (el) data.set(key, el.value);
-  };
-
-  if (activeTab === 'story') {
-    setIfExists('text_prompt', 'ta');
-    setIfExists('format_prompt', 'ta_formatprompt');
-    setIfExists('t2v_conversion_prompt', 'ta_t2v_conversion_prompt');
-    setIfExists('video_post_prompt', 'ta_postprompt');
-    setIfExists('story_fails_to_next', 'story_fails_to_next');
-  } else if (activeTab === 'request') {
-    setIfExists('video_duration', 'video_duration');
-    setIfExists('video_fails_to_next', 'video_fails_to_next');
-  } else if (activeTab === 'service') {
-    setIfExists('app_instance', 'app_instance');
-    setIfExists('notify_email', 'notify_email');
-    setIfExists('notify_phone', 'notify_phone');
-    setIfExists('buffer_minutes', 'buffer_minutes');
-    setIfExists('loop_interval', 'loop_interval');
-    setIfExists('max_batch_threads', 'max_batch_threads');
-    setIfExists('max_model_passes', 'max_model_passes');
-    setIfExists('entries_lifetime', 'entries_lifetime');
-    setIfExists('log_lifetime', 'log_lifetime');
-    setIfExists('batch_lifetime', 'batch_lifetime');
-  } else if (activeTab === 'publish') {
-    setIfExists('target_id', 'target_id');
-  }
+  const setIfExists = (key, id) => { const el = document.getElementById(id); if (el) data.set(key, el.value); };
+  if (ta)    data.set('text_prompt',   ta.value);
+  if (taSys) data.set('format_prompt', taSys.value);
+  if (taT2v) data.set('t2v_conversion_prompt', taT2v.value);
+  setIfExists('video_duration',      'video_duration');
+  setIfExists('video_post_prompt',   'ta_postprompt');
+  setIfExists('story_fails_to_next', 'story_fails_to_next');
+  setIfExists('video_fails_to_next', 'video_fails_to_next');
+  setIfExists('target_id',        'target_id');
+  setIfExists('app_instance',     'app_instance');
+  setIfExists('notify_email',     'notify_email');
+  setIfExists('notify_phone',     'notify_phone');
+  setIfExists('entries_lifetime', 'entries_lifetime');
+  setIfExists('log_lifetime',     'log_lifetime');
+  setIfExists('batch_lifetime',   'batch_lifetime');
+  setIfExists('buffer_minutes',    'buffer_minutes');
+  setIfExists('loop_interval',    'loop_interval');
+  setIfExists('max_batch_threads', 'max_batch_threads');
+  setIfExists('max_model_passes',  'max_model_passes');
   return data;
 }
 
@@ -138,6 +129,7 @@ function validateLifetimes() {
   const requestFields = [
     document.getElementById('video_duration'),
     document.getElementById('video_fails_to_next'),
+    document.getElementById('ta_postprompt'),
   ].filter(Boolean);
   requestFields.forEach(f => {
     f.addEventListener('input',  scheduleRequestSave);
@@ -148,17 +140,11 @@ function validateLifetimes() {
     ta,
     taSys,
     taT2v,
-    document.getElementById('ta_postprompt'),
     document.getElementById('story_fails_to_next'),
   ].filter(Boolean);
-  function flushStorySave() {
-    clearTimeout(_storySaveTimer);
-    saveStorySettings();
-  }
   storyFields.forEach(f => {
     f.addEventListener('input',  scheduleStorySave);
     f.addEventListener('change', scheduleStorySave);
-    f.addEventListener('blur',   flushStorySave);
   });
 
   const serviceFields = [
