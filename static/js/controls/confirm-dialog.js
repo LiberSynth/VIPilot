@@ -9,6 +9,11 @@ class ConfirmDialog extends Dialog {
     this._confirmStyle = opts.confirmStyle || 'background:#b05820';
     this._onConfirm    = opts.onConfirm    || null;
     this._onCancel     = opts.onCancel     || null;
+    this._onClose      = opts.onClose      || null;
+  }
+
+  onClose() {
+    if (this._onClose) this._onClose();
   }
 
   overlayClass() { return 'confirm-overlay'; }

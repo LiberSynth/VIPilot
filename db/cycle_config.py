@@ -45,24 +45,10 @@ def cycle_config_get(key: str):
     return _coerce(key, row[0] if row else None)
 
 def parse_config_int(value) -> int:
-    if isinstance(value, bool):
-        raise ValueError("invalid integer")
-    if isinstance(value, int):
-        return value
-    if isinstance(value, float):
-        if not value.is_integer():
-            raise ValueError("invalid integer")
-        return int(value)
-    text = str(value).strip()
-    if not text:
-        raise ValueError("invalid integer")
     try:
-        parsed = float(text)
+        return int(str(value).strip())
     except (TypeError, ValueError) as exc:
         raise ValueError("invalid integer") from exc
-    if not parsed.is_integer():
-        raise ValueError("invalid integer")
-    return int(parsed)
 
 def cycle_config_set(key: str, value) -> None:
     if key not in _ALLOWED_KEYS:

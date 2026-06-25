@@ -114,7 +114,7 @@ function validateLifetimes() {
 function _showInvalidIntegerDialog(el, dbValue) {
   new ConfirmDialog({
     title: 'Неверное значение',
-    text: 'Нужно целое число. Восстановлено сохранённое значение.',
+    text: 'Нужно целое число. Будет восстановлено сохранённое значение.',
     cancelLabel: 'OK',
     onClose: function() {
       if (!el || dbValue === undefined || dbValue === null) return;
