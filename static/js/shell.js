@@ -115,15 +115,15 @@ function _runPanelEnterEffects(name) {
   }
   if (name === 'story') {
     if (typeof loadTextModels === 'function') loadTextModels();
-    var draftTitle = document.getElementById('draft-story-title');
-    var draftContent = document.getElementById('draft-story-content');
-    if (draftTitle) draftTitle.value = '';
-    if (draftContent) draftContent.value = '';
-    if (typeof resetDraftStoryId === 'function') resetDraftStoryId();
+    var titleEl = document.getElementById('story-title');
+    var contentEl = document.getElementById('story-content');
+    if (titleEl) titleEl.value = '';
+    if (contentEl) contentEl.value = '';
+    if (typeof resetActiveStoryId === 'function') resetActiveStoryId();
   }
   if (name === 'screenwriter') {
-    var draftCard = document.getElementById('card-story-draft');
-    if (draftCard) draftCard.classList.remove('card--editing-new', 'card--editing-existing');
+    var storyCard = document.getElementById('card-story-editor');
+    if (storyCard) storyCard.classList.remove('card--editing-new', 'card--editing-existing');
     if (typeof loadStoryList === 'function') loadStoryList();
   }
 }

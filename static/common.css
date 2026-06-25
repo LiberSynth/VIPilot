@@ -863,7 +863,7 @@
   }
   .story-row--expanded .story-chevron { transform: rotate(180deg); opacity: .85; color: #c8c8e0; }
   .story-chevron svg { width: 12px; height: 7px; }
-  #card-story-draft { display: block; }
+  #card-story-editor { display: block; }
   .story-title {
     flex: 1; font-size: 13px; color: #c8c8e0;
     min-width: 0; word-break: break-word;

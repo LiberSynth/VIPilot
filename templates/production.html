@@ -74,13 +74,13 @@
       </div>
     </div>
     <div id="story-card-holder" hidden>
-      <div id="card-story-draft" data-video-duration="{{ video_duration }}" data-words-per-second="{{ words_per_second | int }}">
+      <div id="card-story-editor" data-video-duration="{{ video_duration }}" data-words-per-second="{{ words_per_second | int }}">
         <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block">Название</label>
-        <input type="text" id="draft-story-title" placeholder="Введите название сюжета" autocomplete="off">
+        <input type="text" id="story-title" placeholder="Введите название сюжета" autocomplete="off">
         <label class="setting-label" style="font-size:12px;margin-top:12px;margin-bottom:4px;display:block">Сюжет</label>
-        <textarea id="draft-story-content" spellcheck="true" placeholder="Введите сюжет" autocomplete="off"></textarea>
-        <label class="setting-label" style="font-size:12px;margin-top:12px;margin-bottom:4px;display:block">Промпт<span id="draft-story-wc-wrap" style="display:none; font-weight:400; text-transform:none; letter-spacing:0"> (слов:&nbsp;<span id="draft-story-wc-num"></span>)</span></label>
-        <textarea id="draft-story-prompt" spellcheck="true" placeholder="T2V-промпт для генерации видео" autocomplete="off"></textarea>
+        <textarea id="story-content" spellcheck="true" placeholder="Введите сюжет" autocomplete="off"></textarea>
+        <label class="setting-label" style="font-size:12px;margin-top:12px;margin-bottom:4px;display:block">Промпт<span id="story-wc-wrap" style="display:none; font-weight:400; text-transform:none; letter-spacing:0"> (слов:&nbsp;<span id="story-wc-num"></span>)</span></label>
+        <textarea id="story-prompt" spellcheck="true" placeholder="T2V-промпт для генерации видео" autocomplete="off"></textarea>
       </div>
     </div>
 

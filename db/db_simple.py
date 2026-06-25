@@ -368,7 +368,7 @@ def db_update_story_content(story_id, content):
         conn.commit()
     return str(row[0]) if row else None
 
-def db_upsert_story_draft(story_id, title, content, prompt=None):
+def db_upsert_story(story_id, title, content, prompt=None):
     prompt_val = prompt.strip() if isinstance(prompt, str) and prompt.strip() else None
     with get_db() as conn:
         with conn.cursor() as cur:

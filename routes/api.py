@@ -43,7 +43,7 @@ from db import (
     db_get_movie_ids_by_filter,
     db_reorder_movie,
     db_set_movie_grade,
-    db_upsert_story_draft,
+    db_upsert_story,
     db_update_story_content,
     db_update_story_prompt,
     db_purge_unused_stories,
@@ -1078,8 +1078,8 @@ def api_production_movie_delete(movie_id):
         return jsonify({"error": "not found"}), 404
     return jsonify({"ok": True, "deleted": result})
 
-@production_bp.route("/production/story/draft", methods=["POST"])
-def api_production_story_draft():
+@production_bp.route("/production/story/save", methods=["POST"])
+def api_production_story_save():
     err = _production_auth_check()
     if err:
         return err
@@ -1088,7 +1088,7 @@ def api_production_story_draft():
     content = data.get("content", "")
     prompt = data.get("prompt", "")
     story_id = data.get("story_id") or None
-    new_id = db_upsert_story_draft(story_id, title, content, prompt)
+    new_id = db_upsert_story(story_id, title, content, prompt)
     if new_id is None:
         return jsonify({"error": "db_error"}), 500
     return jsonify({"story_id": new_id})

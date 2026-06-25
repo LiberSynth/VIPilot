@@ -1,44 +1,44 @@
 /* ── Единое состояние: ID активного сюжета в карточке ── */
-/* null — карточка пуста (ничего не открыто или фиктивная строка нового черновика) */
-/* guid — открыт существующий сюжет или черновик уже сохранён в БД              */
+/* null — карточка пуста (ничего не открыто или новая строка) */
+/* guid — открыт существующий сюжет или уже сохранён в БД              */
 var _activeStoryId = null;
 
-/* ── Автосохранение черновика сюжета ── */
-var resetDraftStoryId;
-var setDraftStoryFromRecord;
+/* ── Автосохранение сюжета ── */
+var resetActiveStoryId;
+var loadStoryIntoEditor;
 (function() {
-  var _draftTimer = null;
+  var _storySaveTimer = null;
   var _inflight = null;
   var _pendingRetry = false;
 
-  resetDraftStoryId = function() {
+  resetActiveStoryId = function() {
     _activeStoryId = null;
     _inflight = null;
     _pendingRetry = false;
-    clearTimeout(_draftTimer);
+    clearTimeout(_storySaveTimer);
   };
 
-  setDraftStoryFromRecord = function(story) {
-    var titleEl = document.getElementById('draft-story-title');
-    var contentEl = document.getElementById('draft-story-content');
-    var promptEl = document.getElementById('draft-story-prompt');
+  loadStoryIntoEditor = function(story) {
+    var titleEl = document.getElementById('story-title');
+    var contentEl = document.getElementById('story-content');
+    var promptEl = document.getElementById('story-prompt');
     if (titleEl) titleEl.value = story.title || '';
     if (contentEl) contentEl.value = story.content || '';
     if (promptEl) promptEl.value = story.prompt || '';
     _activeStoryId = story.id;
     _inflight = null;
     _pendingRetry = false;
-    clearTimeout(_draftTimer);
+    clearTimeout(_storySaveTimer);
   };
 
   function _doPost() {
-    var titleEl = document.getElementById('draft-story-title');
-    var contentEl = document.getElementById('draft-story-content');
-    var promptEl = document.getElementById('draft-story-prompt');
+    var titleEl = document.getElementById('story-title');
+    var contentEl = document.getElementById('story-content');
+    var promptEl = document.getElementById('story-prompt');
     var title = titleEl ? titleEl.value : '';
     var content = contentEl ? contentEl.value : '';
     var prompt = promptEl ? promptEl.value : '';
-    return fetch('/production/story/draft', {
+    return fetch('/production/story/save', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ story_id: _activeStoryId, title: title, content: content, prompt: prompt }),
@@ -58,10 +58,10 @@ var setDraftStoryFromRecord;
     });
   }
 
-  function _postDraft(force) {
-    var titleEl = document.getElementById('draft-story-title');
-    var contentEl = document.getElementById('draft-story-content');
-    var promptEl = document.getElementById('draft-story-prompt');
+  function _postStorySave(force) {
+    var titleEl = document.getElementById('story-title');
+    var contentEl = document.getElementById('story-content');
+    var promptEl = document.getElementById('story-prompt');
     if (!titleEl || !contentEl) return Promise.resolve(null);
     var title = titleEl.value;
     var content = contentEl.value;
@@ -71,7 +71,7 @@ var setDraftStoryFromRecord;
       if (force) {
         return _inflight.then(function() {
           if (_activeStoryId) return _activeStoryId;
-          return _postDraft(true);
+          return _postStorySave(true);
         });
       }
       _pendingRetry = true;
@@ -82,7 +82,7 @@ var setDraftStoryFromRecord;
         _inflight = null;
         if (_pendingRetry) {
           _pendingRetry = false;
-          _postDraft(false);
+          _postStorySave(false);
         }
         return id;
       })
@@ -90,37 +90,37 @@ var setDraftStoryFromRecord;
         _inflight = null;
         if (_pendingRetry) {
           _pendingRetry = false;
-          _postDraft(false);
+          _postStorySave(false);
         }
         throw err;
       });
     return _inflight;
   }
 
-  function saveDraft() { _postDraft(false).catch(function() {}); }
+  function saveStory() { _postStorySave(false).catch(function() {}); }
 
-  window.ensureDraftStoryId = function() {
+  window.ensureStoryId = function() {
     if (_activeStoryId) return Promise.resolve(_activeStoryId);
-    return _postDraft(true).then(function(id) {
-      if (!id) throw new Error('failed_to_create_draft');
+    return _postStorySave(true).then(function(id) {
+      if (!id) throw new Error('failed_to_create_story');
       return id;
     });
   };
 
-  function onDraftInput() {
-    clearTimeout(_draftTimer);
-    _draftTimer = setTimeout(saveDraft, 800);
+  function onStoryInput() {
+    clearTimeout(_storySaveTimer);
+    _storySaveTimer = setTimeout(saveStory, 800);
   }
 
-  function initDraftAutosave() {
-    var titleEl = document.getElementById('draft-story-title');
-    var contentEl = document.getElementById('draft-story-content');
-    var promptEl = document.getElementById('draft-story-prompt');
+  function initStoryAutosave() {
+    var titleEl = document.getElementById('story-title');
+    var contentEl = document.getElementById('story-content');
+    var promptEl = document.getElementById('story-prompt');
     if (!titleEl || !contentEl) return;
-    titleEl.addEventListener('input', onDraftInput);
-    contentEl.addEventListener('input', onDraftInput);
+    titleEl.addEventListener('input', onStoryInput);
+    contentEl.addEventListener('input', onStoryInput);
     if (promptEl) {
-      promptEl.addEventListener('input', onDraftInput);
+      promptEl.addEventListener('input', onStoryInput);
       promptEl.addEventListener('input', function() {
         if (typeof window.syncActiveStoryPromptIcon === 'function') {
           window.syncActiveStoryPromptIcon();
@@ -130,9 +130,9 @@ var setDraftStoryFromRecord;
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initDraftAutosave);
+    document.addEventListener('DOMContentLoaded', initStoryAutosave);
   } else {
-    initDraftAutosave();
+    initStoryAutosave();
   }
 })();
 
@@ -260,7 +260,7 @@ var setDraftStoryFromRecord;
 
   window.syncActiveStoryPromptIcon = function() {
     if (!_activeStoryId || _activeStoryId === '__new__') return;
-    var promptEl = document.getElementById('draft-story-prompt');
+    var promptEl = document.getElementById('story-prompt');
     _updatePromptIconInRow(_activeStoryId, promptEl ? promptEl.value : '');
   };
 
@@ -270,10 +270,10 @@ var setDraftStoryFromRecord;
     if (!_activeStoryId || !stories) return;
     var item = stories.find(function(s) { return String(s.id) === String(_activeStoryId); });
     if (!item || !item.has_prompt) return;
-    var promptEl = document.getElementById('draft-story-prompt');
+    var promptEl = document.getElementById('story-prompt');
     if (promptEl && item.prompt && promptEl.value !== item.prompt) {
       promptEl.value = item.prompt;
-      if (typeof window.updateDraftWordCount === 'function') window.updateDraftWordCount();
+      if (typeof window.updateStoryWordCount === 'function') window.updateStoryWordCount();
     }
   }
 
@@ -368,7 +368,7 @@ var setDraftStoryFromRecord;
 
   var _accordionList = new AccordionList({
     listId:   'stories-list',
-    cardId:   'card-story-draft',
+    cardId:   'card-story-editor',
     holderId: 'story-card-holder',
     countId:  'stories-count',
     gradeUrl: function(id) { return '/production/story/' + id + '/grade'; },
@@ -385,7 +385,7 @@ var setDraftStoryFromRecord;
     },
     onExpand: function(item) {
       _activeStoryId = item ? item.id : null;
-      if (item && typeof setDraftStoryFromRecord === 'function') setDraftStoryFromRecord(item);
+      if (item && typeof loadStoryIntoEditor === 'function') loadStoryIntoEditor(item);
       if (typeof window.loadStoryList === 'function') window.loadStoryList();
     },
     onCollapse: function() {
@@ -434,11 +434,11 @@ var setDraftStoryFromRecord;
         var newPinned = !currentPinned;
         pinBtn.dataset.busy = '1';
         _setPinVisual(pinBtn, newPinned);
-        if (typeof window.ensureDraftStoryId !== 'function') {
+        if (typeof window.ensureStoryId !== 'function') {
           pinBtn.dataset.busy = '0';
           return;
         }
-        window.ensureDraftStoryId().then(function(id) {
+        window.ensureStoryId().then(function(id) {
           return fetch('/production/story/' + id + '/pin', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -481,11 +481,11 @@ var setDraftStoryFromRecord;
         var nextKey = AccordionList.gradeKey(next);
         grBtn.dataset.busy = '1';
         _applyGradeBadge(grBtn, nextKey);
-        if (typeof window.ensureDraftStoryId !== 'function') {
+        if (typeof window.ensureStoryId !== 'function') {
           grBtn.dataset.busy = '0';
           return;
         }
-        window.ensureDraftStoryId().then(function(id) {
+        window.ensureStoryId().then(function(id) {
           return fetch('/production/story/' + id + '/grade', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -740,14 +740,14 @@ var setDraftStoryFromRecord;
       var container = document.getElementById('stories-list');
       if (!container) return;
       _accordionList.collapse();
-      if (typeof resetDraftStoryId === 'function') resetDraftStoryId();
-      var titleEl = document.getElementById('draft-story-title');
-      var contentEl = document.getElementById('draft-story-content');
-      var promptEl = document.getElementById('draft-story-prompt');
+      if (typeof resetActiveStoryId === 'function') resetActiveStoryId();
+      var titleEl = document.getElementById('story-title');
+      var contentEl = document.getElementById('story-content');
+      var promptEl = document.getElementById('story-prompt');
       if (titleEl) titleEl.value = '';
       if (contentEl) contentEl.value = '';
       if (promptEl) promptEl.value = '';
-      if (typeof window.updateDraftWordCount === 'function') window.updateDraftWordCount();
+      if (typeof window.updateStoryWordCount === 'function') window.updateStoryWordCount();
       _accordionList.insertFakeRow(true);
     });
   }
@@ -806,8 +806,8 @@ var setDraftStoryFromRecord;
           fetch('/api/story/' + encodeURIComponent(storyId))
             .then(function(r) { return r.json(); })
             .then(function(s) {
-              if (typeof setDraftStoryFromRecord === 'function') {
-                setDraftStoryFromRecord({ id: storyId, title: s.title || '', content: s.text || '' });
+              if (typeof loadStoryIntoEditor === 'function') {
+                loadStoryIntoEditor({ id: storyId, title: s.title || '', content: s.text || '' });
               }
               if (typeof window.setExpandedStoryId === 'function') window.setExpandedStoryId(storyId);
               _refreshLists();
@@ -1174,9 +1174,9 @@ var setDraftStoryFromRecord;
   }
 
   function updateWordCount() {
-    var textarea = document.getElementById('draft-story-prompt');
-    var wrap = document.getElementById('draft-story-wc-wrap');
-    var numEl = document.getElementById('draft-story-wc-num');
+    var textarea = document.getElementById('story-prompt');
+    var wrap = document.getElementById('story-wc-wrap');
+    var numEl = document.getElementById('story-wc-num');
     if (!textarea || !wrap || !numEl) return;
     var n = countWords(textarea.value);
     if (n > 0) {
@@ -1195,7 +1195,7 @@ var setDraftStoryFromRecord;
     }
   }
 
-  window.updateDraftWordCount = updateWordCount;
+  window.updateStoryWordCount = updateWordCount;
 
   var _wpsTimer = null;
   function _saveWordsPerSecond(value) {
@@ -1223,7 +1223,7 @@ var setDraftStoryFromRecord;
 
   function initWordCount() {
     _readConfig();
-    var textarea = document.getElementById('draft-story-prompt');
+    var textarea = document.getElementById('story-prompt');
     if (textarea) {
       textarea.addEventListener('input', updateWordCount);
       updateWordCount();
@@ -1250,19 +1250,19 @@ var setDraftStoryFromRecord;
     }
   }
 
-  var _origSetDraft = window.setDraftStoryFromRecord;
-  window.setDraftStoryFromRecord = function(story) {
-    if (_origSetDraft) _origSetDraft(story);
+  var _origLoadStory = window.loadStoryIntoEditor;
+  window.loadStoryIntoEditor = function(story) {
+    if (_origLoadStory) _origLoadStory(story);
     updateWordCount();
     if (typeof window.syncActiveStoryPromptIcon === 'function') {
       window.syncActiveStoryPromptIcon();
     }
   };
 
-  var _origResetDraft = window.resetDraftStoryId;
-  window.resetDraftStoryId = function() {
-    if (_origResetDraft) _origResetDraft();
-    var wrap = document.getElementById('draft-story-wc-wrap');
+  var _origResetActive = window.resetActiveStoryId;
+  window.resetActiveStoryId = function() {
+    if (_origResetActive) _origResetActive();
+    var wrap = document.getElementById('story-wc-wrap');
     if (wrap) wrap.style.display = 'none';
   };
 

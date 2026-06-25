@@ -331,7 +331,7 @@ class AccordionList {
     fakeRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     if (this._onNewRowReady) this._onNewRowReady(expandEl, fakeRow);
     if (focusTitle) {
-      var titleEl = document.getElementById('draft-story-title');
+      var titleEl = document.getElementById('story-title');
       if (titleEl) titleEl.focus();
     }
   }

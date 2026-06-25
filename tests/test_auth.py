@@ -188,8 +188,8 @@ class TestProductionBlueprintAuth:
     def test_delete_movie(self, client):
         _assert_401(client.delete("/production/movie/1/delete"))
 
-    def test_post_story_draft(self, client):
-        _assert_401(client.post("/production/story/draft"))
+    def test_post_story_save(self, client):
+        _assert_401(client.post("/production/story/save"))
 
     def test_post_story_content(self, client):
         _assert_401(client.post("/production/story/1/content"))

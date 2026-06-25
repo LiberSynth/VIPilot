@@ -57,12 +57,12 @@
     var mode = (btn && btn.dataset) ? btn.dataset.mode : null;
 
     if (mode === 'manual-new') {
-      var titleEl = document.getElementById('draft-story-title');
-      var contentEl = document.getElementById('draft-story-content');
-      var draftTitle = titleEl ? titleEl.value : '';
-      var draftContent = contentEl ? contentEl.value : '';
+      var titleEl = document.getElementById('story-title');
+      var contentEl = document.getElementById('story-content');
+      var storyTitle = titleEl ? titleEl.value : '';
+      var storyContent = contentEl ? contentEl.value : '';
       _writeQueue = _writeQueue.then(function() {
-        return _processBlock(function() { return _manualBlock(draftTitle, draftContent); }, btn, clickTime);
+        return _processBlock(function() { return _manualBlock(storyTitle, storyContent); }, btn, clickTime);
       });
       return;
     }
