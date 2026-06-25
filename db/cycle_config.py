@@ -44,7 +44,7 @@ def cycle_config_get(key: str):
             row = cur.fetchone()
     return _coerce(key, row[0] if row else None)
 
-def _parse_int_value(value) -> int:
+def parse_config_int(value) -> int:
     if isinstance(value, bool):
         raise ValueError("invalid integer")
     if isinstance(value, int):
@@ -70,7 +70,7 @@ def cycle_config_set(key: str, value) -> None:
     if isinstance(value, bool):
         str_value = "1" if value else "0"
     elif key in ("words_per_second", "good_samples_count", "video_duration"):
-        str_value = str(_parse_int_value(value))
+        str_value = str(parse_config_int(value))
     else:
         str_value = str(value)
     with get_db() as conn:

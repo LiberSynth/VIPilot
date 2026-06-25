@@ -4,7 +4,7 @@ import threading
 import time
 import io
 from datetime import datetime, timezone, timedelta
-from flask import Blueprint, jsonify, request, Response, send_file, stream_with_context
+from db.cycle_config import parse_config_int
 
 from db import (
     db_get_schedule,
@@ -34,6 +34,7 @@ from db import (
     cycle_config_get,
     cycle_config_set,
     settings_set,
+    settings_get,
     db_get_stories_list,
     db_get_story_ids_by_filter,
     db_get_stories_pool,
@@ -590,6 +591,11 @@ _CYCLE_CONFIG_KEYS = frozenset({
     "good_samples_count",
 })
 
+_CYCLE_CONFIG_INT_KEYS = frozenset({
+    "words_per_second",
+    "good_samples_count",
+})
+
 @bp.route("/cycle-config/set", methods=["POST"])
 def api_cycle_config_set_key():
     if not is_authenticated():
@@ -606,12 +612,23 @@ def api_cycle_config_set_key():
     try:
         cycle_config_set(key, value)
     except ValueError:
-        return jsonify({"ok": False, "error": "invalid integer"}), 400
+        payload = {"ok": False, "error": "invalid integer"}
+        if key in _CYCLE_CONFIG_INT_KEYS:
+            payload["value"] = cycle_config_get(key)
+        return jsonify(payload), 400
     return jsonify({"ok": True, "key": key})
 
 _SETTINGS_KEYS = frozenset({
     "story_fails_to_next",
 })
+
+_SETTINGS_INT_KEYS = frozenset({
+    "story_fails_to_next",
+})
+
+_SETTINGS_INT_DEFAULTS = {
+    "story_fails_to_next": "3",
+}
 
 @bp.route("/settings/set", methods=["POST"])
 def api_settings_set_key():
@@ -624,6 +641,17 @@ def api_settings_set_key():
     value = body.get("value", "")
     if value is None:
         value = ""
+    if key in _SETTINGS_INT_KEYS:
+        try:
+            settings_set(key, str(parse_config_int(value)))
+        except ValueError:
+            default = _SETTINGS_INT_DEFAULTS.get(key, "")
+            return jsonify({
+                "ok": False,
+                "error": "invalid integer",
+                "value": settings_get(key, default),
+            }), 400
+        return jsonify({"ok": True, "key": key})
     settings_set(key, str(value))
     return jsonify({"ok": True, "key": key})
 

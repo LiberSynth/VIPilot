@@ -111,7 +111,31 @@ function validateLifetimes() {
   return !llInvalid && !sllInvalid && !blInvalid;
 }
 
-function _saveCycleConfigKey(key, value) {
+function _showInvalidIntegerDialog(el, dbValue) {
+  new ConfirmDialog({
+    title: 'Неверное значение',
+    text: 'Нужно целое число. Восстановлено сохранённое значение.',
+    cancelLabel: 'OK',
+    onClose: function() {
+      if (!el || dbValue === undefined || dbValue === null) return;
+      el.value = String(dbValue);
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    },
+  }).open();
+}
+
+function _handleConfigSaveResponse(r, data, el) {
+  if (r.ok && data.ok) return;
+  if (data.error === 'invalid integer') {
+    _showInvalidIntegerDialog(el, data.value);
+    return;
+  }
+  if (typeof showToast === 'function') {
+    showToast('Ошибка: ' + (data.error || ('HTTP ' + r.status)), 'error');
+  }
+}
+
+function _saveCycleConfigKey(key, value, el) {
   fetch('/api/cycle-config/set', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -119,11 +143,7 @@ function _saveCycleConfigKey(key, value) {
   })
     .then(function(r) {
       return r.json().then(function(data) {
-        if (!r.ok || !data.ok) {
-          if (typeof showToast === 'function') {
-            showToast('Ошибка: ' + (data.error || ('HTTP ' + r.status)), 'error');
-          }
-        }
+        _handleConfigSaveResponse(r, data, el);
       });
     })
     .catch(function() {
@@ -131,7 +151,7 @@ function _saveCycleConfigKey(key, value) {
     });
 }
 
-function _saveSettingsKey(key, value) {
+function _saveSettingsKey(key, value, el) {
   fetch('/api/settings/set', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -139,11 +159,7 @@ function _saveSettingsKey(key, value) {
   })
     .then(function(r) {
       return r.json().then(function(data) {
-        if (!r.ok || !data.ok) {
-          if (typeof showToast === 'function') {
-            showToast('Ошибка: ' + (data.error || ('HTTP ' + r.status)), 'error');
-          }
-        }
+        _handleConfigSaveResponse(r, data, el);
       });
     })
     .catch(function() {
@@ -172,26 +188,26 @@ function _attachDebouncedSave(el, saveFn, delayMs) {
     f.addEventListener('change', scheduleRequestSave);
   });
 
-  _attachDebouncedSave(taSys, function() { _saveCycleConfigKey('format_prompt', taSys.value); });
-  _attachDebouncedSave(ta, function() { _saveCycleConfigKey('text_prompt', ta.value); });
-  _attachDebouncedSave(taT2v, function() { _saveCycleConfigKey('t2v_conversion_prompt', taT2v.value); });
+  _attachDebouncedSave(taSys, function() { _saveCycleConfigKey('format_prompt', taSys.value, null); });
+  _attachDebouncedSave(ta, function() { _saveCycleConfigKey('text_prompt', ta.value, null); });
+  _attachDebouncedSave(taT2v, function() { _saveCycleConfigKey('t2v_conversion_prompt', taT2v.value, null); });
   _attachDebouncedSave(document.getElementById('ta_postprompt'), function() {
     var el = document.getElementById('ta_postprompt');
-    if (el) _saveCycleConfigKey('video_post_prompt', el.value);
+    if (el) _saveCycleConfigKey('video_post_prompt', el.value, null);
   });
 
   var storyFailsEl = document.getElementById('story_fails_to_next');
   _attachDebouncedSave(storyFailsEl, function() {
-    if (storyFailsEl) _saveSettingsKey('story_fails_to_next', storyFailsEl.value);
+    if (storyFailsEl) _saveSettingsKey('story_fails_to_next', storyFailsEl.value, storyFailsEl);
   });
 
   _attachDebouncedSave(document.getElementById('words-per-second-input'), function() {
     var el = document.getElementById('words-per-second-input');
-    if (el) _saveCycleConfigKey('words_per_second', el.value);
+    if (el) _saveCycleConfigKey('words_per_second', el.value, el);
   });
   _attachDebouncedSave(document.getElementById('good-samples-count-input'), function() {
     var el = document.getElementById('good-samples-count-input');
-    if (el) _saveCycleConfigKey('good_samples_count', el.value);
+    if (el) _saveCycleConfigKey('good_samples_count', el.value, el);
   });
 
   const serviceFields = [
