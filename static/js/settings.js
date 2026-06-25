@@ -45,7 +45,6 @@ function collectAllSettings(activeTab) {
   const data = new FormData();
   data.set('active_tab', activeTab || 'pipeline');
   const setIfExists = (key, id) => { const el = document.getElementById(id); if (el) data.set(key, el.value); };
-  setIfExists('target_id',        'target_id');
   setIfExists('app_instance',     'app_instance');
   setIfExists('notify_email',     'notify_email');
   setIfExists('notify_phone',     'notify_phone');
@@ -57,15 +56,6 @@ function collectAllSettings(activeTab) {
   setIfExists('max_batch_threads', 'max_batch_threads');
   setIfExists('max_model_passes',  'max_model_passes');
   return data;
-}
-
-var _publishSaveTimer = null;
-function savePublishSettings() {
-  fetch('/save', { method: 'POST', body: collectAllSettings('publish') }).catch(() => {});
-}
-function schedulePublishSave() {
-  clearTimeout(_publishSaveTimer);
-  _publishSaveTimer = setTimeout(savePublishSettings, SAVE_DEBOUNCE_MS);
 }
 
 var _serviceSaveTimer = null;
@@ -200,6 +190,24 @@ function _attachDebouncedSave(el, saveFn, delayMs) {
     if (el) _saveCycleConfigKey('good_samples_count', el.value, el);
   });
 
+  _attachDebouncedSave(document.getElementById('publication_counter'), function() {
+    var el = document.getElementById('publication_counter');
+    if (!el) return;
+    fetch('/api/publication-counter/set', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value: el.value }),
+    })
+      .then(function(r) {
+        return r.json().then(function(data) {
+          _handleConfigSaveResponse(r, data, el);
+        });
+      })
+      .catch(function() {
+        if (typeof showToast === 'function') showToast('Ошибка запроса', 'error');
+      });
+  });
+
   const serviceFields = [
     document.getElementById('app_instance'),
     document.getElementById('notify_email'),
@@ -225,32 +233,6 @@ function _attachDebouncedSave(el, saveFn, delayMs) {
     el.addEventListener('input',  validateLifetimes);
     el.addEventListener('change', () => { if (validateLifetimes()) scheduleServiceSave(); });
   });
-})();
-
-var _pubCounterTimer = null;
-function _savePublicationCounter() {
-  const el = document.getElementById('publication_counter');
-  if (!el) return;
-  const val = parseInt(el.value);
-  if (isNaN(val) || val < 0) return;
-  fetch('/api/publication-counter/set', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ value: val }),
-  })
-    .then(r => r.json())
-    .then(data => { if (!data.ok) showToast('Ошибка: ' + (data.error || 'неизвестная'), 'error'); })
-    .catch(() => showToast('Ошибка запроса', 'error'));
-}
-function _schedulePubCounterSave() {
-  clearTimeout(_pubCounterTimer);
-  _pubCounterTimer = setTimeout(_savePublicationCounter, SAVE_DEBOUNCE_MS);
-}
-(function() {
-  const el = document.getElementById('publication_counter');
-  if (!el) return;
-  el.addEventListener('input',  _schedulePubCounterSave);
-  el.addEventListener('change', _schedulePubCounterSave);
 })();
 
 function _backupYamlBasename(file) {
@@ -538,7 +520,19 @@ function uploadUpdatePackage(btn) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ targets_config: parsed })
-    });
+    })
+      .then(function(r) {
+        return r.json().then(function(data) {
+          if (!r.ok || !data.ok) {
+            if (typeof showToast === 'function') {
+              showToast('Ошибка: ' + (data.error || ('HTTP ' + r.status)), 'error');
+            }
+          }
+        });
+      })
+      .catch(function() {
+        if (typeof showToast === 'function') showToast('Ошибка запроса', 'error');
+      });
   }
 
   function attachTargetBodyListener(areaId, errorId, targetIdElId) {

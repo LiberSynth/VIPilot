@@ -1268,8 +1268,22 @@ def set_publication_counter():
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
     data = request.get_json(silent=True) or {}
-    val = data.get("value")
-    if val is None or not isinstance(val, int) or val < 0:
-        return jsonify({"ok": False, "error": "value must be a non-negative integer"}), 400
-    env_set("publication_counter", str(val))
+    value = data.get("value", "")
+    if value is None:
+        value = ""
+    try:
+        n = parse_config_int(value)
+    except ValueError:
+        return jsonify({
+            "ok": False,
+            "error": "invalid integer",
+            "value": env_get("publication_counter", "0"),
+        }), 400
+    if n < 0:
+        return jsonify({
+            "ok": False,
+            "error": "invalid integer",
+            "value": env_get("publication_counter", "0"),
+        }), 400
+    env_set("publication_counter", str(n))
     return jsonify({"ok": True})

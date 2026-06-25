@@ -34,9 +34,15 @@ def parse_config_int(value) -> int:
 - `ConfirmDialog` с `onClose` (см. `confirm-dialog.js`) → восстановить `el.value = String(data.value)`.
 - Autosave и listeners — в **`settings.js`**, debounce **`SAVE_DEBOUNCE_MS`** (`static/js/consts.js`, сейчас 400 ms).
 
-## UUID-таблицы (stories, ai_models, …)
+## UUID-таблицы (stories, ai_models, targets, …)
 
-Отдельно: PATCH одного поля по id (режиссёр). Не смешивать с key-value.
+Отдельно: PATCH одного поля по id (режиссёр, таргеты публикации). Не смешивать с key-value.
+
+## Панель «Публикация»
+
+- `publication_counter` (`environment`): `POST /api/publication-counter/set`, int через `parse_config_int`, debounce `SAVE_DEBOUNCE_MS`.
+- JSON конфиг таргета: `POST /api/targets/{id}/targets-config`, debounce + save на blur.
+- Toggle активности: `POST /api/targets/{id}/active` — сразу, без debounce.
 
 ## Не делать
 

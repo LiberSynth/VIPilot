@@ -20,7 +20,6 @@ from db import (
     env_set,
     cycle_config_get,
     cycle_config_set,
-    db_get_active_targets,
     db_get_all_targets,
     db_get_target_by_name,
     db_get_user_by_login,
@@ -223,9 +222,6 @@ def root_page():
     _vkvideo_tc = vkvideo_target.get("config") if vkvideo_target else None
     vkvideo_targets_config_json = json.dumps(_vkvideo_tc, ensure_ascii=False, indent=2) if _vkvideo_tc is not None else ""
 
-    active_targets  = db_get_active_targets()
-    target          = active_targets[0] if active_targets else None
-    target_id       = target["id"] if target else None
     _known_slugs    = {"vk", "dzen", "rutube", "vkvideo"}
     publish_order   = [
         t["slug"] for t in db_get_all_targets()
@@ -285,7 +281,6 @@ def root_page():
         video_fails_to_next=video_fails_to_next,
         deep_debugging=deep_debugging,
         workflow_state=workflow_state,
-        target_id=target_id,
         vk_target_id=vk_target_id,
         vk_targets_config_json=vk_targets_config_json,
         dzen_target_id=dzen_target_id,
