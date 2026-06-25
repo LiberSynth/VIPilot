@@ -38,6 +38,12 @@ def parse_config_int(value) -> int:
 
 Отдельно: PATCH одного поля по id (режиссёр, таргеты публикации). Не смешивать с key-value.
 
+## PRODUCTION «Сценарист» (stories)
+
+- Создание: `POST /production/story` → `{ story_id }`.
+- Поля: `POST /production/story/{id}/title|content|prompt`, debounce `SAVE_DEBOUNCE_MS`.
+- Batch `/production/story/save` не использовать.
+
 ## Панель «Публикация»
 
 - `publication_counter` (`environment`): `POST /api/publication-counter/set`, int через `parse_config_int`, debounce `SAVE_DEBOUNCE_MS`.

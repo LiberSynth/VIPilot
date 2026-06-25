@@ -48,6 +48,7 @@ from db import (
     db_set_movie_grade,
     db_upsert_story,
     db_update_story_content,
+    db_update_story_title,
     db_update_story_prompt,
     db_purge_unused_stories,
     db_delete_bad_movies,
@@ -1176,8 +1177,8 @@ def api_production_movie_delete(movie_id):
         return jsonify({"error": "not found"}), 404
     return jsonify({"ok": True, "deleted": result})
 
-@production_bp.route("/production/story/save", methods=["POST"])
-def api_production_story_save():
+@production_bp.route("/production/story", methods=["POST"])
+def api_production_story_create():
     err = _production_auth_check()
     if err:
         return err
@@ -1185,11 +1186,22 @@ def api_production_story_save():
     title = data.get("title", "")
     content = data.get("content", "")
     prompt = data.get("prompt", "")
-    story_id = data.get("story_id") or None
-    new_id = db_upsert_story(story_id, title, content, prompt)
+    new_id = db_upsert_story(None, title, content, prompt)
     if new_id is None:
         return jsonify({"error": "db_error"}), 500
     return jsonify({"story_id": new_id})
+
+@production_bp.route("/production/story/<story_id>/title", methods=["POST"])
+def api_production_story_title(story_id):
+    err = _production_auth_check()
+    if err:
+        return err
+    data = request.get_json(silent=True) or {}
+    title = data.get("title", "")
+    updated_id = db_update_story_title(story_id, title)
+    if updated_id is None:
+        return jsonify({"error": "not_found"}), 404
+    return jsonify({"ok": True})
 
 @production_bp.route("/production/story/<story_id>/content", methods=["POST"])
 def api_production_story_content(story_id):

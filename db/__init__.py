@@ -27,6 +27,7 @@ from .db_simple import (
     db_set_story_model,
     db_upsert_story,
     db_update_story_content,
+    db_update_story_title,
     db_update_story_prompt,
     db_toggle_model,
     db_reorder_models,

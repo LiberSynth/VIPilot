@@ -7,15 +7,17 @@ var _activeStoryId = null;
 var resetActiveStoryId;
 var loadStoryIntoEditor;
 (function() {
-  var _storySaveTimer = null;
-  var _inflight = null;
-  var _pendingRetry = false;
+  var _titleTimer = null;
+  var _contentTimer = null;
+  var _promptTimer = null;
+  var _createInflight = null;
 
   resetActiveStoryId = function() {
     _activeStoryId = null;
-    _inflight = null;
-    _pendingRetry = false;
-    clearTimeout(_storySaveTimer);
+    _createInflight = null;
+    clearTimeout(_titleTimer);
+    clearTimeout(_contentTimer);
+    clearTimeout(_promptTimer);
   };
 
   loadStoryIntoEditor = function(story) {
@@ -26,101 +28,126 @@ var loadStoryIntoEditor;
     if (contentEl) contentEl.value = story.content || '';
     if (promptEl) promptEl.value = story.prompt || '';
     _activeStoryId = story.id;
-    _inflight = null;
-    _pendingRetry = false;
-    clearTimeout(_storySaveTimer);
+    _createInflight = null;
+    clearTimeout(_titleTimer);
+    clearTimeout(_contentTimer);
+    clearTimeout(_promptTimer);
   };
 
-  function _doPost() {
+  function _editorValues() {
     var titleEl = document.getElementById('story-title');
     var contentEl = document.getElementById('story-content');
     var promptEl = document.getElementById('story-prompt');
-    var title = titleEl ? titleEl.value : '';
-    var content = contentEl ? contentEl.value : '';
-    var prompt = promptEl ? promptEl.value : '';
-    return fetch('/production/story/save', {
+    return {
+      title: titleEl ? titleEl.value : '',
+      content: contentEl ? contentEl.value : '',
+      prompt: promptEl ? promptEl.value : '',
+    };
+  }
+
+  function _handleSaveError() {
+    if (typeof showToast === 'function') showToast('Ошибка сохранения сюжета', 'error');
+  }
+
+  function _afterStoryCreated(wasNew) {
+    if (wasNew) {
+      if (typeof window.setExpandedStoryId === 'function') window.setExpandedStoryId(_activeStoryId);
+      if (typeof loadStoryList === 'function') loadStoryList();
+    }
+  }
+
+  function _ensureStoryExists(force) {
+    if (_activeStoryId) return Promise.resolve(_activeStoryId);
+    var vals = _editorValues();
+    if (!force && !vals.title && !vals.content) return Promise.resolve(null);
+    if (_createInflight) return _createInflight;
+    _createInflight = fetch('/production/story', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ story_id: _activeStoryId, title: title, content: content, prompt: prompt }),
+      body: JSON.stringify(vals),
     })
-    .then(function(r) { return r.ok ? r.json() : null; })
-    .then(function(d) {
-      var newId = d && d.story_id ? String(d.story_id) : null;
-      if (newId) {
+      .then(function(r) {
+        return r.json().then(function(d) { return { ok: r.ok, data: d }; });
+      })
+      .then(function(res) {
+        _createInflight = null;
+        if (!res.ok || !res.data.story_id) throw new Error('create_failed');
         var wasNew = !_activeStoryId;
-        _activeStoryId = newId;
-        if (wasNew) {
-          if (typeof window.setExpandedStoryId === 'function') window.setExpandedStoryId(_activeStoryId);
-          if (typeof loadStoryList === 'function') loadStoryList();
-        }
-      }
-      return newId;
-    });
-  }
-
-  function _postStorySave(force) {
-    var titleEl = document.getElementById('story-title');
-    var contentEl = document.getElementById('story-content');
-    var promptEl = document.getElementById('story-prompt');
-    if (!titleEl || !contentEl) return Promise.resolve(null);
-    var title = titleEl.value;
-    var content = contentEl.value;
-    var prompt = promptEl ? promptEl.value : '';
-    if (!force && !_activeStoryId && !title && !content) return Promise.resolve(null);
-    if (_inflight) {
-      if (force) {
-        return _inflight.then(function() {
-          if (_activeStoryId) return _activeStoryId;
-          return _postStorySave(true);
-        });
-      }
-      _pendingRetry = true;
-      return _inflight;
-    }
-    _inflight = _doPost()
-      .then(function(id) {
-        _inflight = null;
-        if (_pendingRetry) {
-          _pendingRetry = false;
-          _postStorySave(false);
-        }
-        return id;
+        _activeStoryId = String(res.data.story_id);
+        _afterStoryCreated(wasNew);
+        return _activeStoryId;
       })
       .catch(function(err) {
-        _inflight = null;
-        if (_pendingRetry) {
-          _pendingRetry = false;
-          _postStorySave(false);
-        }
+        _createInflight = null;
         throw err;
       });
-    return _inflight;
+    return _createInflight;
   }
 
-  function saveStory() { _postStorySave(false).catch(function() {}); }
+  function _saveStoryField(path, body) {
+    return _ensureStoryExists(false)
+      .then(function(id) {
+        if (!id) return;
+        return fetch('/production/story/' + encodeURIComponent(id) + '/' + path, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        }).then(function(r) {
+          if (!r.ok) throw new Error('save_failed');
+          return r.json();
+        });
+      })
+      .catch(function() {
+        _handleSaveError();
+      });
+  }
+
+  function scheduleTitleSave() {
+    clearTimeout(_titleTimer);
+    _titleTimer = setTimeout(function() {
+      var el = document.getElementById('story-title');
+      if (!el) return;
+      if (!_activeStoryId && !el.value) return;
+      _saveStoryField('title', { title: el.value });
+    }, SAVE_DEBOUNCE_MS);
+  }
+
+  function scheduleContentSave() {
+    clearTimeout(_contentTimer);
+    _contentTimer = setTimeout(function() {
+      var el = document.getElementById('story-content');
+      if (!el) return;
+      if (!_activeStoryId && !el.value) return;
+      _saveStoryField('content', { content: el.value });
+    }, SAVE_DEBOUNCE_MS);
+  }
+
+  function schedulePromptSave() {
+    clearTimeout(_promptTimer);
+    _promptTimer = setTimeout(function() {
+      var el = document.getElementById('story-prompt');
+      if (!el) return;
+      if (!_activeStoryId && !el.value) return;
+      _saveStoryField('prompt', { prompt: el.value });
+    }, SAVE_DEBOUNCE_MS);
+  }
 
   window.ensureStoryId = function() {
-    if (_activeStoryId) return Promise.resolve(_activeStoryId);
-    return _postStorySave(true).then(function(id) {
+    return _ensureStoryExists(true).then(function(id) {
       if (!id) throw new Error('failed_to_create_story');
       return id;
     });
   };
-
-  function onStoryInput() {
-    clearTimeout(_storySaveTimer);
-    _storySaveTimer = setTimeout(saveStory, SAVE_DEBOUNCE_MS);
-  }
 
   function initStoryAutosave() {
     var titleEl = document.getElementById('story-title');
     var contentEl = document.getElementById('story-content');
     var promptEl = document.getElementById('story-prompt');
     if (!titleEl || !contentEl) return;
-    titleEl.addEventListener('input', onStoryInput);
-    contentEl.addEventListener('input', onStoryInput);
+    titleEl.addEventListener('input', scheduleTitleSave);
+    contentEl.addEventListener('input', scheduleContentSave);
     if (promptEl) {
-      promptEl.addEventListener('input', onStoryInput);
+      promptEl.addEventListener('input', schedulePromptSave);
       promptEl.addEventListener('input', function() {
         if (typeof window.syncActiveStoryPromptIcon === 'function') {
           window.syncActiveStoryPromptIcon();
