@@ -249,7 +249,7 @@ def run(batch_id, category):
 
         # pending: новый submit одной конкретной модели.
         try:
-            max_attempts_per_model = max(1, int(settings_get('video_fails_to_next', '3')))
+            max_attempts_per_model = int(settings_get('video_fails_to_next', '3'))
         except (ValueError, TypeError):
             max_attempts_per_model = 3
 
@@ -261,7 +261,7 @@ def run(batch_id, category):
             raise AppException(batch_id, 'video', msg)
 
         story_title = db_get_story_title(story_id) or '(без названия)'
-        video_duration = max(1, min(60, cycle_config_get('video_duration')))
+        video_duration = int(cycle_config_get('video_duration'))
         allowed = model.get('allowed_durations') or [0]
         actual_duration = nearest_allowed_duration(video_duration, allowed)
         if actual_duration != video_duration:

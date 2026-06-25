@@ -4,7 +4,7 @@ from db import cycle_config_get, db_get_graded_stories, db_get_used_stories
 from utils.utils import wrap_block
 
 def _get_video_duration() -> int:
-    return max(1, min(60, cycle_config_get('video_duration')))
+    return int(cycle_config_get('video_duration'))
 
 def _get_duration() -> str:
     return str(_get_video_duration())

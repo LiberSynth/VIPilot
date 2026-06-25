@@ -1,0 +1,46 @@
+---
+description: Образец сохранения полей UI-панели (эталон — «Генерация сюжета»)
+alwaysApply: true
+---
+
+# Сохранение полей панели (образец: «Генерация сюжета»)
+
+## Принцип
+
+Один контрол → одна запись в БД. **Без** batch `/save` и `collectAllSettings` для полей панели.
+
+## Key-value (cycle_config / settings)
+
+- Таблицы `cycle_config`, `settings`: колонка `value` — **TEXT**; целые хранятся как строка `"8"`, не PostgreSQL INT.
+- Текстовые ключи: `POST /api/cycle-config/set` `{ "key", "value" }`, allowlist `_CYCLE_CONFIG_KEYS`.
+- Целые в settings: `POST /api/settings/set`, allowlist `_SETTINGS_KEYS` int-ключей, `parse_config_int`.
+- Целые в cycle_config: те же `/api/cycle-config/set`, парсинг в `cycle_config_set` через `parse_config_int`.
+
+## parse_config_int
+
+```python
+def parse_config_int(value) -> int:
+    try:
+        return int(str(value).strip())
+    except (TypeError, ValueError) as exc:
+        raise ValueError("invalid integer") from exc
+```
+
+Без range/clamp. Не int → **400**, в БD **не писать**.
+
+## Ошибка int на клиенте
+
+- Ответ 400: `{ "ok": false, "error": "invalid integer", "value": <из БД> }`.
+- `ConfirmDialog` с `onClose` (см. `confirm-dialog.js`) → восстановить `el.value = String(data.value)`.
+- Autosave и listeners — в **`settings.js`**, не в `screenwriter.js` (там только UI, напр. счётчик слов).
+
+## UUID-таблицы (stories, ai_models, …)
+
+Отдельно: PATCH одного поля по id (режиссёр). Не смешивать с key-value.
+
+## Не делать
+
+- Пачечный `/save` для полей панели.
+- Silent fallback «сохрани как строку» при ошибке парсинга int.
+- Toast вместо диалога для invalid integer.
+- Именование «draft» для сущности story.

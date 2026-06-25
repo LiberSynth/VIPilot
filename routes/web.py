@@ -182,7 +182,7 @@ def root_page():
     vk_target_id = vk_target["id"] if vk_target else None
     _vk_tc = vk_target.get("config") if vk_target else None
     vk_targets_config_json = json.dumps(_vk_tc, ensure_ascii=False, indent=2) if _vk_tc is not None else ""
-    video_duration     = max(1, min(60, cycle_config_get("video_duration")))
+    video_duration     = cycle_config_get("video_duration")
     video_post_prompt  = cycle_config_get("video_post_prompt")
     try:
         buffer_minutes = int(settings_get("buffer_minutes", "60"))
@@ -194,7 +194,7 @@ def root_page():
     story_fails_to_next = settings_get("story_fails_to_next", "3")
     words_per_second    = cycle_config_get("words_per_second")
     good_samples_count  = cycle_config_get("good_samples_count")
-    video_fails_to_next = max(1, int(settings_get("video_fails_to_next", "3")))
+    video_fails_to_next = settings_get("video_fails_to_next", "3")
     deep_debugging      = environment.deep_debugging
 
     workflow_state = env_get("workflow_state", "running")
@@ -329,10 +329,10 @@ def production_page():
     t2v_conversion_prompt   = cycle_config_get("t2v_conversion_prompt")
     video_post_prompt   = cycle_config_get("video_post_prompt")
     story_fails_to_next = settings_get("story_fails_to_next", "3")
-    video_duration      = max(1, min(60, cycle_config_get("video_duration")))
+    video_duration      = cycle_config_get("video_duration")
     words_per_second    = cycle_config_get("words_per_second")
     good_samples_count  = cycle_config_get("good_samples_count")
-    video_fails_to_next = max(1, int(settings_get("video_fails_to_next", "3")))
+    video_fails_to_next = settings_get("video_fails_to_next", "3")
     screenwriter_show_used = env_get("screenwriter_show_used", "0") == "1"
     screenwriter_only_good = env_get("screenwriter_only_good", "0") == "1"
     screenwriter_for_approval = env_get("screenwriter_for_approval", "0") == "1"
@@ -400,14 +400,6 @@ def save():
     if "notify_phone" in request.form:
         settings_set("notify_phone", request.form.get("notify_phone", "").strip())
 
-    vid_dur_str = request.form.get("video_duration")
-    if vid_dur_str is not None:
-        try:
-            vid_dur = max(1, min(60, int(vid_dur_str)))
-        except (ValueError, TypeError):
-            vid_dur = 6
-        cycle_config_set("video_duration", vid_dur)
-
     buf_str = request.form.get("buffer_minutes", "").strip()
     if buf_str:
         try:
@@ -419,13 +411,6 @@ def save():
     if loop_str:
         try:
             settings_set("loop_interval", str(max(1, min(3600, int(loop_str)))))
-        except (ValueError, TypeError):
-            pass
-
-    video_fails_str = request.form.get("video_fails_to_next", "").strip()
-    if video_fails_str:
-        try:
-            settings_set("video_fails_to_next", str(max(1, int(video_fails_str))))
         except (ValueError, TypeError):
             pass
 

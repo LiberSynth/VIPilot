@@ -590,11 +590,13 @@ _CYCLE_CONFIG_KEYS = frozenset({
     "video_post_prompt",
     "words_per_second",
     "good_samples_count",
+    "video_duration",
 })
 
 _CYCLE_CONFIG_INT_KEYS = frozenset({
     "words_per_second",
     "good_samples_count",
+    "video_duration",
 })
 
 @bp.route("/cycle-config/set", methods=["POST"])
@@ -621,14 +623,17 @@ def api_cycle_config_set_key():
 
 _SETTINGS_KEYS = frozenset({
     "story_fails_to_next",
+    "video_fails_to_next",
 })
 
 _SETTINGS_INT_KEYS = frozenset({
     "story_fails_to_next",
+    "video_fails_to_next",
 })
 
 _SETTINGS_INT_DEFAULTS = {
     "story_fails_to_next": "3",
+    "video_fails_to_next": "3",
 }
 
 @bp.route("/settings/set", methods=["POST"])

@@ -45,8 +45,6 @@ function collectAllSettings(activeTab) {
   const data = new FormData();
   data.set('active_tab', activeTab || 'pipeline');
   const setIfExists = (key, id) => { const el = document.getElementById(id); if (el) data.set(key, el.value); };
-  setIfExists('video_duration',      'video_duration');
-  setIfExists('video_fails_to_next', 'video_fails_to_next');
   setIfExists('target_id',        'target_id');
   setIfExists('app_instance',     'app_instance');
   setIfExists('notify_email',     'notify_email');
@@ -59,15 +57,6 @@ function collectAllSettings(activeTab) {
   setIfExists('max_batch_threads', 'max_batch_threads');
   setIfExists('max_model_passes',  'max_model_passes');
   return data;
-}
-
-var _requestSaveTimer = null;
-function saveRequestSettings() {
-  fetch('/save', { method: 'POST', body: collectAllSettings('request') }).catch(() => {});
-}
-function scheduleRequestSave() {
-  clearTimeout(_requestSaveTimer);
-  _requestSaveTimer = setTimeout(saveRequestSettings, 800);
 }
 
 var _publishSaveTimer = null;
@@ -179,13 +168,14 @@ function _attachDebouncedSave(el, saveFn, delayMs) {
 }
 
 (function() {
-  const requestFields = [
-    document.getElementById('video_duration'),
-    document.getElementById('video_fails_to_next'),
-  ].filter(Boolean);
-  requestFields.forEach(f => {
-    f.addEventListener('input',  scheduleRequestSave);
-    f.addEventListener('change', scheduleRequestSave);
+  var videoDurationEl = document.getElementById('video_duration');
+  _attachDebouncedSave(videoDurationEl, function() {
+    if (videoDurationEl) _saveCycleConfigKey('video_duration', videoDurationEl.value, videoDurationEl);
+  });
+
+  var videoFailsEl = document.getElementById('video_fails_to_next');
+  _attachDebouncedSave(videoFailsEl, function() {
+    if (videoFailsEl) _saveSettingsKey('video_fails_to_next', videoFailsEl.value, videoFailsEl);
   });
 
   _attachDebouncedSave(taSys, function() { _saveCycleConfigKey('format_prompt', taSys.value, null); });
