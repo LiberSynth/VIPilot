@@ -16,7 +16,7 @@ def _get_good_samples() -> str:
     stories = db_get_graded_stories()
     good = [s for s in stories if s['grade'] == 'good']
     if good:
-        limit = max(1, int(cycle_config_get('good_samples_count') or 25))
+        limit = int(cycle_config_get('good_samples_count') or 25)
         good = random.sample(good, min(limit, len(good)))
     parts = [
         wrap_block('Образец хорошего качества', f'{story["title"]}\n\n{story["content"]}', i)

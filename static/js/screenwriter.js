@@ -1232,20 +1232,17 @@ var loadStoryIntoEditor;
     if (wpsInput) {
       wpsInput.addEventListener('input', function() {
         var v = parseInt(wpsInput.value, 10);
-        if (v > 0 && v <= 100) {
+        if (!isNaN(v)) {
           _wordsPerSecond = v;
           updateWordCount();
-          _saveWordsPerSecond(v);
         }
+        _saveWordsPerSecond(wpsInput.value);
       });
     }
     var gscInput = document.getElementById('good-samples-count-input');
     if (gscInput) {
       gscInput.addEventListener('input', function() {
-        var v = parseInt(gscInput.value, 10);
-        if (v >= 1) {
-          _saveGoodSamplesCount(v);
-        }
+        _saveGoodSamplesCount(gscInput.value);
       });
     }
   }

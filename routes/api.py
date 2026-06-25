@@ -586,28 +586,16 @@ def api_cycle_config_words_per_second():
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
     body = request.get_json(silent=True) or {}
-    try:
-        value = float(body.get("value", 0))
-    except (TypeError, ValueError):
-        return jsonify({"error": "invalid value"}), 400
-    if value <= 0 or value > 100:
-        return jsonify({"error": "value must be > 0 and <= 100"}), 400
-    cycle_config_set("words_per_second", value)
-    return jsonify({"ok": True, "words_per_second": value})
+    cycle_config_set("words_per_second", body.get("value", ""))
+    return jsonify({"ok": True})
 
 @bp.route("/cycle-config/good-samples-count", methods=["POST"])
 def api_cycle_config_good_samples_count():
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
     body = request.get_json(silent=True) or {}
-    try:
-        value = int(body.get("value", 0))
-    except (TypeError, ValueError):
-        return jsonify({"error": "invalid value"}), 400
-    if value < 1:
-        return jsonify({"error": "value must be >= 1"}), 400
-    cycle_config_set("good_samples_count", value)
-    return jsonify({"ok": True, "good_samples_count": value})
+    cycle_config_set("good_samples_count", body.get("value", ""))
+    return jsonify({"ok": True})
 
 _CYCLE_CONFIG_TEXT_KEYS = frozenset({
     "format_prompt",
@@ -632,9 +620,9 @@ def api_cycle_config_set_key():
     cycle_config_set(key, value)
     return jsonify({"ok": True, "key": key})
 
-_SETTINGS_INT_KEYS = {
-    "story_fails_to_next": (1, 99),
-}
+_SETTINGS_KEYS = frozenset({
+    "story_fails_to_next",
+})
 
 @bp.route("/settings/set", methods=["POST"])
 def api_settings_set_key():
@@ -642,17 +630,13 @@ def api_settings_set_key():
         return jsonify({"error": "unauthorized"}), 401
     body = request.get_json(silent=True) or {}
     key = (body.get("key") or "").strip()
-    bounds = _SETTINGS_INT_KEYS.get(key)
-    if bounds is None:
+    if key not in _SETTINGS_KEYS:
         return jsonify({"error": "invalid key"}), 400
-    lo, hi = bounds
-    try:
-        n = int(body.get("value", 0))
-    except (TypeError, ValueError):
-        return jsonify({"error": "invalid value"}), 400
-    n = max(lo, min(hi, n))
-    settings_set(key, str(n))
-    return jsonify({"ok": True, "key": key, "value": n})
+    value = body.get("value", "")
+    if value is None:
+        value = ""
+    settings_set(key, str(value))
+    return jsonify({"ok": True, "key": key})
 
 @bp.route("/monitor/batch/<batch_id>/entries")
 def api_monitor_batch_entries(batch_id):

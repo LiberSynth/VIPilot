@@ -68,7 +68,7 @@ def run(batch_id, category):
         raise AppException(batch_id, "prompt", msg)
 
     try:
-        max_attempts_per_model = max(1, int(settings_get("story_fails_to_next", "3")))
+        max_attempts_per_model = int(settings_get("story_fails_to_next", "3"))
     except (ValueError, TypeError):
         max_attempts_per_model = 3
 

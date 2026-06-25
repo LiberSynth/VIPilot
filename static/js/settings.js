@@ -128,11 +128,11 @@ function _saveCycleConfigKey(key, value) {
     });
 }
 
-function _saveSettingsIntKey(key, rawValue) {
+function _saveSettingsKey(key, value) {
   fetch('/api/settings/set', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ key: key, value: rawValue }),
+    body: JSON.stringify({ key: key, value: value }),
   })
     .then(function(r) { return r.json(); })
     .then(function(data) {
@@ -176,7 +176,7 @@ function _attachDebouncedSave(el, saveFn, delayMs) {
 
   var storyFailsEl = document.getElementById('story_fails_to_next');
   _attachDebouncedSave(storyFailsEl, function() {
-    if (storyFailsEl) _saveSettingsIntKey('story_fails_to_next', storyFailsEl.value);
+    if (storyFailsEl) _saveSettingsKey('story_fails_to_next', storyFailsEl.value);
   });
 
   const serviceFields = [

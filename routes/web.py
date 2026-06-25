@@ -191,9 +191,9 @@ def root_page():
     loop_interval       = environment.loop_interval
     max_batch_threads   = environment.max_threads
     max_model_passes    = environment.max_model_passes
-    story_fails_to_next = max(1, int(settings_get("story_fails_to_next", "3")))
-    words_per_second    = float(cycle_config_get("words_per_second") or 8.0)
-    good_samples_count  = max(1, int(cycle_config_get("good_samples_count") or 25))
+    story_fails_to_next = settings_get("story_fails_to_next", "3")
+    words_per_second    = cycle_config_get("words_per_second")
+    good_samples_count  = cycle_config_get("good_samples_count")
     video_fails_to_next = max(1, int(settings_get("video_fails_to_next", "3")))
     deep_debugging      = environment.deep_debugging
 
@@ -328,10 +328,10 @@ def production_page():
     text_prompt         = cycle_config_get("text_prompt")
     t2v_conversion_prompt   = cycle_config_get("t2v_conversion_prompt")
     video_post_prompt   = cycle_config_get("video_post_prompt")
-    story_fails_to_next = max(1, int(settings_get("story_fails_to_next", "3")))
+    story_fails_to_next = settings_get("story_fails_to_next", "3")
     video_duration      = max(1, min(60, cycle_config_get("video_duration")))
     words_per_second    = cycle_config_get("words_per_second")
-    good_samples_count  = max(1, int(cycle_config_get("good_samples_count") or 25))
+    good_samples_count  = cycle_config_get("good_samples_count")
     video_fails_to_next = max(1, int(settings_get("video_fails_to_next", "3")))
     screenwriter_show_used = env_get("screenwriter_show_used", "0") == "1"
     screenwriter_only_good = env_get("screenwriter_only_good", "0") == "1"
