@@ -53,7 +53,7 @@
 
   <!-- ══ РАБОЧИЙ ПОТОК ══ -->
   <div id="panel-workflow" class="tab-panel active">
-    <form id="settings-form" style="margin-top:0">
+    <div style="margin-top:0">
       {% from 'common/controls.html' import modes_card %}
       {{ modes_card() }}
       <div class="card" style="margin-top:12px">
@@ -70,7 +70,7 @@
           <button type="button" class="pt-btn-add" id="pt-save-btn" onclick="addScheduleSlot()" disabled>Сохранить</button>
         </div>
       </div>
-    </form>
+    </div>
   </div>
 
   <!-- ══ ГЕНЕРАЦИЯ СЮЖЕТА ══ -->

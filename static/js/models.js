@@ -275,11 +275,6 @@
     btn && btn.classList.toggle('model-radio-widget--active');
   }
 
-  window.activateModel = function(id) {
-    fetch('/api/models/' + id + '/activate', {method: 'POST'})
-      .catch(function(e) { console.error('activate error', e); loadModels(); });
-  };
-
   function initVideoAccordion() {
     var listEl = document.getElementById('model-list');
     if (!listEl || _videoAccordion) return;
