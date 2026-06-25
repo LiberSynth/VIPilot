@@ -603,7 +603,10 @@ def api_cycle_config_set_key():
         value = ""
     elif not isinstance(value, str):
         value = str(value)
-    cycle_config_set(key, value)
+    try:
+        cycle_config_set(key, value)
+    except ValueError:
+        return jsonify({"ok": False, "error": "invalid integer"}), 400
     return jsonify({"ok": True, "key": key})
 
 _SETTINGS_KEYS = frozenset({

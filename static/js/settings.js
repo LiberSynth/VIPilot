@@ -117,11 +117,14 @@ function _saveCycleConfigKey(key, value) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ key: key, value: value }),
   })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      if (!data.ok && typeof showToast === 'function') {
-        showToast('Ошибка: ' + (data.error || 'неизвестная'), 'error');
-      }
+    .then(function(r) {
+      return r.json().then(function(data) {
+        if (!r.ok || !data.ok) {
+          if (typeof showToast === 'function') {
+            showToast('Ошибка: ' + (data.error || ('HTTP ' + r.status)), 'error');
+          }
+        }
+      });
     })
     .catch(function() {
       if (typeof showToast === 'function') showToast('Ошибка запроса', 'error');
@@ -134,11 +137,14 @@ function _saveSettingsKey(key, value) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ key: key, value: value }),
   })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      if (!data.ok && typeof showToast === 'function') {
-        showToast('Ошибка: ' + (data.error || 'неизвестная'), 'error');
-      }
+    .then(function(r) {
+      return r.json().then(function(data) {
+        if (!r.ok || !data.ok) {
+          if (typeof showToast === 'function') {
+            showToast('Ошибка: ' + (data.error || ('HTTP ' + r.status)), 'error');
+          }
+        }
+      });
     })
     .catch(function() {
       if (typeof showToast === 'function') showToast('Ошибка запроса', 'error');

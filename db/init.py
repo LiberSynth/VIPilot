@@ -61,6 +61,12 @@ def _cleanup_legacy_schema(cur) -> None:
         WHERE key = 'words_per_second'
           AND value ~ '^[0-9]+\\.?[0-9]*$'
     """)
+    cur.execute("""
+        UPDATE cycle_config
+        SET value = '8'
+        WHERE key = 'words_per_second'
+          AND value !~ '^[0-9]+$'
+    """)
 
 def _ensure_movies_bit_columns(cur) -> None:
     """Колонки movies.used/transcoded/published: ADD IF NOT EXISTS + NOT NULL для старых БД."""

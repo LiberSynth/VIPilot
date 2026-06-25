@@ -44,16 +44,33 @@ def cycle_config_get(key: str):
             row = cur.fetchone()
     return _coerce(key, row[0] if row else None)
 
+def _parse_int_value(value) -> int:
+    if isinstance(value, bool):
+        raise ValueError("invalid integer")
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        if not value.is_integer():
+            raise ValueError("invalid integer")
+        return int(value)
+    text = str(value).strip()
+    if not text:
+        raise ValueError("invalid integer")
+    try:
+        parsed = float(text)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("invalid integer") from exc
+    if not parsed.is_integer():
+        raise ValueError("invalid integer")
+    return int(parsed)
+
 def cycle_config_set(key: str, value) -> None:
     if key not in _ALLOWED_KEYS:
         raise ValueError(f"Unknown cycle_config key: {key!r}")
     if isinstance(value, bool):
         str_value = "1" if value else "0"
-    elif key == "words_per_second":
-        try:
-            str_value = str(int(float(value)))
-        except (TypeError, ValueError):
-            str_value = str(value)
+    elif key in ("words_per_second", "good_samples_count", "video_duration"):
+        str_value = str(_parse_int_value(value))
     else:
         str_value = str(value)
     with get_db() as conn:
