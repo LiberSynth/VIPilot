@@ -1164,8 +1164,8 @@ var loadStoryIntoEditor;
     if (el) {
       var d = parseInt(el.getAttribute('data-video-duration'), 10);
       var w = parseInt(el.getAttribute('data-words-per-second'), 10);
-      if (d > 0) _videoDuration = d;
-      if (w > 0) _wordsPerSecond = w;
+      if (!isNaN(d)) _videoDuration = d;
+      if (!isNaN(w)) _wordsPerSecond = w;
     }
   }
 
@@ -1197,30 +1197,6 @@ var loadStoryIntoEditor;
 
   window.updateStoryWordCount = updateWordCount;
 
-  var _wpsTimer = null;
-  function _saveWordsPerSecond(value) {
-    clearTimeout(_wpsTimer);
-    _wpsTimer = setTimeout(function() {
-      fetch('/api/cycle-config/words-per-second', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({value: value})
-      });
-    }, 500);
-  }
-
-  var _gscTimer = null;
-  function _saveGoodSamplesCount(value) {
-    clearTimeout(_gscTimer);
-    _gscTimer = setTimeout(function() {
-      fetch('/api/cycle-config/good-samples-count', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({value: value})
-      });
-    }, 500);
-  }
-
   function initWordCount() {
     _readConfig();
     var textarea = document.getElementById('story-prompt');
@@ -1236,13 +1212,6 @@ var loadStoryIntoEditor;
           _wordsPerSecond = v;
           updateWordCount();
         }
-        _saveWordsPerSecond(wpsInput.value);
-      });
-    }
-    var gscInput = document.getElementById('good-samples-count-input');
-    if (gscInput) {
-      gscInput.addEventListener('input', function() {
-        _saveGoodSamplesCount(gscInput.value);
       });
     }
   }

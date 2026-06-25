@@ -19,17 +19,17 @@ def _coerce(key, raw):
         try:
             return int(raw)
         except (ValueError, TypeError):
-            return _DEFAULTS[key]
+            return raw
     if key == "words_per_second":
         try:
             return float(raw)
         except (ValueError, TypeError):
-            return _DEFAULTS[key]
+            return raw
     if key == "good_samples_count":
         try:
             return int(raw)
         except (ValueError, TypeError):
-            return _DEFAULTS[key]
+            return raw
     return raw
 
 def cycle_config_get(key: str):

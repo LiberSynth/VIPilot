@@ -179,6 +179,15 @@ function _attachDebouncedSave(el, saveFn, delayMs) {
     if (storyFailsEl) _saveSettingsKey('story_fails_to_next', storyFailsEl.value);
   });
 
+  _attachDebouncedSave(document.getElementById('words-per-second-input'), function() {
+    var el = document.getElementById('words-per-second-input');
+    if (el) _saveCycleConfigKey('words_per_second', el.value);
+  });
+  _attachDebouncedSave(document.getElementById('good-samples-count-input'), function() {
+    var el = document.getElementById('good-samples-count-input');
+    if (el) _saveCycleConfigKey('good_samples_count', el.value);
+  });
+
   const serviceFields = [
     document.getElementById('app_instance'),
     document.getElementById('notify_email'),

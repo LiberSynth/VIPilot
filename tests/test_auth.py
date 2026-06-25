@@ -103,12 +103,6 @@ class TestApiBlueprintAuth:
     def test_post_publication_counter_set(self, client):
         _assert_401(client.post("/api/publication-counter/set"))
 
-    def test_post_cycle_config_words_per_second(self, client):
-        _assert_401(client.post("/api/cycle-config/words-per-second"))
-
-    def test_post_cycle_config_good_samples_count(self, client):
-        _assert_401(client.post("/api/cycle-config/good-samples-count"))
-
     def test_post_cycle_config_set(self, client):
         _assert_401(client.post("/api/cycle-config/set", json={"key": "text_prompt", "value": ""}))
 

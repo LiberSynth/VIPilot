@@ -581,27 +581,13 @@ def api_movie_pool_count():
     good_only = flag in ("1", "true", "yes")
     return jsonify({"count": int(db_get_movie_pool_count(good_only=good_only))})
 
-@bp.route("/cycle-config/words-per-second", methods=["POST"])
-def api_cycle_config_words_per_second():
-    if not is_authenticated():
-        return jsonify({"error": "unauthorized"}), 401
-    body = request.get_json(silent=True) or {}
-    cycle_config_set("words_per_second", body.get("value", ""))
-    return jsonify({"ok": True})
-
-@bp.route("/cycle-config/good-samples-count", methods=["POST"])
-def api_cycle_config_good_samples_count():
-    if not is_authenticated():
-        return jsonify({"error": "unauthorized"}), 401
-    body = request.get_json(silent=True) or {}
-    cycle_config_set("good_samples_count", body.get("value", ""))
-    return jsonify({"ok": True})
-
-_CYCLE_CONFIG_TEXT_KEYS = frozenset({
+_CYCLE_CONFIG_KEYS = frozenset({
     "format_prompt",
     "text_prompt",
     "t2v_conversion_prompt",
     "video_post_prompt",
+    "words_per_second",
+    "good_samples_count",
 })
 
 @bp.route("/cycle-config/set", methods=["POST"])
@@ -610,7 +596,7 @@ def api_cycle_config_set_key():
         return jsonify({"error": "unauthorized"}), 401
     body = request.get_json(silent=True) or {}
     key = (body.get("key") or "").strip()
-    if key not in _CYCLE_CONFIG_TEXT_KEYS:
+    if key not in _CYCLE_CONFIG_KEYS:
         return jsonify({"error": "invalid key"}), 400
     value = body.get("value")
     if value is None:
