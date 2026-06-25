@@ -400,9 +400,14 @@
     var chk = document.getElementById('director-autoplay-check');
     if (!chk) return;
     chk.addEventListener('change', function() {
-      var fd = new FormData();
-      fd.append('producer_autoplay_movie', chk.checked ? '1' : '0');
-      fetch('/save', { method: 'POST', body: fd });
+      fetch('/api/env/set', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          key: 'producer_autoplay_movie',
+          value: chk.checked ? '1' : '0',
+        }),
+      }).catch(function() {});
     });
   }
 

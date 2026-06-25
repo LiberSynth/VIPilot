@@ -624,17 +624,45 @@ def api_cycle_config_set_key():
 _SETTINGS_KEYS = frozenset({
     "story_fails_to_next",
     "video_fails_to_next",
+    "app_instance",
+    "notify_email",
+    "notify_phone",
+    "buffer_minutes",
+    "loop_interval",
+    "max_batch_threads",
+    "max_model_passes",
+    "entries_lifetime",
+    "log_lifetime",
+    "batch_lifetime",
 })
 
 _SETTINGS_INT_KEYS = frozenset({
     "story_fails_to_next",
     "video_fails_to_next",
+    "buffer_minutes",
+    "loop_interval",
+    "max_batch_threads",
+    "max_model_passes",
+    "entries_lifetime",
+    "log_lifetime",
+    "batch_lifetime",
 })
 
 _SETTINGS_INT_DEFAULTS = {
     "story_fails_to_next": "3",
     "video_fails_to_next": "3",
+    "buffer_minutes": "60",
+    "loop_interval": "15",
+    "max_batch_threads": "5",
+    "max_model_passes": "5",
+    "entries_lifetime": "30",
+    "log_lifetime": "365",
+    "batch_lifetime": "7",
 }
+
+_ENV_SET_KEYS = frozenset({
+    "producer_autoplay_movie",
+})
 
 @bp.route("/settings/set", methods=["POST"])
 def api_settings_set_key():
@@ -658,7 +686,24 @@ def api_settings_set_key():
                 "value": settings_get(key, default),
             }), 400
         return jsonify({"ok": True, "key": key})
+    if key in ("notify_email", "notify_phone"):
+        settings_set(key, str(value).strip())
+        return jsonify({"ok": True, "key": key})
     settings_set(key, str(value))
+    return jsonify({"ok": True, "key": key})
+
+@bp.route("/env/set", methods=["POST"])
+def api_env_set_key():
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    body = request.get_json(silent=True) or {}
+    key = (body.get("key") or "").strip()
+    if key not in _ENV_SET_KEYS:
+        return jsonify({"error": "invalid key"}), 400
+    value = str(body.get("value", "")).strip()
+    if key == "producer_autoplay_movie" and value not in ("0", "1"):
+        return jsonify({"ok": False, "error": "invalid value"}), 400
+    env_set(key, value)
     return jsonify({"ok": True, "key": key})
 
 @bp.route("/monitor/batch/<batch_id>/entries")

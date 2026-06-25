@@ -44,6 +44,13 @@ def parse_config_int(value) -> int:
 - JSON конфиг таргета: `POST /api/targets/{id}/targets-config`, debounce + save на blur.
 - Toggle активности: `POST /api/targets/{id}/active` — сразу, без debounce.
 
+## Панель «Служебные»
+
+- Все поля `settings`: `POST /api/settings/set`, debounce `SAVE_DEBOUNCE_MS`, int через `parse_config_int` + `ConfirmDialog`.
+- `producer_autoplay_movie` (Режиссёр): `POST /api/env/set`.
+- Иерархии сроков хранения нет — три независимых int-ключа.
+- Batch `/save` удалён.
+
 ## Не делать
 
 - Пачечный `/save` для полей панели.

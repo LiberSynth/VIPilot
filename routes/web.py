@@ -8,18 +8,14 @@ from flask import (
     redirect,
     url_for,
     session,
-    flash,
     send_file,
     make_response,
 )
 
 from db import (
     settings_get,
-    settings_set,
     env_get,
-    env_set,
     cycle_config_get,
-    cycle_config_set,
     db_get_all_targets,
     db_get_target_by_name,
     db_get_user_by_login,
@@ -39,7 +35,7 @@ bp = Blueprint("web", __name__)
 def _inject_global_template_vars():
     return {"app_instance": settings_get("app_instance", "VIPilot")}
 
-RESERVED_SLUGS = {"web", "save", "logout", "select-module", "favicon.ico", "icon-preview", "root", "production"}
+RESERVED_SLUGS = {"web", "logout", "select-module", "favicon.ico", "icon-preview", "root", "production"}
 failed_logins = {}
 
 def _get_session_roles():
@@ -365,69 +361,6 @@ def production_page():
     resp.headers["Pragma"] = "no-cache"
     resp.headers["Expires"] = "0"
     return resp
-
-@bp.route("/save", methods=["POST"])
-def save():
-    if not is_authenticated():
-        return redirect(url_for("web.login"))
-
-    active_tab = request.form.get("active_tab", "pipeline")
-
-    entries_lifetime_raw = request.form.get("entries_lifetime", "").strip()
-    log_lifetime_raw     = request.form.get("log_lifetime",     "").strip()
-    batch_lifetime_raw   = request.form.get("batch_lifetime",   "").strip()
-
-    if entries_lifetime_raw or log_lifetime_raw or batch_lifetime_raw:
-        el  = parse_long_lifetime(entries_lifetime_raw or settings_get("entries_lifetime", "30"), default=30)
-        ll  = parse_long_lifetime(log_lifetime_raw     or settings_get("log_lifetime",     "365"))
-        bl  = parse_batch_lifetime(batch_lifetime_raw     or settings_get("batch_lifetime",   "7"))
-        if el <= ll <= bl:
-            settings_set("entries_lifetime", str(el))
-            settings_set("log_lifetime",     str(ll))
-            settings_set("batch_lifetime",   str(bl))
-        else:
-            flash("Сроки хранения нарушают иерархию: подробный ≤ краткий ≤ история батчей", "error")
-
-    if "app_instance" in request.form:
-        settings_set("app_instance", request.form.get("app_instance", ""))
-    if "notify_email" in request.form:
-        settings_set("notify_email", request.form.get("notify_email", "").strip())
-    if "notify_phone" in request.form:
-        settings_set("notify_phone", request.form.get("notify_phone", "").strip())
-
-    buf_str = request.form.get("buffer_minutes", "").strip()
-    if buf_str:
-        try:
-            settings_set("buffer_minutes", str(int(buf_str)))
-        except (ValueError, TypeError):
-            pass
-
-    loop_str = request.form.get("loop_interval", "").strip()
-    if loop_str:
-        try:
-            settings_set("loop_interval", str(max(1, min(3600, int(loop_str)))))
-        except (ValueError, TypeError):
-            pass
-
-    if "producer_autoplay_movie" in request.form:
-        env_set("producer_autoplay_movie", "1" if request.form.get("producer_autoplay_movie") == "1" else "0")
-
-    max_threads_str = request.form.get("max_batch_threads", "").strip()
-    if max_threads_str:
-        try:
-            settings_set("max_batch_threads", str(max(1, min(32, int(max_threads_str)))))
-        except (ValueError, TypeError):
-            pass
-
-    max_model_passes_str = request.form.get("max_model_passes", "").strip()
-    if max_model_passes_str:
-        try:
-            settings_set("max_model_passes", str(max(1, min(20, int(max_model_passes_str)))))
-        except (ValueError, TypeError):
-            pass
-
-    environment.refresh_environment()
-    return redirect(url_for("web.root_page") + f"?tab={active_tab}")
 
 @bp.route("/select-module")
 def select_module():

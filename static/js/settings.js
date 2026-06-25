@@ -41,53 +41,10 @@ if (taT2v) { taT2v.addEventListener('input', updateT2vCount); updateT2vCount(); 
   if (taT2v) { applyHeight(taT2v, KEY_T2V,  200); watchHeight(taT2v, KEY_T2V); }
 })();
 
-function collectAllSettings(activeTab) {
-  const data = new FormData();
-  data.set('active_tab', activeTab || 'pipeline');
-  const setIfExists = (key, id) => { const el = document.getElementById(id); if (el) data.set(key, el.value); };
-  setIfExists('app_instance',     'app_instance');
-  setIfExists('notify_email',     'notify_email');
-  setIfExists('notify_phone',     'notify_phone');
-  setIfExists('entries_lifetime', 'entries_lifetime');
-  setIfExists('log_lifetime',     'log_lifetime');
-  setIfExists('batch_lifetime',   'batch_lifetime');
-  setIfExists('buffer_minutes',    'buffer_minutes');
-  setIfExists('loop_interval',    'loop_interval');
-  setIfExists('max_batch_threads', 'max_batch_threads');
-  setIfExists('max_model_passes',  'max_model_passes');
-  return data;
-}
-
-var _serviceSaveTimer = null;
-function saveServiceSettings() {
-  fetch('/save', { method: 'POST', body: collectAllSettings('service') }).catch(() => {});
-}
-function scheduleServiceSave() {
-  clearTimeout(_serviceSaveTimer);
-  _serviceSaveTimer = setTimeout(saveServiceSettings, SAVE_DEBOUNCE_MS);
-}
-
 function updateHeaderAppInstance() {
   const headerEl = document.getElementById('header-app-instance');
   const inputEl  = document.getElementById('app_instance');
   if (headerEl && inputEl) headerEl.textContent = inputEl.value;
-}
-
-function validateLifetimes() {
-  const ll  = document.getElementById('entries_lifetime');
-  const sll = document.getElementById('log_lifetime');
-  const bl  = document.getElementById('batch_lifetime');
-  if (!ll || !sll || !bl) return true;
-  const v_ll  = parseInt(ll.value)  || 0;
-  const v_sll = parseInt(sll.value) || 0;
-  const v_bl  = parseInt(bl.value)  || 0;
-  const llInvalid  = v_ll  > v_sll;
-  const sllInvalid = v_sll < v_ll || v_sll > v_bl;
-  const blInvalid  = v_bl  < v_sll;
-  ll.style.outline  = llInvalid  ? '2px solid #ff6060' : '';
-  sll.style.outline = sllInvalid ? '2px solid #ff6060' : '';
-  bl.style.outline  = blInvalid  ? '2px solid #ff6060' : '';
-  return !llInvalid && !sllInvalid && !blInvalid;
 }
 
 function _showInvalidIntegerDialog(el, dbValue) {
@@ -208,31 +165,27 @@ function _attachDebouncedSave(el, saveFn, delayMs) {
       });
   });
 
-  const serviceFields = [
-    document.getElementById('app_instance'),
-    document.getElementById('notify_email'),
-    document.getElementById('notify_phone'),
-    document.getElementById('buffer_minutes'),
-    document.getElementById('loop_interval'),
-    document.getElementById('max_batch_threads'),
-  ].filter(Boolean);
-  serviceFields.forEach(f => {
-    f.addEventListener('input',  function() {
-      if (f.id === 'app_instance') updateHeaderAppInstance();
-      scheduleServiceSave();
-    });
-    f.addEventListener('change', function() {
-      if (f.id === 'app_instance') updateHeaderAppInstance();
-      scheduleServiceSave();
-    });
-  });
-
-  ['entries_lifetime', 'log_lifetime', 'batch_lifetime'].forEach(id => {
-    const el = document.getElementById(id);
+  function _attachSettingsDebounced(id, key, opts) {
+    var el = document.getElementById(id);
     if (!el) return;
-    el.addEventListener('input',  validateLifetimes);
-    el.addEventListener('change', () => { if (validateLifetimes()) scheduleServiceSave(); });
-  });
+    _attachDebouncedSave(el, function() {
+      if (opts && opts.onInput) opts.onInput();
+      var val = el.value;
+      if (opts && opts.trim) val = val.trim();
+      _saveSettingsKey(key, val, opts && opts.intField ? el : null);
+    });
+  }
+
+  _attachSettingsDebounced('app_instance', 'app_instance', { onInput: updateHeaderAppInstance });
+  _attachSettingsDebounced('notify_email', 'notify_email', { trim: true });
+  _attachSettingsDebounced('notify_phone', 'notify_phone', { trim: true });
+  _attachSettingsDebounced('buffer_minutes', 'buffer_minutes', { intField: true });
+  _attachSettingsDebounced('loop_interval', 'loop_interval', { intField: true });
+  _attachSettingsDebounced('max_batch_threads', 'max_batch_threads', { intField: true });
+  _attachSettingsDebounced('max_model_passes', 'max_model_passes', { intField: true });
+  _attachSettingsDebounced('entries_lifetime', 'entries_lifetime', { intField: true });
+  _attachSettingsDebounced('log_lifetime', 'log_lifetime', { intField: true });
+  _attachSettingsDebounced('batch_lifetime', 'batch_lifetime', { intField: true });
 })();
 
 function _backupYamlBasename(file) {

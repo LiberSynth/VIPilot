@@ -109,6 +109,9 @@ class TestApiBlueprintAuth:
     def test_post_settings_set(self, client):
         _assert_401(client.post("/api/settings/set", json={"key": "story_fails_to_next", "value": 3}))
 
+    def test_post_env_set(self, client):
+        _assert_401(client.post("/api/env/set", json={"key": "producer_autoplay_movie", "value": "0"}))
+
     def test_get_monitor_batch_entries(self, client):
         _assert_401(client.get("/api/monitor/batch/some-batch/entries"))
 

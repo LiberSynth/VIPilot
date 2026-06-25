@@ -162,8 +162,7 @@
       </div>
     </div>
 
-    <form id="service-form" style="margin-top:0">
-
+    <div style="margin-top:0">
       <div class="card">
         <div class="card-title">Уведомление о сбое</div>
         <div class="hint">При ошибке выполнения пайплайна придёт уведомление на указанный емайл или номер.</div>
@@ -191,7 +190,7 @@
         <div style="margin-top:14px">
           <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block">Таймаут рабочего цикла</label>
           <div class="lead-row">
-            <input type="number" name="loop_interval" id="loop_interval" value="{{ loop_interval }}" min="1" max="3600" step="1" autocomplete="off">
+            <input type="number" name="loop_interval" id="loop_interval" value="{{ loop_interval }}" step="1" autocomplete="off">
             <span class="lead-unit">с</span>
           </div>
           <div class="hint" style="margin-top:5px">Пауза между итерациями главного цикла. По умолчанию: 15 с.</div>
@@ -199,7 +198,7 @@
         <div style="margin-top:14px">
           <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block">Максимальное количество потоков обработки</label>
           <div class="lead-row">
-            <input type="number" name="max_batch_threads" id="max_batch_threads" value="{{ max_batch_threads }}" min="1" max="32" step="1" autocomplete="off">
+            <input type="number" name="max_batch_threads" id="max_batch_threads" value="{{ max_batch_threads }}" step="1" autocomplete="off">
             <span class="lead-unit">шт</span>
           </div>
           <div class="hint" style="margin-top:5px">Сколько батчей обрабатывается одновременно. По умолчанию: 5.</div>
@@ -207,7 +206,7 @@
         <div style="margin-top:14px">
           <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block">Проходов по коллекции моделей</label>
           <div class="lead-row">
-            <input type="number" name="max_model_passes" id="max_model_passes" value="{{ max_model_passes }}" min="1" max="20" step="1" autocomplete="off">
+            <input type="number" name="max_model_passes" id="max_model_passes" value="{{ max_model_passes }}" step="1" autocomplete="off">
             <span class="lead-unit">шт</span>
           </div>
           <div class="hint" style="margin-top:5px">Сколько раз пайплайн обходит весь список моделей при неудаче. По умолчанию: 5.</div>
@@ -216,12 +215,12 @@
 
       <div class="card">
         <div class="card-title">Обслуживание базы данных</div>
-        <div class="hint">Насколько долго хранятся данные до автоматической очистки. Соблюдайте иерархию: подробный лог ≤ краткий лог ≤ история батчей.</div>
+        <div class="hint">Насколько долго хранятся данные до автоматической очистки.</div>
 
         <div style="margin-top:14px">
           <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block">Подробный лог</label>
           <div class="lead-row">
-            <input type="number" name="entries_lifetime" id="entries_lifetime" value="{{ entries_lifetime }}" min="1" max="3650" step="1" autocomplete="off">
+            <input type="number" name="entries_lifetime" id="entries_lifetime" value="{{ entries_lifetime }}" step="1" autocomplete="off">
             <span class="lead-unit">дней</span>
           </div>
           <div class="hint" style="margin-top:5px">Подробные записи шагов пайплайна.</div>
@@ -230,7 +229,7 @@
         <div style="margin-top:14px">
           <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block">Краткий лог</label>
           <div class="lead-row">
-            <input type="number" name="log_lifetime" id="log_lifetime" value="{{ log_lifetime }}" min="1" max="3650" step="1" autocomplete="off">
+            <input type="number" name="log_lifetime" id="log_lifetime" value="{{ log_lifetime }}" step="1" autocomplete="off">
             <span class="lead-unit">дней</span>
           </div>
           <div class="hint" style="margin-top:5px">Заголовки запусков пайплайна.</div>
@@ -239,7 +238,7 @@
         <div style="margin-top:14px">
           <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block">История батчей</label>
           <div class="lead-row">
-            <input type="number" name="batch_lifetime" id="batch_lifetime" value="{{ batch_lifetime }}" min="1" max="365" step="1" autocomplete="off">
+            <input type="number" name="batch_lifetime" id="batch_lifetime" value="{{ batch_lifetime }}" step="1" autocomplete="off">
             <span class="lead-unit">дней</span>
           </div>
           <div class="hint" style="margin-top:5px">Финальные батчи старше срока; цепочка не трогается, пока хоть одно звено в обработке.</div>
@@ -257,7 +256,7 @@
 
       </div>
 
-    </form>
+    </div>
 
     <div class="card" style="margin-top:12px">
       <div class="card-title">Обновление данных</div>
