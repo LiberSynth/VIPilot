@@ -6,7 +6,7 @@ _DEFAULTS = {
     "t2v_conversion_prompt": "",
     "video_post_prompt": "",
     "video_duration":    6,
-    "words_per_second":    8.0,
+    "words_per_second":    8,
     "good_samples_count": 25,
 }
 
@@ -22,7 +22,7 @@ def _coerce(key, raw):
             return raw
     if key == "words_per_second":
         try:
-            return float(raw)
+            return int(float(raw))
         except (ValueError, TypeError):
             return raw
     if key == "good_samples_count":
@@ -49,6 +49,11 @@ def cycle_config_set(key: str, value) -> None:
         raise ValueError(f"Unknown cycle_config key: {key!r}")
     if isinstance(value, bool):
         str_value = "1" if value else "0"
+    elif key == "words_per_second":
+        try:
+            str_value = str(int(float(value)))
+        except (TypeError, ValueError):
+            str_value = str(value)
     else:
         str_value = str(value)
     with get_db() as conn:

@@ -55,6 +55,12 @@ def _cleanup_legacy_schema(cur) -> None:
         SET key = 't2v_conversion_prompt'
         WHERE key = 'prompt_metaprompt'
     """)
+    cur.execute("""
+        UPDATE cycle_config
+        SET value = (TRUNC(value::numeric))::text
+        WHERE key = 'words_per_second'
+          AND value ~ '^[0-9]+\\.?[0-9]*$'
+    """)
 
 def _ensure_movies_bit_columns(cur) -> None:
     """Колонки movies.used/transcoded/published: ADD IF NOT EXISTS + NOT NULL для старых БД."""
