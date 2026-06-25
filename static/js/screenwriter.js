@@ -109,7 +109,7 @@ var loadStoryIntoEditor;
 
   function onStoryInput() {
     clearTimeout(_storySaveTimer);
-    _storySaveTimer = setTimeout(saveStory, 800);
+    _storySaveTimer = setTimeout(saveStory, SAVE_DEBOUNCE_MS);
   }
 
   function initStoryAutosave() {

@@ -65,7 +65,7 @@ function savePublishSettings() {
 }
 function schedulePublishSave() {
   clearTimeout(_publishSaveTimer);
-  _publishSaveTimer = setTimeout(savePublishSettings, 600);
+  _publishSaveTimer = setTimeout(savePublishSettings, SAVE_DEBOUNCE_MS);
 }
 
 var _serviceSaveTimer = null;
@@ -74,7 +74,7 @@ function saveServiceSettings() {
 }
 function scheduleServiceSave() {
   clearTimeout(_serviceSaveTimer);
-  _serviceSaveTimer = setTimeout(saveServiceSettings, 800);
+  _serviceSaveTimer = setTimeout(saveServiceSettings, SAVE_DEBOUNCE_MS);
 }
 
 function updateHeaderAppInstance() {
@@ -161,7 +161,7 @@ function _attachDebouncedSave(el, saveFn, delayMs) {
   var timer = null;
   function schedule() {
     clearTimeout(timer);
-    timer = setTimeout(saveFn, delayMs || 800);
+    timer = setTimeout(saveFn, typeof delayMs === 'number' ? delayMs : SAVE_DEBOUNCE_MS);
   }
   el.addEventListener('input', schedule);
   el.addEventListener('change', schedule);
@@ -244,7 +244,7 @@ function _savePublicationCounter() {
 }
 function _schedulePubCounterSave() {
   clearTimeout(_pubCounterTimer);
-  _pubCounterTimer = setTimeout(_savePublicationCounter, 800);
+  _pubCounterTimer = setTimeout(_savePublicationCounter, SAVE_DEBOUNCE_MS);
 }
 (function() {
   const el = document.getElementById('publication_counter');
@@ -552,7 +552,7 @@ function uploadUpdatePackage(btn) {
       clearTimeout(_bodyTimers[areaId]);
       _bodyTimers[areaId] = setTimeout(function() {
         _saveTargetBodyIfValid(areaEl, errorEl, tid);
-      }, 800);
+      }, SAVE_DEBOUNCE_MS);
     });
     areaEl.addEventListener('blur', function() {
       clearTimeout(_bodyTimers[areaId]);

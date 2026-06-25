@@ -148,8 +148,8 @@
    *   data-model-url   — POST endpoint for the field
    *
    * Behaviour:
-   *   note  — debounced 800 ms POST on input; plain text, no validation.
-   *   body  — debounced 800 ms POST on input + immediate POST on blur;
+   *   note  — debounced POST on input; plain text, no validation.
+   *   body  — debounced POST on input + immediate POST on blur;
    *            value must be a valid JSON object or the field is marked
    *            with .input-error and a [data-role="body-error"] message.
    *
@@ -192,14 +192,14 @@
             method: 'POST', headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ note: val })
           });
-        }, 800);
+        }, SAVE_DEBOUNCE_MS);
       } else if (field === 'body') {
         syncCached(id, 'body', ta.value);
         clearTimeout(bodyTimers[id]);
         var capturedVal = ta.value;
         bodyTimers[id] = setTimeout(function() {
           _saveBody(container, ta, id, capturedVal);
-        }, 800);
+        }, SAVE_DEBOUNCE_MS);
       }
     });
 

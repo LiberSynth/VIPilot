@@ -32,7 +32,7 @@ def parse_config_int(value) -> int:
 
 - Ответ 400: `{ "ok": false, "error": "invalid integer", "value": <из БД> }`.
 - `ConfirmDialog` с `onClose` (см. `confirm-dialog.js`) → восстановить `el.value = String(data.value)`.
-- Autosave и listeners — в **`settings.js`**, не в `screenwriter.js` (там только UI, напр. счётчик слов).
+- Autosave и listeners — в **`settings.js`**, debounce **`SAVE_DEBOUNCE_MS`** (`static/js/consts.js`, сейчас 400 ms).
 
 ## UUID-таблицы (stories, ai_models, …)
 

@@ -260,6 +260,7 @@
 </div>
 
 <script src="/static/js/panel-boot.js"></script>
+<script src="/static/js/consts.js"></script>
 <script src="/static/js/controls/toast.js"></script>
 <script src="/static/js/controls/tooltip.js"></script>
 <script src="/static/js/controls/memo.js"></script>
@@ -407,7 +408,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ content: _contentSaveEl.value }),
         });
-      }, 800);
+      }, SAVE_DEBOUNCE_MS);
     });
   }
 
@@ -425,7 +426,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ prompt: _promptSaveEl.value }),
         });
-      }, 800);
+      }, SAVE_DEBOUNCE_MS);
     });
   }
 
