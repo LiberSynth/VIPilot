@@ -45,12 +45,7 @@ function collectAllSettings(activeTab) {
   const data = new FormData();
   data.set('active_tab', activeTab || 'pipeline');
   const setIfExists = (key, id) => { const el = document.getElementById(id); if (el) data.set(key, el.value); };
-  if (ta)    data.set('text_prompt',   ta.value);
-  if (taSys) data.set('format_prompt', taSys.value);
-  if (taT2v) data.set('t2v_conversion_prompt', taT2v.value);
   setIfExists('video_duration',      'video_duration');
-  setIfExists('video_post_prompt',   'ta_postprompt');
-  setIfExists('story_fails_to_next', 'story_fails_to_next');
   setIfExists('video_fails_to_next', 'video_fails_to_next');
   setIfExists('target_id',        'target_id');
   setIfExists('app_instance',     'app_instance');
@@ -73,15 +68,6 @@ function saveRequestSettings() {
 function scheduleRequestSave() {
   clearTimeout(_requestSaveTimer);
   _requestSaveTimer = setTimeout(saveRequestSettings, 800);
-}
-
-var _storySaveTimer = null;
-function saveStorySettings() {
-  fetch('/save', { method: 'POST', body: collectAllSettings('story') }).catch(() => {});
-}
-function scheduleStorySave() {
-  clearTimeout(_storySaveTimer);
-  _storySaveTimer = setTimeout(saveStorySettings, 800);
 }
 
 var _publishSaveTimer = null;
@@ -125,26 +111,72 @@ function validateLifetimes() {
   return !llInvalid && !sllInvalid && !blInvalid;
 }
 
+function _saveCycleConfigKey(key, value) {
+  fetch('/api/cycle-config/set', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ key: key, value: value }),
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data.ok && typeof showToast === 'function') {
+        showToast('Ошибка: ' + (data.error || 'неизвестная'), 'error');
+      }
+    })
+    .catch(function() {
+      if (typeof showToast === 'function') showToast('Ошибка запроса', 'error');
+    });
+}
+
+function _saveSettingsIntKey(key, rawValue) {
+  fetch('/api/settings/set', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ key: key, value: rawValue }),
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data.ok && typeof showToast === 'function') {
+        showToast('Ошибка: ' + (data.error || 'неизвестная'), 'error');
+      }
+    })
+    .catch(function() {
+      if (typeof showToast === 'function') showToast('Ошибка запроса', 'error');
+    });
+}
+
+function _attachDebouncedSave(el, saveFn, delayMs) {
+  if (!el) return;
+  var timer = null;
+  function schedule() {
+    clearTimeout(timer);
+    timer = setTimeout(saveFn, delayMs || 800);
+  }
+  el.addEventListener('input', schedule);
+  el.addEventListener('change', schedule);
+}
+
 (function() {
   const requestFields = [
     document.getElementById('video_duration'),
     document.getElementById('video_fails_to_next'),
-    document.getElementById('ta_postprompt'),
   ].filter(Boolean);
   requestFields.forEach(f => {
     f.addEventListener('input',  scheduleRequestSave);
     f.addEventListener('change', scheduleRequestSave);
   });
 
-  const storyFields = [
-    ta,
-    taSys,
-    taT2v,
-    document.getElementById('story_fails_to_next'),
-  ].filter(Boolean);
-  storyFields.forEach(f => {
-    f.addEventListener('input',  scheduleStorySave);
-    f.addEventListener('change', scheduleStorySave);
+  _attachDebouncedSave(taSys, function() { _saveCycleConfigKey('format_prompt', taSys.value); });
+  _attachDebouncedSave(ta, function() { _saveCycleConfigKey('text_prompt', ta.value); });
+  _attachDebouncedSave(taT2v, function() { _saveCycleConfigKey('t2v_conversion_prompt', taT2v.value); });
+  _attachDebouncedSave(document.getElementById('ta_postprompt'), function() {
+    var el = document.getElementById('ta_postprompt');
+    if (el) _saveCycleConfigKey('video_post_prompt', el.value);
+  });
+
+  var storyFailsEl = document.getElementById('story_fails_to_next');
+  _attachDebouncedSave(storyFailsEl, function() {
+    if (storyFailsEl) _saveSettingsIntKey('story_fails_to_next', storyFailsEl.value);
   });
 
   const serviceFields = [

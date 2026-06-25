@@ -109,6 +109,12 @@ class TestApiBlueprintAuth:
     def test_post_cycle_config_good_samples_count(self, client):
         _assert_401(client.post("/api/cycle-config/good-samples-count"))
 
+    def test_post_cycle_config_set(self, client):
+        _assert_401(client.post("/api/cycle-config/set", json={"key": "text_prompt", "value": ""}))
+
+    def test_post_settings_set(self, client):
+        _assert_401(client.post("/api/settings/set", json={"key": "story_fails_to_next", "value": 3}))
+
     def test_get_monitor_batch_entries(self, client):
         _assert_401(client.get("/api/monitor/batch/some-batch/entries"))
 

@@ -33,6 +33,7 @@ from db import (
     db_get_batch_logs,
     cycle_config_get,
     cycle_config_set,
+    settings_set,
     db_get_stories_list,
     db_get_story_ids_by_filter,
     db_get_stories_pool,
@@ -607,6 +608,51 @@ def api_cycle_config_good_samples_count():
         return jsonify({"error": "value must be >= 1"}), 400
     cycle_config_set("good_samples_count", value)
     return jsonify({"ok": True, "good_samples_count": value})
+
+_CYCLE_CONFIG_TEXT_KEYS = frozenset({
+    "format_prompt",
+    "text_prompt",
+    "t2v_conversion_prompt",
+    "video_post_prompt",
+})
+
+@bp.route("/cycle-config/set", methods=["POST"])
+def api_cycle_config_set_key():
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    body = request.get_json(silent=True) or {}
+    key = (body.get("key") or "").strip()
+    if key not in _CYCLE_CONFIG_TEXT_KEYS:
+        return jsonify({"error": "invalid key"}), 400
+    value = body.get("value")
+    if value is None:
+        value = ""
+    elif not isinstance(value, str):
+        value = str(value)
+    cycle_config_set(key, value)
+    return jsonify({"ok": True, "key": key})
+
+_SETTINGS_INT_KEYS = {
+    "story_fails_to_next": (1, 99),
+}
+
+@bp.route("/settings/set", methods=["POST"])
+def api_settings_set_key():
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    body = request.get_json(silent=True) or {}
+    key = (body.get("key") or "").strip()
+    bounds = _SETTINGS_INT_KEYS.get(key)
+    if bounds is None:
+        return jsonify({"error": "invalid key"}), 400
+    lo, hi = bounds
+    try:
+        n = int(body.get("value", 0))
+    except (TypeError, ValueError):
+        return jsonify({"error": "invalid value"}), 400
+    n = max(lo, min(hi, n))
+    settings_set(key, str(n))
+    return jsonify({"ok": True, "key": key, "value": n})
 
 @bp.route("/monitor/batch/<batch_id>/entries")
 def api_monitor_batch_entries(batch_id):
