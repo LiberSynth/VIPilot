@@ -41,9 +41,6 @@
   };
   const TYPE_ERROR_STATUSES = ['error', 'fatal_error'];
   const FINAL_BATCH_STATUSES = ['completed', 'partially', 'ready', 'error', 'fatal_error'];
-  const MONITOR_POLL_MS = 200;
-  const BATCH_ENTRIES_POLL_MS = 200;
-  const SYSTEM_ENTRIES_POLL_MS = 200;
 
   const MON_SVG_COPY     = `<svg viewBox="0 0 16 16"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11V3a1 1 0 0 1 1-1h8"/></svg>`;
   const MON_SVG_RESTART  = `<svg viewBox="0 0 16 16" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="15.3,2.7 15.3,6.7 11.3,6.7"/><path d="M13.66 10a6 6 0 1 1-.08-5"/></svg>`;
