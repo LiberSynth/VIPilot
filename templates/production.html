@@ -288,6 +288,7 @@
   var _DIRECTOR_ITERATE_SENTINEL = '__iterate__';
 
   function selectOption(id, label) {
+    if (typeof window.resetDirectorStorySaveTimers === 'function') window.resetDirectorStorySaveTimers();
     var lbl = document.getElementById('director-story-label');
     var hid = document.getElementById('director-story-id');
     var ta  = document.getElementById('director-story-content');
@@ -392,42 +393,6 @@
   }
 
   document.addEventListener('click', function() { closeList(); });
-
-  /* ── Сохранение содержания сюжета ── */
-  var _contentSaveTimer = null;
-  var _contentSaveEl = document.getElementById('director-story-content');
-  if (_contentSaveEl) {
-    _contentSaveEl.addEventListener('input', function() {
-      var storyId = document.getElementById('director-story-id').value;
-      if (!storyId) return;
-      clearTimeout(_contentSaveTimer);
-      _contentSaveTimer = setTimeout(function() {
-        fetch('/production/story/' + storyId + '/content', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content: _contentSaveEl.value }),
-        });
-      }, SAVE_DEBOUNCE_MS);
-    });
-  }
-
-  /* ── Сохранение промпта ── */
-  var _promptSaveTimer = null;
-  var _promptSaveEl = document.getElementById('director-story-prompt');
-  if (_promptSaveEl) {
-    _promptSaveEl.addEventListener('input', function() {
-      var storyId = document.getElementById('director-story-id').value;
-      if (!storyId) return;
-      clearTimeout(_promptSaveTimer);
-      _promptSaveTimer = setTimeout(function() {
-        fetch('/production/story/' + storyId + '/prompt', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: _promptSaveEl.value }),
-        });
-      }, SAVE_DEBOUNCE_MS);
-    });
-  }
 
   /* ── Комбобокс видеомодели ── */
   function _sanitizeDirectorGenerateCountInput(el) {

@@ -407,9 +407,67 @@
           key: 'producer_autoplay_movie',
           value: chk.checked ? '1' : '0',
         }),
-      }).catch(function() {});
+      }).catch(function() {
+        if (typeof showToast === 'function') showToast('Ошибка сохранения', 'error');
+      });
     });
   }
+
+  var _directorContentTimer = null;
+  var _directorPromptTimer = null;
+
+  function resetDirectorStorySaveTimers() {
+    clearTimeout(_directorContentTimer);
+    clearTimeout(_directorPromptTimer);
+  }
+
+  function _handleDirectorStorySaveError() {
+    if (typeof showToast === 'function') showToast('Ошибка сохранения сюжета', 'error');
+  }
+
+  function _saveDirectorStoryField(path, storyId, body) {
+    return fetch('/production/story/' + encodeURIComponent(storyId) + '/' + path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }).then(function(r) {
+      if (!r.ok) throw new Error('save_failed');
+      return r.json();
+    });
+  }
+
+  function initDirectorStoryAutosave() {
+    var contentEl = document.getElementById('director-story-content');
+    var promptEl = document.getElementById('director-story-prompt');
+    if (contentEl) {
+      contentEl.addEventListener('input', function() {
+        var storyId = ((document.getElementById('director-story-id') || {}).value || '').trim();
+        if (!storyId) return;
+        clearTimeout(_directorContentTimer);
+        _directorContentTimer = setTimeout(function() {
+          var id = ((document.getElementById('director-story-id') || {}).value || '').trim();
+          var el = document.getElementById('director-story-content');
+          if (!id || !el) return;
+          _saveDirectorStoryField('content', id, { content: el.value }).catch(_handleDirectorStorySaveError);
+        }, SAVE_DEBOUNCE_MS);
+      });
+    }
+    if (promptEl) {
+      promptEl.addEventListener('input', function() {
+        var storyId = ((document.getElementById('director-story-id') || {}).value || '').trim();
+        if (!storyId) return;
+        clearTimeout(_directorPromptTimer);
+        _directorPromptTimer = setTimeout(function() {
+          var id = ((document.getElementById('director-story-id') || {}).value || '').trim();
+          var el = document.getElementById('director-story-prompt');
+          if (!id || !el) return;
+          _saveDirectorStoryField('prompt', id, { prompt: el.value }).catch(_handleDirectorStorySaveError);
+        }, SAVE_DEBOUNCE_MS);
+      });
+    }
+  }
+
+  window.resetDirectorStorySaveTimers = resetDirectorStorySaveTimers;
 
   function updateVideoWrapHeight() {
     var wrap = document.getElementById('director-video-wrap');
@@ -426,6 +484,7 @@
     initDeleteBadMoviesButton();
     initImportMovieButton();
     initAutoplayToggle();
+    initDirectorStoryAutosave();
     initMovieListDrag();
     updateVideoWrapHeight();
     window.addEventListener('resize', updateVideoWrapHeight);

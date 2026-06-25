@@ -44,6 +44,12 @@ def parse_config_int(value) -> int:
 - Поля: `POST /production/story/{id}/title|content|prompt`, debounce `SAVE_DEBOUNCE_MS`.
 - Batch `/production/story/save` не использовать.
 
+## PRODUCTION «Режиссёр»
+
+- content/prompt выбранного сюжета: `POST /production/story/{id}/content|prompt`, debounce `SAVE_DEBOUNCE_MS`, код в `director.js`.
+- Фильтры списка роликов: `POST /production/env` (allowlist `director_filter_*`), сразу.
+- Autoplay: `POST /api/env/set` (`producer_autoplay_movie`).
+
 ## Панель «Публикация»
 
 - `publication_counter` (`environment`): `POST /api/publication-counter/set`, int через `parse_config_int`, debounce `SAVE_DEBOUNCE_MS`.
@@ -53,7 +59,6 @@ def parse_config_int(value) -> int:
 ## Панель «Служебные»
 
 - Все поля `settings`: `POST /api/settings/set`, debounce `SAVE_DEBOUNCE_MS`, int через `parse_config_int` + `ConfirmDialog`.
-- `producer_autoplay_movie` (Режиссёр): `POST /api/env/set`.
 - Иерархии сроков хранения нет — три независимых int-ключа.
 - Batch `/save` удалён.
 
