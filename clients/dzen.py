@@ -138,8 +138,9 @@ def _has_captcha_frame(page) -> bool:
 
 def _try_click_captcha_checkbox(page, category, batch_id=None) -> bool:
     """
-    Пытается кликнуть чекбокс капчи «Я не робот» только во фреймах капчи.
-    Возвращает True если клик выполнен хотя бы в одном captcha-iframe.
+    Пытается кликнуть чекбокс капчи «Я не робот» во фреймах капчи,
+    затем в основном фрейме страницы (fallback для SmartCaptcha).
+    Возвращает True если клик выполнен хотя бы в одном месте.
     """
     checkbox_selectors = [
         'input[type="checkbox"]',
@@ -182,6 +183,18 @@ def _try_click_captcha_checkbox(page, category, batch_id=None) -> bool:
                 break
     except Exception:
         pass
+
+    if not clicked:
+        for sel in checkbox_selectors:
+            try:
+                el = page.locator(sel).first
+                if el.is_visible(timeout=300):
+                    el.click(force=True, timeout=2000)
+                    write_log_entry(batch_id, category, f"Капча: Playwright-клик {sel!r} в основном фрейме", level='silent')
+                    clicked = True
+                    break
+            except Exception:
+                pass
 
     return clicked
 
