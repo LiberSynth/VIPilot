@@ -247,7 +247,9 @@
         '<span class="monitor-batch-arrow">▼</span>' +
       '</div>';
 
-    const frameHtml = (btype === 'publish' && batch.batch_id && isActive)
+    const showPubFrame = btype === 'publish' && batch.batch_id
+      && (isActive || batch.batch_id === _openBid);
+    const frameHtml = showPubFrame
       ? '<div class="monitor-pub-frame">' +
           '<canvas class="monitor-pub-canvas" data-bid="' + esc(batch.batch_id) + '" ' +
           'width="1280" height="720"></canvas>' +
@@ -559,7 +561,10 @@
         _batchChainCache[bid] = _openChainIds;
         var batchEl2 = document.querySelector('.monitor-batch[data-bid="' + bid + '"]');
         if (batchEl2) _injectBatchEntries(batchEl2, entries);
-        if (_openBid === bid) _refreshMonitorView();
+        if (_openBid === bid) {
+          applyChainHighlight();
+          updateChainNavButtons();
+        }
       })
       .catch(function() { delete _batchEntriesFetching[bid]; });
   }
@@ -601,11 +606,27 @@
     Object.keys(_pubViewers).forEach(_disconnectPubViewer);
   }
 
+  function _drawPubFrame(viewer, b64, force) {
+    if (!viewer || !viewer.ctx || !b64) return;
+    if (!force && viewer.lastB64 === b64) return;
+    viewer.lastB64 = b64;
+    viewer.frameGen = (viewer.frameGen || 0) + 1;
+    var gen = viewer.frameGen;
+    var img = new Image();
+    img.onload = function() {
+      if (!viewer.ctx || viewer.frameGen !== gen) return;
+      viewer.ctx.drawImage(img, 0, 0);
+    };
+    img.src = 'data:image/jpeg;base64,' + b64;
+  }
+
   function _handlePubViewerStopped(bid) {
     var v = _pubViewers[bid];
     if (!v) return;
     if (v.sse) { v.sse.close(); v.sse = null; }
     v.stopped = true;
+    delete v.lastB64;
+    v.frameGen = (v.frameGen || 0) + 1;
     if (v.ctx) {
       v.ctx.clearRect(0, 0, PUB_VIEWPORT_W, PUB_VIEWPORT_H);
     }
@@ -621,17 +642,21 @@
       return;
     }
 
+    if (v && v.stopped) return;
+
     if (v && v.canvas === canvas && v.sse) return;
     if (v && v.sse) { v.sse.close(); v.sse = null; }
 
     if (!v) v = {};
     v.stopped = false;
 
+    var savedB64 = v.lastB64;
     if (v.canvas !== canvas) {
       canvas.width = PUB_VIEWPORT_W;
       canvas.height = PUB_VIEWPORT_H;
       v.ctx = canvas.getContext('2d');
       v.canvas = canvas;
+      if (savedB64) _drawPubFrame(v, savedB64, true);
     }
 
     var sse = new EventSource('/api/batch/' + encodeURIComponent(bid) + '/publish-stream');
@@ -646,12 +671,8 @@
       }
       if (!data || data.charAt(0) === ':') return;
       var viewer = _pubViewers[bid];
-      if (!viewer || !viewer.ctx) return;
-      var img = new Image();
-      img.onload = function() {
-        viewer.ctx.drawImage(img, 0, 0);
-      };
-      img.src = 'data:image/jpeg;base64,' + data;
+      if (!viewer || !viewer.ctx || viewer.stopped) return;
+      _drawPubFrame(viewer, data, false);
     };
     sse.onerror = function() {};
   }
@@ -736,6 +757,8 @@
                 var newFrame = newBody && newBody.querySelector('.monitor-pub-frame');
                 if (newBody && newFrame) {
                   newBody.replaceChild(oldFrame, newFrame);
+                } else if (newBody) {
+                  newBody.insertBefore(oldFrame, newBody.firstChild);
                 }
               }
             } else {
