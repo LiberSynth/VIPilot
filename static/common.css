@@ -660,7 +660,7 @@
     display: none;
     background: #07070a;
     border-top: 1px solid #0e0e16;
-    padding: 4px 14px 4px 52px;
+    padding: 4px 14px;
   }
   .monitor-batch.open .monitor-entries,
   .monitor-sysgroup.open .monitor-entries { display: block; }
@@ -674,7 +674,7 @@
   }
   .monitor-entry-row:last-child { border-bottom: none; }
   .monitor-entry-ts  { color: #6868a0; flex-shrink: 0; font-variant-numeric: tabular-nums; }
-  .monitor-entry-ch  { color: #7a7aa8; flex-shrink: 0; min-width: 6.5em; }
+  .monitor-entry-ch  { color: #7a7aa8; flex-shrink: 0; }
   .monitor-entry-msg { color: #b8b8d8; flex: 1; word-break: break-word; white-space: pre-wrap; }
   .monitor-entry-msg.error { color: #ff7070; }
   .monitor-entry-msg.fatal_error { color: #ff7070; }

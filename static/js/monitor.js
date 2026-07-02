@@ -247,7 +247,7 @@
         '<span class="monitor-batch-arrow">▼</span>' +
       '</div>';
 
-    const frameHtml = (btype === 'publish' && batch.batch_id)
+    const frameHtml = (btype === 'publish' && batch.batch_id && isActive)
       ? '<div class="monitor-pub-frame">' +
           '<canvas class="monitor-pub-canvas" data-bid="' + esc(batch.batch_id) + '" ' +
           'width="1280" height="720"></canvas>' +
