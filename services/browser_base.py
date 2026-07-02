@@ -9,7 +9,6 @@ import base64
 import queue
 import threading
 import time
-from datetime import datetime, timezone
 from typing import Optional
 
 from log import write_log_entry
@@ -151,15 +150,13 @@ class PlatformBrowser:
                     locale="ru-RU",
                 )
 
-                # Загружаем куки из БД — браузер сразу открывается авторизованным.
-                try:
-                    from db import db_get_target_session_context
-                    saved = db_get_target_session_context(target_id)
-                    if saved and saved.get("cookies"):
-                        context.add_cookies(saved["cookies"])
-                        write_log_entry(None, 'browser', f"platform={self._platform}, Загружено {len(saved['cookies'])} куков из БД", level='silent')
-                except Exception as _e:
-                    write_log_entry(None, 'browser', f'platform={self._platform}, Не удалось загрузить куки из БД: {_e}', level='silent')
+                from clients.target_session import load_into_context
+
+                load_into_context(
+                    context,
+                    target_id,
+                    platform=self._platform,
+                )
 
                 page = context.new_page()
 
@@ -184,22 +181,13 @@ class PlatformBrowser:
                 while self._running:
                     if self._save_request_event.is_set():
                         self._save_request_event.clear()
-                        try:
-                            from db import db_set_target_session_context
-                            cookies  = context.cookies(self._cookie_domains)
-                            saved_at = datetime.now(timezone.utc).isoformat()
-                            state    = {"cookies": cookies, "saved_at": saved_at}
-                            ok = db_set_target_session_context(self._current_target_id, state)
-                            if ok:
-                                self._save_result = {"ok": True, "error": None}
-                                write_log_entry(None, 'browser', f'platform={self._platform}, Сессия сохранена.', level='info')
-                                write_log_entry(None, 'browser', f'platform={self._platform}, ' + fmt_id_msg('Сессия сохранена в БД: {} куков, target={}', len(cookies), self._current_target_id), level='silent')
-                            else:
-                                self._save_result = {"ok": False, "error": "Ошибка записи в БД"}
-                                write_log_entry(None, 'browser', f'platform={self._platform}, Ошибка сохранения сессии: запись в БД не удалась.', level='info')
-                        except Exception as e:
-                            self._save_result = {"ok": False, "error": str(e)}
-                            write_log_entry(None, 'browser', f'platform={self._platform}, Ошибка сохранения сессии: {e}', level='info')
+                        from clients.target_session import save_from_context
+
+                        self._save_result = save_from_context(
+                            context,
+                            self._current_target_id,
+                            platform=self._platform,
+                        )
                         self._save_done_event.set()
 
                     cur_page = active_page[0]
