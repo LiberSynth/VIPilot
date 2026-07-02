@@ -10,7 +10,6 @@ import shutil
 import tempfile
 import time as _time
 
-from clients.common import dismiss_overlays, raise_if_login_required, safe_click
 from log import write_log_entry
 from utils.utils import fmt_id_msg
 from routes.api import publication_file_name
@@ -183,11 +182,12 @@ def _find_rutube_add_button(page):
 
 def _wait_rutube_add_button(page, category, batch_id=None, timeout_ms=180_000):
     """Ждёт готовность студии и видимую кнопку «+ Добавить»."""
+    from services.publish_auth_check import raise_if_login_required
+
     deadline = _time.monotonic() + timeout_ms / 1000
     last_snap_at = 0.0
     while _time.monotonic() < deadline:
         raise_if_login_required(page, "rutube")
-        _rutube_dismiss(page, category, batch_id)
         add_btn = _find_rutube_add_button(page)
         if add_btn is not None:
             return add_btn
@@ -259,17 +259,6 @@ def _rutube_publish_button_visible(page) -> bool:
     except Exception:
         return False
 
-def _detect_rutube_upload_form(page) -> bool:
-    """Форма загрузки/публикации открыта — не закрывать оверлеи."""
-    return _rutube_publish_button_visible(page)
-
-RUTUBE_PUBLISH_WHITELIST = [
-    ("upload_form", _detect_rutube_upload_form, None),
-]
-
-def _rutube_dismiss(page, category, batch_id) -> None:
-    dismiss_overlays(page, RUTUBE_PUBLISH_WHITELIST, batch_id, category, label="Рутьюб")
-
 def _rutube_publish_confirmed_after_submit(page) -> bool:
     """Признак успеха после клика: кнопка «Опубликовать» исчезла, студия открыта."""
     if _rutube_publish_button_visible(page):
@@ -301,18 +290,27 @@ def _check_rutube_publish_result(page, *, after_submit: bool = False) -> tuple[b
 
 def _click_rutube_publish_button(pub_btn, page, category, batch_id) -> None:
     """Клик по «Опубликовать» без ожидания навигации после submit."""
-    try:
-        safe_click(
-            pub_btn, page, RUTUBE_PUBLISH_WHITELIST,
-            batch_id=batch_id, category=category, label="Рутьюб",
-            timeout_ms=5_000, max_attempts=3,
-            click_kwargs={"no_wait_after": True},
-            js_fallback=True,
-        )
-    except Exception as _e:
-        raise RutubeApiError(
-            f"Не удалось нажать «Опубликовать» в Рутьюбе: {_e}"
-        ) from _e
+    _last_err = None
+    for _attempt in range(1, 4):
+        try:
+            pub_btn.click(timeout=5_000, no_wait_after=True)
+            return
+        except Exception as _e:
+            _last_err = _e
+            try:
+                pub_btn.evaluate("el => el.click()")
+                return
+            except Exception as _js_e:
+                _last_err = _js_e
+            write_log_entry(
+                batch_id, category,
+                f"Рутьюб: Клик «Опубликовать» не прошёл (попытка {_attempt}/3).",
+                level="warn",
+            )
+            page.wait_for_timeout(400)
+    raise RutubeApiError(
+        f"Не удалось нажать «Опубликовать» в Рутьюбе: {_last_err}"
+    ) from _last_err
 
 def _rutube_publish_button_ready(pub_btn) -> bool:
     try:
@@ -340,20 +338,41 @@ def _submit_rutube_publish(page, category, batch_id, pub_btn=None) -> None:
 
 def _click_rutube_add_button(add_btn, page, category, batch_id) -> None:
     """Клик «+ Добавить» с обходом перекрывающих оверлеев."""
-    try:
-        add_btn.scroll_into_view_if_needed(timeout=3_000)
-    except Exception:
-        pass
-    try:
-        safe_click(
-            add_btn, page, RUTUBE_PUBLISH_WHITELIST,
-            batch_id=batch_id, category=category, label="Рутьюб",
-            timeout_ms=5_000, max_attempts=5, js_fallback=True,
-        )
-    except Exception as _e:
-        raise RutubeApiError(
-            f"Не удалось нажать «+ Добавить» в студии Рутьюба: {_e}"
-        ) from _e
+    _last_err = None
+    for _attempt in range(1, 6):
+        try:
+            page.keyboard.press("Escape")
+            page.wait_for_timeout(300)
+        except Exception:
+            pass
+        try:
+            add_btn.scroll_into_view_if_needed(timeout=3_000)
+        except Exception:
+            pass
+        try:
+            add_btn.click(timeout=5_000)
+            return
+        except Exception as _e:
+            _last_err = _e
+            try:
+                add_btn.click(force=True, timeout=3_000)
+                return
+            except Exception as _force_e:
+                _last_err = _force_e
+            try:
+                add_btn.evaluate("el => el.click()")
+                return
+            except Exception as _js_e:
+                _last_err = _js_e
+            write_log_entry(
+                batch_id, category,
+                f"Рутьюб: Клик «+ Добавить» заблокирован (попытка {_attempt}/5).",
+                level="warn",
+            )
+            page.wait_for_timeout(500)
+    raise RutubeApiError(
+        f"Не удалось нажать «+ Добавить» в студии Рутьюба: {_last_err}"
+    ) from _last_err
 
 def _publish_ui(page, video_path: str, category, batch_id=None):
     """Управляет браузером для публикации видео через UI Рутьюба."""
@@ -388,6 +407,7 @@ def _publish_ui(page, video_path: str, category, batch_id=None):
 
     cur = page.url
     write_log_entry(batch_id, category, f"URL после перехода: {cur}", level='silent')
+    from services.publish_auth_check import raise_if_login_required
 
     raise_if_login_required(page, "rutube")
 
