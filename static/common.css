@@ -664,6 +664,26 @@
   }
   .monitor-batch.open .monitor-entries,
   .monitor-sysgroup.open .monitor-entries { display: block; }
+  .monitor-log-textarea {
+    display: none;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 120px;
+    max-height: 40vh;
+    resize: vertical;
+    background: #07070a;
+    border: none;
+    border-top: 1px solid #0e0e16;
+    padding: 8px 14px 8px 52px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 11px;
+    line-height: 1.45;
+    color: #b8b8d8;
+    outline: none;
+  }
+  .monitor-sysgroup .monitor-log-textarea { padding-left: 14px; }
+  .monitor-batch.open .monitor-log-textarea,
+  .monitor-sysgroup.open .monitor-log-textarea { display: block; }
   .monitor-entry-row {
     display: flex; gap: 8px; padding: 2px 0;
     border-bottom: 1px solid #0e0e18; font-size: 11px;
