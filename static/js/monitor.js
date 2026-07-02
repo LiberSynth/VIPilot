@@ -87,30 +87,13 @@
     });
   }
 
-  var MON_LOG_LOADING = 'Загрузка...';
-
-  function _formatEntriesText(entries) {
-    if (!entries || !entries.length) return '';
-    return entries.map(formatEntryLine).join('\n');
-  }
-
-  function _ensureLogTextarea(body) {
-    if (!body) return null;
-    var ta = body.querySelector('.monitor-log-textarea');
-    if (!ta) {
-      ta = document.createElement('textarea');
-      ta.className = 'monitor-log-textarea';
-      ta.readOnly = true;
-      ta.spellcheck = false;
-      ta.setAttribute('autocomplete', 'off');
-      body.appendChild(ta);
-    }
-    return ta;
-  }
-
-  function _showLogLoading(body) {
-    var ta = _ensureLogTextarea(body);
-    if (ta) ta.value = MON_LOG_LOADING;
+  function renderEntries(entries) {
+    if (!entries || entries.length === 0) return '';
+    return '<div class="monitor-entries">' +
+      entries.map(function(e) {
+        return _buildEntryRow(e);
+      }).join('') +
+    '</div>';
   }
 
   function _batchDotClass(bs, batchId) {
@@ -460,8 +443,6 @@
         batchEl.classList.add('open');
         if (_batchEntriesCache[_openBid]) {
           _applyBatchEntries(batchEl, _batchEntriesCache[_openBid]);
-        } else if (_batchEntriesFetching[_openBid]) {
-          _showLogLoading(batchEl.querySelector('.monitor-batch-body'));
         }
       }
     } else if (state && state.openBids) {
@@ -474,11 +455,7 @@
       var sysEl = document.querySelector('.monitor-system-block[data-lid="' + _openSysLid + '"]');
       if (sysEl) {
         sysEl.classList.add('open');
-        if (_sysLogEntriesCache[_openSysLid]) {
-          _applySystemEntries(sysEl, _sysLogEntriesCache[_openSysLid]);
-        } else if (_sysLogFetching[_openSysLid]) {
-          _showLogLoading(sysEl.querySelector('.monitor-sysgroup-body'));
-        }
+        if (_sysLogEntriesCache[_openSysLid]) _applySystemEntries(sysEl, _sysLogEntriesCache[_openSysLid]);
       }
     } else if (state && state.openSys) {
       document.querySelectorAll('.monitor-system-block').forEach(function(el) {
@@ -491,40 +468,43 @@
     }
   }
 
+  function _buildEntryRow(en) {
+    var lvl = en.level || 'info';
+    return '<div class="monitor-entry-row">' +
+      '<span class="monitor-entry-ts">' + fmtMsk(en.created_at) + '</span>' +
+      '<span class="monitor-entry-ch">' + esc(en.channel || '—') + '</span>' +
+      '<span class="monitor-entry-msg ' + esc(lvl) + '">' + esc(en.message || '') + '</span>' +
+    '</div>';
+  }
+
   function _applyBatchEntries(batchEl, entries) {
     var body = batchEl.querySelector('.monitor-batch-body');
     if (!body) return;
-    var ta = _ensureLogTextarea(body);
-    if (ta) ta.value = _formatEntriesText(entries);
+    var existing = body.querySelector('.monitor-entries');
+    if (existing) existing.remove();
+    if (!entries || !entries.length) return;
+    body.insertAdjacentHTML('beforeend', renderEntries(entries));
   }
 
   function _applySystemEntries(sysEl, entries) {
     var body = sysEl.querySelector('.monitor-sysgroup-body');
     if (!body) return;
-    var ta = _ensureLogTextarea(body);
-    if (ta) ta.value = _formatEntriesText(entries);
+    body.innerHTML = renderEntries(entries);
   }
 
   function _injectBatchEntries(batchEl, entries) {
     var body = batchEl.querySelector('.monitor-batch-body');
     if (!body) return;
-    var ta = _ensureLogTextarea(body);
-    if (!ta) return;
-    if (ta.value === MON_LOG_LOADING) {
-      ta.value = _formatEntriesText(entries);
+    var existingDiv = body.querySelector('.monitor-entries');
+    if (!existingDiv) {
+      body.insertAdjacentHTML('beforeend', renderEntries(entries));
       return;
     }
-    var newText = _formatEntriesText(entries);
-    if (!ta.value) {
-      ta.value = newText;
-      return;
-    }
-    if (!newText) return;
-    var existingLines = ta.value.split('\n').length;
-    var totalNew = entries.length - existingLines;
+    var existingCount = existingDiv.querySelectorAll('.monitor-entry-row').length;
+    var totalNew = entries.length - existingCount;
     if (totalNew > 0) {
-      var newLines = entries.slice(0, totalNew).map(formatEntryLine).join('\n');
-      ta.value = newLines + '\n' + ta.value;
+      var newEntries = entries.slice(0, totalNew);
+      existingDiv.insertAdjacentHTML('afterbegin', newEntries.map(_buildEntryRow).join(''));
     }
   }
 
@@ -549,14 +529,7 @@
         if (batchEl2) _injectBatchEntries(batchEl2, entries);
         if (_openBid === bid) _refreshMonitorView();
       })
-      .catch(function() {
-        delete _batchEntriesFetching[bid];
-        if (_openBid !== bid) return;
-        var batchEl3 = document.querySelector('.monitor-batch[data-bid="' + bid + '"]');
-        if (!batchEl3) return;
-        var ta = _ensureLogTextarea(batchEl3.querySelector('.monitor-batch-body'));
-        if (ta && ta.value === MON_LOG_LOADING) ta.value = 'Ошибка загрузки';
-      });
+      .catch(function() { delete _batchEntriesFetching[bid]; });
   }
 
   function _fetchSystemEntries(lid) {
@@ -573,14 +546,7 @@
         if (!el) return;
         _applySystemEntries(el, entries);
       })
-      .catch(function() {
-        delete _sysLogFetching[lid];
-        if (_openSysLid !== lid) return;
-        var sysEl2 = document.querySelector('.monitor-system-block[data-lid="' + lid + '"]');
-        if (!sysEl2) return;
-        var ta = _ensureLogTextarea(sysEl2.querySelector('.monitor-sysgroup-body'));
-        if (ta && ta.value === MON_LOG_LOADING) ta.value = 'Ошибка загрузки';
-      });
+      .catch(function() { delete _sysLogFetching[lid]; });
   }
 
   var PUB_VIEWPORT_W = 1280;
@@ -727,10 +693,10 @@
           if (isOpen) {
             newNode.classList.add('open');
             if (item.type === 'batch') {
-              var oldTa = existing.querySelector('.monitor-log-textarea');
-              if (oldTa) {
+              var oldEntries = existing.querySelector('.monitor-entries');
+              if (oldEntries) {
                 var body = newNode.querySelector('.monitor-batch-body');
-                if (body) body.appendChild(oldTa);
+                if (body) body.appendChild(oldEntries);
               }
               var oldFrame = existing.querySelector('.monitor-pub-frame');
               if (oldFrame) {
@@ -741,9 +707,11 @@
                 }
               }
             } else {
-              var oldSysTa = existing.querySelector('.monitor-log-textarea');
-              var newSysBody = newNode.querySelector('.monitor-sysgroup-body');
-              if (oldSysTa && newSysBody) newSysBody.appendChild(oldSysTa);
+              var oldBody = existing.querySelector('.monitor-sysgroup-body');
+              var newBody = newNode.querySelector('.monitor-sysgroup-body');
+              if (oldBody && newBody && oldBody.innerHTML.trim()) {
+                newBody.innerHTML = oldBody.innerHTML;
+              }
             }
           }
           el.replaceChild(newNode, existing);
@@ -840,7 +808,6 @@
             _fetchAndInjectEntries(_openBid);
           }
         } else {
-          if (openEl) _showLogLoading(openEl.querySelector('.monitor-batch-body'));
           _fetchAndInjectEntries(_openBid);
         }
       }
@@ -871,8 +838,6 @@
         sysEl.classList.add('open');
         if (_sysLogEntriesCache[_openSysLid]) {
           _applySystemEntries(sysEl, _sysLogEntriesCache[_openSysLid]);
-        } else {
-          _showLogLoading(sysEl.querySelector('.monitor-sysgroup-body'));
         }
         _fetchSystemEntries(_openSysLid);
       }
@@ -953,7 +918,6 @@
     if (_batchEntriesCache[_openBid]) {
       _applyBatchEntries(targetEl, _batchEntriesCache[_openBid]);
     } else {
-      _showLogLoading(targetEl.querySelector('.monitor-batch-body'));
       _fetchAndInjectEntries(_openBid);
     }
     _refreshMonitorView();
