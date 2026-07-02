@@ -324,17 +324,32 @@ class PlatformBrowser:
         with self._batch_frames_lock:
             self._batch_frames.pop(batch_id, None)
 
+    def _bootstrap_pipeline_page(self, page, target_id: str, batch_id, category) -> str | None:
+        """Load target session and goto start_url. Returns error message or None."""
+        from clients.target_session import SESSION_MISSING_MSG, bootstrap_pipeline_page
+
+        if bootstrap_pipeline_page(
+            page,
+            target_id,
+            self._start_url,
+            batch_id=batch_id,
+            category=category,
+            platform=self._platform,
+        ) == 0:
+            return SESSION_MISSING_MSG
+        return None
+
     def run_pipeline_browser(
         self,
         fn,
-        cookies: list,
+        target_id: str,
         batch_id=None,
         category=None,
         batch_session=None,
         keep_browser: bool = False,
     ) -> dict:
         """
-        Запускает fn(page, context) в браузере с куками из cookies.
+        Запускает fn(page, context) после bootstrap сессии таргета из БД.
         БЛОКИРУЕТ вызывающий поток — вызывать из фонового потока пайплайна.
         Возвращает {"ok": bool, "result": ..., "error": str|None}.
 
@@ -343,7 +358,7 @@ class PlatformBrowser:
         """
         if batch_session is not None:
             try:
-                return batch_session.run_step(self, fn, cookies, batch_id, category)
+                return batch_session.run_step(self, fn, target_id, batch_id, category)
             finally:
                 if not keep_browser:
                     from services.publish_batch_browser import finalize_publish_batch_browser
@@ -368,18 +383,17 @@ class PlatformBrowser:
                     locale="ru-RU",
                     viewport={"width": self._VIEWPORT_W, "height": self._VIEWPORT_H},
                 )
-                if cookies:
-                    try:
-                        ctx.add_cookies(cookies)
-                        write_log_entry(batch_id, category, f"Загружено {len(cookies)} куков", level="silent")
-                    except Exception as e:
-                        write_log_entry(batch_id, category, f"Ошибка куков: {e}", level="silent")
 
                 page = ctx.new_page()
-
                 try:
-                    fn_result = fn(page, ctx)
-                    result = {"ok": True, "result": fn_result}
+                    bootstrap_err = self._bootstrap_pipeline_page(
+                        page, target_id, batch_id, category,
+                    )
+                    if bootstrap_err:
+                        result = {"ok": False, "error": bootstrap_err}
+                    else:
+                        fn_result = fn(page, ctx)
+                        result = {"ok": True, "result": fn_result}
                 except Exception as e:
                     from services.publish_error_dump import save_publish_error_dump
 

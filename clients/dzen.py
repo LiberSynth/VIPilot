@@ -65,8 +65,6 @@ def publish(
             "авторизуйтесь в браузере (вкладка «Публикация»)"
         )
 
-    saved_cookies = session.get("cookies", [])
-
     write_log_entry(batch_id, category, "Дзен: Публикация запущена.")
     write_log_entry(batch_id, category, fmt_id_msg("[dzen] {} КБ, publisher={}", len(video_data) // 1024, publisher_id), level='silent')
 
@@ -83,7 +81,7 @@ def publish(
             _publish_ui(page, publisher_id, video_path, category, batch_id=batch_id)
 
         result = _get_browser("dzen").run_pipeline_browser(
-            _do_publish, saved_cookies, batch_id=batch_id, category=category,
+            _do_publish, target_id, batch_id=batch_id, category=category,
             batch_session=batch_session, keep_browser=keep_browser,
         )
 

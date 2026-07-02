@@ -74,7 +74,7 @@ class PublishBatchBrowserSession:
         self,
         platform_browser: PlatformBrowser,
         fn: Callable,
-        cookies: list,
+        target_id: str,
         batch_id=None,
         category=None,
     ) -> dict:
@@ -89,20 +89,16 @@ class PublishBatchBrowserSession:
                 "height": PlatformBrowser._VIEWPORT_H,
             },
         )
-        if cookies:
-            try:
-                ctx.add_cookies(cookies)
-                write_log_entry(
-                    batch_id, category,
-                    f"Загружено {len(cookies)} куков",
-                    level="silent",
-                )
-            except Exception as e:
-                write_log_entry(batch_id, category, f"Ошибка куков: {e}", level="silent")
         page = ctx.new_page()
         try:
-            fn_result = fn(page, ctx)
-            result = {"ok": True, "result": fn_result}
+            bootstrap_err = platform_browser._bootstrap_pipeline_page(
+                page, target_id, batch_id, category,
+            )
+            if bootstrap_err:
+                result = {"ok": False, "error": bootstrap_err}
+            else:
+                fn_result = fn(page, ctx)
+                result = {"ok": True, "result": fn_result}
         except Exception as e:
             from services.publish_error_dump import save_publish_error_dump
 

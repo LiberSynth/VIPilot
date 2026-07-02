@@ -12,6 +12,56 @@ from db import db_get_target_session_context, db_set_target_session_context
 from log import write_log_entry
 from utils.utils import fmt_id_msg
 
+SESSION_MISSING_MSG = (
+    "Браузерная сессия не сохранена — "
+    "авторизуйтесь в браузере (вкладка «Публикация»)"
+)
+
+_START_URL_TIMEOUT_MS = 30_000
+
+
+def has_saved_cookies(target_id: str) -> bool:
+    saved = db_get_target_session_context(target_id)
+    return bool(saved and saved.get("cookies"))
+
+
+def bootstrap_pipeline_page(
+    page,
+    target_id: str,
+    start_url: str,
+    *,
+    batch_id=None,
+    category: str | None = None,
+    platform: str | None = None,
+) -> int:
+    """Load session from DB and open platform start_url (same path as auth widget)."""
+    count = load_into_context(
+        page.context,
+        target_id,
+        batch_id=batch_id,
+        category=category or "publish",
+        platform=platform,
+    )
+    if count == 0:
+        return 0
+    prefix = f"platform={platform}, " if platform else ""
+    try:
+        page.goto(start_url, wait_until="domcontentloaded", timeout=_START_URL_TIMEOUT_MS)
+        write_log_entry(
+            batch_id,
+            category or "publish",
+            f"{prefix}start_url: {start_url}",
+            level="silent",
+        )
+    except Exception as exc:
+        write_log_entry(
+            batch_id,
+            category or "publish",
+            f"{prefix}Ошибка навигации на start_url: {exc}",
+            level="warn",
+        )
+    return count
+
 
 def load_into_context(
     ctx,
