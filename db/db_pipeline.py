@@ -350,6 +350,7 @@ def db_get_actionable_batches():
                    OR (type = 'prompt' AND status = 'processing')
                    OR status LIKE '%.pending'
                    OR status LIKE '%.completed'
+                   OR status LIKE '%.failed'
                 ORDER BY created_at ASC, id ASC
             """)
             rows = cur.fetchall()

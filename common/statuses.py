@@ -10,7 +10,7 @@ FINAL_BATCH_STATUSES = (
 
 COMPOSITE_BATCH_STATUS_SUFFIXES = frozenset({'.posting', '.completed', '.pending', '.failed'})
 
-PUBLISH_ROUTING_SUFFIXES = ('.pending', '.completed')
+PUBLISH_ROUTING_SUFFIXES = ('.pending', '.completed', '.failed')
 
 def batch_is_active(status: str) -> bool:
     """Возвращает True если батч находится в активном (не финальном) статусе."""
