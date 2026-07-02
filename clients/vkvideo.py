@@ -419,13 +419,13 @@ def _publish_ui(
     write_log_entry(batch_id, category, f"URL после перехода: {cur}", level="silent")
     from services.publish_auth_check import raise_if_login_required
 
-    raise_if_login_required(page, "vkvideo")
+    raise_if_login_required(page, "vkvideo", club_id=club_id)
 
     # ── Шаг 1б: CAPTCHA «Проверяем, что вы не робот» или готовность модала ─
     choose_btn = page.get_by_text("Выбрать файл", exact=False).first
     _captcha_deadline = _time.monotonic() + 5
     while _time.monotonic() < _captcha_deadline:
-        raise_if_login_required(page, "vkvideo")
+        raise_if_login_required(page, "vkvideo", club_id=club_id)
         try:
             if choose_btn.is_visible(timeout=300):
                 break

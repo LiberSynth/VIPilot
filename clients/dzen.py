@@ -732,7 +732,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
     write_log_entry(batch_id, category, f"URL после перехода: {cur}", level='silent')
     from services.publish_auth_check import raise_if_login_required
 
-    raise_if_login_required(page, "dzen")
+    raise_if_login_required(page, "dzen", publisher_id=publisher_id)
 
     plus_btn = page.locator(
         "[class*='addButton'], "
@@ -749,7 +749,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
     _plus_deadline = _time.monotonic() + 180
     _plus_ready = False
     while _time.monotonic() < _plus_deadline:
-        raise_if_login_required(page, "dzen")
+        raise_if_login_required(page, "dzen", publisher_id=publisher_id)
         _dismiss_modal_overlay(page, category, batch_id)
         _handle_popups(page, category, batch_id)
         try:
@@ -760,7 +760,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
             pass
         page.wait_for_timeout(400)
     if not _plus_ready:
-        raise_if_login_required(page, "dzen")
+        raise_if_login_required(page, "dzen", publisher_id=publisher_id)
         plus_btn.wait_for(state="visible", timeout=1_000)
     _last_plus_err = None
     for _plus_attempt in range(1, 6):

@@ -1,11 +1,18 @@
 """
-Обнаружение экрана входа при Playwright-публикации (протухшая сессия).
+Обнаружение экрана входа и потери доступа к кабинету при Playwright-публикации.
 """
 
 from __future__ import annotations
 
 _SESSION_MSG = (
     "Сессия истекла — авторизуйтесь снова в браузере (вкладка «Публикация»)"
+)
+
+_DZEN_STUDIO_SELECTORS = (
+    "[class*='author-studio-header'], "
+    "[data-testid='add-publication-button'], "
+    "[class*='author-studio-header__addButton'], "
+    "[class*='addButton']"
 )
 
 
@@ -38,10 +45,12 @@ def _url_indicates_login(url: str, platform: str) -> bool:
     if platform == "vkvideo":
         return (
             "vk.com/login" in url
-            or "id.vk.com" in url
             or "login.vk" in url
-            or "/auth" in url
-            or "passport" in url
+            or "passport.vk" in url
+            or "oauth.vk" in url
+            or "id.vk.com/auth" in url
+            or "id.vk.com/login" in url
+            or ("id.vk.com" in url and "/auth" in url)
         )
     return False
 
@@ -88,22 +97,89 @@ def _vkvideo_login_ui(page) -> bool:
     return False
 
 
-def login_screen_visible(page, platform: str) -> bool:
+def _dzen_studio_markers_visible(page) -> bool:
+    return _visible(page, page.locator(_DZEN_STUDIO_SELECTORS), 400)
+
+
+def _dzen_public_channel_view(page) -> bool:
+    """Публичная страница канала (гость), не студия автора."""
+    if _visible(page, page.get_by_role("button", name="Подписаться"), 300):
+        return True
+    if _visible(page, page.get_by_role("button", name="Subscribe"), 300):
+        return True
+    return False
+
+
+def _dzen_publish_access_denied(page, publisher_id: str | None = None) -> bool:
+    """
+    Студия автора недоступна: редирект на публичный профиль или чужой publisher_id.
+    Не срабатывает, пока студия ещё грузится (editor URL без маркеров — ждём).
+    """
+    if _dzen_studio_markers_visible(page):
+        return False
+    if _dzen_public_channel_view(page):
+        return True
+
+    url = _page_url(page)
+    if publisher_id:
+        pid = publisher_id.strip().lower()
+        if f"/profile/editor/id/{pid}" not in url:
+            return True
+        return False
+
+    if "/profile/editor/" not in url and ("dzen.ru" in url or "zen.yandex" in url):
+        return True
+    return False
+
+
+def _rutube_publish_access_denied(page) -> bool:
+    url = _page_url(page)
+    if "studio.rutube.ru" in url:
+        return False
+    if _rutube_login_ui(page):
+        return True
+    if "rutube.ru" in url:
+        return True
+    return False
+
+
+def _vkvideo_publish_access_denied(page, club_id: str | None = None) -> bool:
+    url = _page_url(page)
+    if "cabinet.vkvideo.ru" in url:
+        if club_id:
+            normalized = club_id.strip().lstrip("@")
+            if normalized and f"club{normalized}" not in url.replace("@", ""):
+                return True
+        return False
+    if _vkvideo_login_ui(page):
+        return True
+    if "vkvideo.ru" in url or "vk.com" in url:
+        return True
+    return False
+
+
+def login_screen_visible(page, platform: str, **context) -> bool:
     """True если страница или модал требуют повторной авторизации."""
     if _url_indicates_login(_page_url(page), platform):
         return True
     if platform == "rutube":
-        return _rutube_login_ui(page)
+        if _rutube_login_ui(page):
+            return True
+        return _rutube_publish_access_denied(page)
     if platform == "dzen":
-        return _dzen_login_ui(page)
+        if _dzen_login_ui(page):
+            return True
+        return _dzen_publish_access_denied(page, context.get("publisher_id"))
     if platform == "vkvideo":
-        return _vkvideo_login_ui(page)
+        if _vkvideo_login_ui(page):
+            return True
+        return _vkvideo_publish_access_denied(page, context.get("club_id"))
     return False
 
 
-def raise_if_login_required(page, platform: str) -> None:
-    """Бросает *CsrfExpired платформы, если виден экран входа."""
-    if not login_screen_visible(page, platform):
+def raise_if_login_required(page, platform: str, **context) -> None:
+    """Бросает *CsrfExpired платформы, если виден экран входа или нет доступа к кабинету."""
+    if not login_screen_visible(page, platform, **context):
         return
     if platform == "dzen":
         from clients.dzen import DzenCsrfExpired
