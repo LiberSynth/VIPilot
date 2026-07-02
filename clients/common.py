@@ -7,6 +7,7 @@ dismiss_click_outside — только для Rutube/VK (Dzen используе
 
 from __future__ import annotations
 
+import time as _time
 from collections.abc import Callable, Sequence
 from typing import Any
 
@@ -27,6 +28,9 @@ _DZEN_STUDIO_SELECTORS = (
 WhitelistEntry = tuple[str, Callable[..., bool], Callable[..., None] | None]
 
 DismissUnknown = Callable[..., None]
+
+_DISMISS_STATE_KEY = "_vipilot_dismiss_state"
+_DISMISS_COOLDOWN_S = 2.0
 
 _SAFE_FIELD_JS = """
 (inset) => {
@@ -252,10 +256,13 @@ def handle_popups(
     dismiss_unknown: DismissUnknown,
     batch_id=None,
     category=None,
+    *,
+    allow_dismiss: bool = True,
 ) -> None:
     """
     Паттерн из dzen._handle_popups: whitelist → иначе dismiss_unknown.
     handle=None — элемент известен, не закрывать.
+    allow_dismiss=False — только whitelist (ожидание целевого UI, без dismiss).
     """
     for name, detect, handle in whitelist:
         try:
@@ -267,7 +274,26 @@ def handle_popups(
         if handle is not None:
             handle(page, category, batch_id)
         return
-    dismiss_unknown(page, category, batch_id)
+    if allow_dismiss:
+        dismiss_unknown(page, category, batch_id)
+
+
+def _dismiss_state(page) -> dict:
+    st = getattr(page, _DISMISS_STATE_KEY, None)
+    if st is None:
+        st = {"outside_used": False, "last_dismiss_at": 0.0}
+        setattr(page, _DISMISS_STATE_KEY, st)
+    return st
+
+
+def _reset_dismiss_state(page) -> None:
+    st = getattr(page, _DISMISS_STATE_KEY, None)
+    if st is not None:
+        st["outside_used"] = False
+
+
+def _overlay_cleared(page, *, force: bool) -> bool:
+    return force or not _likely_overlay_present(page)
 
 
 def _click_safe_free_field(page, inset: int = 24) -> bool:
@@ -341,19 +367,31 @@ def dismiss_click_outside(
 ) -> None:
     """Закрытие неизвестного оверлея для Rutube/VK.
 
-    phase 0: клик снаружи → Escape → × (вся цепочка за один вызов)
-    phase 1: Escape → ×
+    phase 0: один клик снаружи → если оверлей остался → Escape → ×
+    phase 1: Escape → × (без клика снаружи)
     phase 2+: × → Escape
 
-    force=True после заблокированного клика — пропускает проверку overlay.
+    Клик снаружи не повторяется, пока оверлей не закроется (state на page).
+    force=True — после заблокированного клика, без cooldown.
     """
     if not force and not _likely_overlay_present(page):
+        _reset_dismiss_state(page)
         return
 
     _user_lvl = "info" if batch_id else "silent"
     prefix = f"{label}: " if label else ""
+    st = _dismiss_state(page)
 
-    if phase <= 0:
+    if phase >= 1:
+        st["outside_used"] = True
+
+    if not force:
+        since = _time.monotonic() - st["last_dismiss_at"]
+        if since < _DISMISS_COOLDOWN_S:
+            return
+    st["last_dismiss_at"] = _time.monotonic()
+
+    if phase <= 0 and not st["outside_used"]:
         if _click_safe_free_field(page):
             write_log_entry(
                 batch_id, category,
@@ -361,18 +399,12 @@ def dismiss_click_outside(
                 level=_user_lvl,
             )
             page.wait_for_timeout(200)
-        _try_escape(page)
-        page.wait_for_timeout(200)
-        if _try_generic_close(page):
-            write_log_entry(
-                batch_id, category,
-                f"{prefix}Закрываю оверлей — кнопка закрытия.",
-                level=_user_lvl,
-            )
-            page.wait_for_timeout(200)
-        return
+        st["outside_used"] = True
+        if _overlay_cleared(page, force=force):
+            _reset_dismiss_state(page)
+            return
 
-    if phase == 1:
+    if phase <= 1:
         write_log_entry(
             batch_id, category,
             f"{prefix}Закрываю оверлей — Escape.",
@@ -380,6 +412,9 @@ def dismiss_click_outside(
         )
         _try_escape(page)
         page.wait_for_timeout(200)
+        if _overlay_cleared(page, force=force):
+            _reset_dismiss_state(page)
+            return
         if _try_generic_close(page):
             write_log_entry(
                 batch_id, category,
@@ -387,6 +422,8 @@ def dismiss_click_outside(
                 level=_user_lvl,
             )
             page.wait_for_timeout(200)
+        if _overlay_cleared(page, force=force):
+            _reset_dismiss_state(page)
         return
 
     if _try_generic_close(page):
@@ -404,6 +441,8 @@ def dismiss_click_outside(
         )
         _try_escape(page)
         page.wait_for_timeout(200)
+    if _overlay_cleared(page, force=force):
+        _reset_dismiss_state(page)
 
 
 def safe_click(
@@ -430,6 +469,8 @@ def safe_click(
         _force = attempt > 1
 
         def _dismiss(page, category, batch_id, *, p=_phase, f=_force):
+            if f:
+                _reset_dismiss_state(page)
             dismiss_unknown(
                 page, category, batch_id, label=label, phase=p, force=f,
             )

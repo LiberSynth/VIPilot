@@ -98,6 +98,9 @@ class PublishBatchBrowserSession:
                 result = {"ok": False, "error": bootstrap_err}
             else:
                 fn_result = fn(page, ctx)
+                platform_browser._persist_pipeline_session(
+                    ctx, target_id, batch_id, category,
+                )
                 result = {"ok": True, "result": fn_result}
         except Exception as e:
             from services.publish_error_dump import save_publish_error_dump

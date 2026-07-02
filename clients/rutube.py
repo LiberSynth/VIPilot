@@ -208,7 +208,6 @@ def _wait_rutube_upload(page, category, batch_id=None) -> bool:
     last_log_at = 0.0
     last_snap_at = 0.0
     while _time.monotonic() < deadline:
-        _rutube_handle_popups(page, category, batch_id)
         state = _rutube_upload_state(page)
         if _rutube_upload_ready(state):
             parts = []
@@ -277,7 +276,23 @@ def _detect_rutube_upload_menu(page) -> bool:
             pass
     return False
 
+def _detect_rutube_upload_in_progress(page) -> bool:
+    """Виджет загрузки файла — не dismiss (modal/popup классы у штатного UI)."""
+    for text in ("Загрузка видео", "Выбрать файлы", "Загрузка файла"):
+        try:
+            if page.get_by_text(text, exact=False).first.is_visible(timeout=200):
+                return True
+        except Exception:
+            pass
+    state = _rutube_upload_state(page)
+    if state["uploading"]:
+        return True
+    if state["category_trigger"] and not state["publish_btn"]:
+        return True
+    return False
+
 RUTUBE_PUBLISH_WHITELIST = [
+    ("upload_in_progress", _detect_rutube_upload_in_progress, None),
     ("upload_form", _detect_rutube_upload_form, None),
     ("upload_menu", _detect_rutube_upload_menu, None),
 ]

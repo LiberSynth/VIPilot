@@ -339,6 +339,27 @@ class PlatformBrowser:
             return SESSION_MISSING_MSG
         return None
 
+    def _persist_pipeline_session(self, ctx, target_id: str, batch_id, category) -> None:
+        """Обновляет targets.session_context после успешной публикации."""
+        from clients.target_session import save_from_context
+
+        channel = category or "publish"
+        save_result = save_from_context(
+            ctx,
+            target_id,
+            batch_id=batch_id,
+            category=channel,
+            platform=self._platform,
+        )
+        if not save_result.get("ok"):
+            write_log_entry(
+                batch_id,
+                channel,
+                f"platform={self._platform}, "
+                f"Не удалось обновить сессию в БД: {save_result.get('error')}",
+                level="warn",
+            )
+
     def run_pipeline_browser(
         self,
         fn,
@@ -393,6 +414,7 @@ class PlatformBrowser:
                         result = {"ok": False, "error": bootstrap_err}
                     else:
                         fn_result = fn(page, ctx)
+                        self._persist_pipeline_session(ctx, target_id, batch_id, category)
                         result = {"ok": True, "result": fn_result}
                 except Exception as e:
                     from services.publish_error_dump import save_publish_error_dump

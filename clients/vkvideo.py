@@ -244,9 +244,10 @@ def _vkvideo_dismiss_unknown(
         label=label or "VK Видео", phase=phase, force=force,
     )
 
-def _vkvideo_handle_popups(page, category, batch_id) -> None:
+def _vkvideo_handle_popups(page, category, batch_id, *, allow_dismiss: bool = True) -> None:
     handle_popups(
-        page, VKVIDEO_PUBLISH_WHITELIST, _vkvideo_dismiss_unknown, batch_id, category,
+        page, VKVIDEO_PUBLISH_WHITELIST, _vkvideo_dismiss_unknown,
+        batch_id, category, allow_dismiss=allow_dismiss,
     )
 
 def _vk_publish_button_visible(page) -> bool:
@@ -416,7 +417,7 @@ def _wait_visible(
     deadline = _time.monotonic() + timeout_ms / 1000
     while True:
         raise_if_login_required(page, "vkvideo", club_id=club_id)
-        _vkvideo_handle_popups(page, category, batch_id)
+        _vkvideo_handle_popups(page, category, batch_id, allow_dismiss=False)
         remaining = deadline - _time.monotonic()
         if remaining <= 0:
             raise_if_login_required(page, "vkvideo", club_id=club_id)
@@ -478,7 +479,7 @@ def _publish_ui(
                 break
         except Exception:
             pass
-        _vkvideo_handle_popups(page, category, batch_id)
+        _vkvideo_handle_popups(page, category, batch_id, allow_dismiss=False)
         page.wait_for_timeout(300)
 
     # ── Шаг 2: Ждём появления кнопки «Выбрать файл» ──────────────────────
