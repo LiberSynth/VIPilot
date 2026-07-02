@@ -65,7 +65,7 @@ def publish(
     from db import db_get_target_session_context
 
     cfg = target_config or {}
-    club_id = cfg.get("club_id", "")
+    club_id = str(cfg.get("club_id", "") or "").strip()
 
     if not club_id:
         raise VkVideoApiError("club_id не задан в настройках VK Видео")
@@ -201,6 +201,16 @@ def _vk_publish_modal_visible(page) -> bool:
             continue
     return False
 
+def _detect_vk_upload_modal(page) -> bool:
+    """Модал выбора файла до загрузки — не закрывать."""
+    for text in ("Выбрать файл", "Выберите файл", "Загрузите клип"):
+        try:
+            if page.get_by_text(text, exact=False).first.is_visible(timeout=200):
+                return True
+        except Exception:
+            pass
+    return False
+
 def _detect_vk_captcha(page) -> bool:
     try:
         return page.get_by_text("Продолжить", exact=False).first.is_visible(timeout=200)
@@ -222,11 +232,17 @@ def _handle_vk_captcha(page, category, batch_id) -> None:
 
 VKVIDEO_PUBLISH_WHITELIST = [
     ("captcha", _detect_vk_captcha, _handle_vk_captcha),
+    ("upload_modal", _detect_vk_upload_modal, None),
     ("publish_modal", _vk_publish_modal_visible, None),
 ]
 
-def _vkvideo_dismiss_unknown(page, category, batch_id) -> None:
-    dismiss_click_outside(page, category, batch_id, label="VK Видео")
+def _vkvideo_dismiss_unknown(
+    page, category, batch_id, *, label: str = "", phase: int = 0, force: bool = False,
+) -> None:
+    dismiss_click_outside(
+        page, category, batch_id,
+        label=label or "VK Видео", phase=phase, force=force,
+    )
 
 def _vkvideo_handle_popups(page, category, batch_id) -> None:
     handle_popups(
@@ -385,17 +401,25 @@ def _submit_vk_clip_publish(page, category, batch_id, pub_btn=None) -> None:
         )
     _click_vk_publish_button(pub_btn, page, category, batch_id)
 
-def _wait_visible(locator, timeout_ms: int, page, batch_id, interval_ms: int = 2_000):
+def _wait_visible(
+    locator,
+    timeout_ms: int,
+    page,
+    batch_id,
+    category,
+    club_id=None,
+    interval_ms: int = 2_000,
+):
     """Ждёт видимости локатора, снимая скриншот каждые interval_ms мс.
     Playwright sync API нельзя вызывать из других потоков — поэтому
     скриншоты делаем прямо здесь, в главном потоке Playwright."""
     deadline = _time.monotonic() + timeout_ms / 1000
     while True:
-        raise_if_login_required(page, "vkvideo")
-        _vkvideo_handle_popups(page, None, batch_id)
+        raise_if_login_required(page, "vkvideo", club_id=club_id)
+        _vkvideo_handle_popups(page, category, batch_id)
         remaining = deadline - _time.monotonic()
         if remaining <= 0:
-            raise_if_login_required(page, "vkvideo")
+            raise_if_login_required(page, "vkvideo", club_id=club_id)
             locator.wait_for(state="visible", timeout=1_000)  # бросит TimeoutError
             return
         poll = min(interval_ms, max(500, int(remaining * 1000)))
@@ -460,7 +484,7 @@ def _publish_ui(
     # ── Шаг 2: Ждём появления кнопки «Выбрать файл» ──────────────────────
     write_log_entry(batch_id, category, "VK Видео: Жду модал загрузки клипа.")
     _snap(page, batch_id)
-    _wait_visible(choose_btn, 180_000, page, batch_id)
+    _wait_visible(choose_btn, 180_000, page, batch_id, category, club_id=club_id)
     _snap(page, batch_id)
 
     write_log_entry(batch_id, category, "VK Видео: Кнопка «Выбрать файл» найдена, загружаю файл.")

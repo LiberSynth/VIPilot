@@ -208,6 +208,7 @@ def _wait_rutube_upload(page, category, batch_id=None) -> bool:
     last_log_at = 0.0
     last_snap_at = 0.0
     while _time.monotonic() < deadline:
+        _rutube_handle_popups(page, category, batch_id)
         state = _rutube_upload_state(page)
         if _rutube_upload_ready(state):
             parts = []
@@ -281,8 +282,13 @@ RUTUBE_PUBLISH_WHITELIST = [
     ("upload_menu", _detect_rutube_upload_menu, None),
 ]
 
-def _rutube_dismiss_unknown(page, category, batch_id) -> None:
-    dismiss_click_outside(page, category, batch_id, label="Рутьюб")
+def _rutube_dismiss_unknown(
+    page, category, batch_id, *, label: str = "", phase: int = 0, force: bool = False,
+) -> None:
+    dismiss_click_outside(
+        page, category, batch_id,
+        label=label or "Рутьюб", phase=phase, force=force,
+    )
 
 def _rutube_handle_popups(page, category, batch_id) -> None:
     handle_popups(
@@ -367,17 +373,25 @@ def _click_rutube_add_button(add_btn, page, category, batch_id) -> None:
         safe_click(
             add_btn, page, RUTUBE_PUBLISH_WHITELIST, _rutube_dismiss_unknown,
             batch_id=batch_id, category=category, label="Рутьюб",
-            timeout_ms=5_000, max_attempts=5, js_fallback=True,
+            timeout_ms=5_000, max_attempts=3, js_fallback=True,
         )
     except Exception as _e:
         raise RutubeApiError(
             f"Не удалось нажать «+ Добавить» в студии Рутьюба: {_e}"
         ) from _e
 
-def _publish_ui(page, video_path: str, category, batch_id=None):
-    """Управляет браузером для публикации видео через UI Рутьюба."""
+def _ensure_rutube_studio(page, category, batch_id=None) -> None:
+    """Студия уже открыта bootstrap; повторный goto только если URL не studio."""
+    cur = page.url.lower()
+    if "studio.rutube.ru" in cur:
+        write_log_entry(
+            batch_id, category,
+            f"Рутьюб: Студия уже открыта (bootstrap), URL: {page.url}",
+            level="silent",
+        )
+        _snap(page, batch_id)
+        return
 
-    # ── Шаг 1: Переходим в студию ────────────────────────────────────────
     write_log_entry(batch_id, category, "Рутьюб: Переход в студию Рутьюба.")
     _nav_started = _time.monotonic()
     _last_err = None
@@ -404,6 +418,11 @@ def _publish_ui(page, video_path: str, category, batch_id=None):
         f"Рутьюб: domcontentloaded за {_time.monotonic() - _nav_started:.1f} с.",
     )
     _snap(page, batch_id)
+
+def _publish_ui(page, video_path: str, category, batch_id=None):
+    """Управляет браузером для публикации видео через UI Рутьюба."""
+
+    _ensure_rutube_studio(page, category, batch_id=batch_id)
 
     cur = page.url
     write_log_entry(batch_id, category, f"URL после перехода: {cur}", level='silent')

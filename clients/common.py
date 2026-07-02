@@ -72,6 +72,13 @@ def _page_url(page) -> str:
         return ""
 
 
+def _config_id_str(value) -> str:
+    """Нормализует id из JSON-конфига таргета (str или int)."""
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
 def _visible(page, locator, timeout_ms: int = 400) -> bool:
     try:
         return locator.first.is_visible(timeout=timeout_ms)
@@ -166,7 +173,7 @@ def _dzen_publish_access_denied(page, publisher_id: str | None = None) -> bool:
 
     url = _page_url(page)
     if publisher_id:
-        pid = publisher_id.strip().lower()
+        pid = _config_id_str(publisher_id).lower()
         if f"/profile/editor/id/{pid}" not in url:
             return True
         return False
@@ -191,7 +198,7 @@ def _vkvideo_publish_access_denied(page, club_id: str | None = None) -> bool:
     url = _page_url(page)
     if "cabinet.vkvideo.ru" in url:
         if club_id:
-            normalized = club_id.strip().lstrip("@")
+            normalized = _config_id_str(club_id).lstrip("@")
             if normalized and f"club{normalized}" not in url.replace("@", ""):
                 return True
         return False
@@ -300,33 +307,103 @@ def _try_generic_close(page) -> bool:
     return False
 
 
+def _likely_overlay_present(page) -> bool:
+    """True если на странице похоже на модал/оверлей (не чистый дашборд)."""
+    for sel in (
+        "[role='dialog']",
+        "[role='alertdialog']",
+        "[aria-modal='true']",
+        "[class*='modal']",
+        "[class*='Modal']",
+        "[class*='overlay']",
+        "[class*='Overlay']",
+        "[class*='popup']",
+        "[class*='Popup']",
+        "[class*='drawer']",
+        "[class*='Drawer']",
+    ):
+        try:
+            if page.locator(sel).first.is_visible(timeout=150):
+                return True
+        except Exception:
+            pass
+    return False
+
+
 def dismiss_click_outside(
     page,
     category=None,
     batch_id=None,
     *,
     label: str = "",
+    phase: int = 0,
+    force: bool = False,
 ) -> None:
-    """Закрытие неизвестного оверлея для Rutube/VK: клик снаружи → Escape → ×."""
+    """Закрытие неизвестного оверлея для Rutube/VK.
+
+    phase 0: клик снаружи → Escape → × (вся цепочка за один вызов)
+    phase 1: Escape → ×
+    phase 2+: × → Escape
+
+    force=True после заблокированного клика — пропускает проверку overlay.
+    """
+    if not force and not _likely_overlay_present(page):
+        return
+
     _user_lvl = "info" if batch_id else "silent"
     prefix = f"{label}: " if label else ""
-    if _click_safe_free_field(page):
+
+    if phase <= 0:
+        if _click_safe_free_field(page):
+            write_log_entry(
+                batch_id, category,
+                f"{prefix}Закрываю оверлей — клик в свободную область.",
+                level=_user_lvl,
+            )
+            page.wait_for_timeout(200)
+        _try_escape(page)
+        page.wait_for_timeout(200)
+        if _try_generic_close(page):
+            write_log_entry(
+                batch_id, category,
+                f"{prefix}Закрываю оверлей — кнопка закрытия.",
+                level=_user_lvl,
+            )
+            page.wait_for_timeout(200)
+        return
+
+    if phase == 1:
         write_log_entry(
             batch_id, category,
-            f"{prefix}Закрываю оверлей — клик в свободную область.",
+            f"{prefix}Закрываю оверлей — Escape.",
             level=_user_lvl,
         )
-        page.wait_for_timeout(300)
+        _try_escape(page)
+        page.wait_for_timeout(200)
+        if _try_generic_close(page):
+            write_log_entry(
+                batch_id, category,
+                f"{prefix}Закрываю оверлей — кнопка закрытия.",
+                level=_user_lvl,
+            )
+            page.wait_for_timeout(200)
         return
-    _try_escape(page)
-    page.wait_for_timeout(300)
+
     if _try_generic_close(page):
         write_log_entry(
             batch_id, category,
             f"{prefix}Закрываю оверлей — кнопка закрытия.",
             level=_user_lvl,
         )
-        page.wait_for_timeout(300)
+        page.wait_for_timeout(200)
+    else:
+        write_log_entry(
+            batch_id, category,
+            f"{prefix}Закрываю оверлей — Escape.",
+            level=_user_lvl,
+        )
+        _try_escape(page)
+        page.wait_for_timeout(200)
 
 
 def safe_click(
@@ -343,17 +420,26 @@ def safe_click(
     click_kwargs: dict[str, Any] | None = None,
     js_fallback: bool = False,
 ) -> None:
-    """handle_popups → click; при блокировке повторяет до max_attempts."""
+    """handle_popups → click; при блокировке эскалирует dismiss, не повторяет одно действие."""
     opts = dict(click_kwargs or {})
-
-    def _dismiss(page, category, batch_id):
-        dismiss_unknown(page, category, batch_id, label=label)
+    _blocked_timeout_ms = min(timeout_ms, 2_000)
 
     last_err: Exception | None = None
     for attempt in range(1, max_attempts + 1):
+        _phase = min(attempt - 1, 2)
+        _force = attempt > 1
+
+        def _dismiss(page, category, batch_id, *, p=_phase, f=_force):
+            dismiss_unknown(
+                page, category, batch_id, label=label, phase=p, force=f,
+            )
+
         handle_popups(page, whitelist, _dismiss, batch_id, category)
+        _click_timeout = (
+            timeout_ms if attempt == max_attempts else _blocked_timeout_ms
+        )
         try:
-            locator.click(timeout=timeout_ms, **opts)
+            locator.click(timeout=_click_timeout, **opts)
             return
         except Exception as exc:
             last_err = exc
@@ -368,6 +454,6 @@ def safe_click(
                     return
                 except Exception as js_exc:
                     last_err = js_exc
-            page.wait_for_timeout(500)
+            page.wait_for_timeout(300)
     if last_err is not None:
         raise last_err
