@@ -336,6 +336,44 @@ def _submit_rutube_publish(page, category, batch_id, pub_btn=None) -> None:
         page.wait_for_timeout(400)
     _click_rutube_publish_button(pub_btn, page, category, batch_id)
 
+def _click_rutube_add_button(add_btn, page, category, batch_id) -> None:
+    """Клик «+ Добавить» с обходом перекрывающих оверлеев."""
+    _last_err = None
+    for _attempt in range(1, 6):
+        try:
+            page.keyboard.press("Escape")
+            page.wait_for_timeout(300)
+        except Exception:
+            pass
+        try:
+            add_btn.scroll_into_view_if_needed(timeout=3_000)
+        except Exception:
+            pass
+        try:
+            add_btn.click(timeout=5_000)
+            return
+        except Exception as _e:
+            _last_err = _e
+            try:
+                add_btn.click(force=True, timeout=3_000)
+                return
+            except Exception as _force_e:
+                _last_err = _force_e
+            try:
+                add_btn.evaluate("el => el.click()")
+                return
+            except Exception as _js_e:
+                _last_err = _js_e
+            write_log_entry(
+                batch_id, category,
+                f"Рутьюб: Клик «+ Добавить» заблокирован (попытка {_attempt}/5).",
+                level="warn",
+            )
+            page.wait_for_timeout(500)
+    raise RutubeApiError(
+        f"Не удалось нажать «+ Добавить» в студии Рутьюба: {_last_err}"
+    ) from _last_err
+
 def _publish_ui(page, video_path: str, category, batch_id=None):
     """Управляет браузером для публикации видео через UI Рутьюба."""
 
@@ -376,7 +414,7 @@ def _publish_ui(page, video_path: str, category, batch_id=None):
     # ── Шаг 2: Кнопка «+ Добавить» ───────────────────────────────────────
     write_log_entry(batch_id, category, "Рутьюб: Ищу кнопку «+ Добавить».")
     add_btn = _wait_rutube_add_button(page, category, batch_id=batch_id)
-    add_btn.click()
+    _click_rutube_add_button(add_btn, page, category, batch_id)
     write_log_entry(batch_id, category, "Рутьюб: Кнопка «+ Добавить» нажата, жду меню.")
     _snap(page, batch_id)
 

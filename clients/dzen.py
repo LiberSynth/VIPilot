@@ -120,83 +120,114 @@ def _snap(page, batch_id=None) -> None:
     except Exception as _e:
         write_log_entry(None, 'dzen', f'_snap: {_e}', level='silent')
 
-_CAPTCHA_URL_KEYWORDS = (
-    "not_robot_captcha", "smartcaptcha", "yandexcloud",
-    "captcha.yandex", "recaptcha", "id.vk.com",
+_CAPTCHA_IFRAME_SELECTOR = (
+    "iframe[src*='smartcaptcha'], "
+    "iframe[src*='captcha.yandex'], "
+    "iframe[src*='not_robot_captcha'], "
+    "iframe[src*='yandexcloud'], "
+    "iframe[src*='recaptcha'], "
+    "iframe[title*='SmartCaptcha'], "
+    "iframe[title*='не робот'], "
+    "iframe[title*='robot']"
 )
 
-def _has_captcha_frame(page) -> bool:
-    """Возвращает True если в page есть активный iframe капчи (по URL)."""
+_CAPTCHA_FRAME_URL_KEYWORDS = (
+    "not_robot_captcha", "smartcaptcha", "yandexcloud",
+    "captcha.yandex", "recaptcha",
+)
+
+_CAPTCHA_CHECKBOX_SELECTORS = (
+    "input[type='checkbox']",
+    "[role='checkbox']",
+    "[class*='CheckboxCaptcha']",
+    "[class*='checkbox-captcha']",
+    "[class*='captcha-checkbox']",
+    "[class*='Checkbox__box']",
+    "div[class*='Checkbox']",
+    "span[class*='Checkbox']",
+    "label:has-text('не робот')",
+)
+
+_CAPTCHA_INLINE_SELECTOR = (
+    "[class*='captcha'] input[type='checkbox'], "
+    "[class*='captcha'] [role='checkbox'], "
+    "[class*='CheckboxCaptcha'], "
+    "[class*='captcha-checkbox'], "
+    "[id*='captcha'] input[type='checkbox'], "
+    "label:has-text('не робот')"
+)
+
+def _detect_captcha(page) -> bool:
+    """True только если на странице виден виджет капчи (не скрытый iframe в DOM)."""
     try:
-        for frame in page.frames:
-            furl = frame.url.lower()
-            if any(kw in furl for kw in _CAPTCHA_URL_KEYWORDS):
-                return True
+        if page.locator(_CAPTCHA_IFRAME_SELECTOR).first.is_visible(timeout=300):
+            return True
+    except Exception:
+        pass
+    try:
+        if page.locator(_CAPTCHA_INLINE_SELECTOR).first.is_visible(timeout=300):
+            return True
     except Exception:
         pass
     return False
 
+def _click_captcha_target(el, batch_id, category, where: str) -> bool:
+    try:
+        el.click(force=True, timeout=2_000)
+        write_log_entry(batch_id, category, f"Капча: Playwright-клик в {where}", level='silent')
+        return True
+    except Exception:
+        pass
+    try:
+        el.evaluate("el => el.click()")
+        write_log_entry(batch_id, category, f"Капча: JS-клик в {where}", level='silent')
+        return True
+    except Exception:
+        return False
+
 def _try_click_captcha_checkbox(page, category, batch_id=None) -> bool:
     """
-    Пытается кликнуть чекбокс капчи «Я не робот» во фреймах капчи,
-    затем в основном фрейме страницы (fallback для SmartCaptcha).
-    Возвращает True если клик выполнен хотя бы в одном месте.
+    Пытается кликнуть чекбокс капчи «Я не робот»:
+    frame_locator → все captcha-iframe → inline на странице.
     """
-    checkbox_selectors = [
-        'input[type="checkbox"]',
-        '[class*="Checkbox"] input',
-        '[class*="checkbox"] input',
-        'label',
-        "[role='checkbox']",
-    ]
-    clicked = False
+    checkbox_css = ", ".join(_CAPTCHA_CHECKBOX_SELECTORS)
+
+    try:
+        captcha_frame = page.frame_locator(_CAPTCHA_IFRAME_SELECTOR).first
+        captcha_checkbox = captcha_frame.locator(checkbox_css).first
+        captcha_checkbox.wait_for(state="visible", timeout=2_000)
+        if _click_captcha_target(captcha_checkbox, batch_id, category, "frame_locator"):
+            return True
+    except Exception:
+        pass
 
     try:
         for frame in page.frames:
             furl = frame.url.lower()
-            if not any(kw in furl for kw in _CAPTCHA_URL_KEYWORDS):
+            is_captcha = any(kw in furl for kw in _CAPTCHA_FRAME_URL_KEYWORDS)
+            is_main = furl in ("", "about:blank")
+            if not is_captcha and not is_main:
                 continue
-            for js_sel in checkbox_selectors[:3]:
+            for sel in _CAPTCHA_CHECKBOX_SELECTORS:
                 try:
-                    done = frame.evaluate(
-                        f'() => {{ const el = document.querySelector({repr(js_sel)}); '
-                        f'if (el) {{ el.click(); return true; }} return false; }}'
-                    )
-                    if done:
-                        write_log_entry(batch_id, category, f"Капча: JS-клик {js_sel!r} в фрейме {furl or 'main'}", level='silent')
-                        clicked = True
-                        break
+                    el = frame.locator(sel).first
+                    if el.is_visible(timeout=300):
+                        if _click_captcha_target(el, batch_id, category, f"фрейме {furl or 'main'}"):
+                            return True
                 except Exception:
                     pass
-            if not clicked:
-                for sel in checkbox_selectors:
-                    try:
-                        el = frame.locator(sel).first
-                        if el.is_visible(timeout=300):
-                            el.click(force=True, timeout=2000)
-                            write_log_entry(batch_id, category, f"Капча: Playwright-клик {sel!r} в фрейме {furl}", level='silent')
-                            clicked = True
-                            break
-                    except Exception:
-                        pass
-            if clicked:
-                break
     except Exception:
         pass
 
-    if not clicked:
-        for sel in checkbox_selectors:
-            try:
-                el = page.locator(sel).first
-                if el.is_visible(timeout=300):
-                    el.click(force=True, timeout=2000)
-                    write_log_entry(batch_id, category, f"Капча: Playwright-клик {sel!r} в основном фрейме", level='silent')
-                    clicked = True
-                    break
-            except Exception:
-                pass
+    try:
+        inline = page.locator(_CAPTCHA_INLINE_SELECTOR).first
+        if inline.is_visible(timeout=300):
+            if _click_captcha_target(inline, batch_id, category, "inline"):
+                return True
+    except Exception:
+        pass
 
-    return clicked
+    return False
 
 def _has_publish_confirm_dialog(page) -> bool:
     """
@@ -286,9 +317,6 @@ def _handle_modal_overlay_element(page, category, batch_id) -> None:
 # Всё, что не попало в этот список — закрывается без разбора (_dismiss_unknown).
 # ---------------------------------------------------------------------------
 
-def _detect_captcha(page) -> bool:
-    return _has_captcha_frame(page)
-
 def _detect_confirm_dialog(page) -> bool:
     return _has_publish_confirm_dialog(page)
 
@@ -302,24 +330,36 @@ def _detect_file_input(page) -> bool:
 def _handle_captcha_element(page, category, batch_id) -> None:
     """
     Обрабатывает капчу «Я не робот»: кликает чекбокс, ждёт исчезновения.
-    Бросает DzenApiError если капча не прошла за 30 сек.
+    Бросает DzenApiError если капча не прошла за 60 сек.
     """
-    write_log_entry(batch_id, category, "Дзен: Обнаружена капча, пытаюсь нажать «Я не робот».")
-    _clicked = _try_click_captcha_checkbox(page, category, batch_id)
-    if not _clicked:
-        write_log_entry(batch_id, category, "Дзен: Капча обнаружена, но кликнуть чекбокс не удалось.")
+    if not _detect_captcha(page):
         return
-    write_log_entry(batch_id, category, "Дзен: Капча — чекбокс нажат, жду исчезновения.")
-    _snap(page, batch_id)
-    _deadline = _time.monotonic() + 30
+
+    write_log_entry(batch_id, category, "Дзен: Обнаружена капча, пытаюсь нажать «Я не робот».")
+    _deadline = _time.monotonic() + 60
+    _last_fail_log = 0.0
     while _time.monotonic() < _deadline:
-        page.wait_for_timeout(1_000)
-        if not _detect_captcha(page):
-            write_log_entry(batch_id, category, "Дзен: Капча пройдена.")
+        if _try_click_captcha_checkbox(page, category, batch_id):
+            write_log_entry(batch_id, category, "Дзен: Капча — чекбокс нажат, жду исчезновения.")
             _snap(page, batch_id)
-            return
+            _clear_deadline = _time.monotonic() + 30
+            while _time.monotonic() < _clear_deadline:
+                page.wait_for_timeout(1_000)
+                if not _detect_captcha(page):
+                    write_log_entry(batch_id, category, "Дзен: Капча пройдена.")
+                    _snap(page, batch_id)
+                    return
+            _snap(page, batch_id)
+            raise DzenApiError("Капча не прошла за 30 сек — публикация невозможна.")
+
+        _now = _time.monotonic()
+        if _now - _last_fail_log >= 3:
+            write_log_entry(batch_id, category, "Дзен: Капча обнаружена, но кликнуть чекбокс не удалось.")
+            _last_fail_log = _now
+        page.wait_for_timeout(2_000)
+
     _snap(page, batch_id)
-    raise DzenApiError("Капча не прошла за 30 сек — публикация невозможна.")
+    raise DzenApiError("Капча не прошла за 60 сек — публикация невозможна.")
 
 def _handle_confirm_element(page, category, batch_id) -> None:
     """Обрабатывает вторичный диалог подтверждения (не основную CTA модалки)."""
