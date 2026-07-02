@@ -19,19 +19,16 @@ _CONFIGS = {
     "dzen": dict(
         platform_name="dzen",
         start_url="https://dzen.ru",
-        cookie_domains=["https://dzen.ru", "https://yandex.ru"],
         thread_name="dzen-browser",
     ),
     "rutube": dict(
         platform_name="rutube",
         start_url="https://studio.rutube.ru/",
-        cookie_domains=["https://rutube.ru"],
         thread_name="rutube-browser",
     ),
     "vkvideo": dict(
         platform_name="vkvideo",
         start_url="https://vkvideo.ru/",
-        cookie_domains=["https://vkvideo.ru", "https://vk.com", "https://cabinet.vkvideo.ru"],
         thread_name="vkvideo-browser",
     ),
 }

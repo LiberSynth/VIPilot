@@ -129,6 +129,16 @@ def save_from_context(
                 ),
                 level="silent",
             )
+            domains = sorted(
+                {str(c.get("domain", "")).strip() for c in cookies if c.get("domain")}
+            )
+            if domains:
+                write_log_entry(
+                    batch_id,
+                    category,
+                    prefix + f"Домены куков: {', '.join(domains)}",
+                    level="silent",
+                )
             return {"ok": True, "error": None}
         write_log_entry(
             batch_id,

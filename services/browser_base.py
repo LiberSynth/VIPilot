@@ -30,12 +30,10 @@ class PlatformBrowser:
         self,
         platform_name: str,
         start_url: str,
-        cookie_domains: list,
         thread_name: str,
     ):
         self._platform      = platform_name
         self._start_url     = start_url
-        self._cookie_domains = cookie_domains
         self._thread_name   = thread_name
 
         self._lock    = threading.Lock()
