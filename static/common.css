@@ -664,6 +664,10 @@
   }
   .monitor-batch.open .monitor-entries,
   .monitor-sysgroup.open .monitor-entries { display: block; }
+  .monitor-entry-row.monitor-entry-loading .monitor-entry-msg {
+    color: #555;
+    font-style: italic;
+  }
   .monitor-entry-row {
     display: flex; gap: 8px; padding: 2px 0;
     border-bottom: 1px solid #0e0e18; font-size: 11px;

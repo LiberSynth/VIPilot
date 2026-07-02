@@ -87,6 +87,30 @@
     });
   }
 
+  var MON_ENTRIES_LOADING = 'Загрузка...';
+
+  function _renderLoadingEntries() {
+    return '<div class="monitor-entries monitor-entries-loading">' +
+      '<div class="monitor-entry-row monitor-entry-loading">' +
+        '<span class="monitor-entry-msg">' + esc(MON_ENTRIES_LOADING) + '</span>' +
+      '</div></div>';
+  }
+
+  function _showBatchLoading(batchEl) {
+    var body = batchEl && batchEl.querySelector('.monitor-batch-body');
+    if (!body) return;
+    var existing = body.querySelector('.monitor-entries');
+    if (existing && !existing.classList.contains('monitor-entries-loading')) return;
+    if (existing) existing.remove();
+    body.insertAdjacentHTML('beforeend', _renderLoadingEntries());
+  }
+
+  function _showSystemLoading(sysEl) {
+    var body = sysEl && sysEl.querySelector('.monitor-sysgroup-body');
+    if (!body) return;
+    body.innerHTML = _renderLoadingEntries();
+  }
+
   function renderEntries(entries) {
     if (!entries || entries.length === 0) return '';
     return '<div class="monitor-entries">' +
@@ -443,6 +467,8 @@
         batchEl.classList.add('open');
         if (_batchEntriesCache[_openBid]) {
           _applyBatchEntries(batchEl, _batchEntriesCache[_openBid]);
+        } else if (_batchEntriesFetching[_openBid]) {
+          _showBatchLoading(batchEl);
         }
       }
     } else if (state && state.openBids) {
@@ -455,7 +481,11 @@
       var sysEl = document.querySelector('.monitor-system-block[data-lid="' + _openSysLid + '"]');
       if (sysEl) {
         sysEl.classList.add('open');
-        if (_sysLogEntriesCache[_openSysLid]) _applySystemEntries(sysEl, _sysLogEntriesCache[_openSysLid]);
+        if (_sysLogEntriesCache[_openSysLid]) {
+          _applySystemEntries(sysEl, _sysLogEntriesCache[_openSysLid]);
+        } else if (_sysLogFetching[_openSysLid]) {
+          _showSystemLoading(sysEl);
+        }
       }
     } else if (state && state.openSys) {
       document.querySelectorAll('.monitor-system-block').forEach(function(el) {
@@ -496,7 +526,9 @@
     var body = batchEl.querySelector('.monitor-batch-body');
     if (!body) return;
     var existingDiv = body.querySelector('.monitor-entries');
-    if (!existingDiv) {
+    if (!existingDiv || existingDiv.classList.contains('monitor-entries-loading')) {
+      if (existingDiv) existingDiv.remove();
+      if (!entries || !entries.length) return;
       body.insertAdjacentHTML('beforeend', renderEntries(entries));
       return;
     }
@@ -808,6 +840,7 @@
             _fetchAndInjectEntries(_openBid);
           }
         } else {
+          if (openEl) _showBatchLoading(openEl);
           _fetchAndInjectEntries(_openBid);
         }
       }
@@ -838,6 +871,8 @@
         sysEl.classList.add('open');
         if (_sysLogEntriesCache[_openSysLid]) {
           _applySystemEntries(sysEl, _sysLogEntriesCache[_openSysLid]);
+        } else {
+          _showSystemLoading(sysEl);
         }
         _fetchSystemEntries(_openSysLid);
       }
@@ -918,6 +953,7 @@
     if (_batchEntriesCache[_openBid]) {
       _applyBatchEntries(targetEl, _batchEntriesCache[_openBid]);
     } else {
+      _showBatchLoading(targetEl);
       _fetchAndInjectEntries(_openBid);
     }
     _refreshMonitorView();
