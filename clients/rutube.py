@@ -305,9 +305,10 @@ def _rutube_dismiss_unknown(
         label=label or "Рутьюб", phase=phase, force=force,
     )
 
-def _rutube_handle_popups(page, category, batch_id) -> None:
+def _rutube_handle_popups(page, category, batch_id, *, allow_dismiss: bool = True) -> None:
     handle_popups(
-        page, RUTUBE_PUBLISH_WHITELIST, _rutube_dismiss_unknown, batch_id, category,
+        page, RUTUBE_PUBLISH_WHITELIST, _rutube_dismiss_unknown,
+        batch_id, category, allow_dismiss=allow_dismiss,
     )
 
 def _rutube_publish_confirmed_after_submit(page) -> bool:

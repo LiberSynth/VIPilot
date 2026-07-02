@@ -11,6 +11,7 @@ import shutil
 import tempfile
 import time as _time
 
+from clients.common import dismiss_dzen_hint, handle_popups
 from log import write_log_entry
 from utils.utils import fmt_id_msg
 from routes.api import publication_file_name, tags
@@ -255,7 +256,7 @@ def _dismiss_modal_overlay(page, category=None, batch_id=None) -> bool:
     if not _modal_overlay_visible(page):
         return True
 
-    write_log_entry(batch_id, category, "Дзен: Закрываю модальное окно.")
+    write_log_entry(batch_id, category, "Дзен: Закрываю оверлей — modal-overlay (студия).")
     overlay = page.locator("[data-testid='modal-overlay']").first
     close_selectors = (
         "[class*='modal__rootElement'] button[class*='close']",
@@ -312,7 +313,7 @@ def _handle_modal_overlay_element(page, category, batch_id) -> None:
 #
 # Каждая запись: (имя, detect(page)->bool, handle(page, category, batch_id)->None)
 # handle=None означает «обнаружен, действий не требует — просто не закрывать».
-# Всё, что не попало в этот список — закрывается без разбора (_dismiss_unknown).
+# Всё, что не попало в whitelist — dismiss через _dzen_dismiss_unknown (hint).
 # ---------------------------------------------------------------------------
 
 def _detect_confirm_dialog(page) -> bool:
@@ -452,8 +453,7 @@ def _click_primary_publish_control(page, category, batch_id=None, url_step7_star
             level='silent',
         )
         return False
-    _dismiss_unknown(page, category, batch_id)
-    _handle_popups(page, category, batch_id)
+    _dzen_handle_popups(page, category, batch_id)
     pub_btn = _find_primary_publish_control(page)
     if pub_btn is None:
         return False
@@ -494,105 +494,29 @@ def _retry_publish_if_button_visible(page, category, batch_id, url_step7_start, 
     write_log_entry(batch_id, category, f"Дзен: {reason}")
     return _click_primary_publish_control(page, category, batch_id, url_step7_start)
 
-_EXPECTED_ELEMENTS = [
+DZEN_PUBLISH_WHITELIST = [
     ("modal",   _modal_overlay_visible,   _handle_modal_overlay_element),
     ("captcha", _detect_captcha,        _handle_captcha_element),
     ("confirm", _detect_confirm_dialog, _handle_confirm_element),
     # file_input НЕ ДОБАВЛЯТЬ сюда — после set_files() input[type=file] остаётся в DOM
-    # на всё время публикации и блокирует вызов _dismiss_unknown для любых других попапов.
+    # на всё время публикации и блокирует dismiss для любых других попапов.
 ]
 
-_HINT_CLOSE_SELECTOR = "[class*='helper-tooltip__closeButton']"
+def _dzen_dismiss_unknown(
+    page, category, batch_id, *, label: str = "", phase: int = 0, force: bool = False,
+) -> None:
+    dismiss_dzen_hint(
+        page, category, batch_id,
+        label=label or "Дзен", phase=phase, force=force,
+    )
 
-def _dismiss_unknown(page, category=None, batch_id=None) -> None:
-    """Закрывает хинт-попап Дзена — только если он реально есть.
-
-    Единственный путь: клик по `[class*='helper-tooltip__closeButton']` через
-    Playwright Locator (настоящий мышиный клик, который React гарантированно
-    ловит). После клика — реальная верификация `is_visible()`. Если хинта нет
-    — выходит молча.
-
-    Структурный fallback `_POPUP_FIND_JS` отключён: на практике он цеплялся
-    за постоянные мелкие кнопки редактора (не попапы), генерил ложные
-    'clicked' и спамил warn. В бандле video-editor класс закрытия хинта
-    ровно один — `helper-tooltip__closeButton`. Если Дзен введёт новый тип
-    хинта — добавим его конкретный селектор сюда же.
-    """
-    # При log_id=None все info/warn должны идти как silent (правило 4 конвенций).
-    _user_lvl = 'info' if batch_id else 'silent'
-    _warn_lvl = 'warn' if batch_id else 'silent'
-
-    hint_was_seen = False
-    for _attempt in range(3):
-        try:
-            btn = page.locator(_HINT_CLOSE_SELECTOR).first
-            if not btn.is_visible(timeout=300):
-                break
-        except Exception:
-            break
-
-        hint_was_seen = True
-
-        # Снимок для верификации (короткий таймаут, чтобы не висеть)
-        try:
-            cls_before = btn.get_attribute("class", timeout=300) or ""
-        except Exception:
-            cls_before = ""
-
-        write_log_entry(batch_id, category, f"Дзен: Закрываю хинт (попытка {_attempt + 1}).", level=_user_lvl)
-        write_log_entry(batch_id, category, f"hint close target class={cls_before!r}", level='silent')
-
-        try:
-            url_before_click = page.url
-        except Exception:
-            url_before_click = ""
-
-        try:
-            btn.click(timeout=2_000)
-        except Exception as _e:
-            write_log_entry(batch_id, category, f"hint click failed: {_e}", level='silent')
-            # Во время публикации страница может мгновенно перейти в список материалов.
-            # В этом случае close-кнопка хинта естественно detatch'ится, это не ошибка.
-            try:
-                url_now = page.url
-            except Exception:
-                url_now = ""
-            try:
-                still_visible = page.locator(_HINT_CLOSE_SELECTOR).first.is_visible(timeout=200)
-            except Exception:
-                still_visible = False
-
-            if not still_visible:
-                write_log_entry(batch_id, category, "Дзен: Хинт закрыт.", level=_user_lvl)
-                return
-
-            left_editor = (
-                ("videoEditorPublicationId" in (url_before_click or ""))
-                and ("videoEditorPublicationId" not in (url_now or ""))
-            ) or ("state=published" in (url_now or "")) or ("state=pending" in (url_now or ""))
-            if left_editor:
-                write_log_entry(batch_id, category, f"hint close interrupted by navigation: {url_now}", level='silent')
-                return
-
-            write_log_entry(batch_id, category, "[dzen] hint click failed, retrying.", level='silent')
-            continue
-
-        page.wait_for_timeout(300)
-
-        # Реальная верификация: элемент исчез?
-        try:
-            still_visible = page.locator(_HINT_CLOSE_SELECTOR).first.is_visible(timeout=200)
-        except Exception:
-            still_visible = False
-
-        if not still_visible:
-            write_log_entry(batch_id, category, "Дзен: Хинт закрыт.", level=_user_lvl)
-            return
-
-        write_log_entry(batch_id, category, "[dzen] хинт всё ещё виден после клика — повтор.", level='silent')
-
-    if hint_was_seen:
-        write_log_entry(batch_id, category, "Дзен: Хинт helper-tooltip не закрылся за 3 попытки.", level=_warn_lvl)
+def _dzen_handle_popups(
+    page, category=None, batch_id=None, *, allow_dismiss: bool = True,
+) -> None:
+    handle_popups(
+        page, DZEN_PUBLISH_WHITELIST, _dzen_dismiss_unknown,
+        batch_id, category, allow_dismiss=allow_dismiss,
+    )
 
 def _set_comments_all_users(page, category, batch_id=None) -> None:
     """
@@ -682,21 +606,6 @@ def _set_comments_all_users(page, category, batch_id=None) -> None:
         write_log_entry(batch_id, category, "Дзен: Ошибка при настройке комментариев — продолжаю.", level='warn')
         write_log_entry(batch_id, category, f"Ошибка _set_comments_all_users: {_e}", level='silent')
 
-def _handle_popups(page, category=None, batch_id=None) -> None:
-    """
-    Проверяет страницу на попапы, хинты, тултипы и диалоги.
-    Сначала сверяет со списком _EXPECTED_ELEMENTS — если совпадение найдено,
-    вызывает соответствующий обработчик и возвращает управление.
-    Если ни один известный элемент не обнаружен — закрывает неизвестный попап.
-    """
-    for name, detect, handle in _EXPECTED_ELEMENTS:
-        if detect(page):
-            write_log_entry(batch_id, category, f"Ожидаемый элемент: {name}", level='silent')
-            if handle is not None:
-                handle(page, category, batch_id)
-            return
-    _dismiss_unknown(page, category, batch_id)
-
 def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=None):
     """Управляет браузером для публикации видео через UI Дзена."""
 
@@ -748,8 +657,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
     _plus_ready = False
     while _time.monotonic() < _plus_deadline:
         raise_if_login_required(page, "dzen", publisher_id=publisher_id)
-        _dismiss_modal_overlay(page, category, batch_id)
-        _handle_popups(page, category, batch_id)
+        _dzen_handle_popups(page, category, batch_id)
         try:
             if plus_btn.is_visible(timeout=400):
                 _plus_ready = True
@@ -762,8 +670,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
         plus_btn.wait_for(state="visible", timeout=1_000)
     _last_plus_err = None
     for _plus_attempt in range(1, 6):
-        _handle_popups(page, category, batch_id)
-        _dismiss_modal_overlay(page, category, batch_id)
+        _dzen_handle_popups(page, category, batch_id)
         try:
             plus_btn.click(timeout=30_000)
             _last_plus_err = None
@@ -785,7 +692,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
     _snap(page, batch_id)
 
     # Перед шагом 3: закрываем любой неожиданный попап/хинт.
-    _dismiss_unknown(page, category, batch_id)
+    _dzen_handle_popups(page, category, batch_id)
 
     # ── Шаг 3: «Загрузить видео» из выпадающего меню ─────────────────────
     write_log_entry(batch_id, category, "Дзен: Выбираю «Загрузить видео».")
@@ -801,7 +708,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
     _snap(page, batch_id)
 
     # Перед шагом 4: закрываем любой неожиданный попап/хинт.
-    _dismiss_unknown(page, category, batch_id)
+    _dzen_handle_popups(page, category, batch_id)
 
     # ── Шаг 4: Загружаем файл ────────────────────────────────────────────
     write_log_entry(batch_id, category, "Дзен: Ищу поле загрузки файла.")
@@ -839,7 +746,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
             write_log_entry(batch_id, category, "Дзен: Редактор видео открылся.")
             write_log_entry(batch_id, category, f"URL редактора: {_cur}", level='silent')
             break
-        _handle_popups(page, category, batch_id)
+        _dzen_handle_popups(page, category, batch_id)
         page.wait_for_timeout(1_500)
 
     if _auto_published:
@@ -865,7 +772,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
 
     # Редактор открылся — закрываем все неожиданные попапы (любые подсказки,
     # хинты, уведомления Дзена), которые могут мешать заполнению формы.
-    _handle_popups(page, category, batch_id)
+    _dzen_handle_popups(page, category, batch_id)
 
     # ── Шаг 5: Заполняем теги ────────────────────────────────────────────
     write_log_entry(batch_id, category, "Дзен: Заполняю теги.")
@@ -889,14 +796,14 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
 
     # Перед шагом 6: закрываем хинт «Уже можно публиковать» (он часто
     # всплывает после ввода тегов и перекрывает дропдаун комментариев).
-    _dismiss_unknown(page, category, batch_id)
+    _dzen_handle_popups(page, category, batch_id)
 
     # ── Шаг 6: Выставляем «Все пользователи» в «Кто может комментировать» ─
     # Сразу после тегов — контрол виден в той же модалке «Публикация ролика».
     _set_comments_all_users(page, category, batch_id)
 
     # Перед шагом 7: ещё раз закрываем любые всплывшие хинты/попапы.
-    _dismiss_unknown(page, category, batch_id)
+    _dzen_handle_popups(page, category, batch_id)
 
     # ── Шаг 7: Публикуем ─────────────────────────────────────────────────
     write_log_entry(
@@ -918,7 +825,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
         pub_btn = _find_primary_publish_control(page)
         if pub_btn is not None:
             break
-        _handle_popups(page, category, batch_id)
+        _dzen_handle_popups(page, category, batch_id)
         page.wait_for_timeout(1_500)
 
     if pub_btn is None and not _dzen_step7_success_without_click(page, url_step7_start):
@@ -948,8 +855,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
     _snap(page, batch_id)
 
     # ── Шаг 8: Обрабатываем попапы, диалоги, хинты (до 10 секунд) ───────
-    # Каждую итерацию вызываем _handle_popups — он сверяет со списком
-    # _EXPECTED_ELEMENTS (капча, диалог подтверждения, файловый input)
+    # Каждую итерацию вызываем _dzen_handle_popups — whitelist + hint dismiss.
     # и либо обрабатывает известный элемент, либо закрывает неизвестный.
     _DIALOG_WINDOW = 15_000  # ms
     _DIALOG_POLL   = 800     # ms
@@ -985,7 +891,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
     while _time.monotonic() < _dialog_deadline:
         # Обрабатываем любые попапы/диалоги/хинты через единый список ожидаемых элементов.
         # DzenApiError из _handle_captcha_element пробросится наружу автоматически.
-        _handle_popups(page, category, batch_id)
+        _dzen_handle_popups(page, category, batch_id)
 
         _check_error_toast()
 
@@ -1016,7 +922,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
     write_log_entry(batch_id, category, "Дзен: Шаг 8 завершён, жду подтверждения публикации.")
 
     # Перед шагом 9: закрываем хинты и повторяем клик, если CTA всё ещё на экране.
-    _dismiss_unknown(page, category, batch_id)
+    _dzen_handle_popups(page, category, batch_id)
     if not _step8_done and not _dzen_publish_confirmed(page, url_step7_start):
         _retry_publish_if_button_visible(
             page,
@@ -1115,7 +1021,7 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
         _check_error_toast()
 
         # 2c. Обрабатываем попапы/диалоги/хинты (капча может появиться и здесь)
-        _handle_popups(page, category, batch_id)
+        _dzen_handle_popups(page, category, batch_id)
 
         if _dzen_publish_confirmed(page, url_step7_start, url_before):
             confirmed = True

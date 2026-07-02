@@ -1,8 +1,10 @@
 """
-Общие утилиты Playwright-клиентов публикации.
+Общие утилиты Playwright-клиентов публикации (dzen, rutube, vkvideo).
 
-Паттерн handle_popups + whitelist — из отлаженного clients/dzen.py.
-dismiss_click_outside — только для Rutube/VK (Dzen использует свой hint-only dismiss).
+Единый контракт: handle_popups(whitelist) → dismiss_unknown.
+Платформенное — только whitelist и стратегия dismiss_unknown:
+  • Дзен — dismiss_dzen_hint (кнопка helper-tooltip, без click-outside)
+  • Rutube / VK — dismiss_click_outside (снаружи → Escape → ×)
 """
 
 from __future__ import annotations
@@ -24,6 +26,7 @@ DismissUnknown = Callable[..., None]
 
 _DISMISS_STATE_KEY = "_vipilot_dismiss_state"
 _DISMISS_COOLDOWN_S = 2.0
+_DZEN_HINT_CLOSE_SELECTOR = "[class*='helper-tooltip__closeButton']"
 
 _SAFE_FIELD_JS = """
 (inset) => {
@@ -269,6 +272,131 @@ def _likely_overlay_present(page) -> bool:
     return False
 
 
+def dismiss_dzen_hint(
+    page,
+    category=None,
+    batch_id=None,
+    *,
+    label: str = "Дзен",
+    phase: int = 0,
+    force: bool = False,
+) -> None:
+    """Закрывает helper-tooltip хинт Дзена. Без click-outside (ломает меню «+»).
+
+    phase/force — совместимость с safe_click; hint не использует click-outside.
+    """
+    del phase, force
+    _user_lvl = "info" if batch_id else "silent"
+    _warn_lvl = "warn" if batch_id else "silent"
+    prefix = f"{label}: " if label else ""
+
+    hint_was_seen = False
+    for _attempt in range(3):
+        try:
+            btn = page.locator(_DZEN_HINT_CLOSE_SELECTOR).first
+            if not btn.is_visible(timeout=300):
+                break
+        except Exception:
+            break
+
+        hint_was_seen = True
+
+        try:
+            cls_before = btn.get_attribute("class", timeout=300) or ""
+        except Exception:
+            cls_before = ""
+
+        write_log_entry(
+            batch_id, category,
+            f"{prefix}Закрываю оверлей — кнопка хинта (попытка {_attempt + 1}).",
+            level=_user_lvl,
+        )
+        write_log_entry(
+            batch_id, category,
+            f"hint close target class={cls_before!r}",
+            level="silent",
+        )
+
+        try:
+            url_before_click = page.url
+        except Exception:
+            url_before_click = ""
+
+        try:
+            btn.click(timeout=2_000)
+        except Exception as _e:
+            write_log_entry(
+                batch_id, category, f"hint click failed: {_e}", level="silent",
+            )
+            try:
+                url_now = page.url
+            except Exception:
+                url_now = ""
+            try:
+                still_visible = page.locator(
+                    _DZEN_HINT_CLOSE_SELECTOR,
+                ).first.is_visible(timeout=200)
+            except Exception:
+                still_visible = False
+
+            if not still_visible:
+                write_log_entry(
+                    batch_id, category,
+                    f"{prefix}Оверлей закрыт.",
+                    level=_user_lvl,
+                )
+                return
+
+            left_editor = (
+                ("videoEditorPublicationId" in (url_before_click or ""))
+                and ("videoEditorPublicationId" not in (url_now or ""))
+            ) or ("state=published" in (url_now or "")) or ("state=pending" in (url_now or ""))
+            if left_editor:
+                write_log_entry(
+                    batch_id, category,
+                    f"hint close interrupted by navigation: {url_now}",
+                    level="silent",
+                )
+                return
+
+            write_log_entry(
+                batch_id, category,
+                "[dzen] hint click failed, retrying.",
+                level="silent",
+            )
+            continue
+
+        page.wait_for_timeout(300)
+
+        try:
+            still_visible = page.locator(
+                _DZEN_HINT_CLOSE_SELECTOR,
+            ).first.is_visible(timeout=200)
+        except Exception:
+            still_visible = False
+
+        if not still_visible:
+            write_log_entry(
+                batch_id, category,
+                f"{prefix}Оверлей закрыт.",
+                level=_user_lvl,
+            )
+            return
+
+        write_log_entry(
+            batch_id, category,
+            "[dzen] хинт всё ещё виден после клика — повтор.",
+            level="silent",
+        )
+
+    if hint_was_seen:
+        write_log_entry(
+            batch_id, category,
+            f"{prefix}Оверлей не закрылся за 3 попытки.",
+            level=_warn_lvl,
+        )
+
+
 def dismiss_click_outside(
     page,
     category=None,
@@ -278,15 +406,7 @@ def dismiss_click_outside(
     phase: int = 0,
     force: bool = False,
 ) -> None:
-    """Закрытие неизвестного оверлея для Rutube/VK.
-
-    phase 0: один клик снаружи → если оверлей остался → Escape → ×
-    phase 1: Escape → × (без клика снаружи)
-    phase 2+: × → Escape
-
-    Клик снаружи не повторяется, пока оверлей не закроется (state на page).
-    force=True — после заблокированного клика, без cooldown.
-    """
+    """Click-outside dismiss для Rutube/VK (не для Дзена — см. dismiss_dzen_hint)."""
     if not force and not _likely_overlay_present(page):
         _reset_dismiss_state(page)
         return
