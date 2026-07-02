@@ -101,9 +101,10 @@ def publish(
 
         _state = {"clip_url": ""}
 
-        def _do_publish(page, _ctx):
+        def _do_publish(page, ctx):
             _state["clip_url"] = _publish_ui(
-                page, club_id, video_path, pub_title, category, batch_id=batch_id
+                page, club_id, video_path, pub_title, category,
+                batch_id=batch_id, ctx=ctx, target_id=target_id,
             )
             if _state["clip_url"] and batch_id:
                 db_set_batch_vkvideo_clip_url(batch_id, _state["clip_url"])
@@ -434,7 +435,15 @@ def _wait_visible(
             _snap(page, batch_id)
 
 def _publish_ui(
-    page, club_id: str, video_path: str, pub_title: str, category, batch_id=None
+    page,
+    club_id: str,
+    video_path: str,
+    pub_title: str,
+    category,
+    batch_id=None,
+    *,
+    ctx=None,
+    target_id=None,
 ):
     """Управляет браузером для публикации клипа через UI VK Видео."""
 
@@ -467,7 +476,12 @@ def _publish_ui(
     cur = page.url
     write_log_entry(batch_id, category, f"URL после перехода: {cur}", level="silent")
 
-    raise_if_login_required(page, "vkvideo", club_id=club_id)
+    from clients.target_session import refresh_session_after_auth
+
+    refresh_session_after_auth(
+        page, ctx, target_id, "vkvideo",
+        batch_id=batch_id, category=category, club_id=club_id,
+    )
 
     # ── Шаг 1б: CAPTCHA или готовность модала ─────────────────────────────
     choose_btn = page.get_by_text("Выбрать файл", exact=False).first

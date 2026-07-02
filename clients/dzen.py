@@ -78,8 +78,11 @@ def publish(
         with open(video_path, "wb") as _f:
             _f.write(video_data)
 
-        def _do_publish(page, _ctx):
-            _publish_ui(page, publisher_id, video_path, category, batch_id=batch_id)
+        def _do_publish(page, ctx):
+            _publish_ui(
+                page, publisher_id, video_path, category,
+                batch_id=batch_id, ctx=ctx, target_id=target_id,
+            )
 
         result = _get_browser("dzen").run_pipeline_browser(
             _do_publish, target_id, batch_id=batch_id, category=category,
@@ -606,7 +609,16 @@ def _set_comments_all_users(page, category, batch_id=None) -> None:
         write_log_entry(batch_id, category, "Дзен: Ошибка при настройке комментариев — продолжаю.", level='warn')
         write_log_entry(batch_id, category, f"Ошибка _set_comments_all_users: {_e}", level='silent')
 
-def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=None):
+def _publish_ui(
+    page,
+    publisher_id: str,
+    video_path: str,
+    category,
+    batch_id=None,
+    *,
+    ctx=None,
+    target_id=None,
+):
     """Управляет браузером для публикации видео через UI Дзена."""
 
     studio_url = f"https://dzen.ru/profile/editor/id/{publisher_id}/"
@@ -637,9 +649,13 @@ def _publish_ui(page, publisher_id: str, video_path: str, category, batch_id=Non
 
     cur = page.url
     write_log_entry(batch_id, category, f"URL после перехода: {cur}", level='silent')
+    from clients.target_session import refresh_session_after_auth
     from services.publish_auth_check import raise_if_login_required
 
-    raise_if_login_required(page, "dzen", publisher_id=publisher_id)
+    refresh_session_after_auth(
+        page, ctx, target_id, "dzen",
+        batch_id=batch_id, category=category, publisher_id=publisher_id,
+    )
 
     plus_btn = page.locator(
         "[class*='addButton'], "

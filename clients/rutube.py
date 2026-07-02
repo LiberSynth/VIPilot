@@ -84,8 +84,11 @@ def publish(
         with open(video_path, "wb") as _f:
             _f.write(video_data)
 
-        def _do_publish(page, _ctx):
-            _publish_ui(page, video_path, category, batch_id=batch_id)
+        def _do_publish(page, ctx):
+            _publish_ui(
+                page, video_path, category,
+                batch_id=batch_id, ctx=ctx, target_id=target_id,
+            )
 
         result = _get_browser("rutube").run_pipeline_browser(
             _do_publish, target_id, batch_id=batch_id, category=category,
@@ -435,7 +438,15 @@ def _ensure_rutube_studio(page, category, batch_id=None) -> None:
     )
     _snap(page, batch_id)
 
-def _publish_ui(page, video_path: str, category, batch_id=None):
+def _publish_ui(
+    page,
+    video_path: str,
+    category,
+    batch_id=None,
+    *,
+    ctx=None,
+    target_id=None,
+):
     """Управляет браузером для публикации видео через UI Рутьюба."""
 
     _ensure_rutube_studio(page, category, batch_id=batch_id)
@@ -443,7 +454,12 @@ def _publish_ui(page, video_path: str, category, batch_id=None):
     cur = page.url
     write_log_entry(batch_id, category, f"URL после перехода: {cur}", level='silent')
 
-    raise_if_login_required(page, "rutube")
+    from clients.target_session import refresh_session_after_auth
+
+    refresh_session_after_auth(
+        page, ctx, target_id, "rutube",
+        batch_id=batch_id, category=category,
+    )
 
     # ── Шаг 2: Кнопка «+ Добавить» ───────────────────────────────────────
     write_log_entry(batch_id, category, "Рутьюб: Ищу кнопку «+ Добавить».")

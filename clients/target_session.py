@@ -103,6 +103,7 @@ def save_from_context(
     batch_id=None,
     category: str = "browser",
     platform: str | None = None,
+    info_note: str = "",
 ) -> dict:
     """Сохраняет все куки context в targets.session_context. Возвращает {ok, error}."""
     prefix = f"platform={platform}, " if platform else ""
@@ -115,7 +116,7 @@ def save_from_context(
             write_log_entry(
                 batch_id,
                 category,
-                f"{prefix}Сессия сохранена.",
+                f"{prefix}Сессия сохранена{info_note}.",
                 level="info",
             )
             write_log_entry(
@@ -155,3 +156,27 @@ def save_from_context(
             level="info",
         )
         return {"ok": False, "error": str(exc)}
+
+
+def refresh_session_after_auth(
+    page,
+    ctx,
+    target_id: str,
+    platform: str,
+    *,
+    batch_id=None,
+    category: str = "publish",
+    **auth_context,
+) -> dict:
+    """URL-проверка кабинета, затем snapshot куков в БД (warm-up refresh save)."""
+    from clients.common import raise_if_login_required
+
+    raise_if_login_required(page, platform, **auth_context)
+    return save_from_context(
+        ctx,
+        target_id,
+        batch_id=batch_id,
+        category=category,
+        platform=platform,
+        info_note=" (после входа)",
+    )
