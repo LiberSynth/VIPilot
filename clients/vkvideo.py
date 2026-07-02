@@ -18,6 +18,7 @@ import shutil
 import tempfile
 import time as _time
 
+from clients.common import dismiss_overlays, raise_if_login_required, safe_click
 from db import db_set_batch_vkvideo_clip_url
 from log import write_log_entry
 from utils.utils import fmt_id_msg
@@ -197,6 +198,33 @@ def _vk_publish_modal_visible(page) -> bool:
             continue
     return False
 
+def _detect_vk_captcha(page) -> bool:
+    try:
+        return page.get_by_text("Продолжить", exact=False).first.is_visible(timeout=200)
+    except Exception:
+        return False
+
+def _handle_vk_captcha(page, category, batch_id) -> None:
+    try:
+        cont_btn = page.get_by_text("Продолжить", exact=False).first
+        if cont_btn.is_visible(timeout=300):
+            cont_btn.click()
+            write_log_entry(
+                batch_id, category,
+                "VK Видео: CAPTCHA-диалог закрыт («Продолжить» нажато).",
+            )
+            _snap(page, batch_id)
+    except Exception:
+        pass
+
+VKVIDEO_PUBLISH_WHITELIST = [
+    ("captcha", _detect_vk_captcha, _handle_vk_captcha),
+    ("publish_modal", _vk_publish_modal_visible, None),
+]
+
+def _vkvideo_dismiss(page, category, batch_id) -> None:
+    dismiss_overlays(page, VKVIDEO_PUBLISH_WHITELIST, batch_id, category, label="VK Видео")
+
 def _vk_publish_button_visible(page) -> bool:
     try:
         return page.locator("button:has-text('Опубликовать')").last.is_visible(timeout=300)
@@ -263,8 +291,6 @@ def _vk_publish_button_clickable(pub_btn) -> bool:
 
 def _wait_vk_clip_publish_ready(page, pub_btn, batch_id, category, timeout_ms=_PUBLISH_WAIT):
     """Ждёт, пока кнопка «Опубликовать» станет доступной (enabled)."""
-    from services.publish_auth_check import raise_if_login_required
-
     write_log_entry(
         batch_id, category,
         "VK Видео: Жду доступности кнопки «Опубликовать» (обработка видео).",
@@ -273,6 +299,7 @@ def _wait_vk_clip_publish_ready(page, pub_btn, batch_id, category, timeout_ms=_P
     _next_snap = _time.monotonic()
     while _time.monotonic() < deadline:
         raise_if_login_required(page, "vkvideo")
+        _vkvideo_dismiss(page, category, batch_id)
         _scroll_vk_publish_button(pub_btn)
         if _vk_publish_button_clickable(pub_btn):
             write_log_entry(batch_id, category, "VK Видео: Кнопка «Опубликовать» доступна.")
@@ -325,28 +352,18 @@ def _click_vk_publish_button(pub_btn, page, category, batch_id) -> None:
         raise VkVideoApiError(
             "VK Видео: кнопка «Опубликовать» недоступна — клик пропущен"
         )
-    _last_err = None
-    for _attempt in range(1, 4):
-        try:
-            pub_btn.click(timeout=5_000, no_wait_after=True)
-            return
-        except Exception as _e:
-            _last_err = _e
-            if _vk_publish_button_clickable(pub_btn):
-                try:
-                    pub_btn.evaluate("el => el.click()")
-                    return
-                except Exception as _js_e:
-                    _last_err = _js_e
-            write_log_entry(
-                batch_id, category,
-                f"VK Видео: Клик «Опубликовать» не прошёл (попытка {_attempt}/3).",
-                level="warn",
-            )
-            page.wait_for_timeout(400)
-    raise VkVideoApiError(
-        f"Не удалось нажать «Опубликовать» в VK Видео: {_last_err}"
-    ) from _last_err
+    try:
+        safe_click(
+            pub_btn, page, VKVIDEO_PUBLISH_WHITELIST,
+            batch_id=batch_id, category=category, label="VK Видео",
+            timeout_ms=5_000, max_attempts=3,
+            click_kwargs={"no_wait_after": True},
+            js_fallback=True,
+        )
+    except Exception as _e:
+        raise VkVideoApiError(
+            f"Не удалось нажать «Опубликовать» в VK Видео: {_e}"
+        ) from _e
 
 def _submit_vk_clip_publish(page, category, batch_id, pub_btn=None) -> None:
     """Прокручивает к доступной кнопке и нажимает «Опубликовать»."""
@@ -364,11 +381,10 @@ def _wait_visible(locator, timeout_ms: int, page, batch_id, interval_ms: int = 2
     """Ждёт видимости локатора, снимая скриншот каждые interval_ms мс.
     Playwright sync API нельзя вызывать из других потоков — поэтому
     скриншоты делаем прямо здесь, в главном потоке Playwright."""
-    from services.publish_auth_check import raise_if_login_required
-
     deadline = _time.monotonic() + timeout_ms / 1000
     while True:
         raise_if_login_required(page, "vkvideo")
+        _vkvideo_dismiss(page, None, batch_id)
         remaining = deadline - _time.monotonic()
         if remaining <= 0:
             raise_if_login_required(page, "vkvideo")
@@ -417,7 +433,6 @@ def _publish_ui(
 
     cur = page.url
     write_log_entry(batch_id, category, f"URL после перехода: {cur}", level="silent")
-    from services.publish_auth_check import raise_if_login_required
 
     raise_if_login_required(page, "vkvideo", club_id=club_id)
 
@@ -431,18 +446,7 @@ def _publish_ui(
                 break
         except Exception:
             pass
-        try:
-            cont_btn = page.get_by_text("Продолжить", exact=False).first
-            if cont_btn.is_visible(timeout=300):
-                cont_btn.click()
-                write_log_entry(
-                    batch_id, category,
-                    "VK Видео: CAPTCHA-диалог закрыт («Продолжить» нажато).",
-                )
-                _snap(page, batch_id)
-                break
-        except Exception:
-            pass
+        _vkvideo_dismiss(page, category, batch_id)
         page.wait_for_timeout(300)
 
     # ── Шаг 2: Ждём появления кнопки «Выбрать файл» ──────────────────────
