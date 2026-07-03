@@ -13,6 +13,8 @@ import time as _time
 from clients.common import (
     dismiss_click_outside,
     handle_popups,
+    poll_until,
+    poll_wait_tick,
     raise_if_login_required,
     safe_click,
 )
@@ -178,15 +180,24 @@ def _find_rutube_add_button(page):
 
 def _wait_rutube_add_button(page, category, batch_id=None, timeout_ms=180_000):
     """Ждёт готовность студии и видимую кнопку «+ Добавить»."""
-    deadline = _time.monotonic() + timeout_ms / 1000
-    while _time.monotonic() < deadline:
+    found: list = [None]
+
+    def _on_poll():
         raise_if_login_required(page, "rutube")
         _rutube_handle_popups(page, category, batch_id)
+
+    def _ready() -> bool:
         add_btn = _find_rutube_add_button(page)
         if add_btn is not None:
-            return add_btn
-        now = _time.monotonic()
-        page.wait_for_timeout(500)
+            found[0] = add_btn
+            return True
+        return False
+
+    if poll_until(
+        page, _ready, timeout_ms,
+        batch_id=batch_id, platform="rutube", on_poll=_on_poll,
+    ):
+        return found[0]
     raise_if_login_required(page, "rutube")
     raise RutubeApiError("Не дождались кнопки «+ Добавить» в студии Рутьюба.")
 
@@ -226,7 +237,7 @@ def _wait_rutube_upload(page, category, batch_id=None) -> bool:
             msg = ", ".join(hint) if hint else "жду признаки готовности формы"
             write_log_entry(batch_id, category, f"Рутьюб: Загрузка в процессе — {msg}.")
             last_log_at = now
-        page.wait_for_timeout(800)
+        poll_wait_tick(page, batch_id, "rutube")
 
     write_log_entry(batch_id, category, "Рутьюб: Ожидание загрузки истекло — продолжаю.", level="warn")
     return False

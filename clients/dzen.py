@@ -11,7 +11,7 @@ import shutil
 import tempfile
 import time as _time
 
-from clients.common import dismiss_dzen_hint, handle_popups
+from clients.common import dismiss_dzen_hint, handle_popups, poll_wait_tick
 from log import write_log_entry
 from utils.utils import fmt_id_msg
 from routes.api import publication_file_name, tags
@@ -695,7 +695,7 @@ def _publish_ui(
             write_log_entry(batch_id, category, f"URL редактора: {_cur}", level='silent')
             break
         _dzen_handle_popups(page, category, batch_id)
-        page.wait_for_timeout(1_500)
+        poll_wait_tick(page, batch_id, "dzen")
 
     if _auto_published:
         # Видео уже опубликовано — пропускаем шаги 5-9
@@ -771,7 +771,7 @@ def _publish_ui(
         if pub_btn is not None:
             break
         _dzen_handle_popups(page, category, batch_id)
-        page.wait_for_timeout(1_500)
+        poll_wait_tick(page, batch_id, "dzen")
 
     if pub_btn is None and not _dzen_step7_success_without_click(page, url_step7_start):
         raise DzenApiError(
@@ -802,7 +802,6 @@ def _publish_ui(
     # Каждую итерацию вызываем _dzen_handle_popups — whitelist + hint dismiss.
     # и либо обрабатывает известный элемент, либо закрывает неизвестный.
     _DIALOG_WINDOW = 15_000  # ms
-    _DIALOG_POLL   = 800     # ms
 
     # Тексты, которые Дзен показывает в тост-ошибках при неудаче публикации.
     _DZEN_ERROR_TEXTS = [
@@ -861,7 +860,7 @@ def _publish_ui(
         except Exception:
             pass
 
-        page.wait_for_timeout(_DIALOG_POLL)
+        poll_wait_tick(page, batch_id, "dzen")
 
     write_log_entry(batch_id, category, "Дзен: Шаг 8 завершён, жду подтверждения публикации.")
 
@@ -878,7 +877,6 @@ def _publish_ui(
 
     # ── Шаг 9: Ожидаем подтверждения публикации ──────────────────────────
     _PUBLISH_CONFIRM_TIMEOUT = 60_000  # ms — полный таймаут ожидания
-    _CONFIRM_POLL = 2_000              # ms — интервал опроса
 
     url_before = page.url
     confirmed = False
@@ -982,7 +980,7 @@ def _publish_ui(
         ):
             _publish_retries += 1
 
-        page.wait_for_timeout(_CONFIRM_POLL)
+        poll_wait_tick(page, batch_id, "dzen")
 
     if not confirmed:
         # Финальный URL-снимок

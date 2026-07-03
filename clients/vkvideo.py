@@ -21,6 +21,7 @@ import time as _time
 from clients.common import (
     dismiss_click_outside,
     handle_popups,
+    poll_wait_tick,
     raise_if_login_required,
     safe_click,
 )
@@ -316,7 +317,7 @@ def _wait_vk_clip_publish_ready(page, pub_btn, batch_id, category, timeout_ms=_P
         if _vk_publish_button_clickable(pub_btn):
             write_log_entry(batch_id, category, "VK Видео: Кнопка «Опубликовать» доступна.")
             return
-        page.wait_for_timeout(1_000)
+        poll_wait_tick(page, batch_id, "vkvideo")
     raise VkVideoApiError(
         "VK Видео: таймаут ожидания доступности кнопки «Опубликовать»"
     )
@@ -393,11 +394,9 @@ def _wait_visible(
     batch_id,
     category,
     club_id=None,
-    interval_ms: int = 2_000,
+    interval_ms: int = 200,
 ):
-    """Ждёт видимости локатора, снимая скриншот каждые interval_ms мс.
-    Playwright sync API нельзя вызывать из других потоков — поэтому
-    скриншоты делаем прямо здесь, в главном потоке Playwright."""
+    """Ждёт видимости локатора; при сбое CDP — inline-кадр каждые interval_ms."""
     deadline = _time.monotonic() + timeout_ms / 1000
     while True:
         raise_if_login_required(page, "vkvideo", club_id=club_id)
@@ -407,11 +406,16 @@ def _wait_visible(
             raise_if_login_required(page, "vkvideo", club_id=club_id)
             locator.wait_for(state="visible", timeout=1_000)  # бросит TimeoutError
             return
-        poll = min(interval_ms, max(500, int(remaining * 1000)))
+        poll = min(interval_ms, int(remaining * 1000))
+        if poll <= 0:
+            raise_if_login_required(page, "vkvideo", club_id=club_id)
+            locator.wait_for(state="visible", timeout=1_000)
+            return
         try:
             locator.wait_for(state="visible", timeout=poll)
             return  # виден
         except Exception:
+            poll_wait_tick(page, batch_id, "vkvideo", interval_ms)
             if _time.monotonic() >= deadline:
                 locator.wait_for(state="visible", timeout=1_000)  # бросит TimeoutError
                 return

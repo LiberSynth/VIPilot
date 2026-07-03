@@ -531,3 +531,56 @@ def safe_click(
             page.wait_for_timeout(300)
     if last_err is not None:
         raise last_err
+
+
+_PREVIEW_POLL_MS = 200
+
+
+def poll_wait_tick(
+    page,
+    batch_id=None,
+    platform: str | None = None,
+    poll_ms: int = _PREVIEW_POLL_MS,
+) -> None:
+    """Пауза в wait-цикле: inline-кадр при сбое CDP, иначе только sleep."""
+    _maybe_inline_publish_preview(page, batch_id, platform)
+    page.wait_for_timeout(poll_ms)
+
+
+def poll_until(
+    page,
+    predicate: Callable[[], bool],
+    timeout_ms: int,
+    *,
+    batch_id=None,
+    platform: str | None = None,
+    poll_ms: int = _PREVIEW_POLL_MS,
+    on_poll: Callable[[], None] | None = None,
+) -> bool:
+    """Ожидает predicate; между итерациями — poll_wait_tick (200 ms)."""
+    deadline = _time.monotonic() + timeout_ms / 1000
+    while _time.monotonic() < deadline:
+        if on_poll is not None:
+            on_poll()
+        if predicate():
+            return True
+        poll_wait_tick(page, batch_id, platform, poll_ms)
+    if on_poll is not None:
+        on_poll()
+    return predicate()
+
+
+def _maybe_inline_publish_preview(page, batch_id, platform: str | None) -> None:
+    if not batch_id or not platform:
+        return
+    from services.publish_preview_capture import needs_inline_preview
+
+    if not needs_inline_preview(batch_id):
+        return
+    try:
+        from services.browser_registry import get_browser
+
+        img = page.screenshot(type="jpeg", quality=65)
+        get_browser(platform).push_frame_for_batch(batch_id, img)
+    except Exception:
+        pass
