@@ -520,7 +520,7 @@ def safe_click(
             write_log_entry(
                 batch_id, category,
                 f"{label}: Клик заблокирован (попытка {attempt}/{max_attempts}).",
-                level="warn" if batch_id else "silent",
+                level="info" if batch_id else "silent",
             )
             if js_fallback and attempt == max_attempts:
                 try:

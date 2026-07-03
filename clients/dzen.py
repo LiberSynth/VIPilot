@@ -632,7 +632,7 @@ def _publish_ui(
             write_log_entry(
                 batch_id, category,
                 f"Дзен: Клик по «+» заблокирован (попытка {_plus_attempt}/5), закрываю попапы.",
-                level="warn",
+                level="info",
             )
             page.wait_for_timeout(500)
     if _last_plus_err is not None:
