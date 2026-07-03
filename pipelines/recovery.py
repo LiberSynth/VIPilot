@@ -14,4 +14,4 @@ def recover_interrupted_batches() -> None:
         new = item["new_status"]
         msg = f"Батч сброшен при рестарте: {old} → {new}"
         write_log_entry(bid, "planning", msg, level='warn')
-        write_log_entry(None, 'startup', fmt_id_msg('Батч {} сброшен: {} → {}', bid, old, new), level='silent')
+        write_log_entry(bid, 'planning', fmt_id_msg('Батч {} сброшен: {} → {}', bid, old, new), level='silent')

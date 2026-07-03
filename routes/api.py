@@ -743,7 +743,7 @@ def api_delete_batch(batch_id):
             return jsonify({"error": "not found"}), 404
         return jsonify({"ok": True})
     except Exception as e:
-        write_log_entry(None, 'api', f'Ошибка удаления батча: {e}', level='silent')
+        write_log_entry(batch_id, 'api', f'Ошибка удаления батча: {e}', level='silent')
         return jsonify({"ok": False, "error": "internal error"}), 500
 
 @bp.route("/batch/<batch_id>/reset/<pipeline>", methods=["POST"])

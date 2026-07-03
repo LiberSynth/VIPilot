@@ -101,7 +101,7 @@ def tick():
             batch_id = db_create_planning_batch(dt)
             is_catchup = dt < now
             write_log_entry(
-                None, 'planning', 'phase=slot_evaluated, '
+                batch_id, 'planning', 'phase=slot_evaluated, '
                 + f'dt={dt.isoformat()}, is_catchup={is_catchup}, batch_created={bool(batch_id)}',
                 level='silent',
             )
