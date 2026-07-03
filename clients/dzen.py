@@ -288,6 +288,21 @@ _DZEN_MODAL_DISMISS_EXTRA_STEPS = (
     ("сделан клик за границей окна", _dzen_click_outside_modal),
 )
 
+_CONFIRM_OR_CAPTCHA_SEL = (
+    "button:has-text('Опубликовать после подтверждения'), "
+    "button:has-text('Опубликовать после обработки'), "
+    "iframe[src*='captcha'], iframe[src*='smartcaptcha']"
+)
+
+_DZEN_SUCCESS_TOAST_SEL = (
+    "[class*='toast']:has-text('опубликован'), "
+    "[class*='notification']:has-text('опубликован'), "
+    "[data-testid='publish-success']"
+)
+
+_POST_PUBLISH_POLL_MS = 2_000
+_STEP8_WINDOW_MS = 8_000
+
 
 def dismiss_dzen_hint(
     page,
@@ -541,6 +556,25 @@ def _dzen_publish_confirmed(page, url_step7_start: str, url_before: str | None =
         return True
     return False
 
+def _confirm_or_captcha_visible(page) -> bool:
+    try:
+        return page.locator(_CONFIRM_OR_CAPTCHA_SEL).first.is_visible(timeout=150)
+    except Exception:
+        return False
+
+def _dzen_publish_success_toast_visible(page) -> bool:
+    try:
+        return page.locator(_DZEN_SUCCESS_TOAST_SEL).first.is_visible(timeout=150)
+    except Exception:
+        return False
+
+def _dzen_publish_settled(page, url_step7_start: str) -> bool:
+    return (
+        _dzen_publish_confirmed(page, url_step7_start)
+        or _dzen_step7_success_without_click(page, url_step7_start)
+        or _dzen_publish_success_toast_visible(page)
+    )
+
 def _click_primary_publish_control(page, category, batch_id=None, url_step7_start: str | None = None) -> bool:
     """Закрывает попапы и нажимает основную кнопку «Опубликовать». Возвращает True если кликнули."""
     if url_step7_start and _dzen_publish_confirmed(page, url_step7_start):
@@ -556,30 +590,35 @@ def _click_primary_publish_control(page, category, batch_id=None, url_step7_star
         return False
     write_log_entry(batch_id, category, "Дзен: Элемент публикации найден, нажимаю.")
     try:
-        pub_btn.click(timeout=3_000)
+        safe_click(
+            pub_btn, page, DZEN_PUBLISH_WHITELIST, _dzen_dismiss_unknown,
+            batch_id=batch_id, category=category, label="Дзен",
+            timeout_ms=3_000, max_attempts=3, js_fallback=True,
+        )
     except Exception as _click_err:
-        write_log_entry(batch_id, category, "[dzen] Обычный клик не прошёл — пробую JS-клик.", level='silent')
-        write_log_entry(batch_id, category, f"Причина: {_click_err}", level='silent')
-        try:
-            page.evaluate(
-                """() => {
-                    const byTestId = document.querySelector('[data-testid="publish-btn"]');
-                    if (byTestId) { byTestId.click(); return; }
-                    for (const el of document.querySelectorAll('button, [role="button"], a')) {
-                        const t = (el.textContent || '').trim();
-                        if (/^Опубликовать(?: после обработки)?$/i.test(t)) {
-                            el.click();
-                            return;
-                        }
-                    }
-                }"""
-            )
-        except Exception as _js_err:
-            write_log_entry(batch_id, category, f"JS-клик тоже не прошёл: {_js_err}", level='silent')
-            return False
+        write_log_entry(batch_id, category, f"Клик «Опубликовать» не прошёл: {_click_err}", level='silent')
+        return False
     if url_step7_start and _dzen_publish_confirmed(page, url_step7_start):
         return False
     return True
+
+def _poll_after_publish_click(
+    page, category, batch_id, url_step7_start: str, *, timeout_ms: int = _POST_PUBLISH_POLL_MS,
+) -> None:
+    """Короткий poll после клика: успех, confirm/captcha или повтор CTA."""
+    deadline = _time.monotonic() + timeout_ms / 1000
+    while _time.monotonic() < deadline:
+        if _dzen_publish_settled(page, url_step7_start):
+            return
+        if _confirm_or_captcha_visible(page) or _detect_captcha(page):
+            return
+        if _find_primary_publish_control(page) is not None:
+            _retry_publish_if_button_visible(
+                page, category, batch_id, url_step7_start,
+                "Кнопка «Опубликовать» всё ещё видна — повторяю клик.",
+            )
+            return
+        poll_wait_tick(page, batch_id, "dzen")
 
 def _retry_publish_if_button_visible(page, category, batch_id, url_step7_start, reason: str) -> bool:
     """Повторный клик, если публикация ещё не ушла, а CTA всё ещё на экране."""
@@ -944,30 +983,10 @@ def _publish_ui(
 
     if pub_btn is not None:
         _click_primary_publish_control(page, category, batch_id, url_step7_start)
+        if not _dzen_publish_settled(page, url_step7_start):
+            _poll_after_publish_click(page, category, batch_id, url_step7_start)
 
-    # Ждём диалог подтверждения или капчу; выходим раньше, если URL уже сменился.
-    _CONFIRM_OR_CAPTCHA_SEL = (
-        "button:has-text('Опубликовать после подтверждения'), "
-        "button:has-text('Опубликовать после обработки'), "
-        "iframe[src*='captcha'], iframe[src*='smartcaptcha']"
-    )
-    _confirm_dialog_deadline = _time.monotonic() + 12
-    while _time.monotonic() < _confirm_dialog_deadline:
-        if _dzen_step7_success_without_click(page, url_step7_start):
-            break
-        try:
-            if page.locator(_CONFIRM_OR_CAPTCHA_SEL).first.is_visible(timeout=400):
-                break
-        except Exception:
-            pass
-        page.wait_for_timeout(400)
-
-    # ── Шаг 8: Обрабатываем попапы, диалоги, хинты (до 10 секунд) ───────
-    # Каждую итерацию вызываем _dzen_handle_popups — whitelist + hint dismiss.
-    # и либо обрабатывает известный элемент, либо закрывает неизвестный.
-    _DIALOG_WINDOW = 15_000  # ms
-
-    # Тексты, которые Дзен показывает в тост-ошибках при неудаче публикации.
+    # ── Шаг 8: captcha / confirm / хинты (короткое окно) ─────────────────
     _DZEN_ERROR_TEXTS = [
         "временно ограничена",
         "Публикация материалов",
@@ -980,7 +999,7 @@ def _publish_ui(
     def _check_error_toast():
         """Проверяет body на наличие известных ошибок Дзена; кидает DzenApiError."""
         try:
-            body = page.locator("body").inner_text(timeout=1500)
+            body = page.locator("body").inner_text(timeout=400)
             for err in _DZEN_ERROR_TEXTS:
                 if err.lower() in body.lower():
                     raise DzenApiError(
@@ -992,45 +1011,43 @@ def _publish_ui(
         except Exception:
             pass
 
-    _dialog_deadline = _time.monotonic() + _DIALOG_WINDOW / 1000
+    _dialog_deadline = _time.monotonic() + _STEP8_WINDOW_MS / 1000
     _step8_done = False
+    _step8_iter = 0
 
     while _time.monotonic() < _dialog_deadline:
-        # Обрабатываем любые попапы/диалоги/хинты через единый список ожидаемых элементов.
-        # DzenApiError из _handle_captcha_element пробросится наружу автоматически.
+        _step8_iter += 1
         _dzen_handle_popups(page, category, batch_id)
 
-        _check_error_toast()
+        if _step8_iter % 3 == 0:
+            _check_error_toast()
 
-        if _dzen_step7_success_without_click(page, url_step7_start):
+        if _dzen_publish_settled(page, url_step7_start):
             write_log_entry(
                 batch_id, category,
-                "Дзен: URL подтверждает публикацию в шаге 8.",
+                "Дзен: Публикация подтверждена в шаге 8.",
             )
             _step8_done = True
             break
 
-        # Проверяем финальное подтверждение публикации
-        try:
-            success_now = page.locator(
-                "[class*='toast']:has-text('опубликован'), "
-                "[class*='notification']:has-text('опубликован'), "
-                "[data-testid='publish-success']"
-            ).first
-            if success_now.is_visible():
-                write_log_entry(batch_id, category, "Дзен: Публикация подтверждена в шаге 8.")
-                _step8_done = True
-                break
-        except Exception:
-            pass
+        if _confirm_or_captcha_visible(page) or _detect_captcha(page):
+            poll_wait_tick(page, batch_id, "dzen")
+            continue
 
-        poll_wait_tick(page, batch_id, "dzen")
+        if _find_primary_publish_control(page) is not None:
+            _retry_publish_if_button_visible(
+                page, category, batch_id, url_step7_start,
+                "Кнопка «Опубликовать» всё ещё видна — повторяю клик в шаге 8.",
+            )
+            poll_wait_tick(page, batch_id, "dzen")
+            continue
+
+        break
 
     write_log_entry(batch_id, category, "Дзен: Шаг 8 завершён, жду подтверждения публикации.")
 
-    # Перед шагом 9: закрываем хинты и повторяем клик, если CTA всё ещё на экране.
     _dzen_handle_popups(page, category, batch_id)
-    if not _step8_done and not _dzen_publish_confirmed(page, url_step7_start):
+    if not _step8_done and not _dzen_publish_settled(page, url_step7_start):
         _retry_publish_if_button_visible(
             page,
             category,
