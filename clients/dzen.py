@@ -117,6 +117,43 @@ def publish(
 # UI-driven публикация
 # ---------------------------------------------------------------------------
 
+_CAPTCHA_IFRAME_SELECTOR = (
+    "iframe[src*='smartcaptcha'], "
+    "iframe[src*='captcha.yandex'], "
+    "iframe[src*='not_robot_captcha'], "
+    "iframe[src*='yandexcloud'], "
+    "iframe[src*='recaptcha'], "
+    "iframe[title*='SmartCaptcha'], "
+    "iframe[title*='не робот'], "
+    "iframe[title*='robot']"
+)
+
+_CAPTCHA_FRAME_URL_KEYWORDS = (
+    "not_robot_captcha", "smartcaptcha", "yandexcloud",
+    "captcha.yandex", "recaptcha",
+)
+
+_CAPTCHA_CHECKBOX_SELECTORS = (
+    "input[type='checkbox']",
+    "[role='checkbox']",
+    "[class*='CheckboxCaptcha']",
+    "[class*='checkbox-captcha']",
+    "[class*='captcha-checkbox']",
+    "[class*='Checkbox__box']",
+    "div[class*='Checkbox']",
+    "span[class*='Checkbox']",
+    "label:has-text('не робот')",
+)
+
+_CAPTCHA_INLINE_SELECTOR = (
+    "[class*='captcha'] input[type='checkbox'], "
+    "[class*='captcha'] [role='checkbox'], "
+    "[class*='CheckboxCaptcha'], "
+    "[class*='captcha-checkbox'], "
+    "[id*='captcha'] input[type='checkbox'], "
+    "label:has-text('не робот')"
+)
+
 
 def _detect_captcha(page) -> bool:
     """True только если на странице виден виджет капчи (не скрытый iframe в DOM)."""
@@ -130,6 +167,12 @@ def _detect_captcha(page) -> bool:
             return True
     except Exception:
         pass
+    for text in ("Подтвердите, что вы не робот", "Я не робот"):
+        try:
+            if page.get_by_text(text, exact=False).first.is_visible(timeout=300):
+                return True
+        except Exception:
+            pass
     return False
 
 def _click_captcha_target(el, batch_id, category, where: str) -> bool:
@@ -560,6 +603,8 @@ def _dzen_dismiss_unknown(
 ) -> None:
     del phase, force
     lbl = label or "Дзен"
+    if _detect_captcha(page):
+        return
     if _modal_overlay_visible(page):
         try:
             dismiss_overlay_strict(

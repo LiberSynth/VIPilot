@@ -21,6 +21,16 @@ DismissUnknown = Callable[..., None]
 
 DismissStep = tuple[str, Callable[..., bool]]
 
+_DETECT_BUG_EXCEPTIONS = (
+    NameError,
+    TypeError,
+    AttributeError,
+    ImportError,
+    SyntaxError,
+    UnboundLocalError,
+    RecursionError,
+)
+
 _DISMISS_SETTLE_MS = 600
 _DISMISS_POLL_MS = 50
 
@@ -136,7 +146,14 @@ def handle_popups(
         try:
             if not detect(page):
                 continue
-        except Exception:
+        except _DETECT_BUG_EXCEPTIONS:
+            raise
+        except Exception as exc:
+            write_log_entry(
+                batch_id, category,
+                f"whitelist detect {name!r}: {exc}",
+                level="silent",
+            )
             continue
         write_log_entry(batch_id, category, f"whitelist: {name}", level="silent")
         if handle is not None:
