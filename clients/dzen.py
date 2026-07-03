@@ -110,54 +110,6 @@ def publish(
 # UI-driven публикация
 # ---------------------------------------------------------------------------
 
-def _snap(page, batch_id=None) -> None:
-    """Снимает скриншот и передаёт кадр в SSE-трансляцию и монитор (thread-safe)."""
-    try:
-        from services.browser_registry import get_browser as _get_browser
-        _b = _get_browser("dzen")
-        img = page.screenshot(type="jpeg", quality=65)
-        _b.push_frame(img)
-        if batch_id:
-            _b.push_frame_for_batch(batch_id, img)
-    except Exception as _e:
-        write_log_entry(None, 'dzen', f'_snap: {_e}', level='silent')
-
-_CAPTCHA_IFRAME_SELECTOR = (
-    "iframe[src*='smartcaptcha'], "
-    "iframe[src*='captcha.yandex'], "
-    "iframe[src*='not_robot_captcha'], "
-    "iframe[src*='yandexcloud'], "
-    "iframe[src*='recaptcha'], "
-    "iframe[title*='SmartCaptcha'], "
-    "iframe[title*='не робот'], "
-    "iframe[title*='robot']"
-)
-
-_CAPTCHA_FRAME_URL_KEYWORDS = (
-    "not_robot_captcha", "smartcaptcha", "yandexcloud",
-    "captcha.yandex", "recaptcha",
-)
-
-_CAPTCHA_CHECKBOX_SELECTORS = (
-    "input[type='checkbox']",
-    "[role='checkbox']",
-    "[class*='CheckboxCaptcha']",
-    "[class*='checkbox-captcha']",
-    "[class*='captcha-checkbox']",
-    "[class*='Checkbox__box']",
-    "div[class*='Checkbox']",
-    "span[class*='Checkbox']",
-    "label:has-text('не робот')",
-)
-
-_CAPTCHA_INLINE_SELECTOR = (
-    "[class*='captcha'] input[type='checkbox'], "
-    "[class*='captcha'] [role='checkbox'], "
-    "[class*='CheckboxCaptcha'], "
-    "[class*='captcha-checkbox'], "
-    "[id*='captcha'] input[type='checkbox'], "
-    "label:has-text('не робот')"
-)
 
 def _detect_captcha(page) -> bool:
     """True только если на странице виден виджет капчи (не скрытый iframe в DOM)."""
@@ -282,7 +234,6 @@ def _dismiss_modal_overlay(page, category=None, batch_id=None) -> bool:
                 btn.click(timeout=5_000)
                 page.wait_for_timeout(400)
                 if not _modal_overlay_visible(page):
-                    _snap(page, batch_id)
                     return True
         except Exception:
             pass
@@ -292,7 +243,6 @@ def _dismiss_modal_overlay(page, category=None, batch_id=None) -> bool:
             page.keyboard.press("Escape")
             page.wait_for_timeout(400)
             if not _modal_overlay_visible(page):
-                _snap(page, batch_id)
                 return True
         except Exception:
             pass
@@ -304,7 +254,6 @@ def _dismiss_modal_overlay(page, category=None, batch_id=None) -> bool:
         pass
 
     if not _modal_overlay_visible(page):
-        _snap(page, batch_id)
         return True
     return False
 
@@ -343,15 +292,12 @@ def _handle_captcha_element(page, category, batch_id) -> None:
     while _time.monotonic() < _deadline:
         if _try_click_captcha_checkbox(page, category, batch_id):
             write_log_entry(batch_id, category, "Дзен: Капча — чекбокс нажат, жду исчезновения.")
-            _snap(page, batch_id)
             _clear_deadline = _time.monotonic() + 30
             while _time.monotonic() < _clear_deadline:
                 page.wait_for_timeout(1_000)
                 if not _detect_captcha(page):
                     write_log_entry(batch_id, category, "Дзен: Капча пройдена.")
-                    _snap(page, batch_id)
                     return
-            _snap(page, batch_id)
             raise DzenApiError("Капча не прошла за 30 сек — публикация невозможна.")
 
         _now = _time.monotonic()
@@ -360,7 +306,6 @@ def _handle_captcha_element(page, category, batch_id) -> None:
             _last_fail_log = _now
         page.wait_for_timeout(2_000)
 
-    _snap(page, batch_id)
     raise DzenApiError("Капча не прошла за 60 сек — публикация невозможна.")
 
 def _handle_confirm_element(page, category, batch_id) -> None:
@@ -372,7 +317,6 @@ def _handle_confirm_element(page, category, batch_id) -> None:
                 write_log_entry(batch_id, category, f"Дзен: Нажимаю «{text}».")
                 write_log_entry(batch_id, category, f"Кнопка подтверждения: «{text}»", level='silent')
                 btn.click()
-                _snap(page, batch_id)
                 return
         except Exception:
             pass
@@ -483,7 +427,6 @@ def _click_primary_publish_control(page, category, batch_id=None, url_step7_star
         except Exception as _js_err:
             write_log_entry(batch_id, category, f"JS-клик тоже не прошёл: {_js_err}", level='silent')
             return False
-    _snap(page, batch_id)
     if url_step7_start and _dzen_publish_confirmed(page, url_step7_start):
         return False
     return True
@@ -552,7 +495,6 @@ def _set_comments_all_users(page, category, batch_id=None) -> None:
 
         if _TARGET in current_text:
             write_log_entry(batch_id, category, "Дзен: Комментарии уже «Все пользователи».", level='silent')
-            _snap(page, batch_id)
             return
 
         # Скроллим триггер ближе к верху, чтобы поповер вместился во viewport.
@@ -584,7 +526,6 @@ def _set_comments_all_users(page, category, batch_id=None) -> None:
                 page.keyboard.press("Escape")
             except Exception:
                 pass
-            _snap(page, batch_id)
             return
 
         # ── Верификация: триггер ДОЛЖЕН теперь показывать «Все пользователи» ──
@@ -597,14 +538,12 @@ def _set_comments_all_users(page, category, batch_id=None) -> None:
 
         if _TARGET in new_text:
             write_log_entry(batch_id, category, "Дзен: Комментарии выставлены «Все пользователи» (подтверждено).")
-            _snap(page, batch_id)
         else:
             write_log_entry(
                 batch_id, category,
                 f"Дзен: НЕ УДАЛОСЬ выставить «Все пользователи» — триггер показывает {new_text!r}.",
                 level='warn',
             )
-            _snap(page, batch_id)
     except Exception as _e:
         write_log_entry(batch_id, category, "Дзен: Ошибка при настройке комментариев — продолжаю.", level='warn')
         write_log_entry(batch_id, category, f"Ошибка _set_comments_all_users: {_e}", level='silent')
@@ -639,13 +578,10 @@ def _publish_ui(
                 f"Дзен: попытка {_attempt}/5 перейти в студию не удалась: {_e}",
                 level="warn",
             )
-            if _attempt < 5:
-                _snap(page, batch_id)
     if _last_err is not None:
         raise DzenApiError(
             f"Не удалось перейти в студию Дзена после 5 попыток: {_last_err}"
         ) from _last_err
-    _snap(page, batch_id)
 
     cur = page.url
     write_log_entry(batch_id, category, f"URL после перехода: {cur}", level='silent')
@@ -698,14 +634,12 @@ def _publish_ui(
                 f"Дзен: Клик по «+» заблокирован (попытка {_plus_attempt}/5), закрываю попапы.",
                 level="warn",
             )
-            _snap(page, batch_id)
             page.wait_for_timeout(500)
     if _last_plus_err is not None:
         raise DzenApiError(
             f"Не удалось нажать «+» в студии Дзена: {_last_plus_err}"
         ) from _last_plus_err
     write_log_entry(batch_id, category, "Дзен: Кнопка «+» нажата, жду меню.")
-    _snap(page, batch_id)
 
     # Перед шагом 3: закрываем любой неожиданный попап/хинт.
     _dzen_handle_popups(page, category, batch_id)
@@ -721,7 +655,6 @@ def _publish_ui(
         upload_item.wait_for(state="visible", timeout=180_000)
     upload_item.click()
     write_log_entry(batch_id, category, "Дзен: «Загрузить видео» нажато")
-    _snap(page, batch_id)
 
     # Перед шагом 4: закрываем любой неожиданный попап/хинт.
     _dzen_handle_popups(page, category, batch_id)
@@ -740,7 +673,6 @@ def _publish_ui(
     file_chooser.set_files(video_path)
     write_log_entry(batch_id, category, "Дзен: Файл передан браузеру, жду загрузки.")
     write_log_entry(batch_id, category, f"Файл: {os.path.basename(video_path)}", level='silent')
-    _snap(page, batch_id)
 
     # Ждём одно из двух:
     #   a) ?videoEditorPublicationId=...  — редактор открылся, нужно кликать «Опубликовать»
@@ -767,7 +699,6 @@ def _publish_ui(
 
     if _auto_published:
         # Видео уже опубликовано — пропускаем шаги 5-9
-        _snap(page, batch_id)
         write_log_entry(batch_id, category, "Дзен: Публикация завершена.")
         return
 
@@ -784,7 +715,6 @@ def _publish_ui(
         except Exception:
             write_log_entry(batch_id, category, "Дзен: Форма не обнаружена — продолжаю по таймауту.")
             page.wait_for_timeout(5000)
-    _snap(page, batch_id)
 
     # Редактор открылся — закрываем все неожиданные попапы (любые подсказки,
     # хинты, уведомления Дзена), которые могут мешать заполнению формы.
@@ -805,7 +735,6 @@ def _publish_ui(
             page.keyboard.press("Enter")
             page.wait_for_timeout(300)
         write_log_entry(batch_id, category, "Дзен: Теги заполнены")
-        _snap(page, batch_id)
     except Exception as _e:
         write_log_entry(batch_id, category, "Дзен: Не удалось заполнить теги — продолжаю.")
         write_log_entry(batch_id, category, f"Ошибка тегов: {_e}", level='silent')
@@ -868,7 +797,6 @@ def _publish_ui(
         except Exception:
             pass
         page.wait_for_timeout(400)
-    _snap(page, batch_id)
 
     # ── Шаг 8: Обрабатываем попапы, диалоги, хинты (до 10 секунд) ───────
     # Каждую итерацию вызываем _dzen_handle_popups — whitelist + hint dismiss.
@@ -981,21 +909,12 @@ def _publish_ui(
         "text=Ролик опубликован",
     ]
 
-    # Снимок на каждой навигации главного фрейма (смена URL, редирект и т.п.)
-    def _on_navigate(frame):
-        if frame == page.main_frame:
-            _snap(page, batch_id)
-    page.on("framenavigated", _on_navigate)
-
     _confirm_deadline = _time.monotonic() + _PUBLISH_CONFIRM_TIMEOUT / 1000
-    _snap_every = 3   # опросный снимок каждые N итераций (каждые 6 сек при POLL=2s)
     _iter = 0
     _publish_retries = 0
     _PUBLISH_RETRY_MAX = 3
     while _time.monotonic() < _confirm_deadline and not confirmed:
         _iter += 1
-        if _iter % _snap_every == 1:   # первый снимок сразу, потом каждые 6 сек
-            _snap(page, batch_id)
 
         if _dzen_publish_confirmed(page, url_step7_start, url_before):
             confirmed = True
@@ -1065,8 +984,6 @@ def _publish_ui(
 
         page.wait_for_timeout(_CONFIRM_POLL)
 
-    page.remove_listener("framenavigated", _on_navigate)
-
     if not confirmed:
         # Финальный URL-снимок
         url_after = page.url
@@ -1088,11 +1005,9 @@ def _publish_ui(
                 write_log_entry(batch_id, category, "Дзен: Публикация предположительно подтверждена.")
                 write_log_entry(batch_id, category, f"URL сменился: {url_after}", level='silent')
 
-    _snap(page, batch_id)
 
     if not confirmed:
         _check_error_toast()  # бросает DzenApiError если есть явная ошибка
-        _snap(page, batch_id)
         raise DzenApiError(
             "Подтверждение публикации не получено за 60 с — "
             "видео предположительно в черновиках. Проверьте вручную."

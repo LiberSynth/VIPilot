@@ -11,6 +11,12 @@ from typing import Callable
 
 from log import write_log_entry
 from services.browser_base import PlatformBrowser
+from services.publish_preview_capture import (
+    allocate_cdp_debug_port,
+    cdp_url_for_port,
+    start_publish_preview_capture,
+    stop_publish_preview_capture,
+)
 
 PW_PUBLISH_SLUGS = frozenset({"dzen", "rutube", "vkvideo"})
 
@@ -35,6 +41,7 @@ class PublishBatchBrowserSession:
         self._step_idx = -1
         self._pw = None
         self._browser = None
+        self._cdp_url: str | None = None
         self._open = False
 
     @property
@@ -58,11 +65,14 @@ class PublishBatchBrowserSession:
         _pipeline_args = ["--no-sandbox", "--disable-gpu"]
         if _platform.system() != "Windows":
             _pipeline_args.append("--disable-dev-shm-usage")
+        _debug_port = allocate_cdp_debug_port()
+        _pipeline_args.append(f"--remote-debugging-port={_debug_port}")
         self._pw = sync_playwright().start()
         self._browser = self._pw.chromium.launch(
             headless=True,
             args=_pipeline_args,
         )
+        self._cdp_url = cdp_url_for_port(_debug_port)
         self._open = True
         write_log_entry(
             self.batch_id, self.category,
@@ -90,6 +100,8 @@ class PublishBatchBrowserSession:
             },
         )
         page = ctx.new_page()
+        if batch_id and self._cdp_url:
+            start_publish_preview_capture(batch_id, self._cdp_url, platform_browser)
         try:
             bootstrap_err = platform_browser._bootstrap_pipeline_page(
                 page, target_id, batch_id, category,
@@ -115,6 +127,8 @@ class PublishBatchBrowserSession:
             )
             result = {"ok": False, "error": str(e)}
         finally:
+            if batch_id:
+                stop_publish_preview_capture(batch_id)
             try:
                 ctx.close()
             except Exception:

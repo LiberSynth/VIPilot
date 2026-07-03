@@ -116,17 +116,6 @@ def publish(
 # UI-driven публикация
 # ---------------------------------------------------------------------------
 
-def _snap(page, batch_id=None) -> None:
-    """Снимает скриншот и передаёт кадр в SSE-трансляцию и монитор (thread-safe)."""
-    try:
-        from services.browser_registry import get_browser as _get_browser
-        _b = _get_browser("rutube")
-        img = page.screenshot(type="jpeg", quality=65)
-        _b.push_frame(img)
-        if batch_id:
-            _b.push_frame_for_batch(batch_id, img)
-    except Exception as _e:
-        write_log_entry(None, 'rutube', f'_snap: {_e}', level='silent')
 
 def _rutube_upload_state(page) -> dict:
     """Проверяет видимые признаки загрузки и готовности формы публикации."""
@@ -190,7 +179,6 @@ def _find_rutube_add_button(page):
 def _wait_rutube_add_button(page, category, batch_id=None, timeout_ms=180_000):
     """Ждёт готовность студии и видимую кнопку «+ Добавить»."""
     deadline = _time.monotonic() + timeout_ms / 1000
-    last_snap_at = 0.0
     while _time.monotonic() < deadline:
         raise_if_login_required(page, "rutube")
         _rutube_handle_popups(page, category, batch_id)
@@ -198,9 +186,6 @@ def _wait_rutube_add_button(page, category, batch_id=None, timeout_ms=180_000):
         if add_btn is not None:
             return add_btn
         now = _time.monotonic()
-        if now - last_snap_at >= 5:
-            _snap(page, batch_id)
-            last_snap_at = now
         page.wait_for_timeout(500)
     raise_if_login_required(page, "rutube")
     raise RutubeApiError("Не дождались кнопки «+ Добавить» в студии Рутьюба.")
@@ -209,7 +194,6 @@ def _wait_rutube_upload(page, category, batch_id=None) -> bool:
     write_log_entry(batch_id, category, "Рутьюб: Жду завершения загрузки (до 3 минут).")
     deadline = _time.monotonic() + _UPLOAD_WAIT / 1000
     last_log_at = 0.0
-    last_snap_at = 0.0
     while _time.monotonic() < deadline:
         state = _rutube_upload_state(page)
         if _rutube_upload_ready(state):
@@ -242,10 +226,6 @@ def _wait_rutube_upload(page, category, batch_id=None) -> bool:
             msg = ", ".join(hint) if hint else "жду признаки готовности формы"
             write_log_entry(batch_id, category, f"Рутьюб: Загрузка в процессе — {msg}.")
             last_log_at = now
-        if now - last_snap_at >= 5:
-            _snap(page, batch_id)
-            last_snap_at = now
-
         page.wait_for_timeout(800)
 
     write_log_entry(batch_id, category, "Рутьюб: Ожидание загрузки истекло — продолжаю.", level="warn")
@@ -408,7 +388,6 @@ def _ensure_rutube_studio(page, category, batch_id=None) -> None:
             f"Рутьюб: Студия уже открыта (bootstrap), URL: {page.url}",
             level="silent",
         )
-        _snap(page, batch_id)
         return
 
     write_log_entry(batch_id, category, "Рутьюб: Переход в студию Рутьюба.")
@@ -426,8 +405,6 @@ def _ensure_rutube_studio(page, category, batch_id=None) -> None:
                 f"Рутьюб: попытка {_attempt}/5 перейти в студию не удалась: {_e}",
                 level="warn",
             )
-            if _attempt < 5:
-                _snap(page, batch_id)
     if _last_err is not None:
         raise RutubeApiError(
             f"Не удалось перейти в студию Рутьюба после 5 попыток: {_last_err}"
@@ -436,7 +413,6 @@ def _ensure_rutube_studio(page, category, batch_id=None) -> None:
         batch_id, category,
         f"Рутьюб: domcontentloaded за {_time.monotonic() - _nav_started:.1f} с.",
     )
-    _snap(page, batch_id)
 
 def _publish_ui(
     page,
@@ -466,7 +442,6 @@ def _publish_ui(
     add_btn = _wait_rutube_add_button(page, category, batch_id=batch_id)
     _click_rutube_add_button(add_btn, page, category, batch_id)
     write_log_entry(batch_id, category, "Рутьюб: Кнопка «+ Добавить» нажата, жду меню.")
-    _snap(page, batch_id)
 
     # ── Шаг 3: «Загрузить видео или Shorts» из меню ──────────────────────
     write_log_entry(batch_id, category, "Рутьюб: Выбираю «Загрузить видео или Shorts».")
@@ -479,7 +454,6 @@ def _publish_ui(
         upload_item.wait_for(state="visible", timeout=180_000)
     upload_item.click()
     write_log_entry(batch_id, category, "Рутьюб: «Загрузить видео или Shorts» нажато")
-    _snap(page, batch_id)
 
     # ── Шаг 4: Нажимаем «Выбрать файлы» и передаём видео ────────────────
     write_log_entry(batch_id, category, "Рутьюб: Ищу поле загрузки файла.")
@@ -492,11 +466,9 @@ def _publish_ui(
     file_chooser.set_files(video_path)
     write_log_entry(batch_id, category, "Рутьюб: Файл передан браузеру, жду загрузки.")
     write_log_entry(batch_id, category, f"Файл: {os.path.basename(video_path)}", level='silent')
-    _snap(page, batch_id)
 
     # ── Шаг 5: Ждём завершения загрузки ───────────────────────────────────
     _upload_ok = _wait_rutube_upload(page, category, batch_id=batch_id)
-    _snap(page, batch_id)
 
     # ── Шаг 6: Выбираем категорию ─────────────────────────────────────────
     write_log_entry(batch_id, category, f"Рутьюб: Выбираю категорию «{_CATEGORY}».")
@@ -517,7 +489,6 @@ def _publish_ui(
     except Exception as _e:
         write_log_entry(batch_id, category, "Рутьюб: Не удалось выбрать категорию — продолжаю.")
         write_log_entry(batch_id, category, f"Ошибка категории: {_e}", level='silent')
-    _snap(page, batch_id)
 
     if not _cat_ok and not _upload_ok:
         raise RutubeApiError(
@@ -527,13 +498,11 @@ def _publish_ui(
 
     # ── Шаг 7: Нажимаем «Опубликовать» ───────────────────────────────────
     write_log_entry(batch_id, category, "Рутьюб: Прокручиваю к кнопке «Опубликовать».")
-    _snap(page, batch_id)
     pub_btn = page.locator("button:has-text('Опубликовать')").last
     pub_btn.wait_for(state="visible", timeout=180_000)
 
     write_log_entry(batch_id, category, "Рутьюб: Нажимаю «Опубликовать».")
     _submit_rutube_publish(page, category, batch_id, pub_btn)
-    _snap(page, batch_id)
 
     # ── Шаг 8: Проверяем успех (тост «Видео опубликовано») ──────────────
     write_log_entry(batch_id, category, "Рутьюб: Проверяю результат публикации.")
@@ -562,9 +531,7 @@ def _publish_ui(
                 f"({_publish_retries}/{_PUBLISH_RETRY_MAX}).",
             )
             _submit_rutube_publish(page, category, batch_id)
-            _snap(page, batch_id)
 
-    _snap(page, batch_id)
 
     if _success:
         write_log_entry(

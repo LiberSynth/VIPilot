@@ -134,18 +134,6 @@ def publish(
 # UI-driven публикация
 # ---------------------------------------------------------------------------
 
-def _snap(page, batch_id=None) -> None:
-    """Снимает скриншот и передаёт кадр в SSE-трансляцию и монитор (thread-safe)."""
-    try:
-        from services.browser_registry import get_browser as _get_browser
-
-        _b = _get_browser("vkvideo")
-        img = page.screenshot(type="jpeg", quality=65)
-        _b.push_frame(img)
-        if batch_id:
-            _b.push_frame_for_batch(batch_id, img)
-    except Exception as _e:
-        write_log_entry(None, 'vkvideo', f'_snap: {_e}', level='silent')
 
 def _read_clip_url(page) -> str:
     """Читает ссылку на клип из DOM (раздел «Ссылка на клип»)."""
@@ -227,7 +215,6 @@ def _handle_vk_captcha(page, category, batch_id) -> None:
                 batch_id, category,
                 "VK Видео: CAPTCHA-диалог закрыт («Продолжить» нажато).",
             )
-            _snap(page, batch_id)
     except Exception:
         pass
 
@@ -322,7 +309,6 @@ def _wait_vk_clip_publish_ready(page, pub_btn, batch_id, category, timeout_ms=_P
         "VK Видео: Жду доступности кнопки «Опубликовать» (обработка видео).",
     )
     deadline = _time.monotonic() + timeout_ms / 1000
-    _next_snap = _time.monotonic()
     while _time.monotonic() < deadline:
         raise_if_login_required(page, "vkvideo")
         _vkvideo_handle_popups(page, category, batch_id)
@@ -330,9 +316,6 @@ def _wait_vk_clip_publish_ready(page, pub_btn, batch_id, category, timeout_ms=_P
         if _vk_publish_button_clickable(pub_btn):
             write_log_entry(batch_id, category, "VK Видео: Кнопка «Опубликовать» доступна.")
             return
-        if _time.monotonic() >= _next_snap:
-            _snap(page, batch_id)
-            _next_snap = _time.monotonic() + 2
         page.wait_for_timeout(1_000)
     raise VkVideoApiError(
         "VK Видео: таймаут ожидания доступности кнопки «Опубликовать»"
@@ -432,7 +415,6 @@ def _wait_visible(
             if _time.monotonic() >= deadline:
                 locator.wait_for(state="visible", timeout=1_000)  # бросит TimeoutError
                 return
-            _snap(page, batch_id)
 
 def _publish_ui(
     page,
@@ -451,7 +433,6 @@ def _publish_ui(
 
     # ── Шаг 1: Переходим в кабинет с параметром uploader ─────────────────
     write_log_entry(batch_id, category, "VK Видео: Переход в кабинет автора.")
-    _snap(page, batch_id)
     _last_err = None
     for _attempt in range(1, 6):
         try:
@@ -465,13 +446,10 @@ def _publish_ui(
                 f"VK Видео: попытка {_attempt}/5 перейти в кабинет не удалась: {_e}",
                 level="warn",
             )
-            if _attempt < 5:
-                _snap(page, batch_id)
     if _last_err is not None:
         raise VkVideoApiError(
             f"Не удалось перейти в кабинет VK Видео после 5 попыток: {_last_err}"
         ) from _last_err
-    _snap(page, batch_id)
 
     cur = page.url
     write_log_entry(batch_id, category, f"URL после перехода: {cur}", level="silent")
@@ -498,14 +476,11 @@ def _publish_ui(
 
     # ── Шаг 2: Ждём появления кнопки «Выбрать файл» ──────────────────────
     write_log_entry(batch_id, category, "VK Видео: Жду модал загрузки клипа.")
-    _snap(page, batch_id)
     _wait_visible(choose_btn, 180_000, page, batch_id, category, club_id=club_id)
-    _snap(page, batch_id)
 
     write_log_entry(batch_id, category, "VK Видео: Кнопка «Выбрать файл» найдена, загружаю файл.")
 
     # ── Шаг 3: Загружаем файл через file chooser ─────────────────────────
-    _snap(page, batch_id)
     with page.expect_file_chooser(timeout=180_000) as fc_info:
         choose_btn.click()
     file_chooser = fc_info.value
@@ -514,12 +489,10 @@ def _publish_ui(
     write_log_entry(
         batch_id, category, f"Файл: {os.path.basename(video_path)}", level="silent"
     )
-    _snap(page, batch_id)
 
     # ── Шаг 4: Ждём форму «Публикация клипа» (поле Описание) ─────────────
     write_log_entry(batch_id, category, "VK Видео: Жду форму публикации.")
     _form_ok = False
-    _snap(page, batch_id)
     try:
         page.wait_for_selector(
             "textarea[placeholder*='клип'], "
@@ -532,12 +505,9 @@ def _publish_ui(
     except Exception:
         write_log_entry(batch_id, category, "VK Видео: Ожидание формы истекло — продолжаю.")
         page.wait_for_timeout(5000)
-    _snap(page, batch_id)
 
     # ── Шаг 5: Читаем ссылку на клип из DOM ──────────────────────────────
-    _snap(page, batch_id)
     clip_url = _read_clip_url(page)
-    _snap(page, batch_id)
     if clip_url:
         write_log_entry(batch_id, category, "VK Видео: Ссылка на клип получена.")
         write_log_entry(batch_id, category, f"Ссылка на клип: {clip_url}", level="silent")
@@ -553,15 +523,12 @@ def _publish_ui(
             "textarea[placeholder*='Клип'], "
             "[placeholder*='клип']"
         ).first
-        _snap(page, batch_id)
         desc_field.wait_for(state="visible", timeout=5_000)
-        _snap(page, batch_id)
         desc_field.click()
         description = f"{pub_title}. {hashtags()}"
         desc_field.fill(description)
         write_log_entry(batch_id, category, "VK Видео: Описание заполнено.")
         write_log_entry(batch_id, category, f"Описание: {description}", level="silent")
-        _snap(page, batch_id)
     except Exception as _e:
         write_log_entry(batch_id, category, "VK Видео: Не удалось заполнить описание — продолжаю.")
         write_log_entry(batch_id, category, f"Ошибка описания: {_e}", level="silent")
@@ -569,20 +536,16 @@ def _publish_ui(
     # ── Шаг 7: Ждём кнопку и готовность превью ───────────────────────────
     write_log_entry(batch_id, category, "VK Видео: Жду кнопку «Опубликовать».")
     pub_btn = page.locator("button:has-text('Опубликовать')").last
-    _snap(page, batch_id)
     pub_btn.wait_for(state="visible", timeout=_PUBLISH_WAIT)
-    _snap(page, batch_id)
     _wait_vk_clip_publish_ready(page, pub_btn, batch_id, category)
 
     # ── Шаг 8: Нажимаем «Опубликовать» ───────────────────────────────────
     # Кнопка внизу модалки — часто за пределами viewport; без прокрутки
     # Playwright висит на click() до таймаута, ожидая actionability.
     write_log_entry(batch_id, category, "VK Видео: Прокручиваю к кнопке «Опубликовать».")
-    _snap(page, batch_id)
 
     write_log_entry(batch_id, category, "VK Видео: Нажимаю «Опубликовать».")
     _submit_vk_clip_publish(page, category, batch_id, pub_btn)
-    _snap(page, batch_id)
 
     # ── Шаг 9: Проверяем успех (тост «Клип опубликован») ────────────────
     write_log_entry(batch_id, category, "VK Видео: Проверяю результат публикации.")
@@ -603,9 +566,7 @@ def _publish_ui(
         ):
             _last_click_at = _time.monotonic()
             _submit_vk_clip_publish(page, category, batch_id, _pub_btn)
-            _snap(page, batch_id)
 
-    _snap(page, batch_id)
 
     if _success:
         write_log_entry(
