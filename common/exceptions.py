@@ -20,6 +20,10 @@ class FatalError(Exception):
     def __str__(self):
         return self.message
 
+class ShutdownRequested(BaseException):
+    """Остановка приложения; не ошибка пайплайна."""
+
+
 class AppException(Exception):
     """Прерывающая ошибка пайплайна.
 

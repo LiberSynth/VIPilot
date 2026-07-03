@@ -169,7 +169,7 @@ def refresh_session_after_auth(
     **auth_context,
 ) -> dict:
     """URL-проверка кабинета, затем snapshot куков в БД (warm-up refresh save)."""
-    from clients.common import raise_if_login_required
+    from services.publish_auth_check import raise_if_login_required
 
     raise_if_login_required(page, platform, **auth_context)
     return save_from_context(

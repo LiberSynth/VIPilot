@@ -3,11 +3,28 @@
 """
 import threading
 
-from db import db_set_batch_status
+from db import db_get_batch_status, db_set_batch_status
 from log import write_log_entry
-from common.exceptions import AppException
+from common.exceptions import AppException, ShutdownRequested
+from common.shutdown import (
+    is_playwright_shutdown_error,
+    is_shutting_down,
+    register_batch_thread,
+    unregister_batch_thread,
+)
 import common.environment as environment
 from utils.utils import fmt_id_msg
+
+
+def _interrupt_batch_on_shutdown(batch_id: str) -> None:
+    status = db_get_batch_status(batch_id)
+    if not status:
+        return
+    if status.endswith(".posting"):
+        db_set_batch_status(batch_id, status[: -len(".posting")] + ".pending")
+    elif status == "processing":
+        db_set_batch_status(batch_id, "pending")
+
 
 def _handle_batch_error(e, batch_id, category):
     pipeline_name = category
@@ -40,6 +57,7 @@ def _handle_batch_error(e, batch_id, category):
 
 def run_batch(batch_id, pipeline, category):
     """Запускает пайплайн, обрабатывает ошибки и освобождает слот потока."""
+    register_batch_thread(batch_id, threading.current_thread())
     write_log_entry(batch_id, category, f'Запуск пайплайна {category}.', level='info')
     write_log_entry(
         batch_id,
@@ -55,9 +73,25 @@ def run_batch(batch_id, pipeline, category):
             fmt_id_msg(f"batch={{}}, pipeline={category}, phase=run_done", batch_id),
             level='silent',
         )
+    except ShutdownRequested:
+        _interrupt_batch_on_shutdown(batch_id)
+        write_log_entry(
+            batch_id, category,
+            "Прервано: остановка приложения.",
+            level="info",
+        )
     except Exception as e:
-        _handle_batch_error(e, batch_id, category)
+        if is_shutting_down() and is_playwright_shutdown_error(e):
+            _interrupt_batch_on_shutdown(batch_id)
+            write_log_entry(
+                batch_id, category,
+                "Прервано: остановка приложения.",
+                level="info",
+            )
+        else:
+            _handle_batch_error(e, batch_id, category)
     finally:
+        unregister_batch_thread(batch_id)
         environment.release_batch(batch_id)
         from services.browser_registry import clear_publish_frames_for_batch
         clear_publish_frames_for_batch(batch_id)

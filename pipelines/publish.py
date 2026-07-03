@@ -17,7 +17,8 @@ from db import (
 )
 from log import db_get_batch_log_entries, write_log_entry
 from pipelines.base import ensure_playwright_chromium
-from common.exceptions import AppException
+from common.exceptions import AppException, ShutdownRequested
+from common.shutdown import is_shutting_down, is_playwright_shutdown_error
 from utils.utils import fmt_id_msg
 from routes.api import client_is_configured, build_publication_title
 from clients import vk
@@ -334,6 +335,8 @@ def run(batch_id, category):
     )
     try:
         for step_idx, (slug, method, target) in enumerate(steps):
+            if is_shutting_down():
+                raise ShutdownRequested()
             if resume_from is not None:
                 if (slug, method) != resume_from:
                     continue
@@ -378,12 +381,16 @@ def run(batch_id, category):
                     slug, method, batch_id, category, target, pub_title,
                     batch_session=pw_session, keep_browser=keep_browser,
                 )
+            except ShutdownRequested:
+                raise
             except (DzenSessionMissing, DzenCsrfExpired, RutubeSessionMissing, RutubeCsrfExpired, VkVideoSessionMissing, VkVideoCsrfExpired) as e:
                 ok = False
                 step_error = str(e)
                 write_log_entry(batch_id, category, f'{slug}.{method}: {e}', level='error')
                 write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} — phase=step_exception, step={}.{}, type={}, msg={}", batch_id, slug, method, type(e).__name__, step_error), level='silent')
             except Exception as e:
+                if is_shutting_down() and is_playwright_shutdown_error(e):
+                    raise ShutdownRequested() from e
                 ok = False
                 step_error = str(e)
                 write_log_entry(batch_id, category, f'{slug}.{method}: неожиданная ошибка: {e}', level='error')

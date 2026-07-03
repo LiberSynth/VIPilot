@@ -7,6 +7,7 @@ from flask import Flask
 
 import log.log as log_state
 from log import write_log_entry
+from common.shutdown import graceful_exit, request_shutdown
 from utils.consts import FLASK_SECRET, PLAYWRIGHT_BROWSERS_PATH
 from utils.limiter import limiter
 
@@ -29,16 +30,8 @@ def register_shutdown_hooks() -> None:
         write_log_entry(None, 'main', 'Приложение остановлено', level='info')
 
     def _handler(signum, _frame):
-        with log_state._system_log_lock:
-            already = log_state._lifecycle_stop_logged
-            if not already:
-                log_state._lifecycle_stop_logged = True
-        if not already:
-            write_log_entry(None, 'main', 'Приложение остановлено', level='info')
-        if signum == signal.SIGINT:
-            # Preserve standard Ctrl+C behavior in dev console.
-            signal.default_int_handler(signum, _frame)
-        raise SystemExit(0)
+        request_shutdown()
+        graceful_exit()
 
     for sig in (signal.SIGTERM, signal.SIGINT):
         try:

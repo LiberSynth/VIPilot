@@ -16,9 +16,9 @@ from clients.common import (
     OverlayNotDismissedError,
     poll_until,
     poll_wait_tick,
-    raise_if_login_required,
     safe_click,
 )
+from services.publish_auth_check import raise_if_login_required
 from log import write_log_entry
 from utils.utils import fmt_id_msg
 from routes.api import publication_file_name

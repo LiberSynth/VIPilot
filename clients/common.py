@@ -1,10 +1,9 @@
 """
 Общие утилиты Playwright-клиентов публикации (dzen, rutube, vkvideo).
 
-Единый контракт: handle_popups(whitelist) → dismiss_unknown.
-Платформенное — whitelist и стратегия dismiss_unknown:
-  • Дзен — modal-overlay: dismiss_overlay_strict; hint: dismiss_dzen_hint
-  • Rutube / VK — dismiss_overlay_strict (снаружи → Escape → ×, без ретраев)
+Единый контракт: handle_popups(whitelist) -> dismiss_unknown.
+Платформенное (whitelist, is_present, extra_close_selectors, extra_steps)
+передаётся вызывающим кодом; common не импортирует прикладные модули.
 """
 
 from __future__ import annotations
@@ -15,16 +14,15 @@ from typing import Any
 
 from log import write_log_entry
 
-_SESSION_MSG = (
-    "Сессия истекла — авторизуйтесь снова в браузере (вкладка «Публикация»)"
-)
-
 # (имя, detect(page)->bool, handle(page, category, batch_id)|None)
 WhitelistEntry = tuple[str, Callable[..., bool], Callable[..., None] | None]
 
 DismissUnknown = Callable[..., None]
 
-_DZEN_HINT_CLOSE_SELECTOR = "[class*='helper-tooltip__closeButton']"
+DismissStep = tuple[str, Callable[..., bool]]
+
+_DISMISS_SETTLE_MS = 600
+_DISMISS_POLL_MS = 50
 
 _SAFE_FIELD_JS = """
 (inset) => {
@@ -62,23 +60,55 @@ _SAFE_FIELD_JS = """
 }
 """
 
+_OUTSIDE_MODAL_JS = """
+(args) => {
+  const [overlaySel, modalSel, inset] = args;
+  const overlay = document.querySelector(overlaySel);
+  if (!overlay) return null;
+  const oStyle = window.getComputedStyle(overlay);
+  if (oStyle.display === 'none' || oStyle.visibility === 'hidden') return null;
+  const or = overlay.getBoundingClientRect();
+  if (or.width <= 0 || or.height <= 0) return null;
+  const modal = modalSel ? document.querySelector(modalSel) : null;
+  const mr = modal ? modal.getBoundingClientRect() : null;
+  const insideModal = (x, y) => {
+    if (!mr || mr.width <= 0 || mr.height <= 0) return false;
+    return x >= mr.left && x <= mr.right && y >= mr.top && y <= mr.bottom;
+  };
+  const onOverlay = (el) => {
+    if (!el) return false;
+    return el === overlay || overlay.contains(el);
+  };
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  const points = [
+    [inset, inset],
+    [w - inset, inset],
+    [inset, h - inset],
+    [w - inset, h - inset],
+  ];
+  if (mr) {
+    points.push(
+      [Math.round((or.left + mr.left) / 2), Math.round(or.top + inset)],
+      [Math.round((mr.right + or.right) / 2), Math.round(or.top + inset)],
+      [Math.round((mr.left + mr.right) / 2), Math.round(Math.max(or.top + inset, mr.top - inset))],
+      [Math.round((mr.left + mr.right) / 2), Math.round(Math.min(or.bottom - inset, mr.bottom + inset))],
+      [Math.round(Math.max(or.left + inset, mr.left - inset * 2)), Math.round((mr.top + mr.bottom) / 2)],
+      [Math.round(Math.min(or.right - inset, mr.right + inset * 2)), Math.round((mr.top + mr.bottom) / 2)],
+    );
+  }
+  for (const [x, y] of points) {
+    if (insideModal(x, y)) continue;
+    const el = document.elementFromPoint(x, y);
+    if (onOverlay(el)) return { x, y };
+  }
+  return null;
+}
+"""
+
 
 class OverlayNotDismissedError(RuntimeError):
     """Оверлей остался на экране после полной цепочки закрывающих действий."""
-
-
-def _page_url(page) -> str:
-    try:
-        return page.url.lower()
-    except Exception:
-        return ""
-
-
-def _config_id_str(value) -> str:
-    """Нормализует id из JSON-конфига таргета (str или int)."""
-    if value is None:
-        return ""
-    return str(value).strip()
 
 
 def _visible(page, locator, timeout_ms: int = 400) -> bool:
@@ -86,86 +116,6 @@ def _visible(page, locator, timeout_ms: int = 400) -> bool:
         return locator.first.is_visible(timeout=timeout_ms)
     except Exception:
         return False
-
-
-def _url_indicates_login(url: str, platform: str) -> bool:
-    if not url:
-        return False
-    if platform == "rutube":
-        return (
-            "rutube.ru/login" in url
-            or "passport.rutube" in url
-            or "/auth" in url
-            or "passport" in url
-        )
-    if platform == "dzen":
-        return "passport.yandex" in url or "/auth" in url
-    if platform == "vkvideo":
-        return (
-            "vk.com/login" in url
-            or "login.vk" in url
-            or "passport.vk" in url
-            or "oauth.vk" in url
-            or "id.vk.com/auth" in url
-            or "id.vk.com/login" in url
-            or ("id.vk.com" in url and "/auth" in url)
-        )
-    return False
-
-
-def _dzen_publish_access_denied(page, publisher_id: str | None = None) -> bool:
-    """Нет доступа к студии: URL не editor нужного publisher_id."""
-    url = _page_url(page)
-    if publisher_id:
-        pid = _config_id_str(publisher_id).lower()
-        return f"/profile/editor/id/{pid}" not in url
-    return "/profile/editor/" not in url
-
-
-def _rutube_publish_access_denied(page) -> bool:
-    return "studio.rutube.ru" not in _page_url(page)
-
-
-def _vkvideo_publish_access_denied(page, club_id: str | None = None) -> bool:
-    url = _page_url(page)
-    if "cabinet.vkvideo.ru" not in url:
-        return True
-    if club_id:
-        normalized = _config_id_str(club_id).lstrip("@")
-        if normalized and f"club{normalized}" not in url.replace("@", ""):
-            return True
-    return False
-
-
-def login_screen_visible(page, platform: str, **context) -> bool:
-    """True если URL указывает на экран входа или нет доступа к кабинету."""
-    if _url_indicates_login(_page_url(page), platform):
-        return True
-    if platform == "dzen":
-        return _dzen_publish_access_denied(page, context.get("publisher_id"))
-    if platform == "rutube":
-        return _rutube_publish_access_denied(page)
-    if platform == "vkvideo":
-        return _vkvideo_publish_access_denied(page, context.get("club_id"))
-    return False
-
-
-def raise_if_login_required(page, platform: str, **context) -> None:
-    """Бросает *CsrfExpired платформы, если виден экран входа или нет доступа к кабинету."""
-    if not login_screen_visible(page, platform, **context):
-        return
-    if platform == "dzen":
-        from clients.dzen import DzenCsrfExpired
-
-        raise DzenCsrfExpired(_SESSION_MSG)
-    if platform == "rutube":
-        from clients.rutube import RutubeCsrfExpired
-
-        raise RutubeCsrfExpired(_SESSION_MSG)
-    if platform == "vkvideo":
-        from clients.vkvideo import VkVideoCsrfExpired
-
-        raise VkVideoCsrfExpired(_SESSION_MSG)
 
 
 def handle_popups(
@@ -178,7 +128,7 @@ def handle_popups(
     allow_dismiss: bool = True,
 ) -> None:
     """
-    Паттерн из dzen._handle_popups: whitelist → иначе dismiss_unknown.
+    whitelist -> иначе dismiss_unknown.
     handle=None — элемент известен, не закрывать.
     allow_dismiss=False — только whitelist (ожидание целевого UI, без dismiss).
     """
@@ -208,90 +158,6 @@ def _try_close_selectors(page, selectors: Sequence[str]) -> bool:
     return False
 
 
-def dismiss_overlay_strict(
-    page,
-    category=None,
-    batch_id=None,
-    *,
-    label: str = "",
-    is_present: Callable[..., bool] | None = None,
-    extra_close_selectors: Sequence[str] = (),
-    click_modal_backdrop: bool = False,
-) -> None:
-    """Одна цепочка без пауз и ретраев: снаружи → Escape → × → (backdrop).
-
-    Если оверлей остался — OverlayNotDismissedError.
-    """
-    present = is_present or _likely_overlay_present
-    if not present(page):
-        return
-
-    _user_lvl = "info" if batch_id else "silent"
-    prefix = f"{label}: " if label else ""
-
-    if _click_safe_free_field(page):
-        write_log_entry(
-            batch_id, category,
-            f"{prefix}Закрываю оверлей — клик в свободную область.",
-            level=_user_lvl,
-        )
-        if not present(page):
-            write_log_entry(
-                batch_id, category,
-                f"{prefix}Оверлей закрыт.",
-                level=_user_lvl,
-            )
-            return
-
-    write_log_entry(
-        batch_id, category,
-        f"{prefix}Закрываю оверлей — Escape.",
-        level=_user_lvl,
-    )
-    _try_escape(page)
-    if not present(page):
-        write_log_entry(
-            batch_id, category,
-            f"{prefix}Оверлей закрыт.",
-            level=_user_lvl,
-        )
-        return
-
-    closed = _try_generic_close(page) or _try_close_selectors(page, extra_close_selectors)
-    if closed:
-        write_log_entry(
-            batch_id, category,
-            f"{prefix}Закрываю оверлей — кнопка закрытия.",
-            level=_user_lvl,
-        )
-        if not present(page):
-            write_log_entry(
-                batch_id, category,
-                f"{prefix}Оверлей закрыт.",
-                level=_user_lvl,
-            )
-            return
-
-    if click_modal_backdrop:
-        try:
-            page.locator("[data-testid='modal-overlay']").first.click(
-                force=True, timeout=2_000,
-            )
-        except Exception:
-            pass
-        if not present(page):
-            write_log_entry(
-                batch_id, category,
-                f"{prefix}Оверлей закрыт.",
-                level=_user_lvl,
-            )
-            return
-
-    raise OverlayNotDismissedError(
-        f"{prefix}Не удалось закрыть оверлей — все действия исчерпаны."
-    )
-
-
 def _click_safe_free_field(page, inset: int = 24) -> bool:
     try:
         pt = page.evaluate(_SAFE_FIELD_JS, inset)
@@ -311,6 +177,35 @@ def _try_escape(page) -> None:
         page.keyboard.press("Escape")
     except Exception:
         pass
+
+
+def _step_escape(page) -> bool:
+    _try_escape(page)
+    return True
+
+
+def click_outside_modal_boundary(
+    page,
+    overlay_selector: str,
+    modal_selector: str = "",
+    *,
+    inset: int = 16,
+) -> bool:
+    """Клик по затемнённому backdrop вне прямоугольника modal_selector."""
+    try:
+        pt = page.evaluate(
+            _OUTSIDE_MODAL_JS,
+            [overlay_selector, modal_selector or None, inset],
+        )
+    except Exception:
+        return False
+    if not pt:
+        return False
+    try:
+        page.mouse.click(pt["x"], pt["y"])
+        return True
+    except Exception:
+        return False
 
 
 def _try_generic_close(page) -> bool:
@@ -352,143 +247,90 @@ def _likely_overlay_present(page) -> bool:
     return False
 
 
-def dismiss_dzen_hint(
+def _wait_overlay_gone(page, present: Callable[..., bool], timeout_ms: int = _DISMISS_SETTLE_MS) -> bool:
+    """Ждёт исчезновения оверлея после закрывающего действия (анимация)."""
+    deadline = _time.monotonic() + timeout_ms / 1000
+    while _time.monotonic() < deadline:
+        if not present(page):
+            return True
+        page.wait_for_timeout(_DISMISS_POLL_MS)
+    return not present(page)
+
+
+def _run_dismiss_steps(
     page,
-    category=None,
-    batch_id=None,
-    *,
-    label: str = "Дзен",
-    phase: int = 0,
-    force: bool = False,
+    present: Callable[..., bool],
+    batch_id,
+    category,
+    prefix: str,
+    user_lvl: str,
+    steps: Sequence[DismissStep],
 ) -> None:
-    """Закрывает helper-tooltip хинт Дзена. Без click-outside (ломает меню «+»).
-
-    phase/force — совместимость с safe_click; hint не использует click-outside.
-    """
-    del phase, force
-    _user_lvl = "info" if batch_id else "silent"
-    _warn_lvl = "warn" if batch_id else "silent"
-    prefix = f"{label}: " if label else ""
-
-    hint_was_seen = False
-    for _attempt in range(3):
+    for log_msg, action in steps:
+        if not present(page):
+            return
         try:
-            btn = page.locator(_DZEN_HINT_CLOSE_SELECTOR).first
-            if not btn.is_visible(timeout=300):
-                break
+            performed = action(page)
         except Exception:
-            break
-
-        hint_was_seen = True
-
-        try:
-            cls_before = btn.get_attribute("class", timeout=300) or ""
-        except Exception:
-            cls_before = ""
-
-        write_log_entry(
-            batch_id, category,
-            f"{prefix}Закрываю оверлей — кнопка хинта (попытка {_attempt + 1}).",
-            level=_user_lvl,
-        )
-        write_log_entry(
-            batch_id, category,
-            f"hint close target class={cls_before!r}",
-            level="silent",
-        )
-
-        try:
-            url_before_click = page.url
-        except Exception:
-            url_before_click = ""
-
-        try:
-            btn.click(timeout=2_000)
-        except Exception as _e:
-            write_log_entry(
-                batch_id, category, f"hint click failed: {_e}", level="silent",
-            )
-            try:
-                url_now = page.url
-            except Exception:
-                url_now = ""
-            try:
-                still_visible = page.locator(
-                    _DZEN_HINT_CLOSE_SELECTOR,
-                ).first.is_visible(timeout=200)
-            except Exception:
-                still_visible = False
-
-            if not still_visible:
-                write_log_entry(
-                    batch_id, category,
-                    f"{prefix}Оверлей закрыт.",
-                    level=_user_lvl,
-                )
-                return
-
-            left_editor = (
-                ("videoEditorPublicationId" in (url_before_click or ""))
-                and ("videoEditorPublicationId" not in (url_now or ""))
-            ) or ("state=published" in (url_now or "")) or ("state=pending" in (url_now or ""))
-            if left_editor:
-                write_log_entry(
-                    batch_id, category,
-                    f"hint close interrupted by navigation: {url_now}",
-                    level="silent",
-                )
-                return
-
+            performed = False
+        if performed:
             write_log_entry(
                 batch_id, category,
-                "[dzen] hint click failed, retrying.",
-                level="silent",
+                f"{prefix}{log_msg}",
+                level=user_lvl,
             )
-            continue
-
-        page.wait_for_timeout(300)
-
-        try:
-            still_visible = page.locator(
-                _DZEN_HINT_CLOSE_SELECTOR,
-            ).first.is_visible(timeout=200)
-        except Exception:
-            still_visible = False
-
-        if not still_visible:
+            if present(page):
+                _wait_overlay_gone(page, present)
+        if not present(page):
             write_log_entry(
                 batch_id, category,
                 f"{prefix}Оверлей закрыт.",
-                level=_user_lvl,
+                level=user_lvl,
             )
             return
 
-        write_log_entry(
-            batch_id, category,
-            "[dzen] хинт всё ещё виден после клика — повтор.",
-            level="silent",
-        )
 
-    if hint_was_seen:
-        write_log_entry(
-            batch_id, category,
-            f"{prefix}Оверлей не закрылся за 3 попытки.",
-            level=_warn_lvl,
-        )
-
-
-def dismiss_click_outside(
+def dismiss_overlay_strict(
     page,
     category=None,
     batch_id=None,
     *,
     label: str = "",
-    phase: int = 0,
-    force: bool = False,
+    is_present: Callable[..., bool] | None = None,
+    extra_close_selectors: Sequence[str] = (),
+    extra_steps: Sequence[DismissStep] = (),
 ) -> None:
-    """Rutube/VK: strict dismiss (phase/force ignored, kept for safe_click compat)."""
-    del phase, force
-    dismiss_overlay_strict(page, category, batch_id, label=label)
+    """Одна цепочка закрывающих действий; каждый шаг логируется после выполнения.
+
+    После каждого шага — короткое ожидание исчезновения оверлея (анимация).
+    Базовый порядок: свободная область -> extra_steps -> Escape -> x.
+    Если оверлей остался — OverlayNotDismissedError.
+    """
+    present = is_present or _likely_overlay_present
+    if not present(page):
+        return
+
+    _user_lvl = "info" if batch_id else "silent"
+    prefix = f"{label}: " if label else ""
+
+    def _try_close(page) -> bool:
+        return _try_generic_close(page) or _try_close_selectors(page, extra_close_selectors)
+
+    steps: list[DismissStep] = [
+        ("сделан клик в свободную область", _click_safe_free_field),
+        *extra_steps,
+        ("нажат Escape", _step_escape),
+        ("сделан клик по кнопке закрытия", _try_close),
+    ]
+    _run_dismiss_steps(page, present, batch_id, category, prefix, _user_lvl, steps)
+
+    if present(page):
+        _wait_overlay_gone(page, present)
+    if not present(page):
+        return
+    raise OverlayNotDismissedError(
+        f"{prefix}Не удалось закрыть оверлей — все действия исчерпаны."
+    )
 
 
 def safe_click(
@@ -505,7 +347,7 @@ def safe_click(
     click_kwargs: dict[str, Any] | None = None,
     js_fallback: bool = False,
 ) -> None:
-    """handle_popups → dismiss → click; короткий timeout, без 30-с Playwright-retry."""
+    """handle_popups -> dismiss -> click; короткий timeout, без 30-с Playwright-retry."""
     opts = dict(click_kwargs or {})
     _click_timeout_ms = min(timeout_ms, 2_000)
 
@@ -536,6 +378,32 @@ def safe_click(
 
 
 _PREVIEW_POLL_MS = 200
+_SHUTDOWN_WAIT_CHUNK_MS = 50
+
+
+def _raise_if_shutting_down() -> None:
+    from common.exceptions import ShutdownRequested
+    from common.shutdown import is_shutting_down
+
+    if is_shutting_down():
+        raise ShutdownRequested()
+
+
+def _interruptible_page_wait(page, timeout_ms: int) -> None:
+    from common.exceptions import ShutdownRequested
+    from common.shutdown import is_playwright_shutdown_error, is_shutting_down
+
+    remaining = timeout_ms
+    while remaining > 0:
+        _raise_if_shutting_down()
+        step = min(_SHUTDOWN_WAIT_CHUNK_MS, remaining)
+        try:
+            page.wait_for_timeout(step)
+        except Exception as exc:
+            if is_shutting_down() or is_playwright_shutdown_error(exc):
+                raise ShutdownRequested() from exc
+            raise
+        remaining -= step
 
 
 def poll_wait_tick(
@@ -545,8 +413,9 @@ def poll_wait_tick(
     poll_ms: int = _PREVIEW_POLL_MS,
 ) -> None:
     """Пауза в wait-цикле: inline-кадр при сбое CDP, иначе только sleep."""
+    _raise_if_shutting_down()
     _maybe_inline_publish_preview(page, batch_id, platform)
-    page.wait_for_timeout(poll_ms)
+    _interruptible_page_wait(page, poll_ms)
 
 
 def poll_until(
@@ -562,6 +431,7 @@ def poll_until(
     """Ожидает predicate; между итерациями — poll_wait_tick (200 ms)."""
     deadline = _time.monotonic() + timeout_ms / 1000
     while _time.monotonic() < deadline:
+        _raise_if_shutting_down()
         if on_poll is not None:
             on_poll()
         if predicate():

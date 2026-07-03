@@ -23,9 +23,9 @@ from clients.common import (
     handle_popups,
     OverlayNotDismissedError,
     poll_wait_tick,
-    raise_if_login_required,
     safe_click,
 )
+from services.publish_auth_check import raise_if_login_required
 from db import db_set_batch_vkvideo_clip_url
 from log import write_log_entry
 from utils.utils import fmt_id_msg

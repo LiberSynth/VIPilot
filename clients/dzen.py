@@ -12,7 +12,7 @@ import tempfile
 import time as _time
 
 from clients.common import (
-    dismiss_dzen_hint,
+    click_outside_modal_boundary,
     dismiss_overlay_strict,
     handle_popups,
     OverlayNotDismissedError,
@@ -228,6 +228,145 @@ _DZEN_MODAL_CLOSE_SELECTORS = (
     "[class*='modal'] button:has-text('Позже')",
 )
 
+_DZEN_MODAL_OVERLAY_SELECTOR = "[data-testid='modal-overlay']"
+_DZEN_MODAL_ROOT_SELECTOR = "[class*='modal__rootElement']"
+_DZEN_HINT_CLOSE_SELECTOR = "[class*='helper-tooltip__closeButton']"
+
+
+def _dzen_click_outside_modal(page) -> bool:
+    return click_outside_modal_boundary(
+        page,
+        _DZEN_MODAL_OVERLAY_SELECTOR,
+        _DZEN_MODAL_ROOT_SELECTOR,
+    )
+
+
+_DZEN_MODAL_DISMISS_EXTRA_STEPS = (
+    ("сделан клик за границей окна", _dzen_click_outside_modal),
+)
+
+
+def dismiss_dzen_hint(
+    page,
+    category=None,
+    batch_id=None,
+    *,
+    label: str = "Дзен",
+    phase: int = 0,
+    force: bool = False,
+) -> None:
+    """Закрывает helper-tooltip хинт Дзена. Без click-outside (ломает меню «+»)."""
+    del phase, force
+    _user_lvl = "info" if batch_id else "silent"
+    _warn_lvl = "warn" if batch_id else "silent"
+    prefix = f"{label}: " if label else ""
+
+    hint_was_seen = False
+    for _attempt in range(3):
+        try:
+            btn = page.locator(_DZEN_HINT_CLOSE_SELECTOR).first
+            if not btn.is_visible(timeout=300):
+                break
+        except Exception:
+            break
+
+        hint_was_seen = True
+
+        try:
+            cls_before = btn.get_attribute("class", timeout=300) or ""
+        except Exception:
+            cls_before = ""
+
+        write_log_entry(
+            batch_id, category,
+            f"{prefix}сделан клик по кнопке хинта (попытка {_attempt + 1})",
+            level=_user_lvl,
+        )
+        write_log_entry(
+            batch_id, category,
+            f"hint close target class={cls_before!r}",
+            level="silent",
+        )
+
+        try:
+            url_before_click = page.url
+        except Exception:
+            url_before_click = ""
+
+        try:
+            btn.click(timeout=2_000)
+        except Exception as _e:
+            write_log_entry(
+                batch_id, category, f"hint click failed: {_e}", level="silent",
+            )
+            try:
+                url_now = page.url
+            except Exception:
+                url_now = ""
+            try:
+                still_visible = page.locator(
+                    _DZEN_HINT_CLOSE_SELECTOR,
+                ).first.is_visible(timeout=200)
+            except Exception:
+                still_visible = False
+
+            if not still_visible:
+                write_log_entry(
+                    batch_id, category,
+                    f"{prefix}Оверлей закрыт.",
+                    level=_user_lvl,
+                )
+                return
+
+            left_editor = (
+                ("videoEditorPublicationId" in (url_before_click or ""))
+                and ("videoEditorPublicationId" not in (url_now or ""))
+            ) or ("state=published" in (url_now or "")) or ("state=pending" in (url_now or ""))
+            if left_editor:
+                write_log_entry(
+                    batch_id, category,
+                    f"hint close interrupted by navigation: {url_now}",
+                    level="silent",
+                )
+                return
+
+            write_log_entry(
+                batch_id, category,
+                "hint click failed, retrying.",
+                level="silent",
+            )
+            continue
+
+        page.wait_for_timeout(300)
+
+        try:
+            still_visible = page.locator(
+                _DZEN_HINT_CLOSE_SELECTOR,
+            ).first.is_visible(timeout=200)
+        except Exception:
+            still_visible = False
+
+        if not still_visible:
+            write_log_entry(
+                batch_id, category,
+                f"{prefix}Оверлей закрыт.",
+                level=_user_lvl,
+            )
+            return
+
+        write_log_entry(
+            batch_id, category,
+            "хинт всё ещё виден после клика — повтор.",
+            level="silent",
+        )
+
+    if hint_was_seen:
+        write_log_entry(
+            batch_id, category,
+            f"{prefix}Оверлей не закрылся за 3 попытки.",
+            level=_warn_lvl,
+        )
+
 # ---------------------------------------------------------------------------
 # Известные ожидаемые элементы — список признаков и действий
 #
@@ -427,7 +566,7 @@ def _dzen_dismiss_unknown(
                 page, category, batch_id, label=lbl,
                 is_present=_modal_overlay_visible,
                 extra_close_selectors=_DZEN_MODAL_CLOSE_SELECTORS,
-                click_modal_backdrop=True,
+                extra_steps=_DZEN_MODAL_DISMISS_EXTRA_STEPS,
             )
         except OverlayNotDismissedError as exc:
             raise DzenApiError(str(exc)) from exc
