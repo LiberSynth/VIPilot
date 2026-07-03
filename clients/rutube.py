@@ -11,8 +11,9 @@ import tempfile
 import time as _time
 
 from clients.common import (
-    dismiss_click_outside,
+    dismiss_overlay_strict,
     handle_popups,
+    OverlayNotDismissedError,
     poll_until,
     poll_wait_tick,
     raise_if_login_required,
@@ -294,10 +295,13 @@ RUTUBE_PUBLISH_WHITELIST = [
 def _rutube_dismiss_unknown(
     page, category, batch_id, *, label: str = "", phase: int = 0, force: bool = False,
 ) -> None:
-    dismiss_click_outside(
-        page, category, batch_id,
-        label=label or "Рутьюб", phase=phase, force=force,
-    )
+    del phase, force
+    try:
+        dismiss_overlay_strict(
+            page, category, batch_id, label=label or "Рутьюб",
+        )
+    except OverlayNotDismissedError as exc:
+        raise RutubeApiError(str(exc)) from exc
 
 def _rutube_handle_popups(page, category, batch_id, *, allow_dismiss: bool = True) -> None:
     handle_popups(

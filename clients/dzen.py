@@ -11,7 +11,14 @@ import shutil
 import tempfile
 import time as _time
 
-from clients.common import dismiss_dzen_hint, handle_popups, poll_wait_tick
+from clients.common import (
+    dismiss_dzen_hint,
+    dismiss_overlay_strict,
+    handle_popups,
+    OverlayNotDismissedError,
+    poll_wait_tick,
+    safe_click,
+)
 from log import write_log_entry
 from utils.utils import fmt_id_msg
 from routes.api import publication_file_name, tags
@@ -206,59 +213,20 @@ def _modal_overlay_visible(page) -> bool:
     except Exception:
         return False
 
-def _dismiss_modal_overlay(page, category=None, batch_id=None) -> bool:
-    """Закрывает модальное окно студии Дзена. True — оверлея нет или закрыли."""
-    if not _modal_overlay_visible(page):
-        return True
-
-    write_log_entry(batch_id, category, "Дзен: Закрываю оверлей — modal-overlay (студия).")
-    overlay = page.locator("[data-testid='modal-overlay']").first
-    close_selectors = (
-        "[class*='modal__rootElement'] button[class*='close']",
-        "[class*='modal__rootElement'] [class*='Close']",
-        "[class*='modal__rootElement'] button[aria-label*='lose']",
-        "[class*='modal__rootElement'] button[aria-label*='закр']",
-        "[class*='modal__rootElement'] button[aria-label*='Закр']",
-        "button[aria-label*='Закрыть']",
-        "button[aria-label*='закрыть']",
-        "button[aria-label*='Close']",
-        "[class*='modal'] button:has-text('Понятно')",
-        "[class*='modal'] button:has-text('Не сейчас')",
-        "[class*='modal'] button:has-text('Пропустить')",
-        "[class*='modal'] button:has-text('Позже')",
-    )
-    for sel in close_selectors:
-        try:
-            btn = page.locator(sel).first
-            if btn.is_visible(timeout=300):
-                btn.click(timeout=5_000)
-                page.wait_for_timeout(400)
-                if not _modal_overlay_visible(page):
-                    return True
-        except Exception:
-            pass
-
-    for _ in range(2):
-        try:
-            page.keyboard.press("Escape")
-            page.wait_for_timeout(400)
-            if not _modal_overlay_visible(page):
-                return True
-        except Exception:
-            pass
-
-    try:
-        overlay.click(force=True, timeout=3_000)
-        page.wait_for_timeout(400)
-    except Exception:
-        pass
-
-    if not _modal_overlay_visible(page):
-        return True
-    return False
-
-def _handle_modal_overlay_element(page, category, batch_id) -> None:
-    _dismiss_modal_overlay(page, category, batch_id)
+_DZEN_MODAL_CLOSE_SELECTORS = (
+    "[class*='modal__rootElement'] button[class*='close']",
+    "[class*='modal__rootElement'] [class*='Close']",
+    "[class*='modal__rootElement'] button[aria-label*='lose']",
+    "[class*='modal__rootElement'] button[aria-label*='закр']",
+    "[class*='modal__rootElement'] button[aria-label*='Закр']",
+    "button[aria-label*='Закрыть']",
+    "button[aria-label*='закрыть']",
+    "button[aria-label*='Close']",
+    "[class*='modal'] button:has-text('Понятно')",
+    "[class*='modal'] button:has-text('Не сейчас')",
+    "[class*='modal'] button:has-text('Пропустить')",
+    "[class*='modal'] button:has-text('Позже')",
+)
 
 # ---------------------------------------------------------------------------
 # Известные ожидаемые элементы — список признаков и действий
@@ -441,20 +409,30 @@ def _retry_publish_if_button_visible(page, category, batch_id, url_step7_start, 
     return _click_primary_publish_control(page, category, batch_id, url_step7_start)
 
 DZEN_PUBLISH_WHITELIST = [
-    ("modal",   _modal_overlay_visible,   _handle_modal_overlay_element),
-    ("captcha", _detect_captcha,        _handle_captcha_element),
+    ("captcha", _detect_captcha, _handle_captcha_element),
     ("confirm", _detect_confirm_dialog, _handle_confirm_element),
     # file_input НЕ ДОБАВЛЯТЬ сюда — после set_files() input[type=file] остаётся в DOM
     # на всё время публикации и блокирует dismiss для любых других попапов.
+    # modal-overlay (донаты и пр.) — мусор, закрывается через dismiss_overlay_strict.
 ]
 
 def _dzen_dismiss_unknown(
     page, category, batch_id, *, label: str = "", phase: int = 0, force: bool = False,
 ) -> None:
-    dismiss_dzen_hint(
-        page, category, batch_id,
-        label=label or "Дзен", phase=phase, force=force,
-    )
+    del phase, force
+    lbl = label or "Дзен"
+    if _modal_overlay_visible(page):
+        try:
+            dismiss_overlay_strict(
+                page, category, batch_id, label=lbl,
+                is_present=_modal_overlay_visible,
+                extra_close_selectors=_DZEN_MODAL_CLOSE_SELECTORS,
+                click_modal_backdrop=True,
+            )
+        except OverlayNotDismissedError as exc:
+            raise DzenApiError(str(exc)) from exc
+        return
+    dismiss_dzen_hint(page, category, batch_id, label=lbl)
 
 def _dzen_handle_popups(
     page, category=None, batch_id=None, *, allow_dismiss: bool = True,
@@ -621,20 +599,14 @@ def _publish_ui(
         raise_if_login_required(page, "dzen", publisher_id=publisher_id)
         plus_btn.wait_for(state="visible", timeout=1_000)
     _last_plus_err = None
-    for _plus_attempt in range(1, 6):
-        _dzen_handle_popups(page, category, batch_id)
-        try:
-            plus_btn.click(timeout=30_000)
-            _last_plus_err = None
-            break
-        except Exception as _e:
-            _last_plus_err = _e
-            write_log_entry(
-                batch_id, category,
-                f"Дзен: Клик по «+» заблокирован (попытка {_plus_attempt}/5), закрываю попапы.",
-                level="info",
-            )
-            page.wait_for_timeout(500)
+    try:
+        safe_click(
+            plus_btn, page, DZEN_PUBLISH_WHITELIST, _dzen_dismiss_unknown,
+            batch_id=batch_id, category=category, label="Дзен",
+            timeout_ms=2_000, max_attempts=5, js_fallback=True,
+        )
+    except Exception as _e:
+        _last_plus_err = _e
     if _last_plus_err is not None:
         raise DzenApiError(
             f"Не удалось нажать «+» в студии Дзена: {_last_plus_err}"
@@ -653,7 +625,11 @@ def _publish_ui(
         write_log_entry(batch_id, category, "Дзен: exact-match не нашёл — пробую contains.")
         upload_item = page.locator("text=Загрузить видео").first
         upload_item.wait_for(state="visible", timeout=180_000)
-    upload_item.click()
+    safe_click(
+        upload_item, page, DZEN_PUBLISH_WHITELIST, _dzen_dismiss_unknown,
+        batch_id=batch_id, category=category, label="Дзен",
+        timeout_ms=2_000, max_attempts=3, js_fallback=True,
+    )
     write_log_entry(batch_id, category, "Дзен: «Загрузить видео» нажато")
 
     # Перед шагом 4: закрываем любой неожиданный попап/хинт.
@@ -668,7 +644,11 @@ def _publish_ui(
     choose_btn.wait_for(state="visible", timeout=180_000)
     write_log_entry(batch_id, category, "Дзен: Кнопка «Выбрать видео» найдена, открываю диалог выбора файла.")
     with page.expect_file_chooser(timeout=180_000) as fc_info:
-        choose_btn.click()
+        safe_click(
+            choose_btn, page, DZEN_PUBLISH_WHITELIST, _dzen_dismiss_unknown,
+            batch_id=batch_id, category=category, label="Дзен",
+            timeout_ms=2_000, max_attempts=3, js_fallback=True,
+        )
     file_chooser = fc_info.value
     file_chooser.set_files(video_path)
     write_log_entry(batch_id, category, "Дзен: Файл передан браузеру, жду загрузки.")

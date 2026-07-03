@@ -19,8 +19,9 @@ import tempfile
 import time as _time
 
 from clients.common import (
-    dismiss_click_outside,
+    dismiss_overlay_strict,
     handle_popups,
+    OverlayNotDismissedError,
     poll_wait_tick,
     raise_if_login_required,
     safe_click,
@@ -228,10 +229,13 @@ VKVIDEO_PUBLISH_WHITELIST = [
 def _vkvideo_dismiss_unknown(
     page, category, batch_id, *, label: str = "", phase: int = 0, force: bool = False,
 ) -> None:
-    dismiss_click_outside(
-        page, category, batch_id,
-        label=label or "VK Видео", phase=phase, force=force,
-    )
+    del phase, force
+    try:
+        dismiss_overlay_strict(
+            page, category, batch_id, label=label or "VK Видео",
+        )
+    except OverlayNotDismissedError as exc:
+        raise VkVideoApiError(str(exc)) from exc
 
 def _vkvideo_handle_popups(page, category, batch_id, *, allow_dismiss: bool = True) -> None:
     handle_popups(

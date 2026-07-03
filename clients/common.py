@@ -2,9 +2,9 @@
 Общие утилиты Playwright-клиентов публикации (dzen, rutube, vkvideo).
 
 Единый контракт: handle_popups(whitelist) → dismiss_unknown.
-Платформенное — только whitelist и стратегия dismiss_unknown:
-  • Дзен — dismiss_dzen_hint (кнопка helper-tooltip, без click-outside)
-  • Rutube / VK — dismiss_click_outside (снаружи → Escape → ×)
+Платформенное — whitelist и стратегия dismiss_unknown:
+  • Дзен — modal-overlay: dismiss_overlay_strict; hint: dismiss_dzen_hint
+  • Rutube / VK — dismiss_overlay_strict (снаружи → Escape → ×, без ретраев)
 """
 
 from __future__ import annotations
@@ -24,8 +24,6 @@ WhitelistEntry = tuple[str, Callable[..., bool], Callable[..., None] | None]
 
 DismissUnknown = Callable[..., None]
 
-_DISMISS_STATE_KEY = "_vipilot_dismiss_state"
-_DISMISS_COOLDOWN_S = 2.0
 _DZEN_HINT_CLOSE_SELECTOR = "[class*='helper-tooltip__closeButton']"
 
 _SAFE_FIELD_JS = """
@@ -63,6 +61,10 @@ _SAFE_FIELD_JS = """
   return null;
 }
 """
+
+
+class OverlayNotDismissedError(RuntimeError):
+    """Оверлей остался на экране после полной цепочки закрывающих действий."""
 
 
 def _page_url(page) -> str:
@@ -194,22 +196,100 @@ def handle_popups(
         dismiss_unknown(page, category, batch_id)
 
 
-def _dismiss_state(page) -> dict:
-    st = getattr(page, _DISMISS_STATE_KEY, None)
-    if st is None:
-        st = {"outside_used": False, "last_dismiss_at": 0.0}
-        setattr(page, _DISMISS_STATE_KEY, st)
-    return st
+def _try_close_selectors(page, selectors: Sequence[str]) -> bool:
+    for sel in selectors:
+        try:
+            btn = page.locator(sel).first
+            if btn.is_visible(timeout=150):
+                btn.click(timeout=2_000)
+                return True
+        except Exception:
+            pass
+    return False
 
 
-def _reset_dismiss_state(page) -> None:
-    st = getattr(page, _DISMISS_STATE_KEY, None)
-    if st is not None:
-        st["outside_used"] = False
+def dismiss_overlay_strict(
+    page,
+    category=None,
+    batch_id=None,
+    *,
+    label: str = "",
+    is_present: Callable[..., bool] | None = None,
+    extra_close_selectors: Sequence[str] = (),
+    click_modal_backdrop: bool = False,
+) -> None:
+    """Одна цепочка без пауз и ретраев: снаружи → Escape → × → (backdrop).
 
+    Если оверлей остался — OverlayNotDismissedError.
+    """
+    present = is_present or _likely_overlay_present
+    if not present(page):
+        return
 
-def _overlay_cleared(page, *, force: bool) -> bool:
-    return force or not _likely_overlay_present(page)
+    _user_lvl = "info" if batch_id else "silent"
+    prefix = f"{label}: " if label else ""
+
+    if _click_safe_free_field(page):
+        write_log_entry(
+            batch_id, category,
+            f"{prefix}Закрываю оверлей — клик в свободную область.",
+            level=_user_lvl,
+        )
+        if not present(page):
+            write_log_entry(
+                batch_id, category,
+                f"{prefix}Оверлей закрыт.",
+                level=_user_lvl,
+            )
+            return
+
+    write_log_entry(
+        batch_id, category,
+        f"{prefix}Закрываю оверлей — Escape.",
+        level=_user_lvl,
+    )
+    _try_escape(page)
+    if not present(page):
+        write_log_entry(
+            batch_id, category,
+            f"{prefix}Оверлей закрыт.",
+            level=_user_lvl,
+        )
+        return
+
+    closed = _try_generic_close(page) or _try_close_selectors(page, extra_close_selectors)
+    if closed:
+        write_log_entry(
+            batch_id, category,
+            f"{prefix}Закрываю оверлей — кнопка закрытия.",
+            level=_user_lvl,
+        )
+        if not present(page):
+            write_log_entry(
+                batch_id, category,
+                f"{prefix}Оверлей закрыт.",
+                level=_user_lvl,
+            )
+            return
+
+    if click_modal_backdrop:
+        try:
+            page.locator("[data-testid='modal-overlay']").first.click(
+                force=True, timeout=2_000,
+            )
+        except Exception:
+            pass
+        if not present(page):
+            write_log_entry(
+                batch_id, category,
+                f"{prefix}Оверлей закрыт.",
+                level=_user_lvl,
+            )
+            return
+
+    raise OverlayNotDismissedError(
+        f"{prefix}Не удалось закрыть оверлей — все действия исчерпаны."
+    )
 
 
 def _click_safe_free_field(page, inset: int = 24) -> bool:
@@ -406,76 +486,9 @@ def dismiss_click_outside(
     phase: int = 0,
     force: bool = False,
 ) -> None:
-    """Click-outside dismiss для Rutube/VK (не для Дзена — см. dismiss_dzen_hint)."""
-    if not force and not _likely_overlay_present(page):
-        _reset_dismiss_state(page)
-        return
-
-    _user_lvl = "info" if batch_id else "silent"
-    prefix = f"{label}: " if label else ""
-    st = _dismiss_state(page)
-
-    if phase >= 1:
-        st["outside_used"] = True
-
-    if not force:
-        since = _time.monotonic() - st["last_dismiss_at"]
-        if since < _DISMISS_COOLDOWN_S:
-            return
-    st["last_dismiss_at"] = _time.monotonic()
-
-    if phase <= 0 and not st["outside_used"]:
-        if _click_safe_free_field(page):
-            write_log_entry(
-                batch_id, category,
-                f"{prefix}Закрываю оверлей — клик в свободную область.",
-                level=_user_lvl,
-            )
-            page.wait_for_timeout(200)
-        st["outside_used"] = True
-        if _overlay_cleared(page, force=force):
-            _reset_dismiss_state(page)
-            return
-
-    if phase <= 1:
-        write_log_entry(
-            batch_id, category,
-            f"{prefix}Закрываю оверлей — Escape.",
-            level=_user_lvl,
-        )
-        _try_escape(page)
-        page.wait_for_timeout(200)
-        if _overlay_cleared(page, force=force):
-            _reset_dismiss_state(page)
-            return
-        if _try_generic_close(page):
-            write_log_entry(
-                batch_id, category,
-                f"{prefix}Закрываю оверлей — кнопка закрытия.",
-                level=_user_lvl,
-            )
-            page.wait_for_timeout(200)
-        if _overlay_cleared(page, force=force):
-            _reset_dismiss_state(page)
-        return
-
-    if _try_generic_close(page):
-        write_log_entry(
-            batch_id, category,
-            f"{prefix}Закрываю оверлей — кнопка закрытия.",
-            level=_user_lvl,
-        )
-        page.wait_for_timeout(200)
-    else:
-        write_log_entry(
-            batch_id, category,
-            f"{prefix}Закрываю оверлей — Escape.",
-            level=_user_lvl,
-        )
-        _try_escape(page)
-        page.wait_for_timeout(200)
-    if _overlay_cleared(page, force=force):
-        _reset_dismiss_state(page)
+    """Rutube/VK: strict dismiss (phase/force ignored, kept for safe_click compat)."""
+    del phase, force
+    dismiss_overlay_strict(page, category, batch_id, label=label)
 
 
 def safe_click(
@@ -488,32 +501,22 @@ def safe_click(
     category=None,
     label: str = "",
     timeout_ms: int = 30_000,
-    max_attempts: int = 5,
+    max_attempts: int = 3,
     click_kwargs: dict[str, Any] | None = None,
     js_fallback: bool = False,
 ) -> None:
-    """handle_popups → click; при блокировке эскалирует dismiss, не повторяет одно действие."""
+    """handle_popups → dismiss → click; короткий timeout, без 30-с Playwright-retry."""
     opts = dict(click_kwargs or {})
-    _blocked_timeout_ms = min(timeout_ms, 2_000)
+    _click_timeout_ms = min(timeout_ms, 2_000)
 
     last_err: Exception | None = None
     for attempt in range(1, max_attempts + 1):
-        _phase = min(attempt - 1, 2)
-        _force = attempt > 1
-
-        def _dismiss(page, category, batch_id, *, p=_phase, f=_force):
-            if f:
-                _reset_dismiss_state(page)
-            dismiss_unknown(
-                page, category, batch_id, label=label, phase=p, force=f,
-            )
+        def _dismiss(page, category, batch_id):
+            dismiss_unknown(page, category, batch_id, label=label)
 
         handle_popups(page, whitelist, _dismiss, batch_id, category)
-        _click_timeout = (
-            timeout_ms if attempt == max_attempts else _blocked_timeout_ms
-        )
         try:
-            locator.click(timeout=_click_timeout, **opts)
+            locator.click(timeout=_click_timeout_ms, **opts)
             return
         except Exception as exc:
             last_err = exc
@@ -528,7 +531,6 @@ def safe_click(
                     return
                 except Exception as js_exc:
                     last_err = js_exc
-            page.wait_for_timeout(300)
     if last_err is not None:
         raise last_err
 
