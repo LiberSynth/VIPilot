@@ -620,6 +620,16 @@
     img.src = 'data:image/jpeg;base64,' + b64;
   }
 
+  function _handlePubViewerIdle(bid) {
+    var v = _pubViewers[bid];
+    if (!v) return;
+    delete v.lastB64;
+    v.frameGen = (v.frameGen || 0) + 1;
+    if (v.ctx) {
+      v.ctx.clearRect(0, 0, PUB_VIEWPORT_W, PUB_VIEWPORT_H);
+    }
+  }
+
   function _handlePubViewerStopped(bid) {
     var v = _pubViewers[bid];
     if (!v) return;
@@ -667,6 +677,10 @@
       var data = e.data;
       if (data === 'STOPPED') {
         _handlePubViewerStopped(bid);
+        return;
+      }
+      if (data === 'IDLE') {
+        _handlePubViewerIdle(bid);
         return;
       }
       if (!data || data.charAt(0) === ':') return;

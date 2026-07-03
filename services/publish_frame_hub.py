@@ -18,6 +18,7 @@ class PublishFrameHub:
         self._counters: dict[str, int] = {}
         self._events: dict[str, threading.Event] = {}
         self._stopped: set[str] = set()
+        self._idle_generation: dict[str, int] = {}
 
     def push(self, batch_id: str, img: bytes) -> None:
         """Сохраняет кадр и будит подписчиков SSE."""
@@ -29,11 +30,21 @@ class PublishFrameHub:
             event = self._events.setdefault(batch_id, threading.Event())
         event.set()
 
+    def end_broadcast(self, batch_id: str) -> None:
+        """Сбрасывает кадр между шагами; SSE остаётся живым (data: IDLE)."""
+        with self._lock:
+            self._frames.pop(batch_id, None)
+            self._stopped.discard(batch_id)
+            self._idle_generation[batch_id] = self._idle_generation.get(batch_id, 0) + 1
+            event = self._events.setdefault(batch_id, threading.Event())
+        event.set()
+
     def clear(self, batch_id: str) -> None:
         """Удаляет кадр и сигнализирует подписчикам о завершении."""
         with self._lock:
             self._frames.pop(batch_id, None)
             self._counters.pop(batch_id, None)
+            self._idle_generation.pop(batch_id, None)
             self._stopped.add(batch_id)
             event = self._events.get(batch_id)
         if event is not None:
@@ -53,19 +64,26 @@ class PublishFrameHub:
     def stream_generator(self, batch_id: str):
         """
         SSE-генератор: выдаёт кадры как base64-encoded JPEG.
-        Формат: 'data: <base64>\\n\\n', завершение: 'data: STOPPED\\n\\n'.
+        Формат: 'data: <base64>\\n\\n', пауза: 'data: IDLE\\n\\n', завершение: 'data: STOPPED\\n\\n'.
         """
         last_counter = -1
+        last_idle = 0
 
         while True:
             with self._lock:
                 entry = self._frames.get(batch_id)
                 stopped = batch_id in self._stopped
+                idle_gen = self._idle_generation.get(batch_id, 0)
                 event = self._events.setdefault(batch_id, threading.Event())
 
             if stopped:
                 yield "data: STOPPED\n\n"
                 break
+
+            if idle_gen > last_idle:
+                last_idle = idle_gen
+                last_counter = -1
+                yield "data: IDLE\n\n"
 
             if entry is not None:
                 img, _, counter = entry
