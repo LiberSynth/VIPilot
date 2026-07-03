@@ -15,6 +15,15 @@ from services.publish_preview_capture import (
 
 
 class TestPublishFrameHub:
+    def test_resume_broadcast_clears_stopped(self):
+        hub = PublishFrameHub()
+        hub.push("batch-r", b"jpeg")
+        hub.clear("batch-r")
+        assert hub.is_stopped("batch-r")
+
+        hub.resume_broadcast("batch-r")
+        assert not hub.is_stopped("batch-r")
+
     def test_end_broadcast_clears_frame_without_stop(self):
         hub = PublishFrameHub()
         hub.push("batch-1", b"jpeg")

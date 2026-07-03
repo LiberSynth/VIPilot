@@ -392,11 +392,13 @@ class PlatformBrowser:
             if _platform.system() != "Windows":
                 _pipeline_args.append("--disable-dev-shm-usage")
             from playwright.sync_api import sync_playwright
+            from services.publish_broadcast import (
+                begin_pw_step_broadcast,
+                end_pw_step_broadcast,
+            )
             from services.publish_preview_capture import (
                 allocate_cdp_debug_port,
                 cdp_url_for_port,
-                start_publish_preview_capture,
-                stop_publish_preview_capture,
             )
             _debug_port = allocate_cdp_debug_port()
             _pipeline_args.append(f"--remote-debugging-port={_debug_port}")
@@ -413,8 +415,7 @@ class PlatformBrowser:
                 )
 
                 page = ctx.new_page()
-                if batch_id:
-                    start_publish_preview_capture(batch_id, _cdp_url, self)
+                begin_pw_step_broadcast(batch_id, cdp_url=_cdp_url, platform_browser=self)
                 try:
                     bootstrap_err = self._bootstrap_pipeline_page(
                         page, target_id, batch_id, category,
@@ -438,8 +439,7 @@ class PlatformBrowser:
                     )
                     result = {"ok": False, "error": str(e)}
                 finally:
-                    if batch_id:
-                        stop_publish_preview_capture(batch_id)
+                    end_pw_step_broadcast(batch_id)
                     try:
                         browser.close()
                         write_log_entry(batch_id, category, "Браузер пайплайна закрыт.", level="silent")

@@ -11,12 +11,8 @@ from typing import Callable
 
 from log import write_log_entry
 from services.browser_base import PlatformBrowser
-from services.publish_preview_capture import (
-    allocate_cdp_debug_port,
-    cdp_url_for_port,
-    start_publish_preview_capture,
-    stop_publish_preview_capture,
-)
+from services.publish_broadcast import begin_pw_step_broadcast, end_pw_step_broadcast
+from services.publish_preview_capture import allocate_cdp_debug_port, cdp_url_for_port
 
 PW_PUBLISH_SLUGS = frozenset({"dzen", "rutube", "vkvideo"})
 
@@ -100,8 +96,9 @@ class PublishBatchBrowserSession:
             },
         )
         page = ctx.new_page()
-        if batch_id and self._cdp_url:
-            start_publish_preview_capture(batch_id, self._cdp_url, platform_browser)
+        begin_pw_step_broadcast(
+            batch_id, cdp_url=self._cdp_url, platform_browser=platform_browser,
+        )
         try:
             bootstrap_err = platform_browser._bootstrap_pipeline_page(
                 page, target_id, batch_id, category,
@@ -127,8 +124,7 @@ class PublishBatchBrowserSession:
             )
             result = {"ok": False, "error": str(e)}
         finally:
-            if batch_id:
-                stop_publish_preview_capture(batch_id)
+            end_pw_step_broadcast(batch_id)
             try:
                 ctx.close()
             except Exception:

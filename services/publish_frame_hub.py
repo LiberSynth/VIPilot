@@ -30,8 +30,15 @@ class PublishFrameHub:
             event = self._events.setdefault(batch_id, threading.Event())
         event.set()
 
+    def resume_broadcast(self, batch_id: str) -> None:
+        """Возобновляет трансляцию перед новым PW-шагом (снимает stopped)."""
+        with self._lock:
+            self._stopped.discard(batch_id)
+            event = self._events.setdefault(batch_id, threading.Event())
+        event.set()
+
     def end_broadcast(self, batch_id: str) -> None:
-        """Сбрасывает кадр между шагами; SSE остаётся живым (data: IDLE)."""
+        """Выключает эфир после PW-шага; SSE остаётся живым (data: IDLE)."""
         with self._lock:
             self._frames.pop(batch_id, None)
             self._stopped.discard(batch_id)

@@ -652,7 +652,11 @@
       return;
     }
 
-    if (v && v.stopped) return;
+    if (v && v.stopped) {
+      if (_activeBatchIds.indexOf(bid) < 0) return;
+      v.stopped = false;
+      if (v.sse) { v.sse.close(); v.sse = null; }
+    }
 
     if (v && v.canvas === canvas && v.sse) return;
     if (v && v.sse) { v.sse.close(); v.sse = null; }

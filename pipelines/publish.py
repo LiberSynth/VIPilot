@@ -398,7 +398,6 @@ def run(batch_id, category):
                 write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} — phase=step_failed, step={}.{}, next_expected_from={}", batch_id, slug, method, expected_from), level='silent')
                 if pw_session is not None and pw_session.is_open:
                     pw_session.close()
-                    finalize_publish_batch_browser(batch_id, category)
                     batch_browser_session = None
                 continue
 
@@ -409,9 +408,6 @@ def run(batch_id, category):
             write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {}: шаг {}.{} — завершено успешно", batch_id, slug, method), level='silent')
             expected_from = completed_status
             write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} — phase=step_success, step={}.{}, next_expected_from={}", batch_id, slug, method, expected_from), level='silent')
-            if slug in PW_PUBLISH_SLUGS and has_pw_steps_after(steps, step_idx):
-                from services.publish_frame_hub import get_hub
-                get_hub().end_broadcast(batch_id)
     finally:
         if batch_browser_session is not None and batch_browser_session.is_open:
             batch_browser_session.close()
