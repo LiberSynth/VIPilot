@@ -51,23 +51,16 @@
 
   function runNow() {
     const btn = document.getElementById('btn-run-now');
-    if (btn) { btn.disabled = true; btn.textContent = 'Запускается…'; }
+    if (btn) btn.disabled = true;
     fetch('/api/run-now', { method: 'POST' })
       .then(r => r.json())
       .then(d => {
-        if (d.ok) {
-          if (btn) { btn.textContent = 'Запущено'; }
-          setTimeout(() => {
-            if (btn) { btn.disabled = false; btn.textContent = 'Запустить сейчас'; }
-          }, 3000);
-        } else {
-          alert('Ошибка: ' + (d.error || 'неизвестная ошибка'));
-          if (btn) { btn.disabled = false; btn.textContent = 'Запустить сейчас'; }
-        }
+        if (!d.ok) alert('Ошибка: ' + (d.error || 'неизвестная ошибка'));
+        if (btn) btn.disabled = false;
       })
       .catch(() => {
         alert('Ошибка соединения');
-        if (btn) { btn.disabled = false; btn.textContent = 'Запустить сейчас'; }
+        if (btn) btn.disabled = false;
       });
   }
 
