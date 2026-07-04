@@ -474,18 +474,6 @@ def _detect_dzen_upload_in_progress(page) -> bool:
             pass
     return False
 
-def _dzen_publish_form_active(page) -> bool:
-    """Форма «Публикация ролика» открыта (не модал загрузки файла)."""
-    try:
-        if "videoEditorPublicationId" in page.url:
-            return True
-    except Exception:
-        pass
-    try:
-        return page.get_by_text("Публикация ролика", exact=False).first.is_visible(timeout=150)
-    except Exception:
-        return False
-
 def _detect_dzen_publish_editor(page) -> bool:
     """Редактор / модал «Публикация ролика» — рабочий UI, не мусор."""
     try:
@@ -516,13 +504,6 @@ def _detect_dzen_create_menu(page) -> bool:
     """Выпадающее меню «+» с пунктом «Загрузить видео»."""
     try:
         return page.get_by_text("Загрузить видео", exact=True).first.is_visible(timeout=200)
-    except Exception:
-        return False
-
-def _detect_file_input(page) -> bool:
-    """input[type=file] в DOM — нативный диалог уже закрыт после set_files(), не трогаем."""
-    try:
-        return page.locator('input[type="file"]').count() > 0
     except Exception:
         return False
 
@@ -764,9 +745,9 @@ def _retry_publish_if_button_visible(page, category, batch_id, url_step7_start, 
     write_log_entry(batch_id, category, f"Дзен: {reason}")
     return _click_primary_publish_control(page, category, batch_id, url_step7_start)
 
-def _dzen_coexisting_garbage_present(page) -> bool:
-    """Мусор поверх whitelisted редактора: перекрытый CTA или [role=alert]."""
-    if not _dzen_publish_form_active(page):
+def _dzen_target_blocked(page) -> bool:
+    """Целевой UI редактора перекрыт мусором (без каталога попапов)."""
+    if not _detect_dzen_publish_editor(page):
         return False
     pub = _find_primary_publish_control(page)
     if pub is not None and element_click_blocked(pub):
@@ -809,32 +790,13 @@ def _dzen_whitelisted_overlay_present(page) -> bool:
 
 def _dzen_garbage_overlay_present(page) -> bool:
     """Мусор поверх студии; whitelisted modal-overlay / рабочие модалки — не мусор."""
-    if _dzen_coexisting_garbage_present(page):
+    if _dzen_target_blocked(page):
         return True
     if _dzen_whitelisted_overlay_present(page):
         return False
     if _modal_overlay_visible(page):
         return True
     return _likely_overlay_present(page)
-
-def _dzen_dismiss_coexisting_garbage(page, category, batch_id) -> None:
-    if not _dzen_coexisting_garbage_present(page):
-        return
-    lbl = "Дзен"
-    write_log_entry(
-        batch_id, category,
-        f"{lbl}: Закрываю мусор поверх whitelisted UI.",
-        level="info",
-    )
-    try:
-        dismiss_overlay_strict(
-            page, category, batch_id, label=lbl,
-            is_present=_dzen_coexisting_garbage_present,
-            extra_close_selectors=_DZEN_MODAL_CLOSE_SELECTORS,
-            extra_steps=_DZEN_MODAL_DISMISS_EXTRA_STEPS,
-        )
-    except OverlayNotDismissedError as exc:
-        raise DzenApiError(str(exc)) from exc
 
 def _dzen_dismiss_unknown(
     page, category, batch_id, *, label: str = "", phase: int = 0, force: bool = False,
@@ -859,14 +821,17 @@ def _dzen_dismiss_unknown(
 def _dzen_handle_popups(
     page, category=None, batch_id=None, *, allow_dismiss: bool = True,
 ) -> None:
+    had_whitelisted = _dzen_whitelisted_overlay_present(page)
     handle_popups(
         page, DZEN_PUBLISH_WHITELIST, _dzen_dismiss_unknown,
         batch_id, category, allow_dismiss=allow_dismiss,
     )
-    # publish_editor в whitelist блокирует dismiss_unknown — хинт и coexisting мусор явно.
-    dismiss_dzen_hint(page, category, batch_id)
-    if allow_dismiss:
-        _dzen_dismiss_coexisting_garbage(page, category, batch_id)
+    # publish_editor/create_menu в whitelist блокируют dismiss_unknown.
+    if not allow_dismiss:
+        dismiss_dzen_hint(page, category, batch_id)
+        return
+    if had_whitelisted:
+        _dzen_dismiss_unknown(page, category, batch_id, label="Дзен")
 
 def _set_comments_all_users(page, category, batch_id=None) -> None:
     """

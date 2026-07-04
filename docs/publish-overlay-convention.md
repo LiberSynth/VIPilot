@@ -28,7 +28,6 @@ handle_popups(whitelist) → если не whitelist → dismiss_unknown → dis
 | `upload_in_progress` | Идёт загрузка файла после set_files, до URL редактора |
 | `upload_form` / `publish_editor` | Форма / редактор публикации |
 | `upload_menu` / `create_menu` | Меню «+» / «Загрузить видео» |
-| `upload_in_progress` | Идёт загрузка файла |
 | `publish_modal` | Модал «Опубликовать» (VK) |
 
 `handle=None` — «узнали UI, не закрываем».
@@ -48,7 +47,7 @@ handle_popups(whitelist) → если не whitelist → dismiss_unknown → dis
 
 1. **Признак блокировки:** целевой элемент виден, но **не кликается** (`element_click_blocked` / `elementFromPoint`), **`[role='alert']`**, **`_likely_overlay_present`**, donate `modal-overlay`.
 2. **Не whitelist** → `dismiss_overlay_strict`.
-3. **Whitelist сработал, но мусор поверх** → `_dismiss_coexisting_garbage` после `handle_popups` (тот же generic dismiss, без каталога попапов).
+3. **Whitelist сработал, но мусор поверх** → повторный `dismiss_unknown` после `handle_popups` (тот же generic dismiss, без отдельных `*_coexisting_*` функций).
 4. Платформа может передать **generic** `extra_close_selectors` (×, `[aria-label*='Закрыть']`) — **не** тексты конкретных попапов.
 
 ---
@@ -57,7 +56,7 @@ handle_popups(whitelist) → если не whitelist → dismiss_unknown → dis
 
 `dismiss_dzen_hint` — **не whitelist**, а **dismiss_unknown** для одного стабильного селектора `[class*='helper-tooltip__closeButton']`. Без click-outside (ломает меню «+»). Без списков текстов хинтов.
 
-После `handle_popups` в `_dzen_handle_popups` — повторный вызов `dismiss_dzen_hint` (редактор в whitelist блокирует dismiss_unknown).
+Если `handle_popups` сработал по whitelist, `_dzen_handle_popups` делает повторный `dismiss_unknown`/`dismiss_dzen_hint` (редактор в whitelist блокирует стандартный вызов dismiss).
 
 ---
 

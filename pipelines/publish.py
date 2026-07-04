@@ -32,7 +32,6 @@ from services.publish_batch_browser import (
     PW_PUBLISH_SLUGS,
     PublishBatchBrowserSession,
     finalize_publish_batch_browser,
-    has_pw_steps_after,
     pw_step_count,
 )
 
@@ -189,7 +188,7 @@ def _build_steps(active_targets):
     return steps
 
 def run(batch_id, category):
-    snap = environment.snapshot()
+    _ = environment.snapshot()
     batch = db_get_batch_by_id(batch_id)
     if not batch:
         return
@@ -262,12 +261,6 @@ def run(batch_id, category):
                 raise AppException(batch_id, 'publish', _msg)
 
     target_names = ', '.join(t['name'] for t in active_targets)
-
-    if parsed is not None:
-        cur_slug, cur_method, cur_phase = parsed
-        log_label = f'Публикация (возобновление {cur_slug}.{cur_method}).'
-    else:
-        log_label = f'Публикация ({target_names}).'
 
     resume_from = None
     if parsed is not None:

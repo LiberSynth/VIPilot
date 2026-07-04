@@ -56,6 +56,11 @@ FORBIDDEN_FUNC_RE = re.compile(
     re.IGNORECASE,
 )
 
+FORBIDDEN_COEXISTING_RE = re.compile(
+    r"def _[a-z0-9_]*(coexisting_garbage|dismiss_coexisting|coexisting_overlay)[a-z0-9_]*\(",
+    re.IGNORECASE,
+)
+
 
 def rel(path: Path) -> str:
     return path.relative_to(ROOT).as_posix()
@@ -73,6 +78,8 @@ def check_file(path: Path) -> list[str]:
             errors.append(f"{rel(path)}:{i}: detect/handle мусорного попапа в whitelist-паттерне")
         if FORBIDDEN_FUNC_RE.search(line):
             errors.append(f"{rel(path)}:{i}: функция каталога попапов")
+        if FORBIDDEN_COEXISTING_RE.search(line):
+            errors.append(f"{rel(path)}:{i}: отдельный coexisting-layer запрещён (встраивайте в общий garbage predicate)")
 
     try:
         tree = ast.parse(text, filename=str(path))

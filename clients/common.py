@@ -121,13 +121,6 @@ class OverlayNotDismissedError(RuntimeError):
     """Оверлей остался на экране после полной цепочки закрывающих действий."""
 
 
-def _visible(page, locator, timeout_ms: int = 400) -> bool:
-    try:
-        return locator.first.is_visible(timeout=timeout_ms)
-    except Exception:
-        return False
-
-
 _ELEMENT_CENTER_HIT_JS = """(el) => {
     if (el.disabled) return false;
     if (el.getAttribute('aria-disabled') === 'true') return false;
