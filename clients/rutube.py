@@ -131,15 +131,17 @@ def _rutube_upload_state(page) -> dict:
         "uploading": False,
     }
     try:
-        state["moderation"] = page.get_by_text("Модерация", exact=False).first.is_visible(timeout=300)
-    except Exception:
-        pass
-    try:
         state["publish_btn"] = page.locator("button:has-text('Опубликовать')").last.is_visible(timeout=300)
     except Exception:
         pass
     try:
         state["category_trigger"] = page.locator("text=Выберите категорию").first.is_visible(timeout=300)
+    except Exception:
+        pass
+    in_upload_form = state["publish_btn"] or state["category_trigger"]
+    try:
+        if in_upload_form and page.get_by_text("Модерация", exact=False).first.is_visible(timeout=300):
+            state["moderation"] = True
     except Exception:
         pass
     try:
@@ -283,15 +285,26 @@ def _rutube_publish_button_visible(page) -> bool:
         return False
 
 def _detect_rutube_upload_form(page) -> bool:
-    """Форма публикации открыта — не закрывать."""
-    if _rutube_publish_button_visible(page):
-        return True
-    state = _rutube_upload_state(page)
-    if state["moderation"] or state["category_trigger"]:
-        return True
-    for text in ("Выберите категорию", "Модерация", "Название", "Описание"):
+    """Форма публикации открыта — не закрывать (не путать с пунктами меню студии)."""
+    try:
+        if page.locator("text=Выберите категорию").first.is_visible(timeout=200):
+            return True
+    except Exception:
+        pass
+    if not _rutube_publish_button_visible(page):
+        return False
+    for text in ("Выбрать файлы", "Загрузка видео", "Загрузка файла"):
         try:
             if page.get_by_text(text, exact=False).first.is_visible(timeout=200):
+                return True
+        except Exception:
+            pass
+    for sel in (
+        "input[placeholder*='азван']",
+        "textarea[placeholder*='писан']",
+    ):
+        try:
+            if page.locator(sel).first.is_visible(timeout=200):
                 return True
         except Exception:
             pass
@@ -359,42 +372,16 @@ def _handle_rutube_captcha(page, category, batch_id) -> None:
 
 _RUTUBE_ONBOARDING_TEXTS = (
     "Новый раздел: Уровень канала",
-    "Новый раздел",
-    "Уровень канала",
 )
 
-_RUTUBE_ONBOARDING_SELECTORS = (
-    "[class*='onboarding']",
-    "[class*='Onboarding']",
-    "[class*='product-tour']",
-    "[class*='ProductTour']",
-    "[class*='coach-mark']",
-    "[class*='CoachMark']",
-    "[class*='joyride']",
-    "[class*='tooltip']",
-    "[class*='Tooltip']",
-    "[class*='tour']",
-    "[class*='Tour']",
-    "[class*='spotlight']",
-    "[class*='Spotlight']",
-    "[class*='popover']",
-    "[class*='Popover']",
-)
-
-_RUTUBE_EXTRA_CLOSE_SELECTORS = (
-    "[class*='onboarding'] button[class*='close']",
-    "[class*='Onboarding'] button[class*='close']",
-    "[class*='popup'] button[class*='close']",
-    "[class*='Popup'] button[class*='close']",
-    "[class*='modal'] button[class*='close']",
-    "[class*='Modal'] button[class*='close']",
+_RUTUBE_TOUR_CLOSE_SELECTORS = (
+    "button[class*='close']",
     "[class*='closeButton']",
     "[class*='CloseButton']",
-    "[data-testid*='close']",
     "button[aria-label*='Закрыть']",
     "button[aria-label*='закрыть']",
-    "button[aria-label*='Close']",
 )
+
 
 def _rutube_onboarding_visible(page) -> bool:
     for text in _RUTUBE_ONBOARDING_TEXTS:
@@ -411,55 +398,82 @@ def _rutube_onboarding_visible(page) -> bool:
             return True
     except Exception:
         pass
-    try:
-        body = page.locator("body").inner_text(timeout=300)
-        if "Новый раздел" in body and "1/2" in body and "Далее" in body:
-            return True
-    except Exception:
-        pass
-    for sel in _RUTUBE_ONBOARDING_SELECTORS:
-        try:
-            if page.locator(sel).first.is_visible(timeout=150):
-                return True
-        except Exception:
-            pass
     return False
 
-def _rutube_dismiss_tour_step(page) -> bool:
-    """Закрывает onboarding-тур («Далее», «Пропустить», ×)."""
-    for text in ("Далее", "Пропустить", "Позже"):
-        try:
-            btn = page.get_by_text(text, exact=True).first
-            if btn.is_visible(timeout=150):
-                btn.click(timeout=2_000)
-                return True
-        except Exception:
-            pass
-    try:
-        if page.get_by_text("1/2", exact=False).first.is_visible(timeout=150):
-            for sel in (
-                "button[class*='close']",
-                "[class*='Close']",
-                "[class*='closeButton']",
-                "button[aria-label*='Закрыть']",
-                "button[aria-label*='закрыть']",
-            ):
-                try:
-                    btn = page.locator(sel).first
-                    if btn.is_visible(timeout=150):
-                        btn.click(timeout=2_000)
-                        return True
-                except Exception:
-                    pass
-    except Exception:
-        pass
+
+def _rutube_dismiss_onboarding(
+    page, category, batch_id, *, label: str = "Рутьюб",
+) -> None:
+    """Закрывает onboarding-тур «Уровень канала» (Далее × 2 или ×)."""
+    if not _rutube_onboarding_visible(page):
+        return
+    prefix = f"{label}: "
+    _user_lvl = "info" if batch_id else "silent"
+
+    for attempt in range(4):
+        if not _rutube_onboarding_visible(page):
+            return
+
+        write_log_entry(
+            batch_id, category,
+            f"{prefix}Закрываю onboarding-тур (попытка {attempt + 1}).",
+            level=_user_lvl,
+        )
+
+        dismissed = False
+        for text in ("Далее", "Пропустить", "Позже"):
+            try:
+                btn = page.get_by_role("button", name=text).first
+                if btn.is_visible(timeout=200):
+                    btn.click(timeout=2_000)
+                    dismissed = True
+                    break
+            except Exception:
+                pass
+
+        if not dismissed:
+            try:
+                tour = page.get_by_text("Новый раздел", exact=False).first
+                if tour.is_visible(timeout=200):
+                    root = tour.locator(
+                        "xpath=ancestor::*[contains(@class,'popover') "
+                        "or contains(@class,'tooltip') or contains(@class,'tour') "
+                        "or contains(@class,'onboarding') or @role='dialog'][1]"
+                    )
+                    for sel in _RUTUBE_TOUR_CLOSE_SELECTORS:
+                        try:
+                            btn = root.locator(sel).first
+                            if btn.is_visible(timeout=150):
+                                btn.click(timeout=2_000)
+                                dismissed = True
+                                break
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+
+        if not dismissed:
+            dismissed = _try_close_selectors(page, _RUTUBE_TOUR_CLOSE_SELECTORS)
+
+        page.wait_for_timeout(300)
+        if dismissed and not _rutube_onboarding_visible(page):
+            write_log_entry(
+                batch_id, category,
+                f"{prefix}Onboarding-тур закрыт.",
+                level=_user_lvl,
+            )
+            return
+
     if _rutube_onboarding_visible(page):
-        return _try_close_selectors(page, _RUTUBE_EXTRA_CLOSE_SELECTORS)
-    return False
+        write_log_entry(
+            batch_id, category,
+            f"{prefix}Onboarding-тур не закрылся за 4 попытки.",
+            level="warn" if batch_id else "silent",
+        )
 
-_RUTUBE_DISMISS_EXTRA_STEPS = (
-    ("сделан клик по кнопке тура", _rutube_dismiss_tour_step),
-)
+
+def _handle_rutube_onboarding(page, category, batch_id) -> None:
+    _rutube_dismiss_onboarding(page, category, batch_id)
 
 def _rutube_whitelisted_overlay_present(page) -> bool:
     for _name, detect, _handle in RUTUBE_PUBLISH_WHITELIST:
@@ -478,25 +492,26 @@ def _rutube_garbage_overlay_present(page) -> bool:
     return _likely_overlay_present(page)
 
 RUTUBE_PUBLISH_WHITELIST = [
+    ("onboarding", _rutube_onboarding_visible, _handle_rutube_onboarding),
     ("captcha", _detect_rutube_captcha, _handle_rutube_captcha),
     ("upload_in_progress", _detect_rutube_upload_in_progress, None),
     ("upload_form", _detect_rutube_upload_form, None),
     ("upload_menu", _detect_rutube_upload_menu, None),
 ]
 
+_RUTUBE_OVERLAY_CLOSE_SELECTORS = (
+    "[class*='modal'] button[class*='close']",
+    "[class*='popup'] button[class*='close']",
+    "button[aria-label*='Закрыть']",
+    "button[aria-label*='закрыть']",
+)
+
 def _rutube_dismiss_unknown(
     page, category, batch_id, *, label: str = "", phase: int = 0, force: bool = False,
 ) -> None:
     del phase, force
     lbl = label or "Рутьюб"
-    for _ in range(2):
-        if _rutube_dismiss_tour_step(page):
-            write_log_entry(
-                batch_id, category, f"{lbl}: onboarding-тур — шаг закрыт.",
-                level="info",
-            )
-            if not _rutube_garbage_overlay_present(page):
-                return
+    _rutube_dismiss_onboarding(page, category, batch_id, label=lbl)
     if not _rutube_garbage_overlay_present(page):
         return
     write_log_entry(batch_id, category, f"{lbl}: Закрываю мусорный overlay.", level="info")
@@ -504,13 +519,13 @@ def _rutube_dismiss_unknown(
         dismiss_overlay_strict(
             page, category, batch_id, label=lbl,
             is_present=_rutube_garbage_overlay_present,
-            extra_close_selectors=_RUTUBE_EXTRA_CLOSE_SELECTORS,
-            extra_steps=_RUTUBE_DISMISS_EXTRA_STEPS,
+            extra_close_selectors=_RUTUBE_OVERLAY_CLOSE_SELECTORS,
         )
     except OverlayNotDismissedError as exc:
         raise RutubeApiError(str(exc)) from exc
 
 def _rutube_handle_popups(page, category, batch_id, *, allow_dismiss: bool = True) -> None:
+    _rutube_dismiss_onboarding(page, category, batch_id)
     handle_popups(
         page, RUTUBE_PUBLISH_WHITELIST, _rutube_dismiss_unknown,
         batch_id, category, allow_dismiss=allow_dismiss,
