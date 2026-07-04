@@ -139,13 +139,31 @@ def _rutube_category_trigger_visible(page) -> bool:
 def _rutube_upload_form_fields_visible(page) -> bool:
     for sel in (
         "input[placeholder*='азван']",
+        "input[placeholder*='азвание']",
+        "textarea[placeholder*='азван']",
         "textarea[placeholder*='писан']",
+        "textarea[placeholder*='писание']",
     ):
         try:
             if page.locator(sel).first.is_visible(timeout=200):
                 return True
         except Exception:
             pass
+    return False
+
+def _rutube_upload_form_open(page) -> bool:
+    """Модалка публикации открыта — не свёрнутый виджет и не дашборд."""
+    if _rutube_category_trigger_visible(page):
+        return True
+    if not _rutube_publish_button_visible(page):
+        return False
+    if _rutube_upload_form_fields_visible(page):
+        return True
+    try:
+        if page.get_by_text("Название", exact=True).first.is_visible(timeout=200):
+            return True
+    except Exception:
+        pass
     return False
 
 def _rutube_upload_processing_visible(page) -> bool:
@@ -179,7 +197,7 @@ def _rutube_upload_state(page) -> dict:
     except Exception:
         pass
     state["category_trigger"] = _rutube_category_trigger_visible(page)
-    in_upload_form = state["category_trigger"]
+    in_upload_form = state["publish_btn"] or state["category_trigger"]
     try:
         if in_upload_form and page.get_by_text("Модерация", exact=False).first.is_visible(timeout=300):
             state["moderation"] = True
@@ -189,14 +207,16 @@ def _rutube_upload_state(page) -> dict:
     return state
 
 def _rutube_upload_ready(page, state: dict) -> bool:
-    """Форма публикации открыта: категория, поля, загрузка не идёт."""
+    """Форма открыта, загрузка не идёт — можно выбирать категорию."""
+    if not _rutube_upload_form_open(page):
+        return False
     if state["uploading"]:
         return False
-    if not state["category_trigger"]:
-        return False
-    if not _rutube_upload_form_fields_visible(page):
-        return False
-    return _detect_rutube_upload_form(page)
+    if state["moderation"] or state["category_trigger"]:
+        return True
+    if state["publish_btn"]:
+        return True
+    return False
 
 def _find_rutube_add_button(page):
     """Возвращает видимую кнопку «+ Добавить» в студии или None."""
@@ -319,10 +339,8 @@ def _rutube_publish_button_visible(page) -> bool:
         return False
 
 def _detect_rutube_upload_form(page) -> bool:
-    """Открыта форма публикации — не corner-widget и не дашборд."""
-    if not _rutube_category_trigger_visible(page):
-        return False
-    return _rutube_upload_form_fields_visible(page)
+    """Whitelist: открытая форма публикации."""
+    return _rutube_upload_form_open(page)
 
 def _detect_rutube_upload_menu(page) -> bool:
     """Меню после «+ Добавить» — не закрывать."""
@@ -585,14 +603,17 @@ def _click_rutube_choose_file(choose_btn, page, category, batch_id, *, label: st
         ) from _e
 
 def _click_rutube_locator(locator, page, category, batch_id, *, err_msg: str, label: str = "Rutube") -> None:
-    """Клик по элементу формы; dismiss не трогает открытую форму публикации."""
+    """Клик по элементу формы (категория и т.п.) — safe_click без post-dismiss по форме."""
     try:
         locator.scroll_into_view_if_needed(timeout=1_000)
     except Exception:
         pass
-    _rutube_handle_popups(page, category, batch_id, allow_dismiss=False, label=label)
     try:
-        locator.click(timeout=2_000)
+        safe_click(
+            locator, page, RUTUBE_PUBLISH_WHITELIST, _rutube_dismiss_unknown,
+            batch_id=batch_id, category=category, label=label,
+            timeout_ms=2_000, max_attempts=3, js_fallback=True,
+        )
     except Exception as _e:
         raise RutubeApiError(err_msg) from _e
 
@@ -694,6 +715,8 @@ def _publish_ui(
     write_log_entry(batch_id, category, _tn(target_name, f"Выбираю категорию «{_CATEGORY}»."))
     _cat_ok = False
     try:
+        if not _detect_rutube_upload_form(page):
+            raise RutubeApiError("форма публикации не открыта перед выбором категории")
         cat_trigger = page.locator("text=Выберите категорию").first
         cat_trigger.wait_for(state="visible", timeout=180_000)
         _click_rutube_locator(
