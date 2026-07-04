@@ -37,6 +37,7 @@ def save_publish_error_dump(
     batch_id=None,
     category=None,
     platform: str | None = None,
+    target_name: str | None = None,
     error: str | None = None,
     platform_browser=None,
 ) -> str | None:
@@ -60,10 +61,11 @@ def save_publish_error_dump(
         )
         return None
 
-    parts = [f"Скрин ошибки: {path}"]
-    if platform:
-        parts.append(f"platform={platform}")
+    label = target_name or platform
+    msg = f"Скрин ошибки: {path}"
     if error:
-        parts.append(f"error={error[:200]}")
-    write_log_entry(batch_id, category or "publish", ", ".join(parts), level="warn")
+        msg += f", error={error[:200]}"
+    if label:
+        msg = f"{label}: {msg}"
+    write_log_entry(batch_id, category or "publish", msg, level="warn")
     return str(path)

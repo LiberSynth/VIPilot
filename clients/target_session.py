@@ -20,6 +20,10 @@ SESSION_MISSING_MSG = (
 _START_URL_TIMEOUT_MS = 30_000
 
 
+def _log_prefix(target_name: str | None) -> str:
+    return f"{target_name}: " if target_name else ""
+
+
 def has_saved_cookies(target_id: str) -> bool:
     saved = db_get_target_session_context(target_id)
     return bool(saved and saved.get("cookies"))
@@ -33,6 +37,7 @@ def bootstrap_pipeline_page(
     batch_id=None,
     category: str | None = None,
     platform: str | None = None,
+    target_name: str | None = None,
 ) -> int:
     """Load session from DB and open platform start_url (same path as auth widget)."""
     count = load_into_context(
@@ -41,10 +46,11 @@ def bootstrap_pipeline_page(
         batch_id=batch_id,
         category=category or "publish",
         platform=platform,
+        target_name=target_name,
     )
     if count == 0:
         return 0
-    prefix = f"platform={platform}, " if platform else ""
+    prefix = _log_prefix(target_name)
     try:
         page.goto(start_url, wait_until="domcontentloaded", timeout=_START_URL_TIMEOUT_MS)
         write_log_entry(
@@ -70,9 +76,10 @@ def load_into_context(
     batch_id=None,
     category: str = "browser",
     platform: str | None = None,
+    target_name: str | None = None,
 ) -> int:
     """Читает session_context из БД и добавляет куки в context. Возвращает число куков."""
-    prefix = f"platform={platform}, " if platform else ""
+    prefix = _log_prefix(target_name)
     try:
         saved = db_get_target_session_context(target_id)
         if not saved or not saved.get("cookies"):
@@ -103,10 +110,11 @@ def save_from_context(
     batch_id=None,
     category: str = "browser",
     platform: str | None = None,
+    target_name: str | None = None,
     info_note: str = "",
 ) -> dict:
     """Сохраняет все куки context в targets.session_context. Возвращает {ok, error}."""
-    prefix = f"platform={platform}, " if platform else ""
+    prefix = _log_prefix(target_name)
     try:
         cookies = ctx.cookies()
         saved_at = datetime.now(timezone.utc).isoformat()
@@ -166,6 +174,7 @@ def refresh_session_after_auth(
     *,
     batch_id=None,
     category: str = "publish",
+    target_name: str | None = None,
     **auth_context,
 ) -> dict:
     """URL-проверка кабинета, затем snapshot куков в БД (warm-up refresh save)."""
@@ -178,5 +187,6 @@ def refresh_session_after_auth(
         batch_id=batch_id,
         category=category,
         platform=platform,
+        target_name=target_name,
         info_note=" (после входа)",
     )

@@ -55,35 +55,37 @@ def _get_video(batch_id, category):
 
 def _call_vk(slug, method, batch_id, category, target, pub_title):
     cfg = target.get('config') or {}
+    target_name = target.get('name') or 'VKontakte'
     if not client_is_configured('vk'):
-        write_log_entry(batch_id, category, 'VK_USER_TOKEN не задан', level='error')
+        write_log_entry(batch_id, category, f'{target_name}: VK_USER_TOKEN не задан', level='error')
         return False
     group_id = int(cfg.get('group_id', 236929597))
     if method == 'story':
-        write_log_entry(batch_id, category, 'Публикую историю.')
-        write_log_entry(batch_id, category, f"group_id={group_id}", level='silent')
+        write_log_entry(batch_id, category, f'{target_name}: Публикую историю.')
+        write_log_entry(batch_id, category, f'{target_name}: group_id={group_id}', level='silent')
         video_data = _get_video(batch_id, category)
-        return vk.publish_story(video_data, group_id, batch_id, category, pub_title) is not None
+        return vk.publish_story(video_data, group_id, batch_id, category, pub_title, target_name=target_name) is not None
     elif method == 'wall':
-        write_log_entry(batch_id, category, 'Публикую на стену.')
-        write_log_entry(batch_id, category, f"group_id={group_id}", level='silent')
+        write_log_entry(batch_id, category, f'{target_name}: Публикую на стену.')
+        write_log_entry(batch_id, category, f'{target_name}: group_id={group_id}', level='silent')
         video_data = _get_video(batch_id, category)
-        return vk.publish_wall(video_data, group_id, batch_id, category, pub_title) is not None
+        return vk.publish_wall(video_data, group_id, batch_id, category, pub_title, target_name=target_name) is not None
     elif method == 'clip_wall':
         clip_url = db_get_batch_vkvideo_clip_url(batch_id)
         if not clip_url:
-            write_log_entry(batch_id, category, 'VK clip_wall: clip_url не найден в БД — vkvideo не завершился или не записал ссылку', level='error')
+            write_log_entry(batch_id, category, f'{target_name}: clip_url не найден в БД — vkvideo не завершился или не записал ссылку', level='error')
             return False
-        write_log_entry(batch_id, category, f'VK: Публикую пост с клипом VK Видео.')
-        write_log_entry(batch_id, category, f"clip_url={clip_url}", level='silent')
-        return vk.publish_clip_wall(clip_url, pub_title, group_id, batch_id, category) is not None
+        write_log_entry(batch_id, category, f'{target_name}: Публикую пост с клипом VK Видео.')
+        write_log_entry(batch_id, category, f'{target_name}: clip_url={clip_url}', level='silent')
+        return vk.publish_clip_wall(clip_url, pub_title, group_id, batch_id, category, target_name=target_name) is not None
     else:
-        write_log_entry(batch_id, category, f'VK: неизвестный метод «{method}» — пропуск', level='warn')
+        write_log_entry(batch_id, category, f'{target_name}: неизвестный метод «{method}» — пропуск', level='warn')
         return False
 
 def _call_dzen(slug, method, batch_id, category, target, pub_title, batch_session=None, keep_browser=False):
     cfg = target.get('config') or {}
     target_id = target.get('id')
+    target_name = target.get('name') or 'Дзен'
     if not client_is_configured('dzen', cfg, target_id):
         if not cfg.get('publisher_id'):
             write_log_entry(batch_id, category, 'Дзен не настроен: publisher_id отсутствует', level='error')
@@ -95,13 +97,14 @@ def _call_dzen(slug, method, batch_id, category, target, pub_title, batch_sessio
 
     return dzen_client.publish(
         video_data, cfg, batch_id, category,
-        target_id=target_id, pub_title=pub_title,
+        target_id=target_id, pub_title=pub_title, target_name=target_name,
         batch_session=batch_session, keep_browser=keep_browser,
     )
 
 def _call_rutube(slug, method, batch_id, category, target, pub_title, batch_session=None, keep_browser=False):
     cfg = target.get('config') or {}
     target_id = target.get('id')
+    target_name = target.get('name') or 'Rutube'
     if not client_is_configured('rutube', cfg, target_id):
         if not cfg.get('person_id'):
             write_log_entry(batch_id, category, 'Рутьюб не настроен: person_id отсутствует', level='error')
@@ -113,13 +116,14 @@ def _call_rutube(slug, method, batch_id, category, target, pub_title, batch_sess
 
     return rutube_client.publish(
         video_data, cfg, batch_id, category,
-        target_id=target_id, pub_title=pub_title,
+        target_id=target_id, pub_title=pub_title, target_name=target_name,
         batch_session=batch_session, keep_browser=keep_browser,
     )
 
 def _call_vkvideo(slug, method, batch_id, category, target, pub_title, batch_session=None, keep_browser=False):
     cfg = target.get('config') or {}
     target_id = target.get('id')
+    target_name = target.get('name') or 'VK Видео'
     if not client_is_configured('vkvideo', cfg, target_id):
         if not cfg.get('club_id'):
             write_log_entry(batch_id, category, 'VK Видео не настроен: club_id отсутствует', level='error')
@@ -131,7 +135,7 @@ def _call_vkvideo(slug, method, batch_id, category, target, pub_title, batch_ses
 
     result = vkvideo_client.publish(
         video_data, cfg, batch_id, category,
-        target_id=target_id, pub_title=pub_title,
+        target_id=target_id, pub_title=pub_title, target_name=target_name,
         batch_session=batch_session, keep_browser=keep_browser,
     )
     return result.get('ok', False)

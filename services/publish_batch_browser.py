@@ -83,6 +83,7 @@ class PublishBatchBrowserSession:
         target_id: str,
         batch_id=None,
         category=None,
+        target_name: str | None = None,
     ) -> dict:
         if not self._open:
             self.start()
@@ -101,14 +102,14 @@ class PublishBatchBrowserSession:
         )
         try:
             bootstrap_err = platform_browser._bootstrap_pipeline_page(
-                page, target_id, batch_id, category,
+                page, target_id, batch_id, category, target_name=target_name,
             )
             if bootstrap_err:
                 result = {"ok": False, "error": bootstrap_err}
             else:
                 fn_result = fn(page, ctx)
                 platform_browser._persist_pipeline_session(
-                    ctx, target_id, batch_id, category,
+                    ctx, target_id, batch_id, category, target_name=target_name,
                 )
                 result = {"ok": True, "result": fn_result}
         except Exception as e:
@@ -118,7 +119,7 @@ class PublishBatchBrowserSession:
                 page,
                 batch_id=batch_id,
                 category=category,
-                platform=platform_browser._platform,
+                target_name=target_name,
                 error=str(e),
                 platform_browser=platform_browser,
             )

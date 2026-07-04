@@ -183,7 +183,6 @@ def handle_popups(
                 level="silent",
             )
             continue
-        write_log_entry(batch_id, category, f"whitelist: {name}", level="silent")
         if handle is not None:
             handle(page, category, batch_id)
         return

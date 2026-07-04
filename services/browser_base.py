@@ -322,7 +322,9 @@ class PlatformBrowser:
         with self._batch_frames_lock:
             self._batch_frames.pop(batch_id, None)
 
-    def _bootstrap_pipeline_page(self, page, target_id: str, batch_id, category) -> str | None:
+    def _bootstrap_pipeline_page(
+        self, page, target_id: str, batch_id, category, target_name: str | None = None,
+    ) -> str | None:
         """Load target session and goto start_url. Returns error message or None."""
         from clients.target_session import SESSION_MISSING_MSG, bootstrap_pipeline_page
 
@@ -333,11 +335,14 @@ class PlatformBrowser:
             batch_id=batch_id,
             category=category,
             platform=self._platform,
+            target_name=target_name,
         ) == 0:
             return SESSION_MISSING_MSG
         return None
 
-    def _persist_pipeline_session(self, ctx, target_id: str, batch_id, category) -> None:
+    def _persist_pipeline_session(
+        self, ctx, target_id: str, batch_id, category, target_name: str | None = None,
+    ) -> None:
         """Обновляет targets.session_context после успешной публикации."""
         from clients.target_session import save_from_context
 
@@ -348,13 +353,14 @@ class PlatformBrowser:
             batch_id=batch_id,
             category=channel,
             platform=self._platform,
+            target_name=target_name,
         )
         if not save_result.get("ok"):
+            prefix = f"{target_name}: " if target_name else ""
             write_log_entry(
                 batch_id,
                 channel,
-                f"platform={self._platform}, "
-                f"Не удалось обновить сессию в БД: {save_result.get('error')}",
+                f"{prefix}Не удалось обновить сессию в БД: {save_result.get('error')}",
                 level="warn",
             )
 
@@ -366,6 +372,7 @@ class PlatformBrowser:
         category=None,
         batch_session=None,
         keep_browser: bool = False,
+        target_name: str | None = None,
     ) -> dict:
         """
         Запускает fn(page, context) после bootstrap сессии таргета из БД.
@@ -377,7 +384,9 @@ class PlatformBrowser:
         """
         if batch_session is not None:
             try:
-                return batch_session.run_step(self, fn, target_id, batch_id, category)
+                return batch_session.run_step(
+                    self, fn, target_id, batch_id, category, target_name=target_name,
+                )
             finally:
                 if not keep_browser:
                     from services.publish_batch_browser import finalize_publish_batch_browser
@@ -418,13 +427,15 @@ class PlatformBrowser:
                 begin_pw_step_broadcast(batch_id, cdp_url=_cdp_url, platform_browser=self)
                 try:
                     bootstrap_err = self._bootstrap_pipeline_page(
-                        page, target_id, batch_id, category,
+                        page, target_id, batch_id, category, target_name=target_name,
                     )
                     if bootstrap_err:
                         result = {"ok": False, "error": bootstrap_err}
                     else:
                         fn_result = fn(page, ctx)
-                        self._persist_pipeline_session(ctx, target_id, batch_id, category)
+                        self._persist_pipeline_session(
+                            ctx, target_id, batch_id, category, target_name=target_name,
+                        )
                         result = {"ok": True, "result": fn_result}
                 except Exception as e:
                     from services.publish_error_dump import save_publish_error_dump
@@ -433,7 +444,7 @@ class PlatformBrowser:
                         page,
                         batch_id=batch_id,
                         category=category,
-                        platform=self._platform,
+                        target_name=target_name,
                         error=str(e),
                         platform_browser=self,
                     )
