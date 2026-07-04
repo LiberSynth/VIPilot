@@ -758,8 +758,6 @@ def _dzen_target_blocked(page) -> bool:
             return True
     except Exception:
         pass
-    if _modal_overlay_visible(page) and not _detect_dzen_upload_modal(page):
-        return True
     try:
         if page.locator("[role='alert']").first.is_visible(timeout=150):
             return True
