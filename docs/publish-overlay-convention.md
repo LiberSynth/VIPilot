@@ -25,6 +25,7 @@ handle_popups(whitelist) → если не whitelist → dismiss_unknown → dis
 | `captcha` | Капча — отдельный handler |
 | `confirm` | Диалог подтверждения публикации |
 | `upload_modal` | Модал выбора файла |
+| `upload_in_progress` | Идёт загрузка файла после set_files, до URL редактора |
 | `upload_form` / `publish_editor` | Форма / редактор публикации |
 | `upload_menu` / `create_menu` | Меню «+» / «Загрузить видео» |
 | `upload_in_progress` | Идёт загрузка файла |

@@ -453,6 +453,39 @@ def _detect_dzen_upload_modal(page) -> bool:
             pass
     return False
 
+def _detect_dzen_upload_in_progress(page) -> bool:
+    """Загрузка файла после set_files, до URL редактора — не dismiss."""
+    try:
+        if "videoEditorPublicationId" in page.url:
+            return False
+    except Exception:
+        pass
+    if not _modal_overlay_visible(page):
+        return False
+    if _detect_dzen_upload_modal(page):
+        return True
+    for text in (
+        "загружа", "Загрузка", "обработ", "Передач", "Подождите",
+    ):
+        try:
+            if page.get_by_text(text, exact=False).first.is_visible(timeout=150):
+                return True
+        except Exception:
+            pass
+    return False
+
+def _dzen_publish_form_active(page) -> bool:
+    """Форма «Публикация ролика» открыта (не модал загрузки файла)."""
+    try:
+        if "videoEditorPublicationId" in page.url:
+            return True
+    except Exception:
+        pass
+    try:
+        return page.get_by_text("Публикация ролика", exact=False).first.is_visible(timeout=150)
+    except Exception:
+        return False
+
 def _detect_dzen_publish_editor(page) -> bool:
     """Редактор / модал «Публикация ролика» — рабочий UI, не мусор."""
     try:
@@ -733,7 +766,7 @@ def _retry_publish_if_button_visible(page, category, batch_id, url_step7_start, 
 
 def _dzen_coexisting_garbage_present(page) -> bool:
     """Мусор поверх whitelisted редактора: перекрытый CTA или [role=alert]."""
-    if not _detect_dzen_publish_editor(page):
+    if not _dzen_publish_form_active(page):
         return False
     pub = _find_primary_publish_control(page)
     if pub is not None and element_click_blocked(pub):
@@ -756,6 +789,7 @@ def _dzen_coexisting_garbage_present(page) -> bool:
 DZEN_PUBLISH_WHITELIST = [
     ("captcha", _detect_captcha, _handle_captcha_element),
     ("upload_modal", _detect_dzen_upload_modal, None),
+    ("upload_in_progress", _detect_dzen_upload_in_progress, None),
     ("publish_editor", _detect_dzen_publish_editor, None),
     ("create_menu", _detect_dzen_create_menu, None),
     ("confirm", _detect_confirm_dialog, _handle_confirm_element),
@@ -831,7 +865,8 @@ def _dzen_handle_popups(
     )
     # publish_editor в whitelist блокирует dismiss_unknown — хинт и coexisting мусор явно.
     dismiss_dzen_hint(page, category, batch_id)
-    _dzen_dismiss_coexisting_garbage(page, category, batch_id)
+    if allow_dismiss:
+        _dzen_dismiss_coexisting_garbage(page, category, batch_id)
 
 def _set_comments_all_users(page, category, batch_id=None) -> None:
     """
@@ -1068,7 +1103,7 @@ def _publish_ui(
             write_log_entry(batch_id, category, "Дзен: Редактор видео открылся.")
             write_log_entry(batch_id, category, f"URL редактора: {_cur}", level='silent')
             break
-        _dzen_handle_popups(page, category, batch_id)
+        _dzen_handle_popups(page, category, batch_id, allow_dismiss=False)
         poll_wait_tick(page, batch_id, "dzen")
 
     if _auto_published:
