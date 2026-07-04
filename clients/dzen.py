@@ -753,12 +753,6 @@ def _dzen_target_blocked(page) -> bool:
     if pub is not None and element_click_blocked(pub):
         return True
     try:
-        trigger = page.locator('[data-testid="select-trigger-button-comment"]').first
-        if trigger.is_visible(timeout=150) and element_click_blocked(trigger):
-            return True
-    except Exception:
-        pass
-    try:
         if page.locator("[role='alert']").first.is_visible(timeout=150):
             return True
     except Exception:
@@ -803,6 +797,9 @@ def _dzen_dismiss_unknown(
     lbl = label or "Дзен"
     if _detect_captcha(page):
         return
+    # Dzen helper-tooltip — отдельное исключение: сначала закрываем его,
+    # иначе blocked-check может ошибочно загнать в generic-dismiss.
+    dismiss_dzen_hint(page, category, batch_id, label=lbl)
     if _dzen_garbage_overlay_present(page):
         try:
             dismiss_overlay_strict(
@@ -813,8 +810,6 @@ def _dzen_dismiss_unknown(
             )
         except OverlayNotDismissedError as exc:
             raise DzenApiError(str(exc)) from exc
-        return
-    dismiss_dzen_hint(page, category, batch_id, label=lbl)
 
 def _dzen_handle_popups(
     page, category=None, batch_id=None, *, allow_dismiss: bool = True,
