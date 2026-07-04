@@ -6,6 +6,7 @@ Playwright управляет браузером, скриншоты стрим�
 """
 
 import os
+import re
 import shutil
 import tempfile
 import time as _time
@@ -206,13 +207,28 @@ def _rutube_add_button_clickable(add_btn, page) -> bool:
 def _wait_rutube_add_button(page, category, batch_id=None, timeout_ms=180_000):
     """Ждёт готовность студии и видимую кнопку «+ Добавить»."""
     found: list = [None]
+    last_log_at = 0.0
 
     def _on_poll():
+        nonlocal last_log_at
         raise_if_login_required(page, "rutube")
-        _rutube_handle_popups(page, category, batch_id)
+        _rutube_clear_blocking_ui(page, category, batch_id)
+        now = _time.monotonic()
+        if now - last_log_at >= 8:
+            add_btn = _find_rutube_add_button(page)
+            if add_btn is None:
+                msg = "кнопка «+ Добавить» не найдена"
+            elif not _rutube_add_button_clickable(add_btn, page):
+                msg = "кнопка «+ Добавить» перекрыта overlay"
+            elif _rutube_onboarding_visible(page):
+                msg = "onboarding-тур всё ещё на экране"
+            else:
+                msg = "жду готовность студии"
+            write_log_entry(batch_id, category, f"Рутьюб: {msg}.")
+            last_log_at = now
 
     def _ready() -> bool:
-        if _rutube_garbage_overlay_present(page):
+        if _rutube_onboarding_visible(page):
             return False
         add_btn = _find_rutube_add_button(page)
         if add_btn is None or not _rutube_add_button_clickable(add_btn, page):
@@ -383,7 +399,24 @@ _RUTUBE_TOUR_CLOSE_SELECTORS = (
 )
 
 
+_RUTUBE_TOUR_STEP_RE = re.compile(r"\d\s*/\s*\d")
+
+
+def _rutube_body_suggests_tour(page) -> bool:
+    try:
+        body = page.locator("body").inner_text(timeout=500)
+    except Exception:
+        return False
+    if "Далее" not in body:
+        return False
+    if "Новый раздел" not in body and "Уровень канала" not in body:
+        return False
+    return bool(_RUTUBE_TOUR_STEP_RE.search(body))
+
+
 def _rutube_onboarding_visible(page) -> bool:
+    if _rutube_body_suggests_tour(page):
+        return True
     for text in _RUTUBE_ONBOARDING_TEXTS:
         try:
             if page.get_by_text(text, exact=False).first.is_visible(timeout=150):
@@ -391,14 +424,65 @@ def _rutube_onboarding_visible(page) -> bool:
         except Exception:
             pass
     try:
-        if (
-            page.get_by_text("Далее", exact=True).first.is_visible(timeout=150)
-            and page.get_by_text("1/2", exact=False).first.is_visible(timeout=150)
-        ):
-            return True
+        if page.get_by_text("Далее", exact=False).first.is_visible(timeout=150):
+            if page.get_by_text("Уровень канала", exact=False).first.is_visible(timeout=150):
+                return True
     except Exception:
         pass
     return False
+
+
+def _rutube_js_click_tour_action(page) -> str | None:
+    """React-friendly клик по «Далее» / × внутри тура."""
+    try:
+        return page.evaluate("""() => {
+            const body = document.body.innerText || '';
+            const tourOpen = (body.includes('Новый раздел') || body.includes('Уровень канала'))
+                && body.includes('Далее') && /\\d\\s*\\/\\s*\\d/.test(body);
+            if (!tourOpen) return null;
+
+            for (const label of ['Далее', 'Пропустить', 'Позже']) {
+                for (const el of document.querySelectorAll('button, [role="button"]')) {
+                    if ((el.innerText || el.textContent || '').trim() !== label) continue;
+                    const r = el.getBoundingClientRect();
+                    if (r.width < 8 || r.height < 8) continue;
+                    const st = getComputedStyle(el);
+                    if (st.display === 'none' || st.visibility === 'hidden') continue;
+                    el.click();
+                    return label;
+                }
+            }
+
+            let best = null;
+            for (const el of document.querySelectorAll('div, section, article, aside')) {
+                const t = el.innerText || '';
+                if (!t.includes('Новый раздел') || !t.includes('Далее')) continue;
+                const r = el.getBoundingClientRect();
+                if (r.width < 80 || r.height < 60) continue;
+                if (r.width > window.innerWidth * 0.9) continue;
+                const area = r.width * r.height;
+                if (!best || area < best.area) best = { el, area };
+            }
+            if (!best) return null;
+
+            const buttons = [...best.el.querySelectorAll('button, [role="button"]')];
+            for (const btn of buttons) {
+                if ((btn.innerText || btn.textContent || '').trim() === 'Далее') {
+                    btn.click();
+                    return 'Далее-in-root';
+                }
+            }
+            for (const btn of buttons) {
+                const t = (btn.innerText || btn.textContent || '').trim();
+                if (!t || t.length <= 2) {
+                    btn.click();
+                    return 'x-in-root';
+                }
+            }
+            return null;
+        }""")
+    except Exception:
+        return None
 
 
 def _rutube_dismiss_onboarding(
@@ -421,42 +505,31 @@ def _rutube_dismiss_onboarding(
         )
 
         dismissed = False
-        for text in ("Далее", "Пропустить", "Позже"):
-            try:
-                btn = page.get_by_role("button", name=text).first
-                if btn.is_visible(timeout=200):
-                    btn.click(timeout=2_000)
-                    dismissed = True
-                    break
-            except Exception:
-                pass
+        action = _rutube_js_click_tour_action(page)
+        if action:
+            write_log_entry(
+                batch_id, category,
+                f"{prefix}JS-клик по туру: {action}.",
+                level="silent",
+            )
+            dismissed = True
 
         if not dismissed:
-            try:
-                tour = page.get_by_text("Новый раздел", exact=False).first
-                if tour.is_visible(timeout=200):
-                    root = tour.locator(
-                        "xpath=ancestor::*[contains(@class,'popover') "
-                        "or contains(@class,'tooltip') or contains(@class,'tour') "
-                        "or contains(@class,'onboarding') or @role='dialog'][1]"
-                    )
-                    for sel in _RUTUBE_TOUR_CLOSE_SELECTORS:
-                        try:
-                            btn = root.locator(sel).first
-                            if btn.is_visible(timeout=150):
-                                btn.click(timeout=2_000)
-                                dismissed = True
-                                break
-                        except Exception:
-                            pass
-            except Exception:
-                pass
+            for text in ("Далее", "Пропустить", "Позже"):
+                try:
+                    btn = page.locator(f"button:has-text('{text}')").first
+                    if btn.is_visible(timeout=200):
+                        btn.click(timeout=2_000)
+                        dismissed = True
+                        break
+                except Exception:
+                    pass
 
         if not dismissed:
             dismissed = _try_close_selectors(page, _RUTUBE_TOUR_CLOSE_SELECTORS)
 
-        page.wait_for_timeout(300)
-        if dismissed and not _rutube_onboarding_visible(page):
+        page.wait_for_timeout(400)
+        if not _rutube_onboarding_visible(page):
             write_log_entry(
                 batch_id, category,
                 f"{prefix}Onboarding-тур закрыт.",
@@ -470,6 +543,24 @@ def _rutube_dismiss_onboarding(
             f"{prefix}Onboarding-тур не закрылся за 4 попытки.",
             level="warn" if batch_id else "silent",
         )
+
+
+def _rutube_clear_blocking_ui(page, category, batch_id) -> None:
+    """Закрывает тур и прочий мусор, если «+ Добавить» перекрыт или тур на экране."""
+    add_btn = _find_rutube_add_button(page)
+    blocked = add_btn is not None and not _rutube_add_button_clickable(add_btn, page)
+    if blocked:
+        action = _rutube_js_click_tour_action(page)
+        if action:
+            write_log_entry(
+                batch_id, category,
+                f"Рутьюб: JS-клик по перекрытию: {action}.",
+                level="info",
+            )
+            page.wait_for_timeout(400)
+    if blocked or _rutube_onboarding_visible(page):
+        _rutube_dismiss_onboarding(page, category, batch_id)
+    _rutube_handle_popups(page, category, batch_id)
 
 
 def _handle_rutube_onboarding(page, category, batch_id) -> None:
@@ -723,7 +814,7 @@ def _publish_ui(
         batch_id=batch_id, category=category,
     )
 
-    _rutube_handle_popups(page, category, batch_id)
+    _rutube_clear_blocking_ui(page, category, batch_id)
 
     # ── Шаг 2: Кнопка «+ Добавить» ───────────────────────────────────────
     write_log_entry(batch_id, category, "Рутьюб: Ищу кнопку «+ Добавить».")
