@@ -615,11 +615,49 @@ def _dzen_publish_success_toast_visible(page) -> bool:
     except Exception:
         return False
 
+_DZEN_SUCCESS_BODY_PHRASES = (
+    "видео опубликовано",
+    "ролик опубликован",
+    "отправлено на модерацию",
+    "видео на модерации",
+    "будет опубликовано",
+    "видео добавлено",
+    "видео обрабатывается",
+)
+
+def _dzen_post_submit_success_visible(page) -> bool:
+    """Публикация уже ушла: тост, текст на странице или список «Опубликованные»."""
+    if _dzen_publish_success_toast_visible(page):
+        return True
+    try:
+        body_lower = page.locator("body").inner_text(timeout=500).lower()
+    except Exception:
+        body_lower = ""
+    for phrase in _DZEN_SUCCESS_BODY_PHRASES:
+        if phrase in body_lower:
+            return True
+    try:
+        url = page.url
+    except Exception:
+        return False
+    if "videoEditorPublicationId" in url:
+        return False
+    try:
+        if (
+            page.get_by_text("Опубликованные", exact=False).first.is_visible(timeout=150)
+            and page.get_by_text("Опубликовано", exact=False).first.is_visible(timeout=150)
+        ):
+            return True
+    except Exception:
+        pass
+    return False
+
 def _dzen_publish_settled(page, url_step7_start: str) -> bool:
     return (
         _dzen_publish_confirmed(page, url_step7_start)
         or _dzen_step7_success_without_click(page, url_step7_start)
         or _dzen_publish_success_toast_visible(page)
+        or _dzen_post_submit_success_visible(page)
     )
 
 def _click_primary_publish_control(page, category, batch_id=None, url_step7_start: str | None = None) -> bool:
@@ -649,6 +687,12 @@ def _click_primary_publish_control(page, category, batch_id=None, url_step7_star
                 "Дзен: Клик не прошёл, но публикация уже подтверждена.",
             )
             return False
+        if _dzen_post_submit_success_visible(page):
+            write_log_entry(
+                batch_id, category,
+                "Дзен: Клик заблокирован — на странице уже признак успешной публикации.",
+            )
+            return False
         write_log_entry(batch_id, category, f"Клик «Опубликовать» не прошёл: {_click_err}", level='silent')
         return False
     if url_step7_start and _dzen_publish_settled(page, url_step7_start):
@@ -664,6 +708,8 @@ def _poll_after_publish_click(
         if _dzen_publish_settled(page, url_step7_start):
             return
         if _confirm_or_captcha_visible(page) or _detect_captcha(page):
+            return
+        if _dzen_post_submit_success_visible(page):
             return
         if _find_primary_publish_control(page) is not None:
             _retry_publish_if_button_visible(
@@ -1109,6 +1155,14 @@ def _publish_ui(
         if _confirm_or_captcha_visible(page) or _detect_captcha(page):
             poll_wait_tick(page, batch_id, "dzen")
             continue
+
+        if _dzen_post_submit_success_visible(page):
+            write_log_entry(
+                batch_id, category,
+                "Дзен: Публикация уже отображается как успешная — шаг 8 завершён.",
+            )
+            _step8_done = True
+            break
 
         if _find_primary_publish_control(page) is not None:
             _retry_publish_if_button_visible(

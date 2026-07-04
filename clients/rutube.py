@@ -181,11 +181,11 @@ def _find_rutube_add_button(page):
             pass
     return None
 
-def _rutube_add_button_clickable(add_btn) -> bool:
+def _rutube_add_button_clickable(add_btn, page) -> bool:
     try:
         if not add_btn.is_visible(timeout=200):
             return False
-        return add_btn.evaluate("""el => {
+        return add_btn.evaluate("""(el) => {
             if (el.disabled) return false;
             if (el.getAttribute('aria-disabled') === 'true') return false;
             const st = window.getComputedStyle(el);
@@ -193,7 +193,10 @@ def _rutube_add_button_clickable(add_btn) -> bool:
             if (st.visibility === 'hidden' || st.display === 'none') return false;
             const r = el.getBoundingClientRect();
             if (r.width < 8 || r.height < 8) return false;
-            return true;
+            const cx = r.left + r.width / 2;
+            const cy = r.top + r.height / 2;
+            const top = document.elementFromPoint(cx, cy);
+            return !!(top && (top === el || el.contains(top)));
         }""")
     except Exception:
         return False
@@ -210,7 +213,7 @@ def _wait_rutube_add_button(page, category, batch_id=None, timeout_ms=180_000):
         if _rutube_garbage_overlay_present(page):
             return False
         add_btn = _find_rutube_add_button(page)
-        if add_btn is None or not _rutube_add_button_clickable(add_btn):
+        if add_btn is None or not _rutube_add_button_clickable(add_btn, page):
             return False
         found[0] = add_btn
         return True
@@ -368,6 +371,14 @@ _RUTUBE_ONBOARDING_SELECTORS = (
     "[class*='coach-mark']",
     "[class*='CoachMark']",
     "[class*='joyride']",
+    "[class*='tooltip']",
+    "[class*='Tooltip']",
+    "[class*='tour']",
+    "[class*='Tour']",
+    "[class*='spotlight']",
+    "[class*='Spotlight']",
+    "[class*='popover']",
+    "[class*='Popover']",
 )
 
 _RUTUBE_EXTRA_CLOSE_SELECTORS = (
@@ -385,24 +396,6 @@ _RUTUBE_EXTRA_CLOSE_SELECTORS = (
     "button[aria-label*='Close']",
 )
 
-def _rutube_dismiss_tour_step(page) -> bool:
-    """Закрывает onboarding-тур («Далее», «Пропустить», ×)."""
-    if not _rutube_onboarding_visible(page):
-        return False
-    for name in ("Далее", "Пропустить", "Позже"):
-        try:
-            btn = page.get_by_role("button", name=name).first
-            if btn.is_visible(timeout=150):
-                btn.click(timeout=2_000)
-                return True
-        except Exception:
-            pass
-    return _try_close_selectors(page, _RUTUBE_EXTRA_CLOSE_SELECTORS)
-
-_RUTUBE_DISMISS_EXTRA_STEPS = (
-    ("сделан клик по кнопке тура", _rutube_dismiss_tour_step),
-)
-
 def _rutube_onboarding_visible(page) -> bool:
     for text in _RUTUBE_ONBOARDING_TEXTS:
         try:
@@ -410,6 +403,20 @@ def _rutube_onboarding_visible(page) -> bool:
                 return True
         except Exception:
             pass
+    try:
+        if (
+            page.get_by_text("Далее", exact=True).first.is_visible(timeout=150)
+            and page.get_by_text("1/2", exact=False).first.is_visible(timeout=150)
+        ):
+            return True
+    except Exception:
+        pass
+    try:
+        body = page.locator("body").inner_text(timeout=300)
+        if "Новый раздел" in body and "1/2" in body and "Далее" in body:
+            return True
+    except Exception:
+        pass
     for sel in _RUTUBE_ONBOARDING_SELECTORS:
         try:
             if page.locator(sel).first.is_visible(timeout=150):
@@ -417,6 +424,42 @@ def _rutube_onboarding_visible(page) -> bool:
         except Exception:
             pass
     return False
+
+def _rutube_dismiss_tour_step(page) -> bool:
+    """Закрывает onboarding-тур («Далее», «Пропустить», ×)."""
+    for text in ("Далее", "Пропустить", "Позже"):
+        try:
+            btn = page.get_by_text(text, exact=True).first
+            if btn.is_visible(timeout=150):
+                btn.click(timeout=2_000)
+                return True
+        except Exception:
+            pass
+    try:
+        if page.get_by_text("1/2", exact=False).first.is_visible(timeout=150):
+            for sel in (
+                "button[class*='close']",
+                "[class*='Close']",
+                "[class*='closeButton']",
+                "button[aria-label*='Закрыть']",
+                "button[aria-label*='закрыть']",
+            ):
+                try:
+                    btn = page.locator(sel).first
+                    if btn.is_visible(timeout=150):
+                        btn.click(timeout=2_000)
+                        return True
+                except Exception:
+                    pass
+    except Exception:
+        pass
+    if _rutube_onboarding_visible(page):
+        return _try_close_selectors(page, _RUTUBE_EXTRA_CLOSE_SELECTORS)
+    return False
+
+_RUTUBE_DISMISS_EXTRA_STEPS = (
+    ("сделан клик по кнопке тура", _rutube_dismiss_tour_step),
+)
 
 def _rutube_whitelisted_overlay_present(page) -> bool:
     for _name, detect, _handle in RUTUBE_PUBLISH_WHITELIST:
@@ -445,9 +488,21 @@ def _rutube_dismiss_unknown(
     page, category, batch_id, *, label: str = "", phase: int = 0, force: bool = False,
 ) -> None:
     del phase, force
+    lbl = label or "Рутьюб"
+    for _ in range(2):
+        if _rutube_dismiss_tour_step(page):
+            write_log_entry(
+                batch_id, category, f"{lbl}: onboarding-тур — шаг закрыт.",
+                level="info",
+            )
+            if not _rutube_garbage_overlay_present(page):
+                return
+    if not _rutube_garbage_overlay_present(page):
+        return
+    write_log_entry(batch_id, category, f"{lbl}: Закрываю мусорный overlay.", level="info")
     try:
         dismiss_overlay_strict(
-            page, category, batch_id, label=label or "Рутьюб",
+            page, category, batch_id, label=lbl,
             is_present=_rutube_garbage_overlay_present,
             extra_close_selectors=_RUTUBE_EXTRA_CLOSE_SELECTORS,
             extra_steps=_RUTUBE_DISMISS_EXTRA_STEPS,
@@ -652,6 +707,8 @@ def _publish_ui(
         page, ctx, target_id, "rutube",
         batch_id=batch_id, category=category,
     )
+
+    _rutube_handle_popups(page, category, batch_id)
 
     # ── Шаг 2: Кнопка «+ Добавить» ───────────────────────────────────────
     write_log_entry(batch_id, category, "Рутьюб: Ищу кнопку «+ Добавить».")
