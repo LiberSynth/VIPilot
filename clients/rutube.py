@@ -27,8 +27,7 @@ from utils.utils import fmt_id_msg
 from routes.api import publication_file_name
 
 _NAV_TIMEOUT  = 60_000   # ms — таймаут одной попытки навигации (1 минута; до 5 попыток подряд)
-_UPLOAD_WAIT  = 180_000  # ms — ожидание завершения загрузки (до 3 минут)
-_UPLOAD_READY_STABLE_TICKS = 10  # ~2 с стабильной формы (poll ~200 ms)
+_UPLOAD_WAIT  = 180_000  # ms — ожидание появления формы публикации (до 3 минут)
 _CATEGORY     = "Юмор"   # категория по умолчанию
 
 STUDIO_URL = "https://studio.rutube.ru/"
@@ -167,21 +166,15 @@ def _rutube_upload_form_open(page) -> bool:
     return False
 
 def _rutube_upload_processing_visible(page) -> bool:
-    """Идёт передача/обработка файла (не заголовок свёрнутого виджета «Загрузка видео»)."""
+    """Передача файла до открытия формы (не «Обработка N%» в модалке публикации)."""
+    if _rutube_upload_form_open(page):
+        return False
     for text in ("Загружается", "Загрузка файла", "Идёт загрузка", "Идет загрузка"):
         try:
             if page.get_by_text(text, exact=False).first.is_visible(timeout=200):
                 return True
         except Exception:
             pass
-    try:
-        loc = page.get_by_text("Обработка", exact=False).first
-        if loc.is_visible(timeout=200):
-            label = (loc.inner_text(timeout=200) or "").lower()
-            if "100%" not in label:
-                return True
-    except Exception:
-        pass
     return False
 
 def _rutube_upload_state(page) -> dict:
@@ -207,14 +200,12 @@ def _rutube_upload_state(page) -> dict:
     return state
 
 def _rutube_upload_ready(page, state: dict) -> bool:
-    """Форма открыта, загрузка не идёт — можно выбирать категорию."""
+    """Форма открыта — при «Выберите категорию» не ждём «Обработка N%»."""
     if not _rutube_upload_form_open(page):
-        return False
-    if state["uploading"]:
         return False
     if state["moderation"] or state["category_trigger"]:
         return True
-    if state["publish_btn"]:
+    if state["publish_btn"] and not state["uploading"]:
         return True
     return False
 
@@ -278,32 +269,27 @@ def _wait_rutube_upload(page, category, batch_id=None, *, target_name: str = "Ru
     write_log_entry(batch_id, category, _tn(target_name, "Жду завершения загрузки (до 3 минут)."))
     deadline = _time.monotonic() + _UPLOAD_WAIT / 1000
     last_log_at = 0.0
-    ready_stable = 0
     while _time.monotonic() < deadline:
         _rutube_handle_popups(page, category, batch_id, allow_dismiss=False, label=target_name)
         state = _rutube_upload_state(page)
         if _rutube_upload_ready(page, state):
-            ready_stable += 1
-            if ready_stable >= _UPLOAD_READY_STABLE_TICKS:
-                parts = []
-                if state["moderation"]:
-                    parts.append("Модерация")
-                if state["publish_btn"]:
-                    parts.append("Опубликовать")
-                if state["category_trigger"]:
-                    parts.append("категория")
-                write_log_entry(
-                    batch_id, category,
-                    _tn(
-                        target_name,
-                        "Загрузка завершена"
-                        + (f" ({', '.join(parts)})" if parts else "")
-                        + ", перехожу к публикации.",
-                    ),
-                )
-                return True
-        else:
-            ready_stable = 0
+            parts = []
+            if state["moderation"]:
+                parts.append("Модерация")
+            if state["publish_btn"]:
+                parts.append("Опубликовать")
+            if state["category_trigger"]:
+                parts.append("категория")
+            write_log_entry(
+                batch_id, category,
+                _tn(
+                    target_name,
+                    "Загрузка завершена"
+                    + (f" ({', '.join(parts)})" if parts else "")
+                    + ", перехожу к публикации.",
+                ),
+            )
+            return True
 
         now = _time.monotonic()
         if now - last_log_at >= 8:
