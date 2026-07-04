@@ -12,6 +12,7 @@ import tempfile
 import time as _time
 
 from clients.common import (
+    _likely_overlay_present,
     click_outside_modal_boundary,
     dismiss_overlay_strict,
     handle_popups,
@@ -436,6 +437,52 @@ def dismiss_dzen_hint(
 def _detect_confirm_dialog(page) -> bool:
     return _has_publish_confirm_dialog(page)
 
+def _detect_dzen_upload_modal(page) -> bool:
+    """Модал выбора файла — тот же modal-overlay, что у донатов."""
+    for text in (
+        "Выбрать видео", "Выберите видео",
+        "Перетащите", "Загрузите видео",
+    ):
+        try:
+            if page.get_by_text(text, exact=False).first.is_visible(timeout=200):
+                return True
+        except Exception:
+            pass
+    return False
+
+def _detect_dzen_publish_editor(page) -> bool:
+    """Редактор / модал «Публикация ролика» — рабочий UI, не мусор."""
+    try:
+        if "videoEditorPublicationId" in page.url:
+            return True
+    except Exception:
+        pass
+    for text in ("Публикация ролика", "Опубликовать после обработки"):
+        try:
+            if page.get_by_text(text, exact=False).first.is_visible(timeout=200):
+                return True
+        except Exception:
+            pass
+    for sel in (
+        "input[placeholder*='теги']",
+        "input[placeholder*='Теги']",
+        '[data-testid="select-trigger-button-comment"]',
+        '[data-testid="publish-btn"]',
+    ):
+        try:
+            if page.locator(sel).first.is_visible(timeout=200):
+                return True
+        except Exception:
+            pass
+    return False
+
+def _detect_dzen_create_menu(page) -> bool:
+    """Выпадающее меню «+» с пунктом «Загрузить видео»."""
+    try:
+        return page.get_by_text("Загрузить видео", exact=True).first.is_visible(timeout=200)
+    except Exception:
+        return False
+
 def _detect_file_input(page) -> bool:
     """input[type=file] в DOM — нативный диалог уже закрыт после set_files(), не трогаем."""
     try:
@@ -631,11 +678,31 @@ def _retry_publish_if_button_visible(page, category, batch_id, url_step7_start, 
 
 DZEN_PUBLISH_WHITELIST = [
     ("captcha", _detect_captcha, _handle_captcha_element),
+    ("upload_modal", _detect_dzen_upload_modal, None),
+    ("publish_editor", _detect_dzen_publish_editor, None),
+    ("create_menu", _detect_dzen_create_menu, None),
     ("confirm", _detect_confirm_dialog, _handle_confirm_element),
     # file_input НЕ ДОБАВЛЯТЬ сюда — после set_files() input[type=file] остаётся в DOM
     # на всё время публикации и блокирует dismiss для любых других попапов.
     # modal-overlay (донаты и пр.) — мусор, закрывается через dismiss_overlay_strict.
 ]
+
+def _dzen_whitelisted_overlay_present(page) -> bool:
+    for _name, detect, _handle in DZEN_PUBLISH_WHITELIST:
+        try:
+            if detect(page):
+                return True
+        except Exception:
+            pass
+    return False
+
+def _dzen_garbage_overlay_present(page) -> bool:
+    """Мусор поверх студии; whitelisted modal-overlay / рабочие модалки — не мусор."""
+    if _dzen_whitelisted_overlay_present(page):
+        return False
+    if _modal_overlay_visible(page):
+        return True
+    return _likely_overlay_present(page)
 
 def _dzen_dismiss_unknown(
     page, category, batch_id, *, label: str = "", phase: int = 0, force: bool = False,
@@ -644,11 +711,11 @@ def _dzen_dismiss_unknown(
     lbl = label or "Дзен"
     if _detect_captcha(page):
         return
-    if _modal_overlay_visible(page):
+    if _dzen_garbage_overlay_present(page):
         try:
             dismiss_overlay_strict(
                 page, category, batch_id, label=lbl,
-                is_present=_modal_overlay_visible,
+                is_present=_dzen_garbage_overlay_present,
                 extra_close_selectors=_DZEN_MODAL_CLOSE_SELECTORS,
                 extra_steps=_DZEN_MODAL_DISMISS_EXTRA_STEPS,
             )
@@ -811,6 +878,9 @@ def _publish_ui(
     while _time.monotonic() < _plus_deadline:
         raise_if_login_required(page, "dzen", publisher_id=publisher_id)
         _dzen_handle_popups(page, category, batch_id)
+        if _dzen_garbage_overlay_present(page):
+            page.wait_for_timeout(400)
+            continue
         try:
             if plus_btn.is_visible(timeout=400):
                 _plus_ready = True

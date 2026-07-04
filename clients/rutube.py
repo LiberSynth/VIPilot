@@ -17,6 +17,7 @@ from clients.common import (
     poll_until,
     poll_wait_tick,
     safe_click,
+    _likely_overlay_present,
 )
 from services.publish_auth_check import raise_if_login_required
 from log import write_log_entry
@@ -188,6 +189,8 @@ def _wait_rutube_add_button(page, category, batch_id=None, timeout_ms=180_000):
         _rutube_handle_popups(page, category, batch_id)
 
     def _ready() -> bool:
+        if _rutube_garbage_overlay_present(page):
+            return False
         add_btn = _find_rutube_add_button(page)
         if add_btn is not None:
             found[0] = add_btn
@@ -207,6 +210,7 @@ def _wait_rutube_upload(page, category, batch_id=None) -> bool:
     deadline = _time.monotonic() + _UPLOAD_WAIT / 1000
     last_log_at = 0.0
     while _time.monotonic() < deadline:
+        _rutube_handle_popups(page, category, batch_id)
         state = _rutube_upload_state(page)
         if _rutube_upload_ready(state):
             parts = []
@@ -259,7 +263,18 @@ def _rutube_publish_button_visible(page) -> bool:
 
 def _detect_rutube_upload_form(page) -> bool:
     """Форма публикации открыта — не закрывать."""
-    return _rutube_publish_button_visible(page)
+    if _rutube_publish_button_visible(page):
+        return True
+    state = _rutube_upload_state(page)
+    if state["moderation"] or state["category_trigger"]:
+        return True
+    for text in ("Выберите категорию", "Модерация", "Название", "Описание"):
+        try:
+            if page.get_by_text(text, exact=False).first.is_visible(timeout=200):
+                return True
+        except Exception:
+            pass
+    return False
 
 def _detect_rutube_upload_menu(page) -> bool:
     """Меню после «+ Добавить» — не закрывать."""
@@ -286,7 +301,104 @@ def _detect_rutube_upload_in_progress(page) -> bool:
         return True
     return False
 
+def _detect_rutube_captcha(page) -> bool:
+    try:
+        if page.locator(
+            "iframe[src*='captcha'], iframe[src*='smartcaptcha']",
+        ).first.is_visible(timeout=200):
+            return True
+    except Exception:
+        pass
+    for text in ("Подтвердите, что вы не робот", "Я не робот"):
+        try:
+            if page.get_by_text(text, exact=False).first.is_visible(timeout=200):
+                return True
+        except Exception:
+            pass
+    return False
+
+def _handle_rutube_captcha(page, category, batch_id) -> None:
+    for text in ("Продолжить",):
+        try:
+            btn = page.get_by_text(text, exact=False).first
+            if btn.is_visible(timeout=300):
+                btn.click()
+                write_log_entry(
+                    batch_id, category,
+                    "Рутьюб: CAPTCHA-диалог закрыт («Продолжить» нажато).",
+                )
+                return
+        except Exception:
+            pass
+    write_log_entry(
+        batch_id, category,
+        "Рутьюб: CAPTCHA обнаружена — требуется ручное прохождение.",
+        level="warn",
+    )
+
+_RUTUBE_ONBOARDING_TEXTS = (
+    "Новый раздел: Уровень канала",
+    "Новый раздел",
+)
+
+_RUTUBE_ONBOARDING_SELECTORS = (
+    "[class*='onboarding']",
+    "[class*='Onboarding']",
+    "[class*='product-tour']",
+    "[class*='ProductTour']",
+    "[class*='coach-mark']",
+    "[class*='CoachMark']",
+    "[class*='joyride']",
+)
+
+_RUTUBE_EXTRA_CLOSE_SELECTORS = (
+    "[class*='onboarding'] button[class*='close']",
+    "[class*='Onboarding'] button[class*='close']",
+    "[class*='popup'] button[class*='close']",
+    "[class*='Popup'] button[class*='close']",
+    "[class*='modal'] button[class*='close']",
+    "[class*='Modal'] button[class*='close']",
+    "[class*='closeButton']",
+    "[class*='CloseButton']",
+    "[data-testid*='close']",
+    "button[aria-label*='Закрыть']",
+    "button[aria-label*='закрыть']",
+    "button[aria-label*='Close']",
+)
+
+def _rutube_onboarding_visible(page) -> bool:
+    for text in _RUTUBE_ONBOARDING_TEXTS:
+        try:
+            if page.get_by_text(text, exact=False).first.is_visible(timeout=150):
+                return True
+        except Exception:
+            pass
+    for sel in _RUTUBE_ONBOARDING_SELECTORS:
+        try:
+            if page.locator(sel).first.is_visible(timeout=150):
+                return True
+        except Exception:
+            pass
+    return False
+
+def _rutube_whitelisted_overlay_present(page) -> bool:
+    for _name, detect, _handle in RUTUBE_PUBLISH_WHITELIST:
+        try:
+            if detect(page):
+                return True
+        except Exception:
+            pass
+    return False
+
+def _rutube_garbage_overlay_present(page) -> bool:
+    if _rutube_onboarding_visible(page):
+        return True
+    if _rutube_whitelisted_overlay_present(page):
+        return False
+    return _likely_overlay_present(page)
+
 RUTUBE_PUBLISH_WHITELIST = [
+    ("captcha", _detect_rutube_captcha, _handle_rutube_captcha),
     ("upload_in_progress", _detect_rutube_upload_in_progress, None),
     ("upload_form", _detect_rutube_upload_form, None),
     ("upload_menu", _detect_rutube_upload_menu, None),
@@ -299,6 +411,8 @@ def _rutube_dismiss_unknown(
     try:
         dismiss_overlay_strict(
             page, category, batch_id, label=label or "Рутьюб",
+            is_present=_rutube_garbage_overlay_present,
+            extra_close_selectors=_RUTUBE_EXTRA_CLOSE_SELECTORS,
         )
     except OverlayNotDismissedError as exc:
         raise RutubeApiError(str(exc)) from exc
@@ -344,7 +458,7 @@ def _click_rutube_publish_button(pub_btn, page, category, batch_id) -> None:
         safe_click(
             pub_btn, page, RUTUBE_PUBLISH_WHITELIST, _rutube_dismiss_unknown,
             batch_id=batch_id, category=category, label="Рутьюб",
-            timeout_ms=5_000, max_attempts=3,
+            timeout_ms=2_000, max_attempts=3,
             click_kwargs={"no_wait_after": True},
             js_fallback=True,
         )
@@ -380,19 +494,68 @@ def _submit_rutube_publish(page, category, batch_id, pub_btn=None) -> None:
 def _click_rutube_add_button(add_btn, page, category, batch_id) -> None:
     """Клик «+ Добавить» с обходом перекрывающих оверлеев."""
     try:
-        add_btn.scroll_into_view_if_needed(timeout=3_000)
+        add_btn.scroll_into_view_if_needed(timeout=1_000)
     except Exception:
         pass
     try:
         safe_click(
             add_btn, page, RUTUBE_PUBLISH_WHITELIST, _rutube_dismiss_unknown,
             batch_id=batch_id, category=category, label="Рутьюб",
-            timeout_ms=5_000, max_attempts=3, js_fallback=True,
+            timeout_ms=2_000, max_attempts=3, js_fallback=True,
         )
     except Exception as _e:
         raise RutubeApiError(
             f"Не удалось нажать «+ Добавить» в студии Рутьюба: {_e}"
         ) from _e
+
+def _click_rutube_menu_item(upload_item, page, category, batch_id) -> None:
+    """Клик пункта меню загрузки с обходом оверлеев."""
+    try:
+        upload_item.scroll_into_view_if_needed(timeout=1_000)
+    except Exception:
+        pass
+    try:
+        safe_click(
+            upload_item, page, RUTUBE_PUBLISH_WHITELIST, _rutube_dismiss_unknown,
+            batch_id=batch_id, category=category, label="Рутьюб",
+            timeout_ms=2_000, max_attempts=3, js_fallback=True,
+        )
+    except Exception as _e:
+        raise RutubeApiError(
+            f"Не удалось выбрать пункт загрузки в Рутьюбе: {_e}"
+        ) from _e
+
+def _click_rutube_choose_file(choose_btn, page, category, batch_id) -> None:
+    """Клик «Выбрать файлы» с обходом оверлеев."""
+    try:
+        choose_btn.scroll_into_view_if_needed(timeout=1_000)
+    except Exception:
+        pass
+    try:
+        safe_click(
+            choose_btn, page, RUTUBE_PUBLISH_WHITELIST, _rutube_dismiss_unknown,
+            batch_id=batch_id, category=category, label="Рутьюб",
+            timeout_ms=2_000, max_attempts=3, js_fallback=True,
+        )
+    except Exception as _e:
+        raise RutubeApiError(
+            f"Не удалось нажать «Выбрать файлы» в Рутьюбе: {_e}"
+        ) from _e
+
+def _click_rutube_locator(locator, page, category, batch_id, *, err_msg: str) -> None:
+    """Клик по элементу формы с обходом оверлеев."""
+    try:
+        locator.scroll_into_view_if_needed(timeout=1_000)
+    except Exception:
+        pass
+    try:
+        safe_click(
+            locator, page, RUTUBE_PUBLISH_WHITELIST, _rutube_dismiss_unknown,
+            batch_id=batch_id, category=category, label="Рутьюб",
+            timeout_ms=2_000, max_attempts=3, js_fallback=True,
+        )
+    except Exception as _e:
+        raise RutubeApiError(err_msg) from _e
 
 def _ensure_rutube_studio(page, category, batch_id=None) -> None:
     """Студия уже открыта bootstrap; повторный goto только если URL не studio."""
@@ -467,7 +630,7 @@ def _publish_ui(
         write_log_entry(batch_id, category, "Рутьюб: exact-match не нашёл — пробую contains.")
         upload_item = page.get_by_text("Загрузить видео", exact=False).first
         upload_item.wait_for(state="visible", timeout=180_000)
-    upload_item.click()
+    _click_rutube_menu_item(upload_item, page, category, batch_id)
     write_log_entry(batch_id, category, "Рутьюб: «Загрузить видео или Shorts» нажато")
 
     # ── Шаг 4: Нажимаем «Выбрать файлы» и передаём видео ────────────────
@@ -476,7 +639,7 @@ def _publish_ui(
     choose_btn.wait_for(state="visible", timeout=180_000)
     write_log_entry(batch_id, category, "Рутьюб: Кнопка «Выбрать файлы» найдена, открываю диалог выбора файла.")
     with page.expect_file_chooser(timeout=180_000) as fc_info:
-        choose_btn.click()
+        _click_rutube_choose_file(choose_btn, page, category, batch_id)
     file_chooser = fc_info.value
     file_chooser.set_files(video_path)
     write_log_entry(batch_id, category, "Рутьюб: Файл передан браузеру, жду загрузки.")
@@ -489,15 +652,22 @@ def _publish_ui(
     write_log_entry(batch_id, category, f"Рутьюб: Выбираю категорию «{_CATEGORY}».")
     _cat_ok = False
     try:
+        _rutube_handle_popups(page, category, batch_id)
         cat_trigger = page.locator("text=Выберите категорию").first
         cat_trigger.wait_for(state="visible", timeout=5_000)
-        cat_trigger.click()
+        _click_rutube_locator(
+            cat_trigger, page, category, batch_id,
+            err_msg="Не удалось открыть выбор категории в Рутьюбе",
+        )
         page.wait_for_timeout(500)
         page.keyboard.type(_CATEGORY)
         page.wait_for_timeout(600)
         cat_option = page.get_by_text(_CATEGORY, exact=True).first
         cat_option.wait_for(state="visible", timeout=5_000)
-        cat_option.click()
+        _click_rutube_locator(
+            cat_option, page, category, batch_id,
+            err_msg=f"Не удалось выбрать категорию «{_CATEGORY}» в Рутьюбе",
+        )
         page.wait_for_timeout(500)
         _cat_ok = True
         write_log_entry(batch_id, category, f"Рутьюб: Категория «{_CATEGORY}» выбрана")

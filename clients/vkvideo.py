@@ -19,9 +19,11 @@ import tempfile
 import time as _time
 
 from clients.common import (
+    _likely_overlay_present,
     dismiss_overlay_strict,
     handle_popups,
     OverlayNotDismissedError,
+    poll_until,
     poll_wait_tick,
     safe_click,
 )
@@ -202,11 +204,47 @@ def _detect_vk_upload_modal(page) -> bool:
             pass
     return False
 
-def _detect_vk_captcha(page) -> bool:
+def _detect_vk_upload_processing(page) -> bool:
+    """Клип загружается/обрабатывается в uploader — не закрывать overlay прогресса."""
+    if _vk_publish_modal_visible(page) or _detect_vk_upload_modal(page):
+        return False
     try:
-        return page.get_by_text("Продолжить", exact=False).first.is_visible(timeout=200)
+        if page.locator("button:has-text('Опубликовать')").last.is_visible(timeout=200):
+            return False
+    except Exception:
+        pass
+    try:
+        url = page.url.lower()
     except Exception:
         return False
+    if "showuploader" not in url and "isclipuploading" not in url:
+        return False
+    for text in (
+        "Обрабатывается", "Загрузка клипа", "Идёт обработка",
+        "Идет обработка", "Подождите", "Загрузка...",
+    ):
+        try:
+            if page.get_by_text(text, exact=False).first.is_visible(timeout=200):
+                return True
+        except Exception:
+            pass
+    return False
+
+def _detect_vk_captcha(page) -> bool:
+    try:
+        if page.locator(
+            "iframe[src*='captcha'], iframe[src*='smartcaptcha']",
+        ).first.is_visible(timeout=200):
+            return True
+    except Exception:
+        pass
+    for text in ("Подтвердите, что вы не робот", "Я не робот"):
+        try:
+            if page.get_by_text(text, exact=False).first.is_visible(timeout=200):
+                return True
+        except Exception:
+            pass
+    return False
 
 def _handle_vk_captcha(page, category, batch_id) -> None:
     try:
@@ -223,8 +261,63 @@ def _handle_vk_captcha(page, category, batch_id) -> None:
 VKVIDEO_PUBLISH_WHITELIST = [
     ("captcha", _detect_vk_captcha, _handle_vk_captcha),
     ("upload_modal", _detect_vk_upload_modal, None),
+    ("upload_processing", _detect_vk_upload_processing, None),
     ("publish_modal", _vk_publish_modal_visible, None),
 ]
+
+_VKVIDEO_ONBOARDING_SELECTORS = (
+    "[class*='onboarding']",
+    "[class*='Onboarding']",
+    "[class*='product-tour']",
+    "[class*='ProductTour']",
+    "[class*='coach-mark']",
+    "[class*='CoachMark']",
+    "[class*='joyride']",
+    "[class*='vkuiOnboarding']",
+    "[class*='OnboardingTooltip']",
+    "[class*='HintTooltip']",
+)
+
+_VKVIDEO_EXTRA_CLOSE_SELECTORS = (
+    "[class*='onboarding'] button[class*='close']",
+    "[class*='Onboarding'] button[class*='close']",
+    "[class*='popup'] button[class*='close']",
+    "[class*='Popup'] button[class*='close']",
+    "[class*='modal'] button[class*='close']",
+    "[class*='Modal'] button[class*='close']",
+    "[class*='closeButton']",
+    "[class*='CloseButton']",
+    "[data-testid*='close']",
+    "button[aria-label*='Закрыть']",
+    "button[aria-label*='закрыть']",
+    "button[aria-label*='Close']",
+)
+
+def _vkvideo_whitelisted_overlay_present(page) -> bool:
+    for _name, detect, _handle in VKVIDEO_PUBLISH_WHITELIST:
+        try:
+            if detect(page):
+                return True
+        except Exception:
+            pass
+    return False
+
+def _vkvideo_onboarding_visible(page) -> bool:
+    for sel in _VKVIDEO_ONBOARDING_SELECTORS:
+        try:
+            if page.locator(sel).first.is_visible(timeout=150):
+                return True
+        except Exception:
+            pass
+    return False
+
+def _vkvideo_garbage_overlay_present(page) -> bool:
+    """Мусор поверх кабинета; whitelisted-модалки и туры/onboarding — отдельно."""
+    if _vkvideo_onboarding_visible(page):
+        return True
+    if _vkvideo_whitelisted_overlay_present(page):
+        return False
+    return _likely_overlay_present(page)
 
 def _vkvideo_dismiss_unknown(
     page, category, batch_id, *, label: str = "", phase: int = 0, force: bool = False,
@@ -233,6 +326,8 @@ def _vkvideo_dismiss_unknown(
     try:
         dismiss_overlay_strict(
             page, category, batch_id, label=label or "VK Видео",
+            is_present=_vkvideo_garbage_overlay_present,
+            extra_close_selectors=_VKVIDEO_EXTRA_CLOSE_SELECTORS,
         )
     except OverlayNotDismissedError as exc:
         raise VkVideoApiError(str(exc)) from exc
@@ -284,7 +379,7 @@ def _vk_clip_preview_ready(page) -> bool:
 
 def _scroll_vk_publish_button(pub_btn) -> None:
     try:
-        pub_btn.scroll_into_view_if_needed(timeout=3_000)
+        pub_btn.scroll_into_view_if_needed(timeout=1_000)
     except Exception:
         pass
 
@@ -317,6 +412,9 @@ def _wait_vk_clip_publish_ready(page, pub_btn, batch_id, category, timeout_ms=_P
     while _time.monotonic() < deadline:
         raise_if_login_required(page, "vkvideo")
         _vkvideo_handle_popups(page, category, batch_id)
+        if _vkvideo_garbage_overlay_present(page):
+            poll_wait_tick(page, batch_id, "vkvideo")
+            continue
         _scroll_vk_publish_button(pub_btn)
         if _vk_publish_button_clickable(pub_btn):
             write_log_entry(batch_id, category, "VK Видео: Кнопка «Опубликовать» доступна.")
@@ -370,7 +468,7 @@ def _click_vk_publish_button(pub_btn, page, category, batch_id) -> None:
         safe_click(
             pub_btn, page, VKVIDEO_PUBLISH_WHITELIST, _vkvideo_dismiss_unknown,
             batch_id=batch_id, category=category, label="VK Видео",
-            timeout_ms=5_000, max_attempts=3,
+            timeout_ms=2_000, max_attempts=3,
             click_kwargs={"no_wait_after": True},
             js_fallback=True,
         )
@@ -400,29 +498,44 @@ def _wait_visible(
     club_id=None,
     interval_ms: int = 200,
 ):
-    """Ждёт видимости локатора; при сбое CDP — inline-кадр каждые interval_ms."""
-    deadline = _time.monotonic() + timeout_ms / 1000
-    while True:
+    """Ждёт видимости локатора без мусорного оверлея поверх."""
+
+    def _on_poll() -> None:
         raise_if_login_required(page, "vkvideo", club_id=club_id)
-        _vkvideo_handle_popups(page, category, batch_id, allow_dismiss=False)
-        remaining = deadline - _time.monotonic()
-        if remaining <= 0:
-            raise_if_login_required(page, "vkvideo", club_id=club_id)
-            locator.wait_for(state="visible", timeout=1_000)  # бросит TimeoutError
-            return
-        poll = min(interval_ms, int(remaining * 1000))
-        if poll <= 0:
-            raise_if_login_required(page, "vkvideo", club_id=club_id)
-            locator.wait_for(state="visible", timeout=1_000)
-            return
+        _vkvideo_handle_popups(page, category, batch_id)
+
+    def _ready() -> bool:
+        if _vkvideo_garbage_overlay_present(page):
+            return False
         try:
-            locator.wait_for(state="visible", timeout=poll)
-            return  # виден
+            return locator.is_visible(timeout=200)
         except Exception:
-            poll_wait_tick(page, batch_id, "vkvideo", interval_ms)
-            if _time.monotonic() >= deadline:
-                locator.wait_for(state="visible", timeout=1_000)  # бросит TimeoutError
-                return
+            return False
+
+    if poll_until(
+        page, _ready, timeout_ms,
+        batch_id=batch_id, platform="vkvideo", poll_ms=interval_ms, on_poll=_on_poll,
+    ):
+        return
+    raise_if_login_required(page, "vkvideo", club_id=club_id)
+    locator.wait_for(state="visible", timeout=1_000)  # бросит TimeoutError
+
+def _click_vk_choose_file(choose_btn, page, category, batch_id) -> None:
+    """Клик «Выбрать файл» с обходом перекрывающих оверлеев."""
+    try:
+        choose_btn.scroll_into_view_if_needed(timeout=1_000)
+    except Exception:
+        pass
+    try:
+        safe_click(
+            choose_btn, page, VKVIDEO_PUBLISH_WHITELIST, _vkvideo_dismiss_unknown,
+            batch_id=batch_id, category=category, label="VK Видео",
+            timeout_ms=2_000, max_attempts=3, js_fallback=True,
+        )
+    except Exception as _e:
+        raise VkVideoApiError(
+            f"Не удалось нажать «Выбрать файл» в VK Видео: {_e}"
+        ) from _e
 
 def _publish_ui(
     page,
@@ -479,7 +592,7 @@ def _publish_ui(
                 break
         except Exception:
             pass
-        _vkvideo_handle_popups(page, category, batch_id, allow_dismiss=False)
+        _vkvideo_handle_popups(page, category, batch_id)
         page.wait_for_timeout(300)
 
     # ── Шаг 2: Ждём появления кнопки «Выбрать файл» ──────────────────────
@@ -490,7 +603,7 @@ def _publish_ui(
 
     # ── Шаг 3: Загружаем файл через file chooser ─────────────────────────
     with page.expect_file_chooser(timeout=180_000) as fc_info:
-        choose_btn.click()
+        _click_vk_choose_file(choose_btn, page, category, batch_id)
     file_chooser = fc_info.value
     file_chooser.set_files(video_path)
     write_log_entry(batch_id, category, "VK Видео: Файл передан, жду форму «Публикация клипа».")
@@ -501,16 +614,16 @@ def _publish_ui(
     # ── Шаг 4: Ждём форму «Публикация клипа» (поле Описание) ─────────────
     write_log_entry(batch_id, category, "VK Видео: Жду форму публикации.")
     _form_ok = False
-    try:
-        page.wait_for_selector(
-            "textarea[placeholder*='клип'], "
-            "textarea[placeholder*='Клип'], "
-            "[placeholder*='клип']",
-            timeout=_UPLOAD_WAIT,
-        )
-        _form_ok = True
-        write_log_entry(batch_id, category, "VK Видео: Форма публикации открылась")
-    except Exception:
+    _form_deadline = _time.monotonic() + _UPLOAD_WAIT / 1000
+    while _time.monotonic() < _form_deadline:
+        raise_if_login_required(page, "vkvideo", club_id=club_id)
+        _vkvideo_handle_popups(page, category, batch_id)
+        if _vk_publish_form_visible(page):
+            _form_ok = True
+            write_log_entry(batch_id, category, "VK Видео: Форма публикации открылась")
+            break
+        poll_wait_tick(page, batch_id, "vkvideo")
+    if not _form_ok:
         write_log_entry(batch_id, category, "VK Видео: Ожидание формы истекло — продолжаю.")
         page.wait_for_timeout(5000)
 
