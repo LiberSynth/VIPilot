@@ -289,12 +289,11 @@ def _vkvideo_target_blocked(page) -> bool:
         return False
     try:
         pub = page.locator("button:has-text('Опубликовать')").last
-        if pub.is_visible(timeout=150) and element_click_blocked(pub):
-            return True
-    except Exception:
-        pass
-    try:
-        if page.locator("[role='alert']").first.is_visible(timeout=150):
+        if (
+            pub.is_visible(timeout=150)
+            and _vk_publish_button_clickable(pub)
+            and element_click_blocked(pub)
+        ):
             return True
     except Exception:
         pass
@@ -327,7 +326,7 @@ def _vkvideo_handle_popups(page, category, batch_id, *, allow_dismiss: bool = Tr
         page, VKVIDEO_PUBLISH_WHITELIST, _vkvideo_dismiss_unknown,
         batch_id, category, allow_dismiss=allow_dismiss,
     )
-    if allow_dismiss and had_whitelisted:
+    if allow_dismiss and had_whitelisted and _vkvideo_target_blocked(page):
         _vkvideo_dismiss_unknown(page, category, batch_id, label="VK Видео")
 
 def _vk_publish_button_visible(page) -> bool:
