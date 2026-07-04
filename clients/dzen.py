@@ -268,7 +268,14 @@ _DZEN_MODAL_CLOSE_SELECTORS = (
     "button[aria-label*='закрыть']",
     "button[aria-label*='Close']",
     "[class*='toast'] button[class*='close']",
+    "[class*='toast'] [class*='closeButton']",
     "[class*='notification'] button[class*='close']",
+    "[class*='notification'] [class*='closeButton']",
+    "[class*='snackbar'] button[class*='close']",
+    "[class*='snackbar'] [class*='closeButton']",
+    "[role='alert'] button",
+    "[role='alert'] [class*='close']",
+    "[role='alertdialog'] button[class*='close']",
     "[class*='modal'] button:has-text('Понятно')",
     "[class*='modal'] button:has-text('Не сейчас')",
     "[class*='modal'] button:has-text('Пропустить')",
@@ -287,9 +294,54 @@ def _dzen_click_outside_modal(page) -> bool:
         _DZEN_MODAL_ROOT_SELECTOR,
     )
 
+def _dzen_error_toast_visible(page) -> bool:
+    """Alert/toast поверх редактора — мусор, даже при publish_editor в whitelist."""
+    if _dzen_publish_success_toast_visible(page):
+        return False
+    try:
+        if page.locator(_DZEN_HINT_CLOSE_SELECTOR).first.is_visible(timeout=100):
+            return False
+    except Exception:
+        pass
+    for sel in (
+        "[role='alert']",
+        "[role='alertdialog']",
+        "[class*='toast']",
+        "[class*='notification']",
+        "[class*='snackbar']",
+    ):
+        try:
+            if page.locator(sel).first.is_visible(timeout=150):
+                return True
+        except Exception:
+            pass
+    return False
+
+def _dzen_click_error_toast(page) -> bool:
+    """Клик по видимому alert/toast (часто закрывает уведомление об ошибке сохранения)."""
+    if not _dzen_error_toast_visible(page):
+        return False
+    for sel in (
+        "[role='alert']",
+        "[role='alertdialog']",
+        "[class*='toast']",
+        "[class*='notification']",
+        "[class*='snackbar']",
+    ):
+        try:
+            loc = page.locator(sel).first
+            if not loc.is_visible(timeout=150):
+                continue
+            loc.click(timeout=2_000)
+            return True
+        except Exception:
+            pass
+    return False
+
 
 _DZEN_MODAL_DISMISS_EXTRA_STEPS = (
     ("сделан клик за границей окна", _dzen_click_outside_modal),
+    ("сделан клик по уведомлению", _dzen_click_error_toast),
 )
 
 _CONFIRM_OR_CAPTCHA_SEL = (
@@ -803,6 +855,8 @@ def _dzen_whitelisted_overlay_present(page) -> bool:
 
 def _dzen_garbage_overlay_present(page) -> bool:
     """Мусор поверх студии; whitelisted modal-overlay / рабочие модалки — не мусор."""
+    if _dzen_error_toast_visible(page):
+        return True
     if _dzen_target_blocked(page):
         return True
     if _dzen_whitelisted_overlay_present(page):

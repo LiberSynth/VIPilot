@@ -123,6 +123,30 @@ def publish(
 # ---------------------------------------------------------------------------
 
 
+def _rutube_category_trigger_visible(page) -> bool:
+    try:
+        return page.locator("text=Выберите категорию").first.is_visible(timeout=200)
+    except Exception:
+        return False
+
+def _rutube_upload_processing_visible(page) -> bool:
+    """Идёт передача/обработка файла (не заголовок свёрнутого виджета «Загрузка видео»)."""
+    for text in ("Загружается", "Загрузка файла", "Идёт загрузка", "Идет загрузка"):
+        try:
+            if page.get_by_text(text, exact=False).first.is_visible(timeout=200):
+                return True
+        except Exception:
+            pass
+    try:
+        loc = page.get_by_text("Обработка", exact=False).first
+        if loc.is_visible(timeout=200):
+            label = (loc.inner_text(timeout=200) or "").lower()
+            if "100%" not in label:
+                return True
+    except Exception:
+        pass
+    return False
+
 def _rutube_upload_state(page) -> dict:
     """Проверяет видимые признаки загрузки и готовности формы публикации."""
     state = {
@@ -135,48 +159,23 @@ def _rutube_upload_state(page) -> dict:
         state["publish_btn"] = page.locator("button:has-text('Опубликовать')").last.is_visible(timeout=300)
     except Exception:
         pass
-    try:
-        state["category_trigger"] = page.locator("text=Выберите категорию").first.is_visible(timeout=300)
-    except Exception:
-        pass
-    in_upload_form = state["publish_btn"] or state["category_trigger"]
+    state["category_trigger"] = _rutube_category_trigger_visible(page)
+    in_upload_form = state["category_trigger"]
     try:
         if in_upload_form and page.get_by_text("Модерация", exact=False).first.is_visible(timeout=300):
             state["moderation"] = True
     except Exception:
         pass
-    try:
-        body = page.locator("body").inner_text(timeout=1000).lower()
-        for marker in (
-            "загружается", "загрузка файла", "загрузка видео",
-            "идёт загрузка", "идет загрузка", "uploading",
-        ):
-            if marker in body:
-                state["uploading"] = True
-                break
-    except Exception:
-        pass
+    state["uploading"] = _rutube_upload_processing_visible(page)
     return state
 
 def _rutube_upload_ready(page, state: dict) -> bool:
-    """Форма публикации действительно открыта и готова к продолжению пайплайна."""
-    if not _detect_rutube_upload_form(page):
+    """Форма публикации открыта: видно «Выберите категорию», загрузка не идёт."""
+    if state["uploading"]:
         return False
-    if state["moderation"] or state["category_trigger"]:
-        return True
-    if state["publish_btn"] and not state["uploading"]:
-        return True
-    return False
-
-def _rutube_upload_widget_done(page) -> bool:
-    """Виджет очереди загрузки завершил передачу файла (например, «Обработка 100%»)."""
-    for text in ("Загрузили ролик", "Обработка 100%", "Загружен ролик", "Загрузить ещё"):
-        try:
-            if page.get_by_text(text, exact=False).first.is_visible(timeout=200):
-                return True
-        except Exception:
-            pass
-    return False
+    if not state["category_trigger"]:
+        return False
+    return _detect_rutube_upload_form(page)
 
 def _find_rutube_add_button(page):
     """Возвращает видимую кнопку «+ Добавить» в студии или None."""
@@ -239,7 +238,7 @@ def _wait_rutube_upload(page, category, batch_id=None) -> bool:
     deadline = _time.monotonic() + _UPLOAD_WAIT / 1000
     last_log_at = 0.0
     while _time.monotonic() < deadline:
-        _rutube_handle_popups(page, category, batch_id)
+        _rutube_handle_popups(page, category, batch_id, allow_dismiss=False)
         state = _rutube_upload_state(page)
         if _rutube_upload_ready(page, state):
             parts = []
@@ -291,13 +290,8 @@ def _rutube_publish_button_visible(page) -> bool:
         return False
 
 def _detect_rutube_upload_form(page) -> bool:
-    """Форма публикации открыта — не закрывать (не путать с пунктами меню студии)."""
-    try:
-        if page.locator("text=Выберите категорию").first.is_visible(timeout=200):
-            return True
-    except Exception:
-        pass
-    if not _rutube_publish_button_visible(page):
+    """Открыта форма публикации — не corner-widget и не дашборд."""
+    if not _rutube_category_trigger_visible(page):
         return False
     for sel in (
         "input[placeholder*='азван']",
@@ -308,7 +302,7 @@ def _detect_rutube_upload_form(page) -> bool:
                 return True
         except Exception:
             pass
-    return False
+    return _rutube_publish_button_visible(page)
 
 def _detect_rutube_upload_menu(page) -> bool:
     """Меню после «+ Добавить» — не закрывать."""
@@ -321,23 +315,15 @@ def _detect_rutube_upload_menu(page) -> bool:
     return False
 
 def _detect_rutube_upload_in_progress(page) -> bool:
-    """Виджет загрузки файла — не dismiss (modal/popup классы у штатного UI)."""
-    state = _rutube_upload_state(page)
-    # Форма публикации уже открыта — это другой whitelist (upload_form), не upload_in_progress.
-    if state["publish_btn"] or state["category_trigger"] or state["moderation"]:
+    """Модал «Выбрать файлы» до открытия формы публикации."""
+    if _detect_rutube_upload_form(page):
         return False
-    # Очередь загрузки завершила обработку — виджет больше не рабочий этап.
-    if _rutube_upload_widget_done(page):
-        return False
-    for text in ("Загружается", "Загрузка файла", "Идёт загрузка", "Идет загрузка"):
-        try:
-            if page.get_by_text(text, exact=False).first.is_visible(timeout=200):
-                return True
-        except Exception:
-            pass
-    if state["uploading"]:
-        return True
-    return False
+    try:
+        if page.get_by_text("Выбрать файлы", exact=False).first.is_visible(timeout=200):
+            return True
+    except Exception:
+        pass
+    return _rutube_upload_processing_visible(page)
 
 def _detect_rutube_captcha(page) -> bool:
     try:
@@ -384,6 +370,8 @@ def _rutube_target_blocked(page) -> bool:
     """Целевой UI перекрыт мусором (без каталога попапов)."""
     if _rutube_add_button_blocked(page):
         return True
+    if not _detect_rutube_upload_form(page):
+        return False
     try:
         pub = page.locator("button:has-text('Опубликовать')").last
         if pub.is_visible(timeout=150) and element_click_blocked(pub):
@@ -680,9 +668,8 @@ def _publish_ui(
     write_log_entry(batch_id, category, f"Рутьюб: Выбираю категорию «{_CATEGORY}».")
     _cat_ok = False
     try:
-        _rutube_handle_popups(page, category, batch_id)
         cat_trigger = page.locator("text=Выберите категорию").first
-        cat_trigger.wait_for(state="visible", timeout=5_000)
+        cat_trigger.wait_for(state="visible", timeout=180_000)
         _click_rutube_locator(
             cat_trigger, page, category, batch_id,
             err_msg="Не удалось открыть выбор категории в Рутьюбе",
