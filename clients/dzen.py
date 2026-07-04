@@ -605,6 +605,28 @@ def _find_primary_publish_control(page):
             pass
     return None
 
+def _dzen_publish_control_enabled(control) -> bool:
+    """Кнопка публикации реально готова к клику (без проверки перекрытия)."""
+    try:
+        if not control.is_visible(timeout=200):
+            return False
+        return bool(control.evaluate("""el => {
+            if (el.disabled) return false;
+            if (el.getAttribute('aria-disabled') === 'true') return false;
+            if (el.getAttribute('data-state') === 'disabled') return false;
+            if (el.getAttribute('data-loading') === 'true') return false;
+            const cls = (el.getAttribute('class') || '').toLowerCase();
+            if (cls.includes('disabled') || cls.includes('loading')) return false;
+            const st = window.getComputedStyle(el);
+            if (st.pointerEvents === 'none') return false;
+            if (st.visibility === 'hidden' || st.display === 'none') return false;
+            if (parseFloat(st.opacity) < 0.55) return false;
+            const r = el.getBoundingClientRect();
+            return r.width >= 8 && r.height >= 8;
+        }"""))
+    except Exception:
+        return False
+
 def _dzen_publish_confirmed(page, url_step7_start: str, url_before: str | None = None) -> bool:
     """True если текущий URL подтверждает успешную публикацию."""
     if _dzen_step7_success_without_click(page, url_step7_start):
@@ -750,13 +772,12 @@ def _dzen_target_blocked(page) -> bool:
     if not _detect_dzen_publish_editor(page):
         return False
     pub = _find_primary_publish_control(page)
-    if pub is not None and element_click_blocked(pub):
-        return True
-    try:
-        if page.locator("[role='alert']").first.is_visible(timeout=150):
+    if (
+        pub is not None
+        and _dzen_publish_control_enabled(pub)
+        and element_click_blocked(pub)
+    ):
             return True
-    except Exception:
-        pass
     return False
 
 DZEN_PUBLISH_WHITELIST = [
