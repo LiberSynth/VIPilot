@@ -301,7 +301,7 @@ _DZEN_SUCCESS_TOAST_SEL = (
     "[data-testid='publish-success']"
 )
 
-_POST_PUBLISH_POLL_MS = 2_000
+_POST_PUBLISH_POLL_MS = 8_000
 _STEP8_WINDOW_MS = 8_000
 
 
@@ -624,10 +624,10 @@ def _dzen_publish_settled(page, url_step7_start: str) -> bool:
 
 def _click_primary_publish_control(page, category, batch_id=None, url_step7_start: str | None = None) -> bool:
     """Закрывает попапы и нажимает основную кнопку «Опубликовать». Возвращает True если кликнули."""
-    if url_step7_start and _dzen_publish_confirmed(page, url_step7_start):
+    if url_step7_start and _dzen_publish_settled(page, url_step7_start):
         write_log_entry(
             batch_id, category,
-            "Дзен: Публикация уже подтверждена по URL — клик не нужен.",
+            "Дзен: Публикация уже подтверждена — клик не нужен.",
             level='silent',
         )
         return False
@@ -643,9 +643,15 @@ def _click_primary_publish_control(page, category, batch_id=None, url_step7_star
             timeout_ms=3_000, max_attempts=3, js_fallback=True,
         )
     except Exception as _click_err:
+        if url_step7_start and _dzen_publish_settled(page, url_step7_start):
+            write_log_entry(
+                batch_id, category,
+                "Дзен: Клик не прошёл, но публикация уже подтверждена.",
+            )
+            return False
         write_log_entry(batch_id, category, f"Клик «Опубликовать» не прошёл: {_click_err}", level='silent')
         return False
-    if url_step7_start and _dzen_publish_confirmed(page, url_step7_start):
+    if url_step7_start and _dzen_publish_settled(page, url_step7_start):
         return False
     return True
 
@@ -669,7 +675,7 @@ def _poll_after_publish_click(
 
 def _retry_publish_if_button_visible(page, category, batch_id, url_step7_start, reason: str) -> bool:
     """Повторный клик, если публикация ещё не ушла, а CTA всё ещё на экране."""
-    if _dzen_publish_confirmed(page, url_step7_start):
+    if _dzen_publish_settled(page, url_step7_start):
         return False
     if _find_primary_publish_control(page) is None:
         return False
@@ -1164,6 +1170,17 @@ def _publish_ui(
     _PUBLISH_RETRY_MAX = 3
     while _time.monotonic() < _confirm_deadline and not confirmed:
         _iter += 1
+
+        if _dzen_publish_settled(page, url_step7_start):
+            confirmed = True
+            url_now = page.url
+            if "state=published" in url_now or "state=pending" in url_now:
+                state_label = "state=published" if "state=published" in url_now else "state=pending"
+                write_log_entry(batch_id, category, f"Дзен: URL → {state_label} — публикация подтверждена.")
+            else:
+                write_log_entry(batch_id, category, "Дзен: Публикация подтверждена (тост/settled).")
+            write_log_entry(batch_id, category, f"URL: {url_now}", level='silent')
+            break
 
         if _dzen_publish_confirmed(page, url_step7_start, url_before):
             confirmed = True

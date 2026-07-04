@@ -18,6 +18,7 @@ from clients.common import (
     poll_wait_tick,
     safe_click,
     _likely_overlay_present,
+    _try_close_selectors,
 )
 from services.publish_auth_check import raise_if_login_required
 from log import write_log_entry
@@ -180,6 +181,23 @@ def _find_rutube_add_button(page):
             pass
     return None
 
+def _rutube_add_button_clickable(add_btn) -> bool:
+    try:
+        if not add_btn.is_visible(timeout=200):
+            return False
+        return add_btn.evaluate("""el => {
+            if (el.disabled) return false;
+            if (el.getAttribute('aria-disabled') === 'true') return false;
+            const st = window.getComputedStyle(el);
+            if (st.pointerEvents === 'none') return false;
+            if (st.visibility === 'hidden' || st.display === 'none') return false;
+            const r = el.getBoundingClientRect();
+            if (r.width < 8 || r.height < 8) return false;
+            return true;
+        }""")
+    except Exception:
+        return False
+
 def _wait_rutube_add_button(page, category, batch_id=None, timeout_ms=180_000):
     """Ждёт готовность студии и видимую кнопку «+ Добавить»."""
     found: list = [None]
@@ -192,10 +210,10 @@ def _wait_rutube_add_button(page, category, batch_id=None, timeout_ms=180_000):
         if _rutube_garbage_overlay_present(page):
             return False
         add_btn = _find_rutube_add_button(page)
-        if add_btn is not None:
-            found[0] = add_btn
-            return True
-        return False
+        if add_btn is None or not _rutube_add_button_clickable(add_btn):
+            return False
+        found[0] = add_btn
+        return True
 
     if poll_until(
         page, _ready, timeout_ms,
@@ -339,6 +357,7 @@ def _handle_rutube_captcha(page, category, batch_id) -> None:
 _RUTUBE_ONBOARDING_TEXTS = (
     "Новый раздел: Уровень канала",
     "Новый раздел",
+    "Уровень канала",
 )
 
 _RUTUBE_ONBOARDING_SELECTORS = (
@@ -364,6 +383,24 @@ _RUTUBE_EXTRA_CLOSE_SELECTORS = (
     "button[aria-label*='Закрыть']",
     "button[aria-label*='закрыть']",
     "button[aria-label*='Close']",
+)
+
+def _rutube_dismiss_tour_step(page) -> bool:
+    """Закрывает onboarding-тур («Далее», «Пропустить», ×)."""
+    if not _rutube_onboarding_visible(page):
+        return False
+    for name in ("Далее", "Пропустить", "Позже"):
+        try:
+            btn = page.get_by_role("button", name=name).first
+            if btn.is_visible(timeout=150):
+                btn.click(timeout=2_000)
+                return True
+        except Exception:
+            pass
+    return _try_close_selectors(page, _RUTUBE_EXTRA_CLOSE_SELECTORS)
+
+_RUTUBE_DISMISS_EXTRA_STEPS = (
+    ("сделан клик по кнопке тура", _rutube_dismiss_tour_step),
 )
 
 def _rutube_onboarding_visible(page) -> bool:
@@ -413,6 +450,7 @@ def _rutube_dismiss_unknown(
             page, category, batch_id, label=label or "Рутьюб",
             is_present=_rutube_garbage_overlay_present,
             extra_close_selectors=_RUTUBE_EXTRA_CLOSE_SELECTORS,
+            extra_steps=_RUTUBE_DISMISS_EXTRA_STEPS,
         )
     except OverlayNotDismissedError as exc:
         raise RutubeApiError(str(exc)) from exc
