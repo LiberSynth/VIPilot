@@ -167,6 +167,39 @@ def _rutube_upload_ready(state: dict) -> bool:
         return True
     return False
 
+def _rutube_upload_widget_done(page) -> bool:
+    """Виджет очереди загрузки завершил передачу файла (например, «Обработка 100%»)."""
+    for text in ("Загрузили ролик", "Обработка 100%", "Загружен ролик"):
+        try:
+            if page.get_by_text(text, exact=False).first.is_visible(timeout=200):
+                return True
+        except Exception:
+            pass
+    return False
+
+def _rutube_open_form_from_upload_widget(page, category, batch_id=None) -> bool:
+    """Пробует открыть форму публикации кликом по карточке в виджете загрузки."""
+    candidates = (
+        page.get_by_text("Загрузили ролик", exact=False).first,
+        page.get_by_text("Обработка 100%", exact=False).first,
+        page.get_by_text("Загрузка видео", exact=False).first,
+    )
+    for target in candidates:
+        try:
+            if not target.is_visible(timeout=200):
+                continue
+            target.click(timeout=2_000)
+            page.wait_for_timeout(500)
+            if _rutube_upload_ready(_rutube_upload_state(page)):
+                write_log_entry(
+                    batch_id, category,
+                    "Рутьюб: Форма публикации открыта из виджета загрузки.",
+                )
+                return True
+        except Exception:
+            pass
+    return False
+
 def _find_rutube_add_button(page):
     """Возвращает видимую кнопку «+ Добавить» в студии или None."""
     for loc in (
@@ -227,8 +260,8 @@ def _wait_rutube_upload(page, category, batch_id=None) -> bool:
     write_log_entry(batch_id, category, "Рутьюб: Жду завершения загрузки (до 3 минут).")
     deadline = _time.monotonic() + _UPLOAD_WAIT / 1000
     last_log_at = 0.0
+    widget_retry_at = 0.0
     while _time.monotonic() < deadline:
-        _rutube_handle_popups(page, category, batch_id)
         state = _rutube_upload_state(page)
         if _rutube_upload_ready(state):
             parts = []
@@ -247,6 +280,14 @@ def _wait_rutube_upload(page, category, batch_id=None) -> bool:
             return True
 
         now = _time.monotonic()
+        if (
+            _rutube_upload_widget_done(page)
+            and now >= widget_retry_at
+            and _rutube_open_form_from_upload_widget(page, category, batch_id)
+        ):
+            return True
+        widget_retry_at = now + 2
+
         if now - last_log_at >= 8:
             hint = []
             if state["uploading"]:
