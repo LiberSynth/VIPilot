@@ -45,9 +45,10 @@ handle_popups(whitelist) → если не whitelist → dismiss_unknown → dis
 
 ## Как закрывать мусор
 
-1. **Признак блокировки:** целевой элемент виден, но **не кликается** (`elementFromPoint` / `safe_click`), **или** `_likely_overlay_present`.
+1. **Признак блокировки:** целевой элемент виден, но **не кликается** (`element_click_blocked` / `elementFromPoint`), **`[role='alert']`**, **`_likely_overlay_present`**, donate `modal-overlay`.
 2. **Не whitelist** → `dismiss_overlay_strict`.
-3. Платформа может передать **generic** `extra_close_selectors` (×, `[aria-label*='Закрыть']`) — **не** тексты конкретных попапов.
+3. **Whitelist сработал, но мусор поверх** → `_dismiss_coexisting_garbage` после `handle_popups` (тот же generic dismiss, без каталога попапов).
+4. Платформа может передать **generic** `extra_close_selectors` (×, `[aria-label*='Закрыть']`) — **не** тексты конкретных попапов.
 
 ---
 

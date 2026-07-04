@@ -21,6 +21,7 @@ import time as _time
 from clients.common import (
     _likely_overlay_present,
     dismiss_overlay_strict,
+    element_click_blocked,
     handle_popups,
     OverlayNotDismissedError,
     poll_until,
@@ -282,11 +283,48 @@ def _vkvideo_whitelisted_overlay_present(page) -> bool:
             pass
     return False
 
+def _vkvideo_coexisting_garbage_present(page) -> bool:
+    """Мусор поверх whitelisted UI: перекрытый «Опубликовать» или [role=alert]."""
+    if not _vkvideo_whitelisted_overlay_present(page):
+        return False
+    try:
+        pub = page.locator("button:has-text('Опубликовать')").last
+        if pub.is_visible(timeout=150) and element_click_blocked(pub):
+            return True
+    except Exception:
+        pass
+    try:
+        if page.locator("[role='alert']").first.is_visible(timeout=150):
+            return True
+    except Exception:
+        pass
+    return False
+
 def _vkvideo_garbage_overlay_present(page) -> bool:
     """Мусор поверх кабинета; whitelisted-модалки — не мусор."""
+    if _vkvideo_coexisting_garbage_present(page):
+        return True
     if _vkvideo_whitelisted_overlay_present(page):
         return False
     return _likely_overlay_present(page)
+
+def _vkvideo_dismiss_coexisting_garbage(page, category, batch_id) -> None:
+    if not _vkvideo_coexisting_garbage_present(page):
+        return
+    lbl = "VK Видео"
+    write_log_entry(
+        batch_id, category,
+        f"{lbl}: Закрываю мусор поверх whitelisted UI.",
+        level="info",
+    )
+    try:
+        dismiss_overlay_strict(
+            page, category, batch_id, label=lbl,
+            is_present=_vkvideo_coexisting_garbage_present,
+            extra_close_selectors=_VKVIDEO_EXTRA_CLOSE_SELECTORS,
+        )
+    except OverlayNotDismissedError as exc:
+        raise VkVideoApiError(str(exc)) from exc
 
 def _vkvideo_dismiss_unknown(
     page, category, batch_id, *, label: str = "", phase: int = 0, force: bool = False,
@@ -306,6 +344,7 @@ def _vkvideo_handle_popups(page, category, batch_id, *, allow_dismiss: bool = Tr
         page, VKVIDEO_PUBLISH_WHITELIST, _vkvideo_dismiss_unknown,
         batch_id, category, allow_dismiss=allow_dismiss,
     )
+    _vkvideo_dismiss_coexisting_garbage(page, category, batch_id)
 
 def _vk_publish_button_visible(page) -> bool:
     try:

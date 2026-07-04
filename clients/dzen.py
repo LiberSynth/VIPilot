@@ -15,6 +15,7 @@ from clients.common import (
     _likely_overlay_present,
     click_outside_modal_boundary,
     dismiss_overlay_strict,
+    element_click_blocked,
     handle_popups,
     OverlayNotDismissedError,
     poll_wait_tick,
@@ -730,16 +731,26 @@ def _retry_publish_if_button_visible(page, category, batch_id, url_step7_start, 
     write_log_entry(batch_id, category, f"Дзен: {reason}")
     return _click_primary_publish_control(page, category, batch_id, url_step7_start)
 
-def _dzen_blocking_toast_visible(page) -> bool:
-    """Видимый toast/notification, не success — мусор."""
-    if _dzen_publish_success_toast_visible(page):
+def _dzen_coexisting_garbage_present(page) -> bool:
+    """Мусор поверх whitelisted редактора: перекрытый CTA или [role=alert]."""
+    if not _detect_dzen_publish_editor(page):
         return False
-    for sel in ("[class*='toast']", "[class*='notification']"):
-        try:
-            if page.locator(sel).first.is_visible(timeout=150):
-                return True
-        except Exception:
-            pass
+    pub = _find_primary_publish_control(page)
+    if pub is not None and element_click_blocked(pub):
+        return True
+    try:
+        trigger = page.locator('[data-testid="select-trigger-button-comment"]').first
+        if trigger.is_visible(timeout=150) and element_click_blocked(trigger):
+            return True
+    except Exception:
+        pass
+    if _modal_overlay_visible(page) and not _detect_dzen_upload_modal(page):
+        return True
+    try:
+        if page.locator("[role='alert']").first.is_visible(timeout=150):
+            return True
+    except Exception:
+        pass
     return False
 
 DZEN_PUBLISH_WHITELIST = [
@@ -764,13 +775,32 @@ def _dzen_whitelisted_overlay_present(page) -> bool:
 
 def _dzen_garbage_overlay_present(page) -> bool:
     """Мусор поверх студии; whitelisted modal-overlay / рабочие модалки — не мусор."""
+    if _dzen_coexisting_garbage_present(page):
+        return True
     if _dzen_whitelisted_overlay_present(page):
         return False
     if _modal_overlay_visible(page):
         return True
-    if _dzen_blocking_toast_visible(page):
-        return True
     return _likely_overlay_present(page)
+
+def _dzen_dismiss_coexisting_garbage(page, category, batch_id) -> None:
+    if not _dzen_coexisting_garbage_present(page):
+        return
+    lbl = "Дзен"
+    write_log_entry(
+        batch_id, category,
+        f"{lbl}: Закрываю мусор поверх whitelisted UI.",
+        level="info",
+    )
+    try:
+        dismiss_overlay_strict(
+            page, category, batch_id, label=lbl,
+            is_present=_dzen_coexisting_garbage_present,
+            extra_close_selectors=_DZEN_MODAL_CLOSE_SELECTORS,
+            extra_steps=_DZEN_MODAL_DISMISS_EXTRA_STEPS,
+        )
+    except OverlayNotDismissedError as exc:
+        raise DzenApiError(str(exc)) from exc
 
 def _dzen_dismiss_unknown(
     page, category, batch_id, *, label: str = "", phase: int = 0, force: bool = False,
@@ -799,8 +829,9 @@ def _dzen_handle_popups(
         page, DZEN_PUBLISH_WHITELIST, _dzen_dismiss_unknown,
         batch_id, category, allow_dismiss=allow_dismiss,
     )
-    # publish_editor в whitelist блокирует dismiss_unknown — хинт закрываем явно.
+    # publish_editor в whitelist блокирует dismiss_unknown — хинт и coexisting мусор явно.
     dismiss_dzen_hint(page, category, batch_id)
+    _dzen_dismiss_coexisting_garbage(page, category, batch_id)
 
 def _set_comments_all_users(page, category, batch_id=None) -> None:
     """

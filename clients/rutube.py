@@ -12,6 +12,8 @@ import time as _time
 
 from clients.common import (
     dismiss_overlay_strict,
+    element_center_clickable,
+    element_click_blocked,
     handle_popups,
     OverlayNotDismissedError,
     poll_until,
@@ -183,24 +185,8 @@ def _find_rutube_add_button(page):
     return None
 
 def _rutube_add_button_clickable(add_btn, page) -> bool:
-    try:
-        if not add_btn.is_visible(timeout=200):
-            return False
-        return add_btn.evaluate("""(el) => {
-            if (el.disabled) return false;
-            if (el.getAttribute('aria-disabled') === 'true') return false;
-            const st = window.getComputedStyle(el);
-            if (st.pointerEvents === 'none') return false;
-            if (st.visibility === 'hidden' || st.display === 'none') return false;
-            const r = el.getBoundingClientRect();
-            if (r.width < 8 || r.height < 8) return false;
-            const cx = r.left + r.width / 2;
-            const cy = r.top + r.height / 2;
-            const top = document.elementFromPoint(cx, cy);
-            return !!(top && (top === el || el.contains(top)));
-        }""")
-    except Exception:
-        return False
+    del page
+    return element_center_clickable(add_btn)
 
 def _wait_rutube_add_button(page, category, batch_id=None, timeout_ms=180_000):
     """Ждёт готовность студии и видимую кнопку «+ Добавить»."""
@@ -386,6 +372,18 @@ def _rutube_add_button_blocked(page) -> bool:
         return False
     return not _rutube_add_button_clickable(add_btn, page)
 
+def _rutube_coexisting_garbage_present(page) -> bool:
+    """Мусор поверх whitelisted UI: перекрытый «+» или «Опубликовать»."""
+    if _rutube_add_button_blocked(page):
+        return True
+    try:
+        pub = page.locator("button:has-text('Опубликовать')").last
+        if pub.is_visible(timeout=150) and element_click_blocked(pub):
+            return True
+    except Exception:
+        pass
+    return False
+
 def _rutube_whitelisted_overlay_present(page) -> bool:
     for _name, detect, _handle in RUTUBE_PUBLISH_WHITELIST:
         try:
@@ -396,10 +394,10 @@ def _rutube_whitelisted_overlay_present(page) -> bool:
     return False
 
 def _rutube_garbage_overlay_present(page) -> bool:
+    if _rutube_coexisting_garbage_present(page):
+        return True
     if _rutube_whitelisted_overlay_present(page):
         return False
-    if _rutube_add_button_blocked(page):
-        return True
     return _likely_overlay_present(page)
 
 RUTUBE_PUBLISH_WHITELIST = [
@@ -434,11 +432,30 @@ def _rutube_dismiss_unknown(
     except OverlayNotDismissedError as exc:
         raise RutubeApiError(str(exc)) from exc
 
+def _rutube_dismiss_coexisting_garbage(page, category, batch_id) -> None:
+    if not _rutube_coexisting_garbage_present(page):
+        return
+    lbl = "Рутьюб"
+    write_log_entry(
+        batch_id, category,
+        f"{lbl}: Закрываю мусор поверх whitelisted UI.",
+        level="info",
+    )
+    try:
+        dismiss_overlay_strict(
+            page, category, batch_id, label=lbl,
+            is_present=_rutube_coexisting_garbage_present,
+            extra_close_selectors=_RUTUBE_OVERLAY_CLOSE_SELECTORS,
+        )
+    except OverlayNotDismissedError as exc:
+        raise RutubeApiError(str(exc)) from exc
+
 def _rutube_handle_popups(page, category, batch_id, *, allow_dismiss: bool = True) -> None:
     handle_popups(
         page, RUTUBE_PUBLISH_WHITELIST, _rutube_dismiss_unknown,
         batch_id, category, allow_dismiss=allow_dismiss,
     )
+    _rutube_dismiss_coexisting_garbage(page, category, batch_id)
 
 def _rutube_publish_confirmed_after_submit(page) -> bool:
     """Признак успеха после клика: кнопка «Опубликовать» исчезла, студия открыта."""

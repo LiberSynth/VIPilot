@@ -128,6 +128,41 @@ def _visible(page, locator, timeout_ms: int = 400) -> bool:
         return False
 
 
+_ELEMENT_CENTER_HIT_JS = """(el) => {
+    if (el.disabled) return false;
+    if (el.getAttribute('aria-disabled') === 'true') return false;
+    const st = window.getComputedStyle(el);
+    if (st.pointerEvents === 'none') return false;
+    if (st.visibility === 'hidden' || st.display === 'none') return false;
+    const r = el.getBoundingClientRect();
+    if (r.width < 8 || r.height < 8) return false;
+    const cx = r.left + r.width / 2;
+    const cy = r.top + r.height / 2;
+    const top = document.elementFromPoint(cx, cy);
+    return !!(top && (top === el || el.contains(top)));
+}"""
+
+
+def element_center_clickable(locator) -> bool:
+    """Центр элемента не перекрыт другим UI (elementFromPoint)."""
+    try:
+        if not locator.is_visible(timeout=200):
+            return False
+        return bool(locator.evaluate(_ELEMENT_CENTER_HIT_JS))
+    except Exception:
+        return False
+
+
+def element_click_blocked(locator) -> bool:
+    """Элемент виден, но центр перекрыт — признак мусора поверх whitelisted UI."""
+    try:
+        if not locator.is_visible(timeout=200):
+            return False
+        return not bool(locator.evaluate(_ELEMENT_CENTER_HIT_JS))
+    except Exception:
+        return False
+
+
 def handle_popups(
     page,
     whitelist: Sequence[WhitelistEntry],
@@ -246,6 +281,7 @@ def _likely_overlay_present(page) -> bool:
     for sel in (
         "[role='dialog']",
         "[role='alertdialog']",
+        "[role='alert']",
         "[aria-modal='true']",
         "[class*='modal']",
         "[class*='Modal']",
