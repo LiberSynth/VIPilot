@@ -231,6 +231,24 @@ def _detect_vk_upload_processing(page) -> bool:
             pass
     return False
 
+def _detect_vk_publish_workflow(page) -> bool:
+    """Штатный workflow модала публикации (подготовка/обработка) — не мусор."""
+    if not _vk_publish_modal_visible(page):
+        return False
+    try:
+        pub = page.locator("button:has-text('Опубликовать')").last
+        if pub.is_visible(timeout=150) and not _vk_publish_button_clickable(pub):
+            return True
+    except Exception:
+        pass
+    for text in ("Обрабатывается", "Подготовка", "Готовим", "Подождите"):
+        try:
+            if page.get_by_text(text, exact=False).first.is_visible(timeout=150):
+                return True
+        except Exception:
+            pass
+    return not _vk_clip_preview_ready(page)
+
 def _detect_vk_captcha(page) -> bool:
     try:
         if page.locator(
@@ -263,6 +281,7 @@ VKVIDEO_PUBLISH_WHITELIST = [
     ("captcha", _detect_vk_captcha, _handle_vk_captcha),
     ("upload_modal", _detect_vk_upload_modal, None),
     ("upload_processing", _detect_vk_upload_processing, None),
+    ("publish_workflow", _detect_vk_publish_workflow, None),
     ("publish_modal", _vk_publish_modal_visible, None),
 ]
 
@@ -287,6 +306,8 @@ def _vkvideo_target_blocked(page) -> bool:
     """Целевой UI перекрыт мусором (без каталога попапов)."""
     if not _vkvideo_whitelisted_overlay_present(page):
         return False
+    if _detect_vk_publish_workflow(page):
+        return False
     try:
         pub = page.locator("button:has-text('Опубликовать')").last
         if (
@@ -294,6 +315,11 @@ def _vkvideo_target_blocked(page) -> bool:
             and _vk_publish_button_clickable(pub)
             and element_click_blocked(pub)
         ):
+            return True
+    except Exception:
+        pass
+    try:
+        if page.locator("[role='alert']").first.is_visible(timeout=150):
             return True
     except Exception:
         pass
@@ -382,6 +408,11 @@ def _vk_publish_button_clickable(pub_btn) -> bool:
         return pub_btn.evaluate("""el => {
             if (el.disabled) return false;
             if (el.getAttribute('aria-disabled') === 'true') return false;
+            if (el.getAttribute('data-state') === 'disabled') return false;
+            if (el.getAttribute('data-loading') === 'true') return false;
+            const cls = (el.getAttribute('class') || '').toLowerCase();
+            if (cls.includes('disabled') || cls.includes('loading')) return false;
+            if (el.querySelector('[role="progressbar"], [class*="spinner"], [class*="Spinner"]')) return false;
             const st = window.getComputedStyle(el);
             if (st.pointerEvents === 'none') return false;
             if (parseFloat(st.opacity) < 0.55) return false;
