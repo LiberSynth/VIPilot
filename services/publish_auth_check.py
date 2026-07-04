@@ -1,4 +1,4 @@
-"""Проверка авторизации и доступа к кабинету при публикации."""
+"""Проверка авторизации при публикации (Playwright): только редирект на login/passport."""
 
 from __future__ import annotations
 
@@ -14,12 +14,6 @@ def _page_url(page) -> str:
         return ""
 
 
-def _config_id_str(value) -> str:
-    if value is None:
-        return ""
-    return str(value).strip()
-
-
 def _url_indicates_login(url: str, platform: str) -> bool:
     if not url:
         return False
@@ -31,7 +25,17 @@ def _url_indicates_login(url: str, platform: str) -> bool:
             or "passport" in url
         )
     if platform == "dzen":
-        return "passport.yandex" in url or "/auth" in url
+        return (
+            "passport.yandex" in url
+            or "id.yandex.ru" in url
+            or "login.yandex" in url
+            or "oauth.yandex" in url
+            or "auth.yandex" in url
+            or "accounts.yandex" in url
+            or "dzen.ru/login" in url
+            or "dzen.ru/signin" in url
+            or "/auth" in url
+        )
     if platform == "vkvideo":
         return (
             "vk.com/login" in url
@@ -45,45 +49,16 @@ def _url_indicates_login(url: str, platform: str) -> bool:
     return False
 
 
-def _dzen_publish_access_denied(page, publisher_id: str | None = None) -> bool:
-    url = _page_url(page)
-    if publisher_id:
-        pid = _config_id_str(publisher_id).lower()
-        return f"/profile/editor/id/{pid}" not in url
-    return "/profile/editor/" not in url
-
-
-def _rutube_publish_access_denied(page) -> bool:
-    return "studio.rutube.ru" not in _page_url(page)
-
-
-def _vkvideo_publish_access_denied(page, club_id: str | None = None) -> bool:
-    url = _page_url(page)
-    if "cabinet.vkvideo.ru" not in url:
-        return True
-    if club_id:
-        normalized = _config_id_str(club_id).lstrip("@")
-        if normalized and f"club{normalized}" not in url.replace("@", ""):
-            return True
-    return False
-
-
 def login_screen_visible(page, platform: str, **context) -> bool:
-    """True если URL указывает на экран входа или нет доступа к кабинету."""
-    if _url_indicates_login(_page_url(page), platform):
-        return True
-    if platform == "dzen":
-        return _dzen_publish_access_denied(page, context.get("publisher_id"))
-    if platform == "rutube":
-        return _rutube_publish_access_denied(page)
-    if platform == "vkvideo":
-        return _vkvideo_publish_access_denied(page, context.get("club_id"))
-    return False
+    """True если URL — экран входа (passport/login), не кабинет/studio."""
+    del context
+    return _url_indicates_login(_page_url(page), platform)
 
 
 def raise_if_login_required(page, platform: str, **context) -> None:
-    """Бросает *CsrfExpired платформы, если виден экран входа или нет доступа к кабинету."""
-    if not login_screen_visible(page, platform, **context):
+    """Бросает *CsrfExpired платформы при редиректе на авторизацию."""
+    del context
+    if not login_screen_visible(page, platform):
         return
     if platform == "dzen":
         from clients.dzen import DzenCsrfExpired
