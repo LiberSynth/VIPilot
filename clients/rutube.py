@@ -169,7 +169,7 @@ def _rutube_upload_ready(state: dict) -> bool:
 
 def _rutube_upload_widget_done(page) -> bool:
     """Виджет очереди загрузки завершил передачу файла (например, «Обработка 100%»)."""
-    for text in ("Загрузили ролик", "Обработка 100%", "Загружен ролик"):
+    for text in ("Загрузили ролик", "Обработка 100%", "Загружен ролик", "Загрузить ещё"):
         try:
             if page.get_by_text(text, exact=False).first.is_visible(timeout=200):
                 return True
@@ -358,16 +358,20 @@ def _detect_rutube_upload_menu(page) -> bool:
 
 def _detect_rutube_upload_in_progress(page) -> bool:
     """Виджет загрузки файла — не dismiss (modal/popup классы у штатного UI)."""
-    for text in ("Загрузка видео", "Выбрать файлы", "Загрузка файла"):
+    state = _rutube_upload_state(page)
+    # Форма публикации уже открыта — это другой whitelist (upload_form), не upload_in_progress.
+    if state["publish_btn"] or state["category_trigger"] or state["moderation"]:
+        return False
+    # Очередь загрузки завершила обработку — виджет больше не рабочий этап.
+    if _rutube_upload_widget_done(page):
+        return False
+    for text in ("Загружается", "Загрузка файла", "Идёт загрузка", "Идет загрузка"):
         try:
             if page.get_by_text(text, exact=False).first.is_visible(timeout=200):
                 return True
         except Exception:
             pass
-    state = _rutube_upload_state(page)
     if state["uploading"]:
-        return True
-    if state["category_trigger"] and not state["publish_btn"]:
         return True
     return False
 
