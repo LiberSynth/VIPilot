@@ -265,32 +265,12 @@ VKVIDEO_PUBLISH_WHITELIST = [
     ("publish_modal", _vk_publish_modal_visible, None),
 ]
 
-_VKVIDEO_ONBOARDING_SELECTORS = (
-    "[class*='onboarding']",
-    "[class*='Onboarding']",
-    "[class*='product-tour']",
-    "[class*='ProductTour']",
-    "[class*='coach-mark']",
-    "[class*='CoachMark']",
-    "[class*='joyride']",
-    "[class*='vkuiOnboarding']",
-    "[class*='OnboardingTooltip']",
-    "[class*='HintTooltip']",
-)
-
 _VKVIDEO_EXTRA_CLOSE_SELECTORS = (
-    "[class*='onboarding'] button[class*='close']",
-    "[class*='Onboarding'] button[class*='close']",
     "[class*='popup'] button[class*='close']",
-    "[class*='Popup'] button[class*='close']",
     "[class*='modal'] button[class*='close']",
-    "[class*='Modal'] button[class*='close']",
     "[class*='closeButton']",
-    "[class*='CloseButton']",
-    "[data-testid*='close']",
     "button[aria-label*='Закрыть']",
     "button[aria-label*='закрыть']",
-    "button[aria-label*='Close']",
 )
 
 def _vkvideo_whitelisted_overlay_present(page) -> bool:
@@ -302,19 +282,8 @@ def _vkvideo_whitelisted_overlay_present(page) -> bool:
             pass
     return False
 
-def _vkvideo_onboarding_visible(page) -> bool:
-    for sel in _VKVIDEO_ONBOARDING_SELECTORS:
-        try:
-            if page.locator(sel).first.is_visible(timeout=150):
-                return True
-        except Exception:
-            pass
-    return False
-
 def _vkvideo_garbage_overlay_present(page) -> bool:
-    """Мусор поверх кабинета; whitelisted-модалки и туры/onboarding — отдельно."""
-    if _vkvideo_onboarding_visible(page):
-        return True
+    """Мусор поверх кабинета; whitelisted-модалки — не мусор."""
     if _vkvideo_whitelisted_overlay_present(page):
         return False
     return _likely_overlay_present(page)

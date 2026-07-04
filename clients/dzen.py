@@ -266,6 +266,8 @@ _DZEN_MODAL_CLOSE_SELECTORS = (
     "button[aria-label*='Закрыть']",
     "button[aria-label*='закрыть']",
     "button[aria-label*='Close']",
+    "[class*='toast'] button[class*='close']",
+    "[class*='notification'] button[class*='close']",
     "[class*='modal'] button:has-text('Понятно')",
     "[class*='modal'] button:has-text('Не сейчас')",
     "[class*='modal'] button:has-text('Пропустить')",
@@ -275,63 +277,6 @@ _DZEN_MODAL_CLOSE_SELECTORS = (
 _DZEN_MODAL_OVERLAY_SELECTOR = "[data-testid='modal-overlay']"
 _DZEN_MODAL_ROOT_SELECTOR = "[class*='modal__rootElement']"
 _DZEN_HINT_CLOSE_SELECTOR = "[class*='helper-tooltip__closeButton']"
-_DZEN_HINT_TEXTS = ("Уже можно публиковать",)
-_DZEN_SAVE_ERROR_TOAST_TEXTS = ("Не удалось сохранить публикацию",)
-
-
-def _dzen_publish_hint_visible(page) -> bool:
-    for text in _DZEN_HINT_TEXTS:
-        try:
-            if page.get_by_text(text, exact=False).first.is_visible(timeout=150):
-                return True
-        except Exception:
-            pass
-    for sel in (_DZEN_HINT_CLOSE_SELECTOR, "[class*='helper-tooltip']"):
-        try:
-            if page.locator(sel).first.is_visible(timeout=150):
-                return True
-        except Exception:
-            pass
-    return False
-
-
-def _find_dzen_hint_close_button(page):
-    for sel in (
-        _DZEN_HINT_CLOSE_SELECTOR,
-        "[class*='helper-tooltip'] button[class*='close']",
-        "[class*='helper-tooltip__closeButton']",
-        "[class*='helper-tooltip'] [aria-label*='Закрыть']",
-        "[class*='helper-tooltip'] button",
-    ):
-        try:
-            btn = page.locator(sel).first
-            if btn.is_visible(timeout=150):
-                return btn
-        except Exception:
-            pass
-    try:
-        hint = page.get_by_text("Уже можно публиковать", exact=False).first
-        if hint.is_visible(timeout=150):
-            root = hint.locator(
-                "xpath=ancestor::*[contains(@class,'helper-tooltip') "
-                "or contains(@class,'tooltip')][1]"
-            )
-            close = root.locator("button").first
-            if close.is_visible(timeout=150):
-                return close
-    except Exception:
-        pass
-    return None
-
-
-def _dzen_save_error_toast_visible(page) -> bool:
-    for text in _DZEN_SAVE_ERROR_TOAST_TEXTS:
-        try:
-            if page.get_by_text(text, exact=False).first.is_visible(timeout=150):
-                return True
-        except Exception:
-            pass
-    return False
 
 
 def _dzen_click_outside_modal(page) -> bool:
@@ -379,10 +324,11 @@ def dismiss_dzen_hint(
 
     hint_was_seen = False
     for _attempt in range(3):
-        if not _dzen_publish_hint_visible(page):
-            break
-        btn = _find_dzen_hint_close_button(page)
-        if btn is None:
+        try:
+            btn = page.locator(_DZEN_HINT_CLOSE_SELECTOR).first
+            if not btn.is_visible(timeout=300):
+                break
+        except Exception:
             break
 
         hint_was_seen = True
@@ -419,7 +365,9 @@ def dismiss_dzen_hint(
             except Exception:
                 url_now = ""
             try:
-                still_visible = _dzen_publish_hint_visible(page)
+                still_visible = page.locator(
+                    _DZEN_HINT_CLOSE_SELECTOR,
+                ).first.is_visible(timeout=200)
             except Exception:
                 still_visible = False
 
@@ -453,7 +401,9 @@ def dismiss_dzen_hint(
         page.wait_for_timeout(300)
 
         try:
-            still_visible = _dzen_publish_hint_visible(page)
+            still_visible = page.locator(
+                _DZEN_HINT_CLOSE_SELECTOR,
+            ).first.is_visible(timeout=200)
         except Exception:
             still_visible = False
 
@@ -476,68 +426,6 @@ def dismiss_dzen_hint(
             batch_id, category,
             f"{prefix}Оверлей не закрылся за 3 попытки.",
             level=_warn_lvl,
-        )
-
-
-def dismiss_dzen_save_error_toast(
-    page,
-    category=None,
-    batch_id=None,
-    *,
-    label: str = "Дзен",
-) -> None:
-    """Закрывает тост «Не удалось сохранить публикацию» (автосохранение черновика)."""
-    _user_lvl = "info" if batch_id else "silent"
-    prefix = f"{label}: " if label else ""
-
-    for _attempt in range(3):
-        if not _dzen_save_error_toast_visible(page):
-            return
-
-        write_log_entry(
-            batch_id, category,
-            f"{prefix}Закрываю тост ошибки сохранения (попытка {_attempt + 1}).",
-            level=_user_lvl,
-        )
-
-        closed = False
-        for sel in (
-            "[class*='toast']:has-text('Не удалось сохранить') button[class*='close']",
-            "[class*='toast']:has-text('Не удалось сохранить') [class*='closeButton']",
-            "[class*='notification']:has-text('Не удалось сохранить') button",
-            "[class*='toast'] button[class*='close']",
-            "[class*='notification'] button[class*='close']",
-            "[class*='toast'] [aria-label*='Закрыть']",
-        ):
-            try:
-                btn = page.locator(sel).first
-                if btn.is_visible(timeout=150):
-                    btn.click(timeout=2_000)
-                    closed = True
-                    break
-            except Exception:
-                pass
-
-        if not closed:
-            try:
-                page.keyboard.press("Escape")
-            except Exception:
-                pass
-
-        page.wait_for_timeout(300)
-        if not _dzen_save_error_toast_visible(page):
-            write_log_entry(
-                batch_id, category,
-                f"{prefix}Тост ошибки сохранения закрыт.",
-                level=_user_lvl,
-            )
-            return
-
-    if _dzen_save_error_toast_visible(page):
-        write_log_entry(
-            batch_id, category,
-            f"{prefix}Тост ошибки сохранения не закрылся за 3 попытки.",
-            level="warn" if batch_id else "silent",
         )
 
 # ---------------------------------------------------------------------------
@@ -842,23 +730,21 @@ def _retry_publish_if_button_visible(page, category, batch_id, url_step7_start, 
     write_log_entry(batch_id, category, f"Дзен: {reason}")
     return _click_primary_publish_control(page, category, batch_id, url_step7_start)
 
-def _detect_dzen_publish_hint(page) -> bool:
-    return _dzen_publish_hint_visible(page)
-
-def _handle_dzen_publish_hint(page, category, batch_id) -> None:
-    dismiss_dzen_hint(page, category, batch_id)
-
-def _detect_dzen_save_error_toast(page) -> bool:
-    return _dzen_save_error_toast_visible(page)
-
-def _handle_dzen_save_error_toast(page, category, batch_id) -> None:
-    dismiss_dzen_save_error_toast(page, category, batch_id)
+def _dzen_blocking_toast_visible(page) -> bool:
+    """Видимый toast/notification, не success — мусор."""
+    if _dzen_publish_success_toast_visible(page):
+        return False
+    for sel in ("[class*='toast']", "[class*='notification']"):
+        try:
+            if page.locator(sel).first.is_visible(timeout=150):
+                return True
+        except Exception:
+            pass
+    return False
 
 DZEN_PUBLISH_WHITELIST = [
     ("captcha", _detect_captcha, _handle_captcha_element),
     ("upload_modal", _detect_dzen_upload_modal, None),
-    ("publish_hint", _detect_dzen_publish_hint, _handle_dzen_publish_hint),
-    ("save_error_toast", _detect_dzen_save_error_toast, _handle_dzen_save_error_toast),
     ("publish_editor", _detect_dzen_publish_editor, None),
     ("create_menu", _detect_dzen_create_menu, None),
     ("confirm", _detect_confirm_dialog, _handle_confirm_element),
@@ -881,6 +767,8 @@ def _dzen_garbage_overlay_present(page) -> bool:
     if _dzen_whitelisted_overlay_present(page):
         return False
     if _modal_overlay_visible(page):
+        return True
+    if _dzen_blocking_toast_visible(page):
         return True
     return _likely_overlay_present(page)
 
@@ -911,9 +799,8 @@ def _dzen_handle_popups(
         page, DZEN_PUBLISH_WHITELIST, _dzen_dismiss_unknown,
         batch_id, category, allow_dismiss=allow_dismiss,
     )
-    # publish_editor в whitelist блокирует dismiss_unknown — хинт и тост закрываем явно.
+    # publish_editor в whitelist блокирует dismiss_unknown — хинт закрываем явно.
     dismiss_dzen_hint(page, category, batch_id)
-    dismiss_dzen_save_error_toast(page, category, batch_id)
 
 def _set_comments_all_users(page, category, batch_id=None) -> None:
     """

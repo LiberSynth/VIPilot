@@ -18,3 +18,10 @@ else
 fi
 
 git add utils/_build.py
+
+if command -v bash >/dev/null 2>&1; then
+  bash scripts/check_conventions.sh
+else
+  echo "[pre-commit] bash not found in PATH." >&2
+  exit 1
+fi

@@ -10,6 +10,7 @@ In this repository, always treat these files as mandatory guidance:
 - `docs/conventions.md`
 - `docs/upgrade-convention.md`
 - `docs/project-conventions.md`
+- `docs/publish-overlay-convention.md`
 
 Required behavior:
 

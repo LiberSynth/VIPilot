@@ -108,6 +108,15 @@ if ! bash scripts/check_main_py.sh; then
     ERRORS=$((ERRORS + 1))
 fi
 
+# ── Конвенция publish overlay: whitelist only, no popup catalogs ─────────────
+OVERLAY_RC=0
+OVERLAY_OUT=$(_run_python scripts/check_publish_overlay.py 2>&1) || OVERLAY_RC=$?
+if [ "$OVERLAY_RC" -eq 127 ]; then
+    fail "Publish overlay: python не найден для scripts/check_publish_overlay.py" ""
+elif [ "$OVERLAY_RC" -ne 0 ]; then
+    fail "Publish overlay (docs/publish-overlay-convention.md)" "$OVERLAY_OUT"
+fi
+
 # ── Итог ──────────────────────────────────────────────────────────────────────
 echo ""
 if [ "$ERRORS" -eq 0 ]; then
