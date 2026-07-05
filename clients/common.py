@@ -135,7 +135,11 @@ _OVERLAY_SCRIM_JS = """
     const m = bg.match(/rgba?\\((\\d+),\\s*(\\d+),\\s*(\\d+)(?:,\\s*([\\d.]+))?\\)/);
     if (!m) continue;
     const a = m[4] !== undefined ? parseFloat(m[4]) : 1;
-    if (a < 0.08) continue;
+    if (a < 0.12) continue;
+    const r = parseInt(m[1], 10);
+    const g = parseInt(m[2], 10);
+    const b = parseInt(m[3], 10);
+    if ((r + g + b) / 3 > 120) continue;
     const z = parseInt(st.zIndex, 10);
     if (Number.isFinite(z) && z < 1) continue;
     return true;
@@ -267,30 +271,18 @@ def click_outside_modal_boundary(
         return False
 
 
-# Признаки отрисованного поверх UI слоя (классы/roles, не тексты попапов).
-_OVERLAY_LAYER_SELECTORS: tuple[str, ...] = (
+# Блокирующий слой: dialog/modal/scrim (не tooltip/backdrop в layout chrome).
+_STRONG_OVERLAY_LAYER_SELECTORS: tuple[str, ...] = (
     "[data-testid='modal-overlay']",
     "[role='dialog']",
     "[role='alertdialog']",
-    "[role='alert']",
-    "[role='tooltip']",
     "[aria-modal='true']",
     "[class*='ModalOverlay']",
     "[class*='modalOverlay']",
     "[class*='ModalLayout']",
     "[class*='PopoutRoot']",
-    "[class*='Popover']",
-    "[class*='popover']",
-    "[class*='Tooltip']",
-    "[class*='tooltip']",
-    "[class*='Backdrop']",
-    "[class*='backdrop']",
-    "[class*='Drawer']",
-    "[class*='drawer']",
     "[class*='CoachMark']",
     "[class*='coachmark']",
-    "[class*='Snackbar']",
-    "[class*='snackbar']",
 )
 
 _OVERLAY_BACKDROP_SELECTORS: tuple[str, ...] = (
@@ -356,18 +348,46 @@ _OVERLAY_CLOSE_SELECTORS: tuple[str, ...] = (
 )
 
 
+def _overlay_scrim_visible(page) -> bool:
+    try:
+        return bool(page.evaluate(_OVERLAY_SCRIM_JS))
+    except Exception:
+        return False
+
+
+def _blocking_popover_visible(page) -> bool:
+    """Крупная popover/coachmark-карточка (онбординг), не layout-tooltip."""
+    for sel in (
+        "[class*='Popover']",
+        "[class*='popover']",
+        "[class*='CoachMark']",
+        "[class*='coachmark']",
+    ):
+        try:
+            loc = page.locator(sel).first
+            if not loc.is_visible(timeout=150):
+                continue
+            box = loc.bounding_box()
+            if box and box.get("width", 0) >= 180 and box.get("height", 0) >= 60:
+                return True
+        except Exception:
+            pass
+    return False
+
+
 def publish_overlay_visible(page) -> bool:
-    """Видимый overlay/modal/backdrop/scrim поверх страницы."""
-    for sel in _OVERLAY_LAYER_SELECTORS:
+    """Блокирующий overlay: scrim, modal/dialog или крупная popover-карточка."""
+    if _overlay_scrim_visible(page):
+        return True
+    if _blocking_popover_visible(page):
+        return True
+    for sel in _STRONG_OVERLAY_LAYER_SELECTORS:
         try:
             if page.locator(sel).first.is_visible(timeout=150):
                 return True
         except Exception:
             pass
-    try:
-        return bool(page.evaluate(_OVERLAY_SCRIM_JS))
-    except Exception:
-        return False
+    return False
 
 
 def whitelisted_publish_ui(page, whitelist: Sequence[WhitelistEntry]) -> bool:
