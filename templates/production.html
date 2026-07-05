@@ -757,29 +757,41 @@
       loadDirectorVideoModels().then(function(activeModels) {
         if (!Array.isArray(activeModels) || activeModels.length === 0) return;
 
-        if (requestedModelId !== _DIRECTOR_ITERATE_SENTINEL) {
+        var isIterate = requestedModelId === _DIRECTOR_ITERATE_SENTINEL;
+        var modelsForPlan;
+        if (isIterate) {
+          modelsForPlan = activeModels;
+        } else {
           var selectedModel = _findModelById(activeModels, requestedModelId);
           if (!selectedModel) {
             _showDirectorHint('Выбранная модель недоступна', 3000);
             return;
           }
-          _startDirectorGeneration(_buildBatchPlan([selectedModel], count), storyId);
+          modelsForPlan = [selectedModel];
+        }
+
+        var plan = _buildBatchPlan(modelsForPlan, count);
+        if (!isIterate && count <= 1) {
+          _startDirectorGeneration(plan, storyId);
           return;
         }
 
-        var estimate = _estimateIterateOrderCost(activeModels, count);
+        var estimate = _estimateIterateOrderCost(modelsForPlan, count);
         var warningExtra = '';
         if (estimate.invalidCount > 0) {
           warningExtra = estimate.fallbackMode
             ? '<br>Цена моделей не распознана: применён дефолт 1 $/10 сек.'
             : '<br>Для части моделей цена не распознана: использовано среднее по распознанным.';
         }
+        var schemaLine = isIterate
+          ? 'Схема запуска: <b>' + count + '</b> × каждая из <b>' + activeModels.length + '</b> активных моделей.<br>'
+          : 'Схема запуска: <b>' + count + '</b> генераций выбранной модели.<br>';
         new ConfirmDialog({
-          title: 'Запустить перебор моделей?',
+          title: isIterate ? 'Запустить перебор моделей?' : 'Запустить генерацию?',
           text:
             'Будет выполнен большой заказ генераций.<br><br>' +
             'Всего генераций: <b>' + estimate.totalGenerations + '</b><br>' +
-            'Схема запуска: <b>' + count + '</b> × каждая из <b>' + activeModels.length + '</b> активных моделей.<br>' +
+            schemaLine +
             'Ориентировочная стоимость: <b>' + _formatUsd(estimate.totalCost) + '</b>.' +
             warningExtra,
           confirmLabel: 'Запустить',
@@ -788,7 +800,7 @@
             confirmBtn.disabled = true;
             confirmBtn.textContent = 'Запускаю…';
             dlg.close();
-            _startDirectorGeneration(_buildBatchPlan(activeModels, count), storyId);
+            _startDirectorGeneration(plan, storyId);
           },
         }).open();
       });
