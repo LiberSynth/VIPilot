@@ -271,9 +271,11 @@ def click_outside_modal_boundary(
         return False
 
 
-# Блокирующий слой: dialog/modal/scrim (не tooltip/backdrop в layout chrome).
+_DISMISS_COOLDOWN_SEC = 2.0
+_last_dismiss_at: dict[int, float] = {}
+
+# Блокирующий слой: dialog/modal/scrim (не голый backdrop без контента).
 _STRONG_OVERLAY_LAYER_SELECTORS: tuple[str, ...] = (
-    "[data-testid='modal-overlay']",
     "[role='dialog']",
     "[role='alertdialog']",
     "[aria-modal='true']",
@@ -355,6 +357,23 @@ def _overlay_scrim_visible(page) -> bool:
         return False
 
 
+def _modal_backdrop_with_content_visible(page) -> bool:
+    """Backdrop (dzen modal-overlay и т.п.) только если поверх него есть modal/dialog."""
+    for backdrop in _OVERLAY_BACKDROP_SELECTORS:
+        try:
+            if not page.locator(backdrop).first.is_visible(timeout=150):
+                continue
+        except Exception:
+            continue
+        for content in _OVERLAY_CONTENT_SELECTORS:
+            try:
+                if page.locator(content).first.is_visible(timeout=150):
+                    return True
+            except Exception:
+                pass
+    return False
+
+
 def _blocking_popover_visible(page) -> bool:
     """Крупная popover/coachmark-карточка (онбординг), не layout-tooltip."""
     for sel in (
@@ -380,10 +399,12 @@ def _blocking_popover_visible(page) -> bool:
 
 
 def publish_overlay_visible(page) -> bool:
-    """Блокирующий overlay: scrim, modal/dialog или крупная popover-карточка."""
+    """Блокирующий overlay: scrim, modal/dialog, backdrop+контент или popover-карточка."""
     if _overlay_scrim_visible(page):
         return True
     if _blocking_popover_visible(page):
+        return True
+    if _modal_backdrop_with_content_visible(page):
         return True
     for sel in _STRONG_OVERLAY_LAYER_SELECTORS:
         try:
@@ -392,6 +413,24 @@ def publish_overlay_visible(page) -> bool:
         except Exception:
             pass
     return False
+
+
+def _make_dismiss_present(
+    blocked_locator=None,
+) -> Callable[..., bool]:
+    def _present(page) -> bool:
+        if publish_overlay_visible(page):
+            return True
+        if blocked_locator is None:
+            return False
+        try:
+            return (
+                blocked_locator.is_visible(timeout=100)
+                and element_click_blocked(blocked_locator)
+            )
+        except Exception:
+            return False
+    return _present
 
 
 def whitelisted_publish_ui(page, whitelist: Sequence[WhitelistEntry]) -> bool:
@@ -551,6 +590,11 @@ def dismiss_publish_overlay(
             should_dismiss = False
     if not should_dismiss:
         return
+    page_id = id(page)
+    now = _time.monotonic()
+    if now - _last_dismiss_at.get(page_id, 0.0) < _DISMISS_COOLDOWN_SEC:
+        return
+    _last_dismiss_at[page_id] = now
     _user_lvl = "info" if batch_id else "silent"
     prefix = f"{label}: " if label else ""
     write_log_entry(
@@ -558,15 +602,28 @@ def dismiss_publish_overlay(
         f"{prefix}Закрываю мусорный overlay.",
         level=_user_lvl,
     )
+    present = _make_dismiss_present(blocked_locator)
     try:
         dismiss_overlay_strict(
             page, category, batch_id, label=label,
-            is_present=publish_overlay_visible,
+            is_present=present,
         )
     except OverlayNotDismissedError as exc:
         if error_factory is not None:
             raise error_factory(str(exc)) from exc
         raise
+    if blocked_locator is not None:
+        try:
+            if blocked_locator.is_visible(timeout=150) and element_center_clickable(blocked_locator):
+                return
+        except Exception:
+            pass
+    if not present(page):
+        return
+    if error_factory is not None:
+        raise error_factory(
+            f"{prefix}Не удалось закрыть оверлей — все действия исчерпаны."
+        )
 
 
 def safe_click(

@@ -14,7 +14,6 @@ import time as _time
 from clients.common import (
     dismiss_publish_overlay,
     handle_popups,
-    publish_overlay_is_garbage,
     poll_wait_tick,
     safe_click,
 )
@@ -941,9 +940,6 @@ def _publish_ui(
     while _time.monotonic() < _plus_deadline:
         raise_if_login_required(page, "dzen", publisher_id=publisher_id)
         _dzen_handle_popups(page, category, batch_id)
-        if publish_overlay_is_garbage(page, DZEN_PUBLISH_WHITELIST):
-            page.wait_for_timeout(400)
-            continue
         try:
             if plus_btn.is_visible(timeout=400):
                 _plus_ready = True

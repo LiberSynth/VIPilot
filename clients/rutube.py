@@ -232,18 +232,26 @@ def _wait_rutube_add_button(page, category, batch_id=None, timeout_ms=180_000, *
     """Ждёт готовность студии и видимую кнопку «+ Добавить»."""
     found: list = [None]
     last_log_at = 0.0
+    blocked_btn: list = [None]
+
+    def _dismiss_with_blocked(page, category, batch_id, *, label: str = "", **kw):
+        dismiss_publish_overlay(
+            page, RUTUBE_PUBLISH_WHITELIST, batch_id, category,
+            label=label or target_name, error_factory=RutubeApiError,
+            blocked_locator=blocked_btn[0],
+        )
 
     def _on_poll():
         nonlocal last_log_at
         raise_if_login_required(page, "rutube")
         add_btn = _find_rutube_add_button(page)
-        _rutube_handle_popups(page, category, batch_id, label=target_name)
-        if add_btn is not None and not _rutube_add_button_clickable(add_btn):
-            dismiss_publish_overlay(
-                page, RUTUBE_PUBLISH_WHITELIST, batch_id, category,
-                label=target_name, error_factory=RutubeApiError,
-                blocked_locator=add_btn,
-            )
+        blocked_btn[0] = (
+            add_btn if (add_btn is not None and not _rutube_add_button_clickable(add_btn)) else None
+        )
+        handle_popups(
+            page, RUTUBE_PUBLISH_WHITELIST, _dismiss_with_blocked,
+            batch_id, category,
+        )
         now = _time.monotonic()
         if now - last_log_at >= 8:
             add_btn = _find_rutube_add_button(page)
