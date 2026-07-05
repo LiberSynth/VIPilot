@@ -322,12 +322,13 @@ var loadStoryIntoEditor;
   }
 
   function _renderStoryIcons(s) {
-    var icons = _renderPromptIcon(s);
+    var icons = '';
     if (s.used) {
       icons += '<span class="story-icon story-icon-used" title="Использован в производстве">'
         + '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">'
         + '<polyline points="2,8 6,12 14,4"/></svg></span>';
     }
+    icons += _renderPromptIcon(s);
     if (s.ai_generated && s.manual_changed) {
       icons += '<span class="story-icon story-icon-ai-manual" title="Происхождение: Сгенерировано AI, отредактировано вручную">'
         + '<svg viewBox="0 0 26 24" fill="none" stroke="none" stroke-linecap="round" stroke-linejoin="round">'
