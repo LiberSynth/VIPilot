@@ -11,15 +11,13 @@ import tempfile
 import time as _time
 
 from clients.common import (
-    dismiss_overlay_strict,
+    dismiss_publish_overlay,
     element_center_clickable,
-    element_click_blocked,
     handle_popups,
-    OverlayNotDismissedError,
+    publish_overlay_is_garbage,
     poll_until,
     poll_wait_tick,
     safe_click,
-    _likely_overlay_present,
 )
 from services.publish_auth_check import raise_if_login_required
 from log import write_log_entry
@@ -384,46 +382,6 @@ def _handle_rutube_captcha(page, category, batch_id) -> None:
         level="warn",
     )
 
-def _rutube_add_button_blocked(page) -> bool:
-    add_btn = _find_rutube_add_button(page)
-    if add_btn is None:
-        return False
-    return not _rutube_add_button_clickable(add_btn)
-
-def _rutube_target_blocked(page) -> bool:
-    """Целевой UI перекрыт мусором (без каталога попапов)."""
-    if _rutube_add_button_blocked(page):
-        return True
-    if not _detect_rutube_upload_form(page):
-        return False
-    try:
-        pub = page.locator("button:has-text('Опубликовать')").last
-        if (
-            pub.is_visible(timeout=150)
-            and _rutube_publish_button_ready(pub)
-            and element_click_blocked(pub)
-        ):
-            return True
-    except Exception:
-        pass
-    return False
-
-def _rutube_whitelisted_overlay_present(page) -> bool:
-    for _name, detect, _handle in RUTUBE_PUBLISH_WHITELIST:
-        try:
-            if detect(page):
-                return True
-        except Exception:
-            pass
-    return False
-
-def _rutube_garbage_overlay_present(page) -> bool:
-    if _rutube_target_blocked(page):
-        return True
-    if _rutube_whitelisted_overlay_present(page):
-        return False
-    return _likely_overlay_present(page)
-
 RUTUBE_PUBLISH_WHITELIST = [
     ("captcha", _detect_rutube_captcha, _handle_rutube_captcha),
     ("upload_in_progress", _detect_rutube_upload_in_progress, None),
@@ -431,43 +389,20 @@ RUTUBE_PUBLISH_WHITELIST = [
     ("upload_menu", _detect_rutube_upload_menu, None),
 ]
 
-_RUTUBE_OVERLAY_CLOSE_SELECTORS = (
-    "[class*='modal'] button[class*='close']",
-    "[class*='popup'] button[class*='close']",
-    "button[aria-label*='Закрыть']",
-    "button[aria-label*='закрыть']",
-    "[class*='closeButton']",
-)
-
 def _rutube_dismiss_unknown(
     page, category, batch_id, *, label: str = "", phase: int = 0, force: bool = False,
 ) -> None:
     del phase, force
-    lbl = label or "Рутьюб"
-    if not _rutube_garbage_overlay_present(page):
-        return
-    write_log_entry(batch_id, category, f"{lbl}: Закрываю мусорный overlay.", level="info")
-    try:
-        dismiss_overlay_strict(
-            page, category, batch_id, label=lbl,
-            is_present=_rutube_garbage_overlay_present,
-            extra_close_selectors=_RUTUBE_OVERLAY_CLOSE_SELECTORS,
-        )
-    except OverlayNotDismissedError as exc:
-        raise RutubeApiError(str(exc)) from exc
+    dismiss_publish_overlay(
+        page, RUTUBE_PUBLISH_WHITELIST, batch_id, category,
+        label=label or "Rutube", error_factory=RutubeApiError,
+    )
 
 def _rutube_handle_popups(page, category, batch_id, *, allow_dismiss: bool = True, label: str = "Rutube") -> None:
-    had_whitelisted = _rutube_whitelisted_overlay_present(page)
     handle_popups(
         page, RUTUBE_PUBLISH_WHITELIST, _rutube_dismiss_unknown,
         batch_id, category, allow_dismiss=allow_dismiss,
     )
-    if not allow_dismiss:
-        return
-    if _detect_rutube_upload_form(page):
-        return
-    if had_whitelisted:
-        _rutube_dismiss_unknown(page, category, batch_id, label=label)
 
 def _rutube_publish_confirmed_after_submit(page) -> bool:
     """Признак успеха после клика: кнопка «Опубликовать» исчезла, студия открыта."""

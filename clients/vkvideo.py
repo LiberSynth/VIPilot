@@ -19,11 +19,10 @@ import tempfile
 import time as _time
 
 from clients.common import (
-    _likely_overlay_present,
-    dismiss_overlay_strict,
-    element_click_blocked,
+    dismiss_publish_overlay,
+    element_center_clickable,
     handle_popups,
-    OverlayNotDismissedError,
+    publish_overlay_is_garbage,
     poll_until,
     poll_wait_tick,
     safe_click,
@@ -291,75 +290,20 @@ VKVIDEO_PUBLISH_WHITELIST = [
     ("publish_modal", _vk_publish_modal_visible, None),
 ]
 
-_VKVIDEO_EXTRA_CLOSE_SELECTORS = (
-    "[class*='popup'] button[class*='close']",
-    "[class*='modal'] button[class*='close']",
-    "[class*='closeButton']",
-    "button[aria-label*='Закрыть']",
-    "button[aria-label*='закрыть']",
-)
-
-def _vkvideo_whitelisted_overlay_present(page) -> bool:
-    for _name, detect, _handle in VKVIDEO_PUBLISH_WHITELIST:
-        try:
-            if detect(page):
-                return True
-        except Exception:
-            pass
-    return False
-
-def _vkvideo_target_blocked(page) -> bool:
-    """Целевой UI перекрыт мусором (без каталога попапов)."""
-    if not _vkvideo_whitelisted_overlay_present(page):
-        return False
-    if _detect_vk_publish_workflow(page):
-        return False
-    try:
-        pub = page.locator("button:has-text('Опубликовать')").last
-        if (
-            pub.is_visible(timeout=150)
-            and _vk_publish_button_clickable(pub)
-            and element_click_blocked(pub)
-        ):
-            return True
-    except Exception:
-        pass
-    try:
-        if page.locator("[role='alert']").first.is_visible(timeout=150):
-            return True
-    except Exception:
-        pass
-    return False
-
-def _vkvideo_garbage_overlay_present(page) -> bool:
-    """Мусор поверх кабинета; whitelisted-модалки — не мусор."""
-    if _vkvideo_target_blocked(page):
-        return True
-    if _vkvideo_whitelisted_overlay_present(page):
-        return False
-    return _likely_overlay_present(page)
-
 def _vkvideo_dismiss_unknown(
     page, category, batch_id, *, label: str = "", phase: int = 0, force: bool = False,
 ) -> None:
     del phase, force
-    try:
-        dismiss_overlay_strict(
-            page, category, batch_id, label=label or "VK Видео",
-            is_present=_vkvideo_garbage_overlay_present,
-            extra_close_selectors=_VKVIDEO_EXTRA_CLOSE_SELECTORS,
-        )
-    except OverlayNotDismissedError as exc:
-        raise VkVideoApiError(str(exc)) from exc
+    dismiss_publish_overlay(
+        page, VKVIDEO_PUBLISH_WHITELIST, batch_id, category,
+        label=label or "VK Видео", error_factory=VkVideoApiError,
+    )
 
 def _vkvideo_handle_popups(page, category, batch_id, *, allow_dismiss: bool = True, label: str = "VK Видео") -> None:
-    had_whitelisted = _vkvideo_whitelisted_overlay_present(page)
     handle_popups(
         page, VKVIDEO_PUBLISH_WHITELIST, _vkvideo_dismiss_unknown,
         batch_id, category, allow_dismiss=allow_dismiss,
     )
-    if allow_dismiss and had_whitelisted and _vkvideo_target_blocked(page):
-        _vkvideo_dismiss_unknown(page, category, batch_id, label=label)
 
 def _vk_publish_button_visible(page) -> bool:
     try:
@@ -440,7 +384,7 @@ def _wait_vk_clip_publish_ready(page, pub_btn, batch_id, category, timeout_ms=_P
     while _time.monotonic() < deadline:
         raise_if_login_required(page, "vkvideo")
         _vkvideo_handle_popups(page, category, batch_id, label=target_name)
-        if _vkvideo_garbage_overlay_present(page):
+        if publish_overlay_is_garbage(page, VKVIDEO_PUBLISH_WHITELIST):
             poll_wait_tick(page, batch_id, "vkvideo")
             continue
         _scroll_vk_publish_button(pub_btn)
@@ -533,7 +477,7 @@ def _wait_visible(
         _vkvideo_handle_popups(page, category, batch_id)
 
     def _ready() -> bool:
-        if _vkvideo_garbage_overlay_present(page):
+        if publish_overlay_is_garbage(page, VKVIDEO_PUBLISH_WHITELIST):
             return False
         try:
             return locator.is_visible(timeout=200)

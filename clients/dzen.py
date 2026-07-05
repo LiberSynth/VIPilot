@@ -12,12 +12,9 @@ import tempfile
 import time as _time
 
 from clients.common import (
-    _likely_overlay_present,
-    click_outside_modal_boundary,
-    dismiss_overlay_strict,
-    element_click_blocked,
+    dismiss_publish_overlay,
     handle_popups,
-    OverlayNotDismissedError,
+    publish_overlay_is_garbage,
     poll_wait_tick,
     safe_click,
 )
@@ -264,91 +261,7 @@ def _modal_overlay_visible(page) -> bool:
     except Exception:
         return False
 
-_DZEN_MODAL_CLOSE_SELECTORS = (
-    "[class*='modal__rootElement'] button[class*='close']",
-    "[class*='modal__rootElement'] [class*='Close']",
-    "[class*='modal__rootElement'] button[aria-label*='lose']",
-    "[class*='modal__rootElement'] button[aria-label*='закр']",
-    "[class*='modal__rootElement'] button[aria-label*='Закр']",
-    "button[aria-label*='Закрыть']",
-    "button[aria-label*='закрыть']",
-    "button[aria-label*='Close']",
-    "[class*='toast'] button[class*='close']",
-    "[class*='toast'] [class*='closeButton']",
-    "[class*='notification'] button[class*='close']",
-    "[class*='notification'] [class*='closeButton']",
-    "[class*='snackbar'] button[class*='close']",
-    "[class*='snackbar'] [class*='closeButton']",
-    "[role='alert'] button",
-    "[role='alert'] [class*='close']",
-    "[role='alertdialog'] button[class*='close']",
-    "[class*='modal'] button:has-text('Понятно')",
-    "[class*='modal'] button:has-text('Не сейчас')",
-    "[class*='modal'] button:has-text('Пропустить')",
-    "[class*='modal'] button:has-text('Позже')",
-)
-
-_DZEN_MODAL_OVERLAY_SELECTOR = "[data-testid='modal-overlay']"
-_DZEN_MODAL_ROOT_SELECTOR = "[class*='modal__rootElement']"
 _DZEN_HINT_CLOSE_SELECTOR = "[class*='helper-tooltip__closeButton']"
-
-
-def _dzen_click_outside_modal(page) -> bool:
-    return click_outside_modal_boundary(
-        page,
-        _DZEN_MODAL_OVERLAY_SELECTOR,
-        _DZEN_MODAL_ROOT_SELECTOR,
-    )
-
-def _dzen_error_toast_visible(page) -> bool:
-    """Alert/toast поверх редактора — мусор, даже при publish_editor в whitelist."""
-    if _dzen_publish_success_toast_visible(page):
-        return False
-    try:
-        if page.locator(_DZEN_HINT_CLOSE_SELECTOR).first.is_visible(timeout=100):
-            return False
-    except Exception:
-        pass
-    for sel in (
-        "[role='alert']",
-        "[role='alertdialog']",
-        "[class*='toast']",
-        "[class*='notification']",
-        "[class*='snackbar']",
-    ):
-        try:
-            if page.locator(sel).first.is_visible(timeout=150):
-                return True
-        except Exception:
-            pass
-    return False
-
-def _dzen_click_error_toast(page) -> bool:
-    """Клик по видимому alert/toast (часто закрывает уведомление об ошибке сохранения)."""
-    if not _dzen_error_toast_visible(page):
-        return False
-    for sel in (
-        "[role='alert']",
-        "[role='alertdialog']",
-        "[class*='toast']",
-        "[class*='notification']",
-        "[class*='snackbar']",
-    ):
-        try:
-            loc = page.locator(sel).first
-            if not loc.is_visible(timeout=150):
-                continue
-            loc.click(timeout=2_000)
-            return True
-        except Exception:
-            pass
-    return False
-
-
-_DZEN_MODAL_DISMISS_EXTRA_STEPS = (
-    ("сделан клик за границей окна", _dzen_click_outside_modal),
-    ("сделан клик по уведомлению", _dzen_click_error_toast),
-)
 
 _CONFIRM_OR_CAPTCHA_SEL = (
     "button:has-text('Опубликовать после подтверждения'), "
@@ -825,19 +738,6 @@ def _retry_publish_if_button_visible(page, category, batch_id, url_step7_start, 
     write_log_entry(batch_id, category, f"Дзен: {reason}")
     return _click_primary_publish_control(page, category, batch_id, url_step7_start)
 
-def _dzen_target_blocked(page) -> bool:
-    """Целевой UI редактора перекрыт мусором (без каталога попапов)."""
-    if not _detect_dzen_publish_editor(page):
-        return False
-    pub = _find_primary_publish_control(page)
-    if (
-        pub is not None
-        and _dzen_publish_control_enabled(pub)
-        and element_click_blocked(pub)
-    ):
-            return True
-    return False
-
 DZEN_PUBLISH_WHITELIST = [
     ("captcha", _detect_captcha, _handle_captcha_element),
     ("upload_modal", _detect_dzen_upload_modal, None),
@@ -847,29 +747,7 @@ DZEN_PUBLISH_WHITELIST = [
     ("confirm", _detect_confirm_dialog, _handle_confirm_element),
     # file_input НЕ ДОБАВЛЯТЬ сюда — после set_files() input[type=file] остаётся в DOM
     # на всё время публикации и блокирует dismiss для любых других попапов.
-    # modal-overlay (донаты и пр.) — мусор, закрывается через dismiss_overlay_strict.
 ]
-
-def _dzen_whitelisted_overlay_present(page) -> bool:
-    for _name, detect, _handle in DZEN_PUBLISH_WHITELIST:
-        try:
-            if detect(page):
-                return True
-        except Exception:
-            pass
-    return False
-
-def _dzen_garbage_overlay_present(page) -> bool:
-    """Мусор поверх студии; whitelisted modal-overlay / рабочие модалки — не мусор."""
-    if _dzen_error_toast_visible(page):
-        return True
-    if _dzen_target_blocked(page):
-        return True
-    if _dzen_whitelisted_overlay_present(page):
-        return False
-    if _modal_overlay_visible(page):
-        return True
-    return _likely_overlay_present(page)
 
 def _dzen_dismiss_unknown(
     page, category, batch_id, *, label: str = "", phase: int = 0, force: bool = False,
@@ -878,34 +756,26 @@ def _dzen_dismiss_unknown(
     lbl = label or "Дзен"
     if _detect_captcha(page):
         return
-    # Dzen helper-tooltip — отдельное исключение: сначала закрываем его,
-    # иначе blocked-check может ошибочно загнать в generic-dismiss.
     dismiss_dzen_hint(page, category, batch_id, label=lbl)
-    if _dzen_garbage_overlay_present(page):
-        try:
-            dismiss_overlay_strict(
-                page, category, batch_id, label=lbl,
-                is_present=_dzen_garbage_overlay_present,
-                extra_close_selectors=_DZEN_MODAL_CLOSE_SELECTORS,
-                extra_steps=_DZEN_MODAL_DISMISS_EXTRA_STEPS,
-            )
-        except OverlayNotDismissedError as exc:
-            raise DzenApiError(str(exc)) from exc
+    dismiss_publish_overlay(
+        page, DZEN_PUBLISH_WHITELIST, batch_id, category,
+        label=lbl, error_factory=DzenApiError,
+    )
 
 def _dzen_handle_popups(
     page, category=None, batch_id=None, *, allow_dismiss: bool = True,
 ) -> None:
-    had_whitelisted = _dzen_whitelisted_overlay_present(page)
+    if not allow_dismiss:
+        dismiss_dzen_hint(page, category, batch_id)
+        handle_popups(
+            page, DZEN_PUBLISH_WHITELIST, _dzen_dismiss_unknown,
+            batch_id, category, allow_dismiss=False,
+        )
+        return
     handle_popups(
         page, DZEN_PUBLISH_WHITELIST, _dzen_dismiss_unknown,
         batch_id, category, allow_dismiss=allow_dismiss,
     )
-    # publish_editor/create_menu в whitelist блокируют dismiss_unknown.
-    if not allow_dismiss:
-        dismiss_dzen_hint(page, category, batch_id)
-        return
-    if had_whitelisted:
-        _dzen_dismiss_unknown(page, category, batch_id, label="Дзен")
 
 def _set_comments_all_users(page, category, batch_id=None) -> None:
     """
@@ -1054,7 +924,7 @@ def _publish_ui(
     while _time.monotonic() < _plus_deadline:
         raise_if_login_required(page, "dzen", publisher_id=publisher_id)
         _dzen_handle_popups(page, category, batch_id)
-        if _dzen_garbage_overlay_present(page):
+        if publish_overlay_is_garbage(page, DZEN_PUBLISH_WHITELIST):
             page.wait_for_timeout(400)
             continue
         try:

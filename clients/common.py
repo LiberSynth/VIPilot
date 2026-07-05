@@ -1,9 +1,8 @@
 """
 Общие утилиты Playwright-клиентов публикации (dzen, rutube, vkvideo).
 
-Единый контракт: handle_popups(whitelist) -> dismiss_unknown.
-Платформенное (whitelist, is_present, extra_close_selectors, extra_steps)
-передаётся вызывающим кодом; common не импортирует прикладные модули.
+Единый контракт: overlay виден → whitelist → иначе dismiss_publish_overlay.
+Платформенное — только whitelist-detect; dismiss и overlay-селекторы здесь.
 """
 
 from __future__ import annotations
@@ -166,9 +165,8 @@ def handle_popups(
     allow_dismiss: bool = True,
 ) -> None:
     """
-    whitelist -> иначе dismiss_unknown.
-    handle=None — элемент известен, не закрывать.
-    allow_dismiss=False — только whitelist (ожидание целевого UI, без dismiss).
+    whitelist → handler; иначе dismiss_unknown (overlay → whitelist → dismiss).
+    allow_dismiss=False — только whitelist, без dismiss.
     """
     for name, detect, handle in whitelist:
         try:
@@ -188,18 +186,6 @@ def handle_popups(
         return
     if allow_dismiss:
         dismiss_unknown(page, category, batch_id)
-
-
-def _try_close_selectors(page, selectors: Sequence[str]) -> bool:
-    for sel in selectors:
-        try:
-            btn = page.locator(sel).first
-            if btn.is_visible(timeout=150):
-                btn.click(timeout=2_000)
-                return True
-        except Exception:
-            pass
-    return False
 
 
 def _click_safe_free_field(page, inset: int = 24) -> bool:
@@ -252,40 +238,119 @@ def click_outside_modal_boundary(
         return False
 
 
-def _try_generic_close(page) -> bool:
-    for sel in (
-        "button[aria-label*='Закрыть']",
-        "button[aria-label*='закрыть']",
-        "button[aria-label*='Close']",
-    ):
+# Признаки отрисованного поверх UI слоя (не тексты попапов, не layout chrome).
+_OVERLAY_LAYER_SELECTORS: tuple[str, ...] = (
+    "[data-testid='modal-overlay']",
+    "[role='dialog']",
+    "[role='alertdialog']",
+    "[role='alert']",
+    "[aria-modal='true']",
+    "[class*='ModalOverlay']",
+    "[class*='modalOverlay']",
+    "[class*='ModalLayout']",
+    "[class*='PopoutRoot']",
+    "[class*='Snackbar']",
+    "[class*='snackbar']",
+)
+
+_OVERLAY_BACKDROP_SELECTORS: tuple[str, ...] = (
+    "[data-testid='modal-overlay']",
+    "[class*='ModalOverlay']",
+    "[class*='modalOverlay']",
+)
+
+_OVERLAY_CONTENT_SELECTORS: tuple[str, ...] = (
+    "[role='dialog']",
+    "[class*='modal__rootElement']",
+    "[class*='ModalRoot']",
+    "[class*='modalRoot']",
+    "[aria-modal='true']",
+)
+
+_OVERLAY_CLOSE_SELECTORS: tuple[str, ...] = (
+    "[class*='helper-tooltip__closeButton']",
+    "[class*='modal__rootElement'] button[class*='close']",
+    "[class*='modal__rootElement'] [class*='Close']",
+    "[class*='modal__rootElement'] button[aria-label*='lose']",
+    "[class*='modal__rootElement'] button[aria-label*='закр']",
+    "[class*='modal__rootElement'] button[aria-label*='Закр']",
+    "[class*='popup'] button[class*='close']",
+    "[class*='modal'] button[class*='close']",
+    "[class*='closeButton']",
+    "[class*='CloseButton']",
+    "button[aria-label*='Закрыть']",
+    "button[aria-label*='закрыть']",
+    "button[aria-label*='Close']",
+    "[class*='toast'] button[class*='close']",
+    "[class*='toast'] [class*='closeButton']",
+    "[class*='notification'] button[class*='close']",
+    "[class*='notification'] [class*='closeButton']",
+    "[class*='snackbar'] button[class*='close']",
+    "[class*='snackbar'] [class*='closeButton']",
+    "[role='alert'] button",
+    "[role='alert'] [class*='close']",
+    "[role='alertdialog'] button[class*='close']",
+)
+
+
+def publish_overlay_visible(page) -> bool:
+    """Видимый overlay/modal/backdrop поверх страницы."""
+    for sel in _OVERLAY_LAYER_SELECTORS:
         try:
-            btn = page.locator(sel).first
-            if btn.is_visible(timeout=200):
-                btn.click(timeout=2_000)
+            if page.locator(sel).first.is_visible(timeout=150):
                 return True
         except Exception:
             pass
     return False
 
 
-def _likely_overlay_present(page) -> bool:
-    """True если на странице похоже на модал/оверлей (не чистый дашборд)."""
-    for sel in (
-        "[role='dialog']",
-        "[role='alertdialog']",
-        "[role='alert']",
-        "[aria-modal='true']",
-        "[class*='modal']",
-        "[class*='Modal']",
-        "[class*='overlay']",
-        "[class*='Overlay']",
-        "[class*='popup']",
-        "[class*='Popup']",
-        "[class*='drawer']",
-        "[class*='Drawer']",
-    ):
+def whitelisted_publish_ui(page, whitelist: Sequence[WhitelistEntry]) -> bool:
+    for _name, detect, _handle in whitelist:
         try:
-            if page.locator(sel).first.is_visible(timeout=150):
+            if detect(page):
+                return True
+        except _DETECT_BUG_EXCEPTIONS:
+            raise
+        except Exception:
+            pass
+    return False
+
+
+def publish_overlay_is_garbage(page, whitelist: Sequence[WhitelistEntry]) -> bool:
+    """Overlay есть и не входит в whitelist штатного UI."""
+    if not publish_overlay_visible(page):
+        return False
+    return not whitelisted_publish_ui(page, whitelist)
+
+
+def _step_click_outside_overlay_backdrop(page) -> bool:
+    for backdrop in _OVERLAY_BACKDROP_SELECTORS:
+        for content in _OVERLAY_CONTENT_SELECTORS:
+            if click_outside_modal_boundary(page, backdrop, content):
+                return True
+        if click_outside_modal_boundary(page, backdrop, ""):
+            return True
+    return False
+
+
+def _step_click_overlay_layer(page) -> bool:
+    for sel in ("[role='alert']", "[role='alertdialog']", "[class*='toast']", "[class*='notification']"):
+        try:
+            loc = page.locator(sel).first
+            if loc.is_visible(timeout=150):
+                loc.click(timeout=2_000)
+                return True
+        except Exception:
+            pass
+    return False
+
+
+def _step_click_close_buttons(page) -> bool:
+    for sel in _OVERLAY_CLOSE_SELECTORS:
+        try:
+            btn = page.locator(sel).first
+            if btn.is_visible(timeout=150):
+                btn.click(timeout=2_000)
                 return True
         except Exception:
             pass
@@ -318,14 +383,14 @@ def _run_dismiss_steps(
             performed = action(page)
         except Exception:
             performed = False
-        if performed:
-            write_log_entry(
-                batch_id, category,
-                f"{prefix}{log_msg}",
-                level=user_lvl,
-            )
-            if present(page):
-                _wait_overlay_gone(page, present)
+        suffix = "" if performed else " (не найдено)"
+        write_log_entry(
+            batch_id, category,
+            f"{prefix}{log_msg}{suffix}",
+            level=user_lvl,
+        )
+        if performed and present(page):
+            _wait_overlay_gone(page, present)
         if not present(page):
             write_log_entry(
                 batch_id, category,
@@ -342,30 +407,25 @@ def dismiss_overlay_strict(
     *,
     label: str = "",
     is_present: Callable[..., bool] | None = None,
-    extra_close_selectors: Sequence[str] = (),
-    extra_steps: Sequence[DismissStep] = (),
 ) -> None:
-    """Одна цепочка закрывающих действий; каждый шаг логируется после выполнения.
+    """Единая цепочка закрытия overlay; каждый шаг логируется.
 
-    После каждого шага — короткое ожидание исчезновения оверлея (анимация).
-    Базовый порядок: свободная область -> extra_steps -> Escape -> x.
+    Порядок: backdrop → свободная область → alert/toast → Escape → ×.
     Если оверлей остался — OverlayNotDismissedError.
     """
-    present = is_present or _likely_overlay_present
+    present = is_present or publish_overlay_visible
     if not present(page):
         return
 
     _user_lvl = "info" if batch_id else "silent"
     prefix = f"{label}: " if label else ""
 
-    def _try_close(page) -> bool:
-        return _try_generic_close(page) or _try_close_selectors(page, extra_close_selectors)
-
     steps: list[DismissStep] = [
+        ("сделан клик за границей окна", _step_click_outside_overlay_backdrop),
         ("сделан клик в свободную область", _click_safe_free_field),
-        *extra_steps,
+        ("сделан клик по уведомлению", _step_click_overlay_layer),
         ("нажат Escape", _step_escape),
-        ("сделан клик по кнопке закрытия", _try_close),
+        ("сделан клик по кнопке закрытия", _step_click_close_buttons),
     ]
     _run_dismiss_steps(page, present, batch_id, category, prefix, _user_lvl, steps)
 
@@ -376,6 +436,36 @@ def dismiss_overlay_strict(
     raise OverlayNotDismissedError(
         f"{prefix}Не удалось закрыть оверлей — все действия исчерпаны."
     )
+
+
+def dismiss_publish_overlay(
+    page,
+    whitelist: Sequence[WhitelistEntry],
+    batch_id=None,
+    category=None,
+    *,
+    label: str = "",
+    error_factory: type[Exception] | None = None,
+) -> None:
+    """Overlay виден и не в whitelist — закрыть единой цепочкой."""
+    if not publish_overlay_is_garbage(page, whitelist):
+        return
+    _user_lvl = "info" if batch_id else "silent"
+    prefix = f"{label}: " if label else ""
+    write_log_entry(
+        batch_id, category,
+        f"{prefix}Закрываю мусорный overlay.",
+        level=_user_lvl,
+    )
+    try:
+        dismiss_overlay_strict(
+            page, category, batch_id, label=label,
+            is_present=publish_overlay_visible,
+        )
+    except OverlayNotDismissedError as exc:
+        if error_factory is not None:
+            raise error_factory(str(exc)) from exc
+        raise
 
 
 def safe_click(
