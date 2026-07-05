@@ -13,6 +13,7 @@ import time as _time
 from clients.common import (
     dismiss_publish_overlay,
     element_center_clickable,
+    element_click_blocked,
     handle_popups,
     publish_overlay_is_garbage,
     poll_until,
@@ -235,7 +236,14 @@ def _wait_rutube_add_button(page, category, batch_id=None, timeout_ms=180_000, *
     def _on_poll():
         nonlocal last_log_at
         raise_if_login_required(page, "rutube")
+        add_btn = _find_rutube_add_button(page)
         _rutube_handle_popups(page, category, batch_id, label=target_name)
+        if add_btn is not None and not _rutube_add_button_clickable(add_btn):
+            dismiss_publish_overlay(
+                page, RUTUBE_PUBLISH_WHITELIST, batch_id, category,
+                label=target_name, error_factory=RutubeApiError,
+                blocked_locator=add_btn,
+            )
         now = _time.monotonic()
         if now - last_log_at >= 8:
             add_btn = _find_rutube_add_button(page)

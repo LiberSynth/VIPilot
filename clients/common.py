@@ -128,18 +128,18 @@ _OVERLAY_SCRIM_JS = """
     if (st.pointerEvents === 'none') continue;
     const pos = st.position;
     if (pos !== 'fixed' && pos !== 'absolute') continue;
-    const r = el.getBoundingClientRect();
-    if (r.width < minW || r.height < minH) continue;
+    const rect = el.getBoundingClientRect();
+    if (rect.width < minW || rect.height < minH) continue;
     const bg = st.backgroundColor;
     if (!bg || bg === 'transparent' || bg === 'rgba(0, 0, 0, 0)') continue;
     const m = bg.match(/rgba?\\((\\d+),\\s*(\\d+),\\s*(\\d+)(?:,\\s*([\\d.]+))?\\)/);
     if (!m) continue;
     const a = m[4] !== undefined ? parseFloat(m[4]) : 1;
     if (a < 0.12) continue;
-    const r = parseInt(m[1], 10);
-    const g = parseInt(m[2], 10);
-    const b = parseInt(m[3], 10);
-    if ((r + g + b) / 3 > 120) continue;
+    const rv = parseInt(m[1], 10);
+    const gv = parseInt(m[2], 10);
+    const bv = parseInt(m[3], 10);
+    if ((rv + gv + bv) / 3 > 120) continue;
     const z = parseInt(st.zIndex, 10);
     if (Number.isFinite(z) && z < 1) continue;
     return true;
@@ -362,6 +362,10 @@ def _blocking_popover_visible(page) -> bool:
         "[class*='popover']",
         "[class*='CoachMark']",
         "[class*='coachmark']",
+        "[class*='Tour']",
+        "[class*='tour']",
+        "[class*='Onboarding']",
+        "[class*='onboarding']",
     ):
         try:
             loc = page.locator(sel).first
@@ -532,9 +536,20 @@ def dismiss_publish_overlay(
     *,
     label: str = "",
     error_factory: type[Exception] | None = None,
+    blocked_locator=None,
 ) -> None:
-    """Overlay виден и не в whitelist — закрыть единой цепочкой."""
-    if not publish_overlay_is_garbage(page, whitelist):
+    """Overlay или перекрытый target (не в whitelist) — закрыть единой цепочкой."""
+    should_dismiss = publish_overlay_is_garbage(page, whitelist)
+    if not should_dismiss and blocked_locator is not None:
+        try:
+            should_dismiss = (
+                blocked_locator.is_visible(timeout=150)
+                and element_click_blocked(blocked_locator)
+                and not whitelisted_publish_ui(page, whitelist)
+            )
+        except Exception:
+            should_dismiss = False
+    if not should_dismiss:
         return
     _user_lvl = "info" if batch_id else "silent"
     prefix = f"{label}: " if label else ""

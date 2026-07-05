@@ -683,6 +683,13 @@ def _click_primary_publish_control(page, category, batch_id=None, url_step7_star
     pub_btn = _find_primary_publish_control(page)
     if pub_btn is None:
         return False
+    if not _dzen_publish_control_enabled(pub_btn):
+        if _dzen_post_submit_success_visible(page) or _dzen_publish_settled(page, url_step7_start or ""):
+            write_log_entry(
+                batch_id, category,
+                "Дзен: Кнопка «Опубликовать» неактивна — публикация уже завершена.",
+            )
+        return False
     write_log_entry(batch_id, category, "Дзен: Элемент публикации найден, нажимаю.")
     try:
         safe_click(
@@ -730,10 +737,20 @@ def _poll_after_publish_click(
         poll_wait_tick(page, batch_id, "dzen")
 
 def _retry_publish_if_button_visible(page, category, batch_id, url_step7_start, reason: str) -> bool:
-    """Повторный клик, если публикация ещё не ушла, а CTA всё ещё на экране."""
+    """Повторный клик, если публикация ещё не ушла, а CTA активна."""
     if _dzen_publish_settled(page, url_step7_start):
         return False
-    if _find_primary_publish_control(page) is None:
+    if _dzen_post_submit_success_visible(page):
+        return False
+    pub = _find_primary_publish_control(page)
+    if pub is None:
+        return False
+    if not _dzen_publish_control_enabled(pub):
+        write_log_entry(
+            batch_id, category,
+            "Дзен: Кнопка «Опубликовать» неактивна — повторный клик не нужен.",
+            level="silent",
+        )
         return False
     write_log_entry(batch_id, category, f"Дзен: {reason}")
     return _click_primary_publish_control(page, category, batch_id, url_step7_start)
