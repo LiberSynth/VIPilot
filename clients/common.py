@@ -115,6 +115,35 @@ _OUTSIDE_MODAL_JS = """
 }
 """
 
+# Затемняющий scrim: fixed/absolute слой ≥60% viewport с полупрозрачным фоном.
+_OVERLAY_SCRIM_JS = """
+() => {
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const minW = vw * 0.55;
+  const minH = vh * 0.55;
+  for (const el of document.body.querySelectorAll('*')) {
+    const st = window.getComputedStyle(el);
+    if (st.display === 'none' || st.visibility === 'hidden') continue;
+    if (st.pointerEvents === 'none') continue;
+    const pos = st.position;
+    if (pos !== 'fixed' && pos !== 'absolute') continue;
+    const r = el.getBoundingClientRect();
+    if (r.width < minW || r.height < minH) continue;
+    const bg = st.backgroundColor;
+    if (!bg || bg === 'transparent' || bg === 'rgba(0, 0, 0, 0)') continue;
+    const m = bg.match(/rgba?\\((\\d+),\\s*(\\d+),\\s*(\\d+)(?:,\\s*([\\d.]+))?\\)/);
+    if (!m) continue;
+    const a = m[4] !== undefined ? parseFloat(m[4]) : 1;
+    if (a < 0.08) continue;
+    const z = parseInt(st.zIndex, 10);
+    if (Number.isFinite(z) && z < 1) continue;
+    return true;
+  }
+  return false;
+}
+"""
+
 
 class OverlayNotDismissedError(RuntimeError):
     """Оверлей остался на экране после полной цепочки закрывающих действий."""
@@ -238,17 +267,28 @@ def click_outside_modal_boundary(
         return False
 
 
-# Признаки отрисованного поверх UI слоя (не тексты попапов, не layout chrome).
+# Признаки отрисованного поверх UI слоя (классы/roles, не тексты попапов).
 _OVERLAY_LAYER_SELECTORS: tuple[str, ...] = (
     "[data-testid='modal-overlay']",
     "[role='dialog']",
     "[role='alertdialog']",
     "[role='alert']",
+    "[role='tooltip']",
     "[aria-modal='true']",
     "[class*='ModalOverlay']",
     "[class*='modalOverlay']",
     "[class*='ModalLayout']",
     "[class*='PopoutRoot']",
+    "[class*='Popover']",
+    "[class*='popover']",
+    "[class*='Tooltip']",
+    "[class*='tooltip']",
+    "[class*='Backdrop']",
+    "[class*='backdrop']",
+    "[class*='Drawer']",
+    "[class*='drawer']",
+    "[class*='CoachMark']",
+    "[class*='coachmark']",
     "[class*='Snackbar']",
     "[class*='snackbar']",
 )
@@ -257,13 +297,20 @@ _OVERLAY_BACKDROP_SELECTORS: tuple[str, ...] = (
     "[data-testid='modal-overlay']",
     "[class*='ModalOverlay']",
     "[class*='modalOverlay']",
+    "[class*='Backdrop']",
+    "[class*='backdrop']",
 )
 
 _OVERLAY_CONTENT_SELECTORS: tuple[str, ...] = (
     "[role='dialog']",
+    "[role='tooltip']",
     "[class*='modal__rootElement']",
     "[class*='ModalRoot']",
     "[class*='modalRoot']",
+    "[class*='Popover']",
+    "[class*='popover']",
+    "[class*='Tooltip']",
+    "[class*='tooltip']",
     "[aria-modal='true']",
 )
 
@@ -274,10 +321,20 @@ _OVERLAY_CLOSE_SELECTORS: tuple[str, ...] = (
     "[class*='modal__rootElement'] button[aria-label*='lose']",
     "[class*='modal__rootElement'] button[aria-label*='закр']",
     "[class*='modal__rootElement'] button[aria-label*='Закр']",
+    "[class*='popover'] button[class*='close']",
+    "[class*='Popover'] button[class*='close']",
+    "[class*='tooltip'] button[class*='close']",
+    "[class*='Tooltip'] button[class*='close']",
+    "[class*='tooltip'] [class*='closeIcon']",
+    "[class*='Tooltip'] [class*='closeIcon']",
+    "[class*='tour'] button[class*='close']",
+    "[class*='Tour'] button[class*='close']",
     "[class*='popup'] button[class*='close']",
     "[class*='modal'] button[class*='close']",
     "[class*='closeButton']",
     "[class*='CloseButton']",
+    "[class*='closeIcon']",
+    "[class*='CloseIcon']",
     "button[aria-label*='Закрыть']",
     "button[aria-label*='закрыть']",
     "button[aria-label*='Close']",
@@ -290,18 +347,27 @@ _OVERLAY_CLOSE_SELECTORS: tuple[str, ...] = (
     "[role='alert'] button",
     "[role='alert'] [class*='close']",
     "[role='alertdialog'] button[class*='close']",
+    "[class*='modal'] button:has-text('Понятно')",
+    "[class*='modal'] button:has-text('Не сейчас')",
+    "[class*='modal'] button:has-text('Пропустить')",
+    "[class*='modal'] button:has-text('Позже')",
+    "[class*='popover'] button:has-text('Пропустить')",
+    "[class*='tooltip'] button:has-text('Пропустить')",
 )
 
 
 def publish_overlay_visible(page) -> bool:
-    """Видимый overlay/modal/backdrop поверх страницы."""
+    """Видимый overlay/modal/backdrop/scrim поверх страницы."""
     for sel in _OVERLAY_LAYER_SELECTORS:
         try:
             if page.locator(sel).first.is_visible(timeout=150):
                 return True
         except Exception:
             pass
-    return False
+    try:
+        return bool(page.evaluate(_OVERLAY_SCRIM_JS))
+    except Exception:
+        return False
 
 
 def whitelisted_publish_ui(page, whitelist: Sequence[WhitelistEntry]) -> bool:
