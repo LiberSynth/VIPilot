@@ -574,9 +574,14 @@
       return window._directorApi || null;
     }
 
-    function _beginDirectorCreation(text) {
+    function _beginDirectorCreation(text, opts) {
       var api = _directorStatusApi();
-      if (api && api.beginGenerationCreation) api.beginGenerationCreation(text);
+      if (api && api.beginGenerationCreation) api.beginGenerationCreation(text, opts);
+    }
+
+    function _trackDirectorBatch(batchId, requestIndex) {
+      var api = _directorStatusApi();
+      if (api && api.trackGenerationBatch) api.trackGenerationBatch(batchId, requestIndex);
     }
 
     function _endDirectorCreation() {
@@ -725,14 +730,20 @@
         _setGeneratingState(false);
         return;
       }
+      var multiRequest = plan.length > 1;
       _setGeneratingState(true);
-      _beginDirectorCreation(plan.length > 1 ? ('Создаю ' + plan.length + ' батчей…') : 'Запускаю генерацию…');
+      _beginDirectorCreation(
+        multiRequest ? ('Создаю ' + plan.length + ' батчей…') : 'Запускаю генерацию…',
+        multiRequest ? { multiRequest: true } : null
+      );
       var createdBatchIds = [];
       _dispatchGeneratePlanSequentially(
         plan,
         storyId,
         function(batchId) {
-          if (batchId) createdBatchIds.push(batchId);
+          if (!batchId) return;
+          createdBatchIds.push(batchId);
+          if (multiRequest) _trackDirectorBatch(batchId, createdBatchIds.length);
         },
         function(created) {
           _setGeneratingState(false);

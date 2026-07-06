@@ -28,8 +28,10 @@ class GenerationConsoleController {
     this._renderConsole();
   }
 
-  beginCreation(hintText) {
+  beginCreation(hintText, opts) {
+    opts = opts || {};
     this._resetSession();
+    if (opts.multiRequest) this._multiRequestMode = true;
     this._creating += 1;
     if (hintText) this._creationHint = String(hintText);
     this._refreshHint();
@@ -281,6 +283,7 @@ class GenerationConsoleController {
   _appendEntryLine(batchId, entry) {
     var state = this._tracked.get(batchId);
     var requestIndex = state && state.meta ? state.meta.requestIndex : 0;
+    if (this._multiRequestMode && !requestIndex) return;
     var line = this._formatEntryLine(entry, requestIndex);
     if (this._isErrorLevel(entry.level)) {
       this._addPinnedLine(line);

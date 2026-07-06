@@ -496,9 +496,14 @@
       if (!status) return;
       status.trackBatch(batchId, { selectMovieOnReady: !!movieId });
     },
-    beginGenerationCreation: function(hintText) {
+    beginGenerationCreation: function(hintText, opts) {
       var status = _statusController();
-      if (status) status.beginCreation(hintText);
+      if (status) status.beginCreation(hintText, opts);
+    },
+    trackGenerationBatch: function(batchId, requestIndex) {
+      var status = _statusController();
+      if (!status || !batchId) return;
+      status.trackBatch(batchId, { requestIndex: requestIndex });
     },
     endGenerationCreation: function() {
       var status = _statusController();
