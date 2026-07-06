@@ -238,7 +238,7 @@ def _wait_rutube_add_button(page, category, batch_id=None, timeout_ms=180_000, *
 
     result = wait_for_publish_target(
         page,
-        find_target=_find_rutube_add_button,
+        find_target=lambda: _find_rutube_add_button(page),
         is_ready=lambda t: t is not None and _rutube_add_button_clickable(t),
         whitelist=RUTUBE_PUBLISH_WHITELIST,
         batch_id=batch_id,
@@ -381,13 +381,13 @@ RUTUBE_PUBLISH_WHITELIST = [
 
 def _rutube_dismiss_unknown(
     page, category, batch_id, *, label: str = "", phase: int = 0, force: bool = False,
-    target=None,
+    target=None, raise_on_failure: bool = False,
 ) -> None:
     del phase, force
     try_dismiss_publish_overlay(
         page, RUTUBE_PUBLISH_WHITELIST, batch_id, category,
         target=target, label=label or "Rutube", error_factory=RutubeApiError,
-        raise_on_failure=True,
+        raise_on_failure=raise_on_failure,
     )
 
 def _rutube_handle_popups(page, category, batch_id, *, label: str = "Rutube") -> None:

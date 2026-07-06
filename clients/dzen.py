@@ -770,7 +770,7 @@ DZEN_PUBLISH_WHITELIST = [
 
 def _dzen_dismiss_unknown(
     page, category, batch_id, *, label: str = "", phase: int = 0, force: bool = False,
-    target=None,
+    target=None, raise_on_failure: bool = False,
 ) -> None:
     del phase, force
     lbl = label or "Дзен"
@@ -780,7 +780,7 @@ def _dzen_dismiss_unknown(
     try_dismiss_publish_overlay(
         page, DZEN_PUBLISH_WHITELIST, batch_id, category,
         target=target, label=lbl, error_factory=DzenApiError,
-        raise_on_failure=True,
+        raise_on_failure=raise_on_failure,
     )
 
 def _dzen_handle_popups(
@@ -949,7 +949,7 @@ def _publish_ui(
             return "кнопка «+» не найдена"
         if not element_center_clickable(target):
             return "кнопка «+» перекрыта overlay"
-        return "жду готовность студии"
+        return "кнопка «+» найдена"
 
     def _plus_before_poll():
         raise_if_login_required(page, "dzen", publisher_id=publisher_id)

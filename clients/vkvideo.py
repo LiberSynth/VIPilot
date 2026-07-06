@@ -292,13 +292,13 @@ VKVIDEO_PUBLISH_WHITELIST = [
 
 def _vkvideo_dismiss_unknown(
     page, category, batch_id, *, label: str = "", phase: int = 0, force: bool = False,
-    target=None,
+    target=None, raise_on_failure: bool = False,
 ) -> None:
     del phase, force
     try_dismiss_publish_overlay(
         page, VKVIDEO_PUBLISH_WHITELIST, batch_id, category,
         target=target, label=label or "VK Видео", error_factory=VkVideoApiError,
-        raise_on_failure=True,
+        raise_on_failure=raise_on_failure,
     )
 
 def _vkvideo_handle_popups(page, category, batch_id, *, label: str = "VK Видео") -> None:
