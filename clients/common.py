@@ -745,10 +745,6 @@ def safe_click(
     last_err: Exception | None = None
     for attempt in range(1, max_attempts + 1):
         handle_popups(page, whitelist, noop_dismiss_unknown, batch_id, category)
-        dismiss_unknown(
-            page, category, batch_id, label=label, target=locator,
-            raise_on_failure=False,
-        )
         try:
             locator.click(timeout=_click_timeout_ms, **opts)
             return
@@ -759,10 +755,15 @@ def safe_click(
                 f"{label}: Клик заблокирован (попытка {attempt}/{max_attempts}).",
                 level="info" if batch_id else "silent",
             )
-            try_dismiss_publish_overlay(
-                page, whitelist, batch_id, category,
-                target=locator, label=label,
-            )
+            if not element_center_clickable(locator):
+                dismiss_unknown(
+                    page, category, batch_id, label=label, target=locator,
+                    raise_on_failure=False,
+                )
+                try_dismiss_publish_overlay(
+                    page, whitelist, batch_id, category,
+                    target=locator, label=label,
+                )
             if js_fallback and attempt == max_attempts:
                 try:
                     locator.evaluate("el => el.click()")
