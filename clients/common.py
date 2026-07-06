@@ -210,6 +210,24 @@ def element_obstructed(locator) -> bool:
         return False
 
 
+def _target_obstructed(target) -> bool:
+    if target is None:
+        return False
+    try:
+        if not target.is_visible(timeout=150):
+            return False
+    except Exception:
+        return False
+    return element_obstructed(target)
+
+
+def _overlay_still_blocking(page, target) -> bool:
+    """Overlay по классовым признакам или цель всё ещё перекрыта."""
+    if publish_overlay_visible(page):
+        return True
+    return _target_obstructed(target)
+
+
 def publish_target_needs_dismiss(target) -> bool:
     """Целевой элемент не найден, не виден или перекрыт overlay."""
     if target is None:
@@ -598,13 +616,14 @@ def try_dismiss_publish_overlay(
     error_factory: type[Exception] | None = None,
     raise_on_failure: bool = False,
 ) -> bool:
-    """Target-first: dismiss только если цель не готова и overlay виден по классовым признакам."""
-    del whitelist  # whitelist не блокирует dismiss при перекрытой цели
+    """Target-first: dismiss если цель не готова и (overlay по классам или цель перекрыта)."""
+    del whitelist
     if not publish_target_needs_dismiss(target):
         return False
     if target is not None and element_center_clickable(target):
         return False
-    if not publish_overlay_visible(page):
+    obstructed = _target_obstructed(target)
+    if not publish_overlay_visible(page) and not obstructed:
         return False
     page_id = id(page)
     now = _time.monotonic()
@@ -618,10 +637,11 @@ def try_dismiss_publish_overlay(
         f"{prefix}Закрываю мусорный overlay.",
         level=_user_lvl,
     )
+    present = lambda p: _overlay_still_blocking(p, target)
     try:
         dismiss_overlay_strict(
             page, category, batch_id, label=label,
-            is_present=publish_overlay_visible,
+            is_present=present,
         )
     except OverlayNotDismissedError as exc:
         if raise_on_failure and error_factory is not None:
@@ -631,7 +651,7 @@ def try_dismiss_publish_overlay(
         return False
     if target is not None and element_center_clickable(target):
         return True
-    if publish_overlay_visible(page):
+    if _overlay_still_blocking(page, target):
         if raise_on_failure and error_factory is not None:
             raise error_factory(
                 f"{prefix}Не удалось закрыть оверлей — все действия исчерпаны."

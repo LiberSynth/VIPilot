@@ -52,8 +52,8 @@ wait_for_publish_target / safe_click:
 ## Как закрывать мусор
 
 1. **Триггер:** `publish_target_needs_dismiss(target)` — цель `None`, не видна или `element_obstructed`.
-2. **Detect overlay:** `publish_overlay_visible()` — scrim, dialog, backdrop+контент, крупный popover (классовые признаки).
-3. **Dismiss:** `dismiss_overlay_strict` (backdrop → свободная область → alert → Escape → ×).
+2. **Detect overlay:** `publish_overlay_visible()` **или** цель перекрыта (`element_obstructed`) — без списков промо/текстов.
+3. **Dismiss:** `dismiss_overlay_strict` (backdrop → свободная область → alert → Escape → ×); `is_present` — overlay или перекрытие цели.
 4. **safe_click:** whitelist → click → при провале `try_dismiss_publish_overlay(target=locator)`.
 
 ---
