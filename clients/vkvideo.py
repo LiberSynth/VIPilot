@@ -19,13 +19,13 @@ import tempfile
 import time as _time
 
 from clients.common import (
-    dismiss_publish_overlay,
     element_center_clickable,
     handle_popups,
-    publish_overlay_is_garbage,
-    poll_until,
+    noop_dismiss_unknown,
     poll_wait_tick,
     safe_click,
+    try_dismiss_publish_overlay,
+    wait_for_publish_target,
 )
 from services.publish_auth_check import raise_if_login_required
 from db import db_set_batch_vkvideo_clip_url
@@ -292,17 +292,20 @@ VKVIDEO_PUBLISH_WHITELIST = [
 
 def _vkvideo_dismiss_unknown(
     page, category, batch_id, *, label: str = "", phase: int = 0, force: bool = False,
+    target=None,
 ) -> None:
     del phase, force
-    dismiss_publish_overlay(
+    try_dismiss_publish_overlay(
         page, VKVIDEO_PUBLISH_WHITELIST, batch_id, category,
-        label=label or "VK Видео", error_factory=VkVideoApiError,
+        target=target, label=label or "VK Видео", error_factory=VkVideoApiError,
+        raise_on_failure=True,
     )
 
-def _vkvideo_handle_popups(page, category, batch_id, *, allow_dismiss: bool = True, label: str = "VK Видео") -> None:
+def _vkvideo_handle_popups(page, category, batch_id, *, label: str = "VK Видео") -> None:
+    del label
     handle_popups(
-        page, VKVIDEO_PUBLISH_WHITELIST, _vkvideo_dismiss_unknown,
-        batch_id, category, allow_dismiss=allow_dismiss,
+        page, VKVIDEO_PUBLISH_WHITELIST, noop_dismiss_unknown,
+        batch_id, category,
     )
 
 def _vk_publish_button_visible(page) -> bool:
@@ -380,21 +383,26 @@ def _wait_vk_clip_publish_ready(page, pub_btn, batch_id, category, timeout_ms=_P
         batch_id, category,
         _tn(target_name, "Жду доступности кнопки «Опубликовать» (обработка видео)."),
     )
-    deadline = _time.monotonic() + timeout_ms / 1000
-    while _time.monotonic() < deadline:
+
+    def _before_poll():
         raise_if_login_required(page, "vkvideo")
-        _vkvideo_handle_popups(page, category, batch_id, label=target_name)
-        if publish_overlay_is_garbage(page, VKVIDEO_PUBLISH_WHITELIST):
-            poll_wait_tick(page, batch_id, "vkvideo")
-            continue
         _scroll_vk_publish_button(pub_btn)
-        if _vk_publish_button_clickable(pub_btn):
-            write_log_entry(batch_id, category, _tn(target_name, "Кнопка «Опубликовать» доступна."))
-            return
-        poll_wait_tick(page, batch_id, "vkvideo")
-    raise VkVideoApiError(
-        "VK Видео: таймаут ожидания доступности кнопки «Опубликовать»"
+
+    wait_for_publish_target(
+        page,
+        find_target=lambda: pub_btn,
+        is_ready=lambda t: t is not None and _vk_publish_button_clickable(t),
+        whitelist=VKVIDEO_PUBLISH_WHITELIST,
+        batch_id=batch_id,
+        category=category,
+        platform="vkvideo",
+        label=target_name,
+        timeout_ms=timeout_ms,
+        before_poll=_before_poll,
+        error_factory=VkVideoApiError,
+        timeout_message="VK Видео: таймаут ожидания доступности кнопки «Опубликовать»",
     )
+    write_log_entry(batch_id, category, _tn(target_name, "Кнопка «Опубликовать» доступна."))
 
 def _vk_publish_confirmed_after_submit(page) -> bool:
     """Признак успеха после клика «Опубликовать»: модалка и кнопка submit исчезли."""
@@ -470,27 +478,29 @@ def _wait_visible(
     club_id=None,
     interval_ms: int = 200,
 ):
-    """Ждёт видимости локатора без мусорного оверлея поверх."""
+    """Ждёт видимости локатора; overlay dismiss — только если цель не видна."""
 
-    def _on_poll() -> None:
-        raise_if_login_required(page, "vkvideo", club_id=club_id)
-        _vkvideo_handle_popups(page, category, batch_id)
-
-    def _ready() -> bool:
-        if publish_overlay_is_garbage(page, VKVIDEO_PUBLISH_WHITELIST):
-            return False
+    def _find():
         try:
-            return locator.is_visible(timeout=200)
+            if locator.is_visible(timeout=200):
+                return locator
         except Exception:
-            return False
+            pass
+        return None
 
-    if poll_until(
-        page, _ready, timeout_ms,
-        batch_id=batch_id, platform="vkvideo", poll_ms=interval_ms, on_poll=_on_poll,
-    ):
-        return
-    raise_if_login_required(page, "vkvideo", club_id=club_id)
-    locator.wait_for(state="visible", timeout=1_000)  # бросит TimeoutError
+    wait_for_publish_target(
+        page,
+        find_target=_find,
+        is_ready=lambda t: t is not None,
+        whitelist=VKVIDEO_PUBLISH_WHITELIST,
+        batch_id=batch_id,
+        category=category,
+        platform="vkvideo",
+        timeout_ms=timeout_ms,
+        before_poll=lambda: raise_if_login_required(page, "vkvideo", club_id=club_id),
+        error_factory=VkVideoApiError,
+        timeout_message="VK Видео: элемент не появился в срок.",
+    )
 
 def _click_vk_choose_file(choose_btn, page, category, batch_id, *, label: str = "VK Видео") -> None:
     """Клик «Выбрать файл» с обходом перекрывающих оверлеев."""

@@ -1,8 +1,8 @@
 """
-Общие утилиты Playwright-клиентов публикации (dzen, rutube, vkvideo).
+Общие утилиты Playwright-kлиентов публикации (dzen, rutube, vkvideo).
 
-Единый контракт: overlay виден → whitelist → иначе dismiss_publish_overlay.
-Платформенное — только whitelist-detect; dismiss и overlay-селекторы здесь.
+Единый контракт: whitelist (captcha/confirm/шаг) → ждём целевой элемент →
+если не видим/перекрыт и есть overlay по классовым признакам → dismiss.
 """
 
 from __future__ import annotations
@@ -167,6 +167,18 @@ _ELEMENT_CENTER_HIT_JS = """(el) => {
     return !!(top && (top === el || el.contains(top)));
 }"""
 
+_ELEMENT_OBSTRUCTED_JS = """(el) => {
+    const st = window.getComputedStyle(el);
+    if (st.visibility === 'hidden' || st.display === 'none') return false;
+    const r = el.getBoundingClientRect();
+    if (r.width < 8 || r.height < 8) return false;
+    const cx = r.left + r.width / 2;
+    const cy = r.top + r.height / 2;
+    const top = document.elementFromPoint(cx, cy);
+    if (!top) return true;
+    return !(top === el || el.contains(top));
+}"""
+
 
 def element_center_clickable(locator) -> bool:
     """Центр элемента не перекрыт другим UI (elementFromPoint)."""
@@ -188,6 +200,32 @@ def element_click_blocked(locator) -> bool:
         return False
 
 
+def element_obstructed(locator) -> bool:
+    """Центр элемента перекрыт другим UI (без учёта disabled)."""
+    try:
+        if not locator.is_visible(timeout=200):
+            return False
+        return bool(locator.evaluate(_ELEMENT_OBSTRUCTED_JS))
+    except Exception:
+        return False
+
+
+def publish_target_needs_dismiss(target) -> bool:
+    """Целевой элемент не найден, не виден или перекрыт overlay."""
+    if target is None:
+        return True
+    try:
+        if not target.is_visible(timeout=150):
+            return True
+    except Exception:
+        return True
+    return element_obstructed(target)
+
+
+def noop_dismiss_unknown(*_args, **_kwargs) -> None:
+    """Заглушка для handle_popups: dismiss только через try_dismiss_publish_overlay."""
+
+
 def handle_popups(
     page,
     whitelist: Sequence[WhitelistEntry],
@@ -195,11 +233,11 @@ def handle_popups(
     batch_id=None,
     category=None,
     *,
-    allow_dismiss: bool = True,
+    allow_dismiss: bool = False,
 ) -> None:
     """
-    whitelist → handler; иначе dismiss_unknown (overlay → whitelist → dismiss).
-    allow_dismiss=False — только whitelist, без dismiss.
+    whitelist → handler; иначе noop (dismiss — только target-first, см. try_dismiss).
+    allow_dismiss=True — устаревший путь, вызывает dismiss_unknown без target.
     """
     for name, detect, handle in whitelist:
         try:
@@ -415,24 +453,6 @@ def publish_overlay_visible(page) -> bool:
     return False
 
 
-def _make_dismiss_present(
-    blocked_locator=None,
-) -> Callable[..., bool]:
-    def _present(page) -> bool:
-        if publish_overlay_visible(page):
-            return True
-        if blocked_locator is None:
-            return False
-        try:
-            return (
-                blocked_locator.is_visible(timeout=100)
-                and element_click_blocked(blocked_locator)
-            )
-        except Exception:
-            return False
-    return _present
-
-
 def whitelisted_publish_ui(page, whitelist: Sequence[WhitelistEntry]) -> bool:
     for _name, detect, _handle in whitelist:
         try:
@@ -567,33 +587,27 @@ def dismiss_overlay_strict(
     )
 
 
-def dismiss_publish_overlay(
+def try_dismiss_publish_overlay(
     page,
     whitelist: Sequence[WhitelistEntry],
     batch_id=None,
     category=None,
     *,
+    target=None,
     label: str = "",
     error_factory: type[Exception] | None = None,
-    blocked_locator=None,
-) -> None:
-    """Overlay или перекрытый target (не в whitelist) — закрыть единой цепочкой."""
-    should_dismiss = publish_overlay_is_garbage(page, whitelist)
-    if not should_dismiss and blocked_locator is not None:
-        try:
-            should_dismiss = (
-                blocked_locator.is_visible(timeout=150)
-                and element_click_blocked(blocked_locator)
-                and not whitelisted_publish_ui(page, whitelist)
-            )
-        except Exception:
-            should_dismiss = False
-    if not should_dismiss:
-        return
+    raise_on_failure: bool = False,
+) -> bool:
+    """Target-first: dismiss только если цель не готова и overlay виден по классовым признакам."""
+    del whitelist  # whitelist не блокирует dismiss при перекрытой цели
+    if not publish_target_needs_dismiss(target):
+        return False
+    if not publish_overlay_visible(page):
+        return False
     page_id = id(page)
     now = _time.monotonic()
     if now - _last_dismiss_at.get(page_id, 0.0) < _DISMISS_COOLDOWN_SEC:
-        return
+        return False
     _last_dismiss_at[page_id] = now
     _user_lvl = "info" if batch_id else "silent"
     prefix = f"{label}: " if label else ""
@@ -602,28 +616,108 @@ def dismiss_publish_overlay(
         f"{prefix}Закрываю мусорный overlay.",
         level=_user_lvl,
     )
-    present = _make_dismiss_present(blocked_locator)
     try:
         dismiss_overlay_strict(
             page, category, batch_id, label=label,
-            is_present=present,
+            is_present=publish_overlay_visible,
         )
     except OverlayNotDismissedError as exc:
-        if error_factory is not None:
+        if raise_on_failure and error_factory is not None:
             raise error_factory(str(exc)) from exc
-        raise
-    if blocked_locator is not None:
-        try:
-            if blocked_locator.is_visible(timeout=150) and element_center_clickable(blocked_locator):
-                return
-        except Exception:
-            pass
-    if not present(page):
-        return
-    if error_factory is not None:
-        raise error_factory(
-            f"{prefix}Не удалось закрыть оверлей — все действия исчерпаны."
+        if raise_on_failure:
+            raise
+        return False
+    if publish_overlay_visible(page):
+        if raise_on_failure and error_factory is not None:
+            raise error_factory(
+                f"{prefix}Не удалось закрыть оверлей — все действия исчерпаны."
+            )
+        return False
+    return True
+
+
+def dismiss_publish_overlay(
+    page,
+    whitelist: Sequence[WhitelistEntry],
+    batch_id=None,
+    category=None,
+    *,
+    label: str = "",
+    error_factory: type[Exception] | None = None,
+    target=None,
+    blocked_locator=None,
+) -> None:
+    """Обёртка try_dismiss с raise_on_failure (blocked_locator → target)."""
+    tgt = target if target is not None else blocked_locator
+    try_dismiss_publish_overlay(
+        page, whitelist, batch_id, category,
+        target=tgt, label=label, error_factory=error_factory,
+        raise_on_failure=True,
+    )
+
+
+def wait_for_publish_target(
+    page,
+    *,
+    find_target: Callable[[], Any],
+    is_ready: Callable[[Any], bool] | None = None,
+    whitelist: Sequence[WhitelistEntry],
+    batch_id=None,
+    category=None,
+    platform: str | None = None,
+    label: str = "",
+    timeout_ms: int = 180_000,
+    log_every_sec: float = 8.0,
+    status_message: Callable[[Any], str] | None = None,
+    before_poll: Callable[..., None] | None = None,
+    error_factory: type[Exception] | None = None,
+    timeout_message: str = "",
+) -> Any:
+    """Единое ожидание цели: whitelist → target-first dismiss → poll."""
+    found: list[Any] = [None]
+    last_log_at = 0.0
+
+    def _ready_fn(target) -> bool:
+        if is_ready is not None:
+            return is_ready(target)
+        return target is not None and element_center_clickable(target)
+
+    def _on_poll() -> None:
+        nonlocal last_log_at
+        if before_poll is not None:
+            before_poll()
+        handle_popups(page, whitelist, noop_dismiss_unknown, batch_id, category)
+        target = find_target()
+        try_dismiss_publish_overlay(
+            page, whitelist, batch_id, category,
+            target=target, label=label,
         )
+        if log_every_sec <= 0 or status_message is None:
+            return
+        now = _time.monotonic()
+        if now - last_log_at < log_every_sec:
+            return
+        msg = status_message(find_target())
+        if msg:
+            prefix = f"{label}: " if label else ""
+            write_log_entry(batch_id, category, f"{prefix}{msg}")
+        last_log_at = now
+
+    def _predicate() -> bool:
+        target = find_target()
+        if _ready_fn(target):
+            found[0] = target
+            return True
+        return False
+
+    if poll_until(
+        page, _predicate, timeout_ms,
+        batch_id=batch_id, platform=platform, on_poll=_on_poll,
+    ):
+        return found[0]
+    if error_factory is not None and timeout_message:
+        raise error_factory(timeout_message)
+    return None
 
 
 def safe_click(
@@ -646,10 +740,8 @@ def safe_click(
 
     last_err: Exception | None = None
     for attempt in range(1, max_attempts + 1):
-        def _dismiss(page, category, batch_id):
-            dismiss_unknown(page, category, batch_id, label=label)
-
-        handle_popups(page, whitelist, _dismiss, batch_id, category)
+        handle_popups(page, whitelist, noop_dismiss_unknown, batch_id, category)
+        dismiss_unknown(page, category, batch_id, label=label, target=locator)
         try:
             locator.click(timeout=_click_timeout_ms, **opts)
             return
@@ -659,6 +751,10 @@ def safe_click(
                 batch_id, category,
                 f"{label}: Клик заблокирован (попытка {attempt}/{max_attempts}).",
                 level="info" if batch_id else "silent",
+            )
+            try_dismiss_publish_overlay(
+                page, whitelist, batch_id, category,
+                target=locator, label=label,
             )
             if js_fallback and attempt == max_attempts:
                 try:

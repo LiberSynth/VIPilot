@@ -11,14 +11,13 @@ import tempfile
 import time as _time
 
 from clients.common import (
-    dismiss_publish_overlay,
     element_center_clickable,
-    element_click_blocked,
     handle_popups,
-    publish_overlay_is_garbage,
-    poll_until,
+    noop_dismiss_unknown,
     poll_wait_tick,
     safe_click,
+    try_dismiss_publish_overlay,
+    wait_for_publish_target,
 )
 from services.publish_auth_check import raise_if_login_required
 from log import write_log_entry
@@ -230,61 +229,36 @@ def _rutube_add_button_clickable(add_btn) -> bool:
 
 def _wait_rutube_add_button(page, category, batch_id=None, timeout_ms=180_000, *, target_name: str = "Rutube"):
     """Ждёт готовность студии и видимую кнопку «+ Добавить»."""
-    found: list = [None]
-    last_log_at = 0.0
-    blocked_btn: list = [None]
+    def _add_status(target):
+        if target is None:
+            return "кнопка «+ Добавить» не найдена."
+        if not _rutube_add_button_clickable(target):
+            return "кнопка «+ Добавить» перекрыта overlay."
+        return "жду готовность студии."
 
-    def _dismiss_with_blocked(page, category, batch_id, *, label: str = "", **kw):
-        dismiss_publish_overlay(
-            page, RUTUBE_PUBLISH_WHITELIST, batch_id, category,
-            label=label or target_name, error_factory=RutubeApiError,
-            blocked_locator=blocked_btn[0],
-        )
-
-    def _on_poll():
-        nonlocal last_log_at
-        raise_if_login_required(page, "rutube")
-        add_btn = _find_rutube_add_button(page)
-        blocked_btn[0] = (
-            add_btn if (add_btn is not None and not _rutube_add_button_clickable(add_btn)) else None
-        )
-        handle_popups(
-            page, RUTUBE_PUBLISH_WHITELIST, _dismiss_with_blocked,
-            batch_id, category,
-        )
-        now = _time.monotonic()
-        if now - last_log_at >= 8:
-            add_btn = _find_rutube_add_button(page)
-            if add_btn is None:
-                msg = "кнопка «+ Добавить» не найдена"
-            elif not _rutube_add_button_clickable(add_btn):
-                msg = "кнопка «+ Добавить» перекрыта overlay"
-            else:
-                msg = "жду готовность студии"
-            write_log_entry(batch_id, category, _tn(target_name, f"{msg}."))
-            last_log_at = now
-
-    def _ready() -> bool:
-        add_btn = _find_rutube_add_button(page)
-        if add_btn is None or not _rutube_add_button_clickable(add_btn):
-            return False
-        found[0] = add_btn
-        return True
-
-    if poll_until(
-        page, _ready, timeout_ms,
-        batch_id=batch_id, platform="rutube", on_poll=_on_poll,
-    ):
-        return found[0]
-    raise_if_login_required(page, "rutube")
-    raise RutubeApiError("Не дождались кнопки «+ Добавить» в студии Рутьюба.")
+    result = wait_for_publish_target(
+        page,
+        find_target=_find_rutube_add_button,
+        is_ready=lambda t: t is not None and _rutube_add_button_clickable(t),
+        whitelist=RUTUBE_PUBLISH_WHITELIST,
+        batch_id=batch_id,
+        category=category,
+        platform="rutube",
+        label=target_name,
+        timeout_ms=timeout_ms,
+        status_message=_add_status,
+        before_poll=lambda: raise_if_login_required(page, "rutube"),
+        error_factory=RutubeApiError,
+        timeout_message="Не дождались кнопки «+ Добавить» в студии Рутьюба.",
+    )
+    return result
 
 def _wait_rutube_upload(page, category, batch_id=None, *, target_name: str = "Rutube") -> bool:
     write_log_entry(batch_id, category, _tn(target_name, "Жду завершения загрузки (до 3 минут)."))
     deadline = _time.monotonic() + _UPLOAD_WAIT / 1000
     last_log_at = 0.0
     while _time.monotonic() < deadline:
-        _rutube_handle_popups(page, category, batch_id, allow_dismiss=False, label=target_name)
+        _rutube_handle_popups(page, category, batch_id, label=target_name)
         state = _rutube_upload_state(page)
         if _rutube_upload_ready(page, state):
             parts = []
@@ -407,17 +381,20 @@ RUTUBE_PUBLISH_WHITELIST = [
 
 def _rutube_dismiss_unknown(
     page, category, batch_id, *, label: str = "", phase: int = 0, force: bool = False,
+    target=None,
 ) -> None:
     del phase, force
-    dismiss_publish_overlay(
+    try_dismiss_publish_overlay(
         page, RUTUBE_PUBLISH_WHITELIST, batch_id, category,
-        label=label or "Rutube", error_factory=RutubeApiError,
+        target=target, label=label or "Rutube", error_factory=RutubeApiError,
+        raise_on_failure=True,
     )
 
-def _rutube_handle_popups(page, category, batch_id, *, allow_dismiss: bool = True, label: str = "Rutube") -> None:
+def _rutube_handle_popups(page, category, batch_id, *, label: str = "Rutube") -> None:
+    del label
     handle_popups(
-        page, RUTUBE_PUBLISH_WHITELIST, _rutube_dismiss_unknown,
-        batch_id, category, allow_dismiss=allow_dismiss,
+        page, RUTUBE_PUBLISH_WHITELIST, noop_dismiss_unknown,
+        batch_id, category,
     )
 
 def _rutube_publish_confirmed_after_submit(page) -> bool:

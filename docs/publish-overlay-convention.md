@@ -6,13 +6,19 @@
 
 ## Принцип
 
-**Whitelist** — только **ожидаемый рабочий UI** пайплайна публикации (то, что **нельзя** закрывать).
+**Target-first:** dismiss только если **ожидаемый элемент шага не готов** (не найден / не виден / центр перекрыт) **и** по классовым признакам виден блокирующий overlay.
 
-**Всё остальное — мусор.** Закрывается **одной** цепочкой `dismiss_overlay_strict` (снаружи → Escape → ×), без каталога попапов.
+**Whitelist** — только **ожидаемый рабочий UI** пайплайна (captcha, confirm, форма шага). Без каталогов промо/онбординга.
 
 ```
-handle_popups(whitelist) → если не whitelist → dismiss_unknown → dismiss_overlay_strict
+wait_for_publish_target / safe_click:
+  whitelist handlers (captcha, confirm)
+  → цель не готова?
+  → publish_overlay_visible() (scrim, dialog, backdrop+контент, popover)
+  → dismiss_overlay_strict
 ```
+
+`handle_popups` **не** вызывает dismiss сам по себе (`allow_dismiss=False` по умолчанию).
 
 ---
 
@@ -36,38 +42,28 @@ handle_popups(whitelist) → если не whitelist → dismiss_unknown → dis
 
 ## Запрещено
 
-1. **Списки попапов / туров / хинтов** для dismiss: `_ONBOARDING_*`, `_POPUP_*`, `_TOUR_*`, `_HINT_TEXTS`, `_TOAST_TEXTS`, перечисления текстов «Новый раздел», «Уже можно публиковать» и т.п.
-2. **Записи мусора в whitelist** — `onboarding`, `hint`, `toast`, `tour`, `popup`, `overlay`, `publish_hint`, `save_error_toast` и любые detect+handle «закрыть этот попап».
-3. **Отдельные функции** `_onboarding_visible`, `_detect_*_hint`, `_handle_*_tour` **в whitelist**.
-4. **Клик по тексту кнопки тура** («Далее», «Пропустить») как стратегия dismiss — только generic close.
+1. **Списки попапов / туров / хинтов** для dismiss.
+2. **Записи мусора в whitelist** — onboarding, hint, toast, tour, popup, overlay и т.п.
+3. **Ignore-list chrome дашборда** — промо, онбординг не перечислять; только target-first + generic overlay detect.
+4. **Проактивный dismiss** без провала цели шага.
 
 ---
 
 ## Как закрывать мусор
 
-1. **Признак блокировки:** целевой элемент виден, но **не кликается** (`element_click_blocked` / `elementFromPoint`), **`[role='alert']`**, **`_likely_overlay_present`**, donate `modal-overlay`.
-2. **Не whitelist** → `dismiss_overlay_strict`.
-3. **Whitelist сработал, но мусор поверх** → повторный `dismiss_unknown` после `handle_popups` (тот же generic dismiss, без отдельных `*_coexisting_*` функций).
-4. Платформа может передать **generic** `extra_close_selectors` (×, `[aria-label*='Закрыть']`) — **не** тексты конкретных попапов.
+1. **Триггер:** `publish_target_needs_dismiss(target)` — цель `None`, не видна или `element_obstructed`.
+2. **Detect overlay:** `publish_overlay_visible()` — scrim, dialog, backdrop+контент, крупный popover (классовые признаки).
+3. **Dismiss:** `dismiss_overlay_strict` (backdrop → свободная область → alert → Escape → ×).
+4. **safe_click:** whitelist → click → при провале `try_dismiss_publish_overlay(target=locator)`.
 
 ---
 
 ## Исключение: Dzen helper-tooltip
 
-`dismiss_dzen_hint` — **не whitelist**, а **dismiss_unknown** для одного стабильного селектора `[class*='helper-tooltip__closeButton']`. Без click-outside (ломает меню «+»). Без списков текстов хинтов.
-
-Если `handle_popups` сработал по whitelist, `_dzen_handle_popups` делает повторный `dismiss_unknown`/`dismiss_dzen_hint` (редактор в whitelist блокирует стандартный вызов dismiss).
-
----
-
-## Detect whitelist — строго
-
-Detect **не должен** матчиться на постоянный chrome студии (пункты меню «Модерация», «Описание» в сайдбаре). Только признаки **открытой формы** текущего шага.
+`dismiss_dzen_hint` — стабильный селектор `[class*='helper-tooltip__closeButton']`, вызывается в `before_poll` / `_dzen_dismiss_unknown`, без click-outside.
 
 ---
 
 ## Проверка
 
 `bash scripts/check_conventions.sh` → `scripts/check_publish_overlay.py`.
-
-Коммит с нарушениями в `clients/{dzen,rutube,vkvideo}.py` **блокируется**.

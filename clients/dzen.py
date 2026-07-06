@@ -12,10 +12,13 @@ import tempfile
 import time as _time
 
 from clients.common import (
-    dismiss_publish_overlay,
+    element_center_clickable,
     handle_popups,
+    noop_dismiss_unknown,
     poll_wait_tick,
     safe_click,
+    try_dismiss_publish_overlay,
+    wait_for_publish_target,
 )
 from log import write_log_entry
 
@@ -767,30 +770,27 @@ DZEN_PUBLISH_WHITELIST = [
 
 def _dzen_dismiss_unknown(
     page, category, batch_id, *, label: str = "", phase: int = 0, force: bool = False,
+    target=None,
 ) -> None:
     del phase, force
     lbl = label or "Дзен"
     if _detect_captcha(page):
         return
     dismiss_dzen_hint(page, category, batch_id, label=lbl)
-    dismiss_publish_overlay(
+    try_dismiss_publish_overlay(
         page, DZEN_PUBLISH_WHITELIST, batch_id, category,
-        label=lbl, error_factory=DzenApiError,
+        target=target, label=lbl, error_factory=DzenApiError,
+        raise_on_failure=True,
     )
 
 def _dzen_handle_popups(
-    page, category=None, batch_id=None, *, allow_dismiss: bool = True,
+    page, category=None, batch_id=None, **kwargs,
 ) -> None:
-    if not allow_dismiss:
-        dismiss_dzen_hint(page, category, batch_id)
-        handle_popups(
-            page, DZEN_PUBLISH_WHITELIST, _dzen_dismiss_unknown,
-            batch_id, category, allow_dismiss=False,
-        )
-        return
+    del kwargs
+    dismiss_dzen_hint(page, category, batch_id)
     handle_popups(
-        page, DZEN_PUBLISH_WHITELIST, _dzen_dismiss_unknown,
-        batch_id, category, allow_dismiss=allow_dismiss,
+        page, DZEN_PUBLISH_WHITELIST, noop_dismiss_unknown,
+        batch_id, category,
     )
 
 def _set_comments_all_users(page, category, batch_id=None) -> None:
@@ -933,23 +933,43 @@ def _publish_ui(
         "button[aria-label*='Create']"
     ).first
 
-    # ── Шаг 2: Кнопка «+» — ждём готовность студии, закрываем модалки ───
+    # ── Шаг 2: Кнопка «+» — ждём готовность студии ───────────────────────
     write_log_entry(batch_id, category, _tn(target_name, "Ищу кнопку «+» для создания публикации."))
-    _plus_deadline = _time.monotonic() + 180
-    _plus_ready = False
-    while _time.monotonic() < _plus_deadline:
-        raise_if_login_required(page, "dzen", publisher_id=publisher_id)
-        _dzen_handle_popups(page, category, batch_id)
+
+    def _find_plus():
         try:
             if plus_btn.is_visible(timeout=400):
-                _plus_ready = True
-                break
+                return plus_btn
         except Exception:
             pass
-        page.wait_for_timeout(400)
-    if not _plus_ready:
+        return None
+
+    def _plus_status(target):
+        if target is None:
+            return "кнопка «+» не найдена"
+        if not element_center_clickable(target):
+            return "кнопка «+» перекрыта overlay"
+        return "жду готовность студии"
+
+    def _plus_before_poll():
         raise_if_login_required(page, "dzen", publisher_id=publisher_id)
-        plus_btn.wait_for(state="visible", timeout=1_000)
+        dismiss_dzen_hint(page, category, batch_id, label=target_name)
+
+    wait_for_publish_target(
+        page,
+        find_target=_find_plus,
+        is_ready=lambda t: t is not None and element_center_clickable(t),
+        whitelist=DZEN_PUBLISH_WHITELIST,
+        batch_id=batch_id,
+        category=category,
+        platform="dzen",
+        label=target_name,
+        timeout_ms=180_000,
+        status_message=_plus_status,
+        before_poll=_plus_before_poll,
+        error_factory=DzenApiError,
+        timeout_message="Не дождались кнопки «+» в студии Дзена.",
+    )
     _last_plus_err = None
     try:
         safe_click(
@@ -1026,7 +1046,7 @@ def _publish_ui(
             write_log_entry(batch_id, category, _tn(target_name, "Редактор видео открылся."))
             write_log_entry(batch_id, category, _tn(target_name, f"URL редактора: {_cur}"), level='silent')
             break
-        _dzen_handle_popups(page, category, batch_id, allow_dismiss=False)
+        _dzen_handle_popups(page, category, batch_id)
         poll_wait_tick(page, batch_id, "dzen")
 
     if _auto_published:
