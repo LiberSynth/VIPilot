@@ -177,8 +177,8 @@ var loadStoryIntoEditor;
 
   function _promptIconSvg(filled) {
     var svg = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">'
-      + '<rect x="2" y="2" width="12" height="12" rx="1.5"/>';
-    if (filled) svg += '<path d="M5 5h6M5 8h6M5 11h4"/>';
+      + '<rect x="3" y="1" width="10" height="13" rx="1.5"/>';
+    if (filled) svg += '<path d="M5.5 4.5h5M5.5 7.5h5M5.5 10.5h3.5"/>';
     return svg + '</svg>';
   }
 
