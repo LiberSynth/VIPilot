@@ -90,11 +90,11 @@
       + (disabled ? ' disabled' : ' data-story-id="' + AccordionList.escapeHtml(m.story_id) + '"');
     return '<button type="button" ' + attrs + '>'
       + '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">'
-      + '<polyline points="6,4 2,8 6,12"/>'
-      + '<rect x="7.5" y="3" width="6.5" height="10" rx="1.2"/>'
-      + '<line x1="9.5" y1="6" x2="12.5" y2="6"/>'
-      + '<line x1="9.5" y1="8" x2="12.5" y2="8"/>'
-      + '<line x1="9.5" y1="10" x2="11.5" y2="10"/>'
+      + '<rect x="1.5" y="1" width="9" height="13" rx="1.5"/>'
+      + '<line x1="3.5" y1="4.5" x2="8" y2="4.5"/>'
+      + '<line x1="3.5" y1="7.5" x2="8" y2="7.5"/>'
+      + '<line x1="3.5" y1="10.5" x2="6.5" y2="10.5"/>'
+      + '<polyline points="11,4 14.5,8 11,12"/>'
       + '</svg></button>';
   }
 
