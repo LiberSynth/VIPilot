@@ -24,12 +24,14 @@ var loadStoryIntoEditor;
     var titleEl = document.getElementById('story-title');
     var contentEl = document.getElementById('story-content');
     var promptEl = document.getElementById('story-prompt');
-    if (titleEl && story.title !== undefined) titleEl.value = story.title || '';
+    var fullLoad = story.id !== undefined && story.id !== null && String(story.id) !== '__new__';
+    if (titleEl && (story.title !== undefined || fullLoad)) titleEl.value = story.title || '';
     if (contentEl) {
       if (story.content !== undefined) contentEl.value = story.content || '';
       else if (story.text !== undefined) contentEl.value = story.text || '';
+      else if (fullLoad) contentEl.value = '';
     }
-    if (promptEl && story.prompt !== undefined) promptEl.value = story.prompt || '';
+    if (promptEl && (story.prompt !== undefined || fullLoad)) promptEl.value = story.prompt || '';
     _activeStoryId = story.id;
     _createInflight = null;
     clearTimeout(_titleTimer);
@@ -312,7 +314,11 @@ var loadStoryIntoEditor;
     var promptEl = document.getElementById('story-prompt');
     var titleEmpty = titleEl && !titleEl.value.trim();
     var contentEmpty = contentEl && !contentEl.value.trim();
-    if ((titleEmpty && item.title) || (contentEmpty && item.content)) {
+    var promptStale = promptEl && (
+      (item.has_prompt && item.prompt && promptEl.value !== item.prompt)
+      || (!item.has_prompt && promptEl.value.trim())
+    );
+    if ((titleEmpty && item.title) || (contentEmpty && item.content) || promptStale) {
       if (typeof loadStoryIntoEditor === 'function') loadStoryIntoEditor(item);
       return;
     }
@@ -853,7 +859,12 @@ var loadStoryIntoEditor;
             .then(function(r) { return r.json(); })
             .then(function(s) {
               if (typeof loadStoryIntoEditor === 'function') {
-                loadStoryIntoEditor({ id: storyId, title: s.title || '', content: s.text || '' });
+                loadStoryIntoEditor({
+                  id: storyId,
+                  title: s.title || '',
+                  content: s.text || '',
+                  prompt: '',
+                });
               }
               if (typeof window.setExpandedStoryId === 'function') window.setExpandedStoryId(storyId);
               _refreshLists();
