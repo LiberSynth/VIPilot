@@ -1,7 +1,7 @@
 import subprocess
 import os
 
-_VERSION_BASE = os.environ.get("APP_VERSION_BASE", "2.2.0")
+_VERSION_BASE = os.environ.get("APP_VERSION_BASE", "2.2.1")
 
 def _get_build_number() -> str:
     try:
