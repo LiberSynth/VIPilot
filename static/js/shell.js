@@ -115,11 +115,6 @@ function _runPanelEnterEffects(name) {
   }
   if (name === 'story') {
     if (typeof loadTextModels === 'function') loadTextModels();
-    var titleEl = document.getElementById('story-title');
-    var contentEl = document.getElementById('story-content');
-    if (titleEl) titleEl.value = '';
-    if (contentEl) contentEl.value = '';
-    if (typeof resetActiveStoryId === 'function') resetActiveStoryId();
   }
   if (name === 'screenwriter') {
     var storyCard = document.getElementById('card-story-editor');

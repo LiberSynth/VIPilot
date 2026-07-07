@@ -24,9 +24,12 @@ var loadStoryIntoEditor;
     var titleEl = document.getElementById('story-title');
     var contentEl = document.getElementById('story-content');
     var promptEl = document.getElementById('story-prompt');
-    if (titleEl) titleEl.value = story.title || '';
-    if (contentEl) contentEl.value = story.content || '';
-    if (promptEl) promptEl.value = story.prompt || '';
+    if (titleEl && story.title !== undefined) titleEl.value = story.title || '';
+    if (contentEl) {
+      if (story.content !== undefined) contentEl.value = story.content || '';
+      else if (story.text !== undefined) contentEl.value = story.text || '';
+    }
+    if (promptEl && story.prompt !== undefined) promptEl.value = story.prompt || '';
     _activeStoryId = story.id;
     _createInflight = null;
     clearTimeout(_titleTimer);
@@ -292,11 +295,29 @@ var loadStoryIntoEditor;
 
   var _promptPollTimer = null;
 
-  function _syncOpenStoryPromptFromList(stories) {
-    if (!_activeStoryId || !stories) return;
-    var item = stories.find(function(s) { return String(s.id) === String(_activeStoryId); });
-    if (!item || !item.has_prompt) return;
+  function _syncOpenStoryEditorFromList(stories) {
+    var activeId = _accordionList.getActiveId();
+    if (!activeId || activeId === '__new__' || !stories || !stories.length) return;
+    var item = null;
+    for (var i = 0; i < stories.length; i++) {
+      if (String(stories[i].id) === String(activeId)) {
+        item = stories[i];
+        break;
+      }
+    }
+    if (!item) return;
+
+    var titleEl = document.getElementById('story-title');
+    var contentEl = document.getElementById('story-content');
     var promptEl = document.getElementById('story-prompt');
+    var titleEmpty = titleEl && !titleEl.value.trim();
+    var contentEmpty = contentEl && !contentEl.value.trim();
+    if ((titleEmpty && item.title) || (contentEmpty && item.content)) {
+      if (typeof loadStoryIntoEditor === 'function') loadStoryIntoEditor(item);
+      return;
+    }
+
+    if (!item.has_prompt) return;
     if (promptEl && item.prompt && promptEl.value !== item.prompt) {
       promptEl.value = item.prompt;
       if (typeof window.updateStoryWordCount === 'function') window.updateStoryWordCount();
@@ -311,12 +332,9 @@ var loadStoryIntoEditor;
           if (typeof window.loadStoryList === 'function') window.loadStoryList();
         }, 1500);
       }
-    } else {
-      if (_promptPollTimer) {
-        clearInterval(_promptPollTimer);
-        _promptPollTimer = null;
-      }
-      _syncOpenStoryPromptFromList(stories);
+    } else if (_promptPollTimer) {
+      clearInterval(_promptPollTimer);
+      _promptPollTimer = null;
     }
   }
 
@@ -647,6 +665,7 @@ var loadStoryIntoEditor;
     _setExportStoriesBtnEnabled(true);
     _accordionList.render(stories);
     _bindListButtons(container);
+    _syncOpenStoryEditorFromList(stories);
     _syncPromptPoll(stories);
   }
 
