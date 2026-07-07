@@ -1,11 +1,10 @@
 {% macro pools_card() %}
-{% from "common/macros.html" import story_pool_hint %}
+{% from "common/macros.html" import story_pool_section %}
 <div class="card" style="margin-top:12px">
   <div class="card-title">Пулы</div>
   <div class="wf-row" style="margin-top:4px">
     <div style="flex:1">
-      <div class="toggle-label">Сюжеты для генерации видео</div>
-      {{ story_pool_hint() }}
+      {{ story_pool_section() }}
     </div>
   </div>
   <div class="wf-row" style="margin-top:12px;padding-top:10px;border-top:1px solid #1e1e2e">

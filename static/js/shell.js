@@ -108,6 +108,8 @@ function _runPanelEnterEffects(name) {
   if (typeof refreshDbOpStatus === 'function') refreshDbOpStatus();
   if (name === 'director' || name === 'workflow') {
     if (typeof refreshMoviePoolCount === 'function') refreshMoviePoolCount();
+  }
+  if (name === 'director' || name === 'workflow' || name === 'screenwriter') {
     refreshGoodPoolCount();
   }
   if (name === 'request') {
@@ -170,10 +172,12 @@ function loadGoodPoolCount() {
 }
 
 function _isStoryPoolPanelActive() {
-  var el = document.querySelector('.pool-count-value');
-  if (!el) return false;
-  var panel = el.closest('.tab-panel');
-  return panel ? panel.classList.contains('active') : false;
+  var els = document.querySelectorAll('.pool-count-value');
+  for (var i = 0; i < els.length; i++) {
+    var panel = els[i].closest('.tab-panel');
+    if (panel && panel.classList.contains('active')) return true;
+  }
+  return false;
 }
 
 function refreshGoodPoolCount() {

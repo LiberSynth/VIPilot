@@ -1,3 +1,8 @@
 {% macro story_pool_hint() %}
 <div class="hint">Для генерации видео используются только сюжеты с оценкой «хорошо» и заполненным T2V-промптом. Если пул пуст, батч завершается ошибкой.<br>Текущий пул: <span class="pool-count-value" style="color:#f59e0b">—</span>.</div>
 {% endmacro %}
+
+{% macro story_pool_section() %}
+<div class="toggle-label">Сюжеты для генерации видео</div>
+{{ story_pool_hint() }}
+{% endmacro %}
