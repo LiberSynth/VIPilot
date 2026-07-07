@@ -89,12 +89,14 @@
       + ' title="К сюжету"'
       + (disabled ? ' disabled' : ' data-story-id="' + AccordionList.escapeHtml(m.story_id) + '"');
     return '<button type="button" ' + attrs + '>'
-      + '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">'
+      + '<svg viewBox="0 0 16 16" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">'
+      + '<g stroke="#5a5a78">'
       + '<rect x="1.5" y="1" width="9" height="13" rx="1.5"/>'
       + '<line x1="3.5" y1="4.5" x2="8" y2="4.5"/>'
       + '<line x1="3.5" y1="7.5" x2="8" y2="7.5"/>'
       + '<line x1="3.5" y1="10.5" x2="6.5" y2="10.5"/>'
-      + '<polyline points="11,4 14.5,8 11,12"/>'
+      + '</g>'
+      + '<polyline stroke="#c8c8e8" points="14.5,4 11,8 14.5,12"/>'
       + '</svg></button>';
   }
 
