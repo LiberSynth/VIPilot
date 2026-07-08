@@ -155,6 +155,9 @@ class TestProductionBlueprintAuth:
     def test_get_stories(self, client):
         _assert_401(client.get("/production/stories"))
 
+    def test_get_story(self, client):
+        _assert_401(client.get("/production/story/1"))
+
     def test_post_story_pin(self, client):
         _assert_401(client.post("/production/story/1/pin"))
 

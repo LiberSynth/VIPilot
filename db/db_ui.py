@@ -119,14 +119,13 @@ def db_get_stories_list(show_used=True, show_bad=True, for_approval=False, pin_i
                 SELECT
                     s.id::text,
                     s.title,
-                    s.content,
-                    s.prompt,
                     s.grade,
                     s.manual_changed,
                     s.model_id IS NOT NULL AS ai_generated,
                     {used_expr} AS used,
                     am.name AS model_name,
                     s.pinned,
+                    (NULLIF(TRIM(s.prompt), '') IS NOT NULL) AS has_prompt,
                     EXISTS (
                         SELECT 1 FROM batches b
                         WHERE b.story_id = s.id
@@ -159,21 +158,19 @@ def db_get_stories_list(show_used=True, show_bad=True, for_approval=False, pin_i
         {
             "id": row[0],
             "title": row[1] or "",
-            "content": row[2] or "",
-            "prompt": row[3] or "",
-            "has_prompt": bool(row[3] and str(row[3]).strip()),
-            "grade": row[4],
-            "manual_changed": bool(row[5]),
-            "ai_generated": bool(row[6]),
-            "used": bool(row[7]),
-            "model_name": row[8] or "",
-            "pinned": bool(row[9]),
-            "has_active_batch": bool(row[10]),
-            "has_movie": bool(row[11]),
-            "has_active_prompt_batch": bool(row[12]),
+            "has_prompt": bool(row[8]),
+            "grade": row[2],
+            "manual_changed": bool(row[3]),
+            "ai_generated": bool(row[4]),
+            "used": bool(row[5]),
+            "model_name": row[6] or "",
+            "pinned": bool(row[7]),
+            "has_active_batch": bool(row[9]),
+            "has_movie": bool(row[10]),
+            "has_active_prompt_batch": bool(row[11]),
             "prompt_gen_error": (
-                not (row[3] and str(row[3]).strip())
-                and row[13] in ('error', 'fatal_error')
+                not bool(row[8])
+                and row[12] in ('error', 'fatal_error')
             ),
         }
         for row in rows

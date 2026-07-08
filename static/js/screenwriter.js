@@ -284,7 +284,6 @@ var loadStoryIntoEditor;
       return String(s.id) === String(storyId);
     });
     if (item) {
-      item.prompt = promptText;
       item.has_prompt = state.has_prompt;
     }
   }
@@ -296,6 +295,63 @@ var loadStoryIntoEditor;
   };
 
   var _promptPollTimer = null;
+  var _editorFetchSeq = 0;
+
+  function _fetchStoryEditor(storyId) {
+    var seq = ++_editorFetchSeq;
+    return fetch('/production/story/' + encodeURIComponent(storyId))
+      .then(function(r) {
+        if (!r.ok) throw new Error('fetch_failed');
+        return r.json();
+      })
+      .then(function(data) {
+        if (seq !== _editorFetchSeq) return null;
+        return data;
+      });
+  }
+
+  function _loadStoryEditorFromServer(storyId, listItem) {
+    _activeStoryId = String(storyId);
+    if (typeof loadStoryIntoEditor === 'function') {
+      loadStoryIntoEditor({
+        id: storyId,
+        title: listItem ? (listItem.title || '') : '',
+      });
+    }
+    return _fetchStoryEditor(storyId).then(function(data) {
+      if (!data || String(_activeStoryId) !== String(storyId)) return;
+      if (typeof loadStoryIntoEditor === 'function') loadStoryIntoEditor(data);
+    });
+  }
+
+  function _applyEditorSyncFromServer(data) {
+    if (!data) return;
+    var titleEl = document.getElementById('story-title');
+    var contentEl = document.getElementById('story-content');
+    var promptEl = document.getElementById('story-prompt');
+    var titleEmpty = titleEl && !titleEl.value.trim();
+    var contentEmpty = contentEl && !contentEl.value.trim();
+    var promptStale = promptEl && data.has_prompt && data.prompt && promptEl.value !== data.prompt;
+    if ((titleEmpty && data.title) || (contentEmpty && data.content) || promptStale) {
+      if (typeof loadStoryIntoEditor === 'function') loadStoryIntoEditor(data);
+      return;
+    }
+    if (!data.has_prompt) return;
+    if (promptEl && data.prompt && promptEl.value !== data.prompt) {
+      promptEl.value = data.prompt;
+      if (typeof window.updateStoryWordCount === 'function') window.updateStoryWordCount();
+    }
+  }
+
+  function _shouldFetchEditorSync(item) {
+    if (!item || item.id === '__new__') return false;
+    if (item.has_active_prompt_batch) return true;
+    var contentEl = document.getElementById('story-content');
+    var promptEl = document.getElementById('story-prompt');
+    if (contentEl && !contentEl.value.trim()) return true;
+    if (item.has_prompt && promptEl && !promptEl.value.trim()) return true;
+    return false;
+  }
 
   function _syncOpenStoryEditorFromList(stories) {
     var activeId = _accordionList.getActiveId();
@@ -307,27 +363,11 @@ var loadStoryIntoEditor;
         break;
       }
     }
-    if (!item) return;
-
-    var titleEl = document.getElementById('story-title');
-    var contentEl = document.getElementById('story-content');
-    var promptEl = document.getElementById('story-prompt');
-    var titleEmpty = titleEl && !titleEl.value.trim();
-    var contentEmpty = contentEl && !contentEl.value.trim();
-    var promptStale = promptEl && (
-      (item.has_prompt && item.prompt && promptEl.value !== item.prompt)
-      || (!item.has_prompt && promptEl.value.trim())
-    );
-    if ((titleEmpty && item.title) || (contentEmpty && item.content) || promptStale) {
-      if (typeof loadStoryIntoEditor === 'function') loadStoryIntoEditor(item);
-      return;
-    }
-
-    if (!item.has_prompt) return;
-    if (promptEl && item.prompt && promptEl.value !== item.prompt) {
-      promptEl.value = item.prompt;
-      if (typeof window.updateStoryWordCount === 'function') window.updateStoryWordCount();
-    }
+    if (!item || !_shouldFetchEditorSync(item)) return;
+    _fetchStoryEditor(activeId).then(function(data) {
+      if (!data || String(_accordionList.getActiveId()) !== String(activeId)) return;
+      _applyEditorSyncFromServer(data);
+    }).catch(function() {});
   }
 
   function _syncPromptPoll(stories) {
@@ -435,9 +475,15 @@ var loadStoryIntoEditor;
       return _renderStoryIcons(item) + _renderPinBtn(item) + _renderDeleteBtn(item) + _renderExportBtn(item);
     },
     onExpand: function(item) {
-      _activeStoryId = item ? item.id : null;
-      if (item && typeof loadStoryIntoEditor === 'function') loadStoryIntoEditor(item);
-      if (typeof window.loadStoryList === 'function') window.loadStoryList();
+      if (!item || item.id === '__new__') {
+        _activeStoryId = item ? item.id : null;
+        if (item && typeof loadStoryIntoEditor === 'function') loadStoryIntoEditor(item);
+        if (typeof window.loadStoryList === 'function') window.loadStoryList();
+        return;
+      }
+      _loadStoryEditorFromServer(item.id, item).finally(function() {
+        if (typeof window.loadStoryList === 'function') window.loadStoryList();
+      });
     },
     onCollapse: function() {
       _activeStoryId = null;
@@ -448,7 +494,7 @@ var loadStoryIntoEditor;
       ai_generated: false, manual_changed: true, used: false,
       has_prompt: false, has_active_prompt_batch: false, prompt_gen_error: false,
       has_movie: false, has_active_batch: false,
-      title: '', content: '', prompt: '',
+      title: '',
     },
     onNewRowReady: function(_expandEl, fakeRow) {
       if (fakeRow) _bindFakeRowButtons(fakeRow);
@@ -855,15 +901,15 @@ var loadStoryIntoEditor;
         var status = String((data && data.batch_status) || '');
         var storyId = data ? data.story_id : null;
         if (status === 'ready' && storyId) {
-          fetch('/api/story/' + encodeURIComponent(storyId))
+          fetch('/production/story/' + encodeURIComponent(storyId))
             .then(function(r) { return r.json(); })
             .then(function(s) {
               if (typeof loadStoryIntoEditor === 'function') {
                 loadStoryIntoEditor({
                   id: storyId,
                   title: s.title || '',
-                  content: s.text || '',
-                  prompt: '',
+                  content: s.content || '',
+                  prompt: s.prompt || '',
                 });
               }
               if (typeof window.setExpandedStoryId === 'function') window.setExpandedStoryId(storyId);
@@ -1027,17 +1073,29 @@ var loadStoryIntoEditor;
     btn.addEventListener('click', function() {
       var stories = window._currentStoriesList;
       if (!stories || stories.length === 0) return;
-      var parts = [];
-      for (var i = 0; i < stories.length; i++) {
-        var s = stories[i];
-        var body = (s.title || '') + '\n\n' + (s.content || '');
-        parts.push(window.wrapBlock('Сюжет', body, i + 1));
-      }
-      var text = parts.join('\n\n');
-      window.clipboardWrite(text, function() {
-        btn.classList.add('copied');
-        setTimeout(function() { btn.classList.remove('copied'); }, 2000);
-      });
+      btn.disabled = true;
+      Promise.all(stories.map(function(s) {
+        return fetch('/production/story/' + encodeURIComponent(s.id))
+          .then(function(r) { return r.ok ? r.json() : null; });
+      }))
+        .then(function(rows) {
+          var parts = [];
+          var n = 0;
+          for (var i = 0; i < rows.length; i++) {
+            var d = rows[i];
+            if (!d) continue;
+            n += 1;
+            var body = (d.title || '') + '\n\n' + (d.content || '');
+            parts.push(window.wrapBlock('Сюжет', body, n));
+          }
+          if (!parts.length) return;
+          var text = parts.join('\n\n');
+          window.clipboardWrite(text, function() {
+            btn.classList.add('copied');
+            setTimeout(function() { btn.classList.remove('copied'); }, 2000);
+          });
+        })
+        .finally(function() { btn.disabled = false; });
     });
   }
 

@@ -302,6 +302,33 @@ def db_get_story_title(story_id):
             row = cur.fetchone()
     return row[0] if row else None
 
+def db_get_story_editor_data(story_id):
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                    s.id::text,
+                    s.title,
+                    s.content,
+                    NULLIF(TRIM(s.prompt), '')
+                FROM stories s
+                WHERE s.id = %s
+                """,
+                (story_id,),
+            )
+            row = cur.fetchone()
+    if not row:
+        return None
+    prompt = row[3] or ""
+    return {
+        "id": row[0],
+        "title": row[1] or "",
+        "content": row[2] or "",
+        "prompt": prompt,
+        "has_prompt": bool(prompt),
+    }
+
 def db_get_story_export_data(story_id):
     with get_db() as conn:
         with conn.cursor() as cur:

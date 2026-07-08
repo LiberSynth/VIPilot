@@ -23,6 +23,7 @@ from .db_simple import (
     db_get_story_text,
     db_get_story_prompt,
     db_get_story_title,
+    db_get_story_editor_data,
     db_get_story_export_data,
     db_set_story_model,
     db_upsert_story,

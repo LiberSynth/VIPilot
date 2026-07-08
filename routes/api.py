@@ -24,6 +24,7 @@ from db import (
     env_set,
     db_create_planning_batch,
     db_reset_batch_pipeline,
+    db_get_story_editor_data,
     db_get_story_export_data,
     db_get_batch_video_path,
     db_get_movie_video_path,
@@ -1176,6 +1177,16 @@ def api_production_movie_delete(movie_id):
     if not result:
         return jsonify({"error": "not found"}), 404
     return jsonify({"ok": True, "deleted": result})
+
+@production_bp.route("/production/story/<story_id>", methods=["GET"])
+def api_production_story_get(story_id):
+    err = _production_auth_check()
+    if err:
+        return err
+    story = db_get_story_editor_data(story_id)
+    if story is None:
+        return jsonify({"error": "not found"}), 404
+    return jsonify(story)
 
 @production_bp.route("/production/story", methods=["POST"])
 def api_production_story_create():
