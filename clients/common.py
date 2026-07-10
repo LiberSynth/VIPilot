@@ -16,6 +16,18 @@ from log import write_log_entry
 # (имя, detect(page)->bool, handle(page, category, batch_id)|None)
 WhitelistEntry = tuple[str, Callable[..., bool], Callable[..., None] | None]
 
+
+class PublishUiWaitTimeout(Exception):
+    """Долгое (~3 мин) ожидание UI до клика «Опубликовать» истекло — ретрай с нуля безопасен."""
+
+
+def wait_visible_ui(locator, timeout_ms: int, message: str) -> None:
+    """locator.wait_for(visible); при таймауте — PublishUiWaitTimeout (без разбора DOM-текстов)."""
+    try:
+        locator.wait_for(state="visible", timeout=timeout_ms)
+    except Exception as exc:
+        raise PublishUiWaitTimeout(message) from exc
+
 DismissUnknown = Callable[..., None]
 
 DismissStep = tuple[str, Callable[..., bool]]

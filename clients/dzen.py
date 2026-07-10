@@ -12,6 +12,7 @@ import tempfile
 import time as _time
 
 from clients.common import (
+    PublishUiWaitTimeout,
     element_center_clickable,
     handle_popups,
     noop_dismiss_unknown,
@@ -19,6 +20,7 @@ from clients.common import (
     safe_click,
     try_dismiss_publish_overlay,
     wait_for_publish_target,
+    wait_visible_ui,
 )
 from log import write_log_entry
 
@@ -31,7 +33,7 @@ from routes.api import publication_file_name, tags
 
 _NAV_TIMEOUT = 60_000   # ms — таймаут одной попытки навигации (1 минута; до 5 попыток подряд)
 _UPLOAD_WAIT  = 60_000  # ms — ожидание завершения загрузки видео
-_PUBLISH_UI_ATTEMPTS = 3  # полный перезапуск _publish_ui при таймауте кнопки «Опубликовать»
+_PUBLISH_UI_ATTEMPTS = 3  # полный перезапуск _publish_ui при PublishUiWaitTimeout
 
 class DzenSessionMissing(RuntimeError):
     """Браузерная сессия Дзен не сохранена — требуется авторизация."""
@@ -41,11 +43,6 @@ class DzenCsrfExpired(RuntimeError):
 
 class DzenApiError(RuntimeError):
     """Ошибка публикации на Дзен."""
-
-
-def _is_publish_btn_wait_timeout(exc: BaseException) -> bool:
-    """Таймаут ожидания кнопки публикации — можно ретраить с нуля."""
-    return "Не дождались кнопки публикации" in str(exc)
 
 # ---------------------------------------------------------------------------
 # Публичный API
@@ -99,7 +96,13 @@ def publish(
             _f.write(video_data)
 
         def _do_publish(page, ctx):
+            gate = {"submitted": False}
+
+            def mark_submitted():
+                gate["submitted"] = True
+
             for attempt in range(1, _PUBLISH_UI_ATTEMPTS + 1):
+                gate["submitted"] = False
                 try:
                     if attempt > 1:
                         write_log_entry(
@@ -108,7 +111,7 @@ def publish(
                                 target_name,
                                 "Повтор публикации с начала "
                                 f"({attempt}/{_PUBLISH_UI_ATTEMPTS}) "
-                                "после таймаута кнопки «Опубликовать».",
+                                "после таймаута UI.",
                             ),
                             level="warn",
                         )
@@ -116,17 +119,15 @@ def publish(
                         page, publisher_id, video_path, category,
                         batch_id=batch_id, ctx=ctx, target_id=target_id,
                         target_name=target_name,
+                        mark_submitted=mark_submitted,
                     )
                     return
-                except DzenApiError as exc:
-                    if (
-                        not _is_publish_btn_wait_timeout(exc)
-                        or attempt >= _PUBLISH_UI_ATTEMPTS
-                    ):
-                        raise
+                except PublishUiWaitTimeout as exc:
+                    if gate["submitted"] or attempt >= _PUBLISH_UI_ATTEMPTS:
+                        raise DzenApiError(str(exc)) from exc
                     write_log_entry(
                         batch_id, category,
-                        _tn(target_name, f"Таймаут кнопки «Опубликовать»: {exc}"),
+                        _tn(target_name, f"Таймаут UI (ретрай): {exc}"),
                         level="warn",
                     )
 
@@ -919,6 +920,7 @@ def _publish_ui(
     ctx=None,
     target_id=None,
     target_name: str = "Дзен",
+    mark_submitted=None,
 ):
     """Управляет браузером для публикации видео через UI Дзена."""
 
@@ -999,7 +1001,7 @@ def _publish_ui(
         timeout_ms=180_000,
         status_message=_plus_status,
         before_poll=_plus_before_poll,
-        error_factory=DzenApiError,
+        error_factory=PublishUiWaitTimeout,
         timeout_message="Не дождались кнопки «+» в студии Дзена.",
     )
     _last_plus_err = None
@@ -1024,11 +1026,17 @@ def _publish_ui(
     write_log_entry(batch_id, category, _tn(target_name, "Выбираю «Загрузить видео»."))
     upload_item = page.get_by_text("Загрузить видео", exact=True).first
     try:
-        upload_item.wait_for(state="visible", timeout=180_000)
-    except Exception:
+        wait_visible_ui(
+            upload_item, 180_000,
+            "Дзен: таймаут пункта меню «Загрузить видео»",
+        )
+    except PublishUiWaitTimeout:
         write_log_entry(batch_id, category, _tn(target_name, "exact-match не нашёл — пробую contains."))
         upload_item = page.locator("text=Загрузить видео").first
-        upload_item.wait_for(state="visible", timeout=180_000)
+        wait_visible_ui(
+            upload_item, 180_000,
+            "Дзен: таймаут пункта меню «Загрузить видео»",
+        )
     safe_click(
         upload_item, page, DZEN_PUBLISH_WHITELIST, _dzen_dismiss_unknown,
         batch_id=batch_id, category=category, label=target_name,
@@ -1045,15 +1053,27 @@ def _publish_ui(
     # если войти до того, как кнопка видна, click() зависает внутри with-блока
     # и expect_file_chooser истекает раньше, чем диалог успевает открыться.
     choose_btn = page.get_by_text("Выбрать видео", exact=False).first
-    choose_btn.wait_for(state="visible", timeout=180_000)
+    wait_visible_ui(
+        choose_btn, 180_000,
+        "Дзен: таймаут кнопки «Выбрать видео»",
+    )
     write_log_entry(batch_id, category, _tn(target_name, "Кнопка «Выбрать видео» найдена, открываю диалог выбора файла."))
-    with page.expect_file_chooser(timeout=180_000) as fc_info:
-        safe_click(
-            choose_btn, page, DZEN_PUBLISH_WHITELIST, _dzen_dismiss_unknown,
-            batch_id=batch_id, category=category, label=target_name,
-            timeout_ms=2_000, max_attempts=3, js_fallback=True,
-        )
-    file_chooser = fc_info.value
+    try:
+        with page.expect_file_chooser(timeout=180_000) as fc_info:
+            safe_click(
+                choose_btn, page, DZEN_PUBLISH_WHITELIST, _dzen_dismiss_unknown,
+                batch_id=batch_id, category=category, label=target_name,
+                timeout_ms=2_000, max_attempts=3, js_fallback=True,
+            )
+        file_chooser = fc_info.value
+    except PublishUiWaitTimeout:
+        raise
+    except Exception as _e:
+        if type(_e).__name__ == "TimeoutError" or "timeout" in str(_e).lower():
+            raise PublishUiWaitTimeout(
+                "Дзен: таймаут выбора файла / file chooser"
+            ) from _e
+        raise
     file_chooser.set_files(video_path)
     write_log_entry(batch_id, category, _tn(target_name, "Файл передан браузеру, жду загрузки."))
     write_log_entry(batch_id, category, _tn(target_name, f"Файл: {os.path.basename(video_path)}"), level='silent')
@@ -1083,6 +1103,8 @@ def _publish_ui(
 
     if _auto_published:
         # Видео уже опубликовано — пропускаем шаги 5-9
+        if mark_submitted is not None:
+            mark_submitted()
         write_log_entry(batch_id, category, _tn(target_name, "Публикация завершена."))
         return
 
@@ -1149,6 +1171,8 @@ def _publish_ui(
                 "Дзен: Публикация уже ушла (редирект/студия) — отдельный клик не нужен.",
             )
             write_log_entry(batch_id, category, _tn(target_name, f"URL: {page.url}"), level='silent')
+            if mark_submitted is not None:
+                mark_submitted()
             pub_btn = None
             break
         pub_btn = _find_primary_publish_control(page)
@@ -1158,11 +1182,13 @@ def _publish_ui(
         poll_wait_tick(page, batch_id, "dzen")
 
     if pub_btn is None and not _dzen_step7_success_without_click(page, url_step7_start):
-        raise DzenApiError(
+        raise PublishUiWaitTimeout(
             "Не дождались кнопки публикации и не обнаружили успешный редирект за 3 минуты."
         )
 
     if pub_btn is not None:
+        if mark_submitted is not None:
+            mark_submitted()
         _click_primary_publish_control(page, category, batch_id, url_step7_start)
         if not _dzen_publish_settled(page, url_step7_start):
             _poll_after_publish_click(page, category, batch_id, url_step7_start)

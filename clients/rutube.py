@@ -11,6 +11,7 @@ import tempfile
 import time as _time
 
 from clients.common import (
+    PublishUiWaitTimeout,
     element_center_clickable,
     handle_popups,
     noop_dismiss_unknown,
@@ -18,6 +19,7 @@ from clients.common import (
     safe_click,
     try_dismiss_publish_overlay,
     wait_for_publish_target,
+    wait_visible_ui,
 )
 from services.publish_auth_check import raise_if_login_required
 from log import write_log_entry
@@ -26,7 +28,7 @@ from routes.api import publication_file_name
 
 _NAV_TIMEOUT  = 60_000   # ms — таймаут одной попытки навигации (1 минута; до 5 попыток подряд)
 _UPLOAD_WAIT  = 180_000  # ms — ожидание появления формы публикации (до 3 минут)
-_PUBLISH_UI_ATTEMPTS = 3  # полный перезапуск _publish_ui при таймауте кнопки «Опубликовать»
+_PUBLISH_UI_ATTEMPTS = 3  # полный перезапуск _publish_ui при PublishUiWaitTimeout
 _CATEGORY     = "Юмор"   # категория по умолчанию
 
 STUDIO_URL = "https://studio.rutube.ru/"
@@ -34,12 +36,6 @@ STUDIO_URL = "https://studio.rutube.ru/"
 
 def _tn(target_name: str, msg: str) -> str:
     return f"{target_name}: {msg}"
-
-
-def _is_publish_btn_wait_timeout(exc: BaseException) -> bool:
-    """Таймаут ожидания кнопки «Опубликовать» — можно ретраить с нуля."""
-    msg = str(exc)
-    return "таймаут ожидания" in msg and "Опубликовать" in msg
 
 
 class RutubeSessionMissing(RuntimeError):
@@ -102,7 +98,13 @@ def publish(
             _f.write(video_data)
 
         def _do_publish(page, ctx):
+            gate = {"submitted": False}
+
+            def mark_submitted():
+                gate["submitted"] = True
+
             for attempt in range(1, _PUBLISH_UI_ATTEMPTS + 1):
+                gate["submitted"] = False
                 try:
                     if attempt > 1:
                         write_log_entry(
@@ -111,7 +113,7 @@ def publish(
                                 target_name,
                                 "Повтор публикации с начала "
                                 f"({attempt}/{_PUBLISH_UI_ATTEMPTS}) "
-                                "после таймаута кнопки «Опубликовать».",
+                                "после таймаута UI.",
                             ),
                             level="warn",
                         )
@@ -126,17 +128,15 @@ def publish(
                         page, video_path, category,
                         batch_id=batch_id, ctx=ctx, target_id=target_id,
                         target_name=target_name,
+                        mark_submitted=mark_submitted,
                     )
                     return
-                except RutubeApiError as exc:
-                    if (
-                        not _is_publish_btn_wait_timeout(exc)
-                        or attempt >= _PUBLISH_UI_ATTEMPTS
-                    ):
-                        raise
+                except PublishUiWaitTimeout as exc:
+                    if gate["submitted"] or attempt >= _PUBLISH_UI_ATTEMPTS:
+                        raise RutubeApiError(str(exc)) from exc
                     write_log_entry(
                         batch_id, category,
-                        _tn(target_name, f"Таймаут кнопки «Опубликовать»: {exc}"),
+                        _tn(target_name, f"Таймаут UI (ретрай): {exc}"),
                         level="warn",
                     )
 
@@ -288,7 +288,7 @@ def _wait_rutube_add_button(page, category, batch_id=None, timeout_ms=180_000, *
         timeout_ms=timeout_ms,
         status_message=_add_status,
         before_poll=lambda: raise_if_login_required(page, "rutube"),
-        error_factory=RutubeApiError,
+        error_factory=PublishUiWaitTimeout,
         timeout_message="Не дождались кнопки «+ Добавить» в студии Рутьюба.",
     )
     return result
@@ -615,6 +615,7 @@ def _publish_ui(
     ctx=None,
     target_id=None,
     target_name: str = "Rutube",
+    mark_submitted=None,
 ):
     """Управляет браузером для публикации видео через UI Рутьюба."""
 
@@ -642,22 +643,42 @@ def _publish_ui(
     write_log_entry(batch_id, category, _tn(target_name, "Выбираю «Загрузить видео или Shorts»."))
     upload_item = page.get_by_text("Загрузить видео или Shorts", exact=False).first
     try:
-        upload_item.wait_for(state="visible", timeout=180_000)
-    except Exception:
+        wait_visible_ui(
+            upload_item, 180_000,
+            "Рутьюб: таймаут пункта меню «Загрузить видео»",
+        )
+    except PublishUiWaitTimeout:
         write_log_entry(batch_id, category, _tn(target_name, "exact-match не нашёл — пробую contains."))
         upload_item = page.get_by_text("Загрузить видео", exact=False).first
-        upload_item.wait_for(state="visible", timeout=180_000)
+        wait_visible_ui(
+            upload_item, 180_000,
+            "Рутьюб: таймаут пункта меню «Загрузить видео»",
+        )
     _click_rutube_menu_item(upload_item, page, category, batch_id, label=target_name)
     write_log_entry(batch_id, category, _tn(target_name, "«Загрузить видео или Shorts» нажато"))
 
     # ── Шаг 4: Нажимаем «Выбрать файлы» и передаём видео ────────────────
     write_log_entry(batch_id, category, _tn(target_name, "Ищу поле загрузки файла."))
     choose_btn = page.get_by_text("Выбрать файлы", exact=False).first
-    choose_btn.wait_for(state="visible", timeout=180_000)
+    wait_visible_ui(
+        choose_btn, 180_000,
+        "Рутьюб: таймаут кнопки «Выбрать файлы»",
+    )
     write_log_entry(batch_id, category, _tn(target_name, "Кнопка «Выбрать файлы» найдена, открываю диалог выбора файла."))
-    with page.expect_file_chooser(timeout=180_000) as fc_info:
-        _click_rutube_choose_file(choose_btn, page, category, batch_id, label=target_name)
-    file_chooser = fc_info.value
+    try:
+        with page.expect_file_chooser(timeout=180_000) as fc_info:
+            _click_rutube_choose_file(choose_btn, page, category, batch_id, label=target_name)
+        file_chooser = fc_info.value
+    except PublishUiWaitTimeout:
+        raise
+    except RutubeApiError:
+        raise
+    except Exception as _e:
+        if type(_e).__name__ == "TimeoutError" or "timeout" in str(_e).lower():
+            raise PublishUiWaitTimeout(
+                "Рутьюб: таймаут выбора файла / file chooser"
+            ) from _e
+        raise
     file_chooser.set_files(video_path)
     write_log_entry(batch_id, category, _tn(target_name, "Файл передан браузеру, жду загрузки."))
     write_log_entry(batch_id, category, _tn(target_name, f"Файл: {os.path.basename(video_path)}"), level='silent')
@@ -672,7 +693,10 @@ def _publish_ui(
         if not _detect_rutube_upload_form(page):
             raise RutubeApiError("форма публикации не открыта перед выбором категории")
         cat_trigger = page.locator("text=Выберите категорию").first
-        cat_trigger.wait_for(state="visible", timeout=180_000)
+        wait_visible_ui(
+            cat_trigger, 180_000,
+            "Рутьюб: таймаут поля «Выберите категорию»",
+        )
         _click_rutube_locator(
             cat_trigger, page, category, batch_id,
             err_msg="Не удалось открыть выбор категории в Рутьюбе",
@@ -691,6 +715,8 @@ def _publish_ui(
         page.wait_for_timeout(500)
         _cat_ok = True
         write_log_entry(batch_id, category, _tn(target_name, f"Категория «{_CATEGORY}» выбрана"))
+    except PublishUiWaitTimeout:
+        raise
     except Exception as _e:
         write_log_entry(batch_id, category, _tn(target_name, "Не удалось выбрать категорию — продолжаю."))
         write_log_entry(batch_id, category, _tn(target_name, f"Ошибка категории: {_e}"), level='silent')
@@ -714,14 +740,14 @@ def _publish_ui(
             "Рутьюб: форма публикации не открыта — «Опубликовать» недоступна"
         )
     pub_btn = page.locator("button:has-text('Опубликовать')").last
-    try:
-        pub_btn.wait_for(state="visible", timeout=180_000)
-    except Exception as _e:
-        raise RutubeApiError(
-            "Рутьюб: таймаут ожидания кнопки «Опубликовать»"
-        ) from _e
+    wait_visible_ui(
+        pub_btn, 180_000,
+        "Рутьюб: таймаут ожидания кнопки «Опубликовать»",
+    )
 
     write_log_entry(batch_id, category, _tn(target_name, "Нажимаю «Опубликовать»."))
+    if mark_submitted is not None:
+        mark_submitted()
     _submit_rutube_publish(page, category, batch_id, pub_btn, label=target_name)
 
     # ── Шаг 8: Проверяем успех (тост «Видео опубликовано») ──────────────
