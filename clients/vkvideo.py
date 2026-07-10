@@ -35,7 +35,8 @@ from routes.api import publication_file_name, hashtags
 
 _NAV_TIMEOUT = 60_000  # ms — таймаут одной попытки навигации (1 минута; до 5 попыток подряд)
 _UPLOAD_WAIT = 180_000  # ms — ожидание завершения загрузки (до 3 минут)
-_PUBLISH_WAIT = 300_000  # ms — готовность превью/кнопки и подтверждение (до 5 минут)
+_PUBLISH_WAIT = 180_000  # ms — готовность превью/кнопки и подтверждение (до 3 минут)
+_PUBLISH_UI_ATTEMPTS = 3  # полный перезапуск _publish_ui при таймауте кнопки «Опубликовать»
 
 class VkVideoSessionMissing(RuntimeError):
     """Браузерная сессия VK Видео не сохранена — требуется авторизация."""
@@ -45,6 +46,12 @@ class VkVideoCsrfExpired(RuntimeError):
 
 class VkVideoApiError(RuntimeError):
     """Ошибка публикации на VK Видео."""
+
+
+def _is_publish_btn_wait_timeout(exc: BaseException) -> bool:
+    """Таймаут ожидания появления/доступности кнопки «Опубликовать» — можно ретраить с нуля."""
+    msg = str(exc)
+    return "таймаут ожидания" in msg and "Опубликовать" in msg
 
 
 def _tn(target_name: str, msg: str) -> str:
@@ -112,10 +119,36 @@ def publish(
         _state = {"clip_url": ""}
 
         def _do_publish(page, ctx):
-            _state["clip_url"] = _publish_ui(
-                page, club_id, video_path, pub_title, category,
-                batch_id=batch_id, ctx=ctx, target_id=target_id, target_name=target_name,
-            )
+            for attempt in range(1, _PUBLISH_UI_ATTEMPTS + 1):
+                try:
+                    if attempt > 1:
+                        write_log_entry(
+                            batch_id, category,
+                            _tn(
+                                target_name,
+                                "Повтор публикации с начала "
+                                f"({attempt}/{_PUBLISH_UI_ATTEMPTS}) "
+                                "после таймаута кнопки «Опубликовать».",
+                            ),
+                            level="warn",
+                        )
+                    _state["clip_url"] = _publish_ui(
+                        page, club_id, video_path, pub_title, category,
+                        batch_id=batch_id, ctx=ctx, target_id=target_id,
+                        target_name=target_name,
+                    )
+                    break
+                except VkVideoApiError as exc:
+                    if (
+                        not _is_publish_btn_wait_timeout(exc)
+                        or attempt >= _PUBLISH_UI_ATTEMPTS
+                    ):
+                        raise
+                    write_log_entry(
+                        batch_id, category,
+                        _tn(target_name, f"Таймаут кнопки «Опубликовать»: {exc}"),
+                        level="warn",
+                    )
             if _state["clip_url"] and batch_id:
                 db_set_batch_vkvideo_clip_url(batch_id, _state["clip_url"])
 
@@ -640,7 +673,12 @@ def _publish_ui(
     # ── Шаг 7: Ждём кнопку и готовность превью ───────────────────────────
     write_log_entry(batch_id, category, _tn(target_name, "Жду кнопку «Опубликовать»."))
     pub_btn = page.locator("button:has-text('Опубликовать')").last
-    pub_btn.wait_for(state="visible", timeout=_PUBLISH_WAIT)
+    try:
+        pub_btn.wait_for(state="visible", timeout=_PUBLISH_WAIT)
+    except Exception as _e:
+        raise VkVideoApiError(
+            "VK Видео: таймаут ожидания кнопки «Опубликовать»"
+        ) from _e
     _wait_vk_clip_publish_ready(page, pub_btn, batch_id, category, target_name=target_name)
 
     # ── Шаг 8: Нажимаем «Опубликовать» ───────────────────────────────────

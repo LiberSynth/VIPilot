@@ -26,6 +26,7 @@ from routes.api import publication_file_name
 
 _NAV_TIMEOUT  = 60_000   # ms — таймаут одной попытки навигации (1 минута; до 5 попыток подряд)
 _UPLOAD_WAIT  = 180_000  # ms — ожидание появления формы публикации (до 3 минут)
+_PUBLISH_UI_ATTEMPTS = 3  # полный перезапуск _publish_ui при таймауте кнопки «Опубликовать»
 _CATEGORY     = "Юмор"   # категория по умолчанию
 
 STUDIO_URL = "https://studio.rutube.ru/"
@@ -33,6 +34,12 @@ STUDIO_URL = "https://studio.rutube.ru/"
 
 def _tn(target_name: str, msg: str) -> str:
     return f"{target_name}: {msg}"
+
+
+def _is_publish_btn_wait_timeout(exc: BaseException) -> bool:
+    """Таймаут ожидания кнопки «Опубликовать» — можно ретраить с нуля."""
+    msg = str(exc)
+    return "таймаут ожидания" in msg and "Опубликовать" in msg
 
 
 class RutubeSessionMissing(RuntimeError):
@@ -95,10 +102,43 @@ def publish(
             _f.write(video_data)
 
         def _do_publish(page, ctx):
-            _publish_ui(
-                page, video_path, category,
-                batch_id=batch_id, ctx=ctx, target_id=target_id, target_name=target_name,
-            )
+            for attempt in range(1, _PUBLISH_UI_ATTEMPTS + 1):
+                try:
+                    if attempt > 1:
+                        write_log_entry(
+                            batch_id, category,
+                            _tn(
+                                target_name,
+                                "Повтор публикации с начала "
+                                f"({attempt}/{_PUBLISH_UI_ATTEMPTS}) "
+                                "после таймаута кнопки «Опубликовать».",
+                            ),
+                            level="warn",
+                        )
+                        # Short-circuit _ensure_rutube_studio пропускает goto —
+                        # на ретрае принудительно уходим с зависшего модала.
+                        page.goto(
+                            STUDIO_URL,
+                            wait_until="domcontentloaded",
+                            timeout=_NAV_TIMEOUT,
+                        )
+                    _publish_ui(
+                        page, video_path, category,
+                        batch_id=batch_id, ctx=ctx, target_id=target_id,
+                        target_name=target_name,
+                    )
+                    return
+                except RutubeApiError as exc:
+                    if (
+                        not _is_publish_btn_wait_timeout(exc)
+                        or attempt >= _PUBLISH_UI_ATTEMPTS
+                    ):
+                        raise
+                    write_log_entry(
+                        batch_id, category,
+                        _tn(target_name, f"Таймаут кнопки «Опубликовать»: {exc}"),
+                        level="warn",
+                    )
 
         result = _get_browser("rutube").run_pipeline_browser(
             _do_publish, target_id, batch_id=batch_id, category=category,
@@ -674,7 +714,12 @@ def _publish_ui(
             "Рутьюб: форма публикации не открыта — «Опубликовать» недоступна"
         )
     pub_btn = page.locator("button:has-text('Опубликовать')").last
-    pub_btn.wait_for(state="visible", timeout=180_000)
+    try:
+        pub_btn.wait_for(state="visible", timeout=180_000)
+    except Exception as _e:
+        raise RutubeApiError(
+            "Рутьюб: таймаут ожидания кнопки «Опубликовать»"
+        ) from _e
 
     write_log_entry(batch_id, category, _tn(target_name, "Нажимаю «Опубликовать»."))
     _submit_rutube_publish(page, category, batch_id, pub_btn, label=target_name)

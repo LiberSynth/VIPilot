@@ -31,6 +31,7 @@ from routes.api import publication_file_name, tags
 
 _NAV_TIMEOUT = 60_000   # ms — таймаут одной попытки навигации (1 минута; до 5 попыток подряд)
 _UPLOAD_WAIT  = 60_000  # ms — ожидание завершения загрузки видео
+_PUBLISH_UI_ATTEMPTS = 3  # полный перезапуск _publish_ui при таймауте кнопки «Опубликовать»
 
 class DzenSessionMissing(RuntimeError):
     """Браузерная сессия Дзен не сохранена — требуется авторизация."""
@@ -40,6 +41,11 @@ class DzenCsrfExpired(RuntimeError):
 
 class DzenApiError(RuntimeError):
     """Ошибка публикации на Дзен."""
+
+
+def _is_publish_btn_wait_timeout(exc: BaseException) -> bool:
+    """Таймаут ожидания кнопки публикации — можно ретраить с нуля."""
+    return "Не дождались кнопки публикации" in str(exc)
 
 # ---------------------------------------------------------------------------
 # Публичный API
@@ -93,10 +99,36 @@ def publish(
             _f.write(video_data)
 
         def _do_publish(page, ctx):
-            _publish_ui(
-                page, publisher_id, video_path, category,
-                batch_id=batch_id, ctx=ctx, target_id=target_id, target_name=target_name,
-            )
+            for attempt in range(1, _PUBLISH_UI_ATTEMPTS + 1):
+                try:
+                    if attempt > 1:
+                        write_log_entry(
+                            batch_id, category,
+                            _tn(
+                                target_name,
+                                "Повтор публикации с начала "
+                                f"({attempt}/{_PUBLISH_UI_ATTEMPTS}) "
+                                "после таймаута кнопки «Опубликовать».",
+                            ),
+                            level="warn",
+                        )
+                    _publish_ui(
+                        page, publisher_id, video_path, category,
+                        batch_id=batch_id, ctx=ctx, target_id=target_id,
+                        target_name=target_name,
+                    )
+                    return
+                except DzenApiError as exc:
+                    if (
+                        not _is_publish_btn_wait_timeout(exc)
+                        or attempt >= _PUBLISH_UI_ATTEMPTS
+                    ):
+                        raise
+                    write_log_entry(
+                        batch_id, category,
+                        _tn(target_name, f"Таймаут кнопки «Опубликовать»: {exc}"),
+                        level="warn",
+                    )
 
         result = _get_browser("dzen").run_pipeline_browser(
             _do_publish, target_id, batch_id=batch_id, category=category,
