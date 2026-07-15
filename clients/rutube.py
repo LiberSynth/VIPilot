@@ -298,6 +298,7 @@ def _wait_rutube_upload(page, category, batch_id=None, *, target_name: str = "Ru
     deadline = _time.monotonic() + _UPLOAD_WAIT / 1000
     last_log_at = 0.0
     while _time.monotonic() < deadline:
+        raise_if_login_required(page, "rutube")
         _rutube_handle_popups(page, category, batch_id, label=target_name)
         state = _rutube_upload_state(page)
         if _rutube_upload_ready(page, state):
