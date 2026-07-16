@@ -253,6 +253,8 @@ def client_is_configured(slug: str, cfg: dict = None, target_id: str = None) -> 
         )
     if slug == "skyreels":
         return bool(os.environ.get("SKYREELS_API_KEY", ""))
+    if slug == "seedance":
+        return bool(os.environ.get("SEEDANCE_API_KEY", ""))
     if slug == "falai":
         return bool(os.environ.get("FAL_API_KEY", ""))
     return False

@@ -26,10 +26,19 @@ from db import (
 )
 from log import write_log_entry
 from common.exceptions import AppException
-from clients import falai, grok, skyreels
+from clients import falai, grok, skyreels, seedance
 from routes.api import client_is_configured
 from clients.falai import ProviderFatalError
 from utils.utils import fmt_id_msg, nearest_allowed_duration
+
+def _video_client_slug(platform_name: str) -> str:
+    if platform_name == 'Grok':
+        return 'grok'
+    if platform_name == 'SkyReels':
+        return 'skyreels'
+    if platform_name == 'Seedance':
+        return 'seedance'
+    return 'falai'
 
 def _video_client(platform_name: str):
     """Возвращает клиент нужной платформы по имени."""
@@ -37,6 +46,8 @@ def _video_client(platform_name: str):
         return grok
     if platform_name == 'SkyReels':
         return skyreels
+    if platform_name == 'Seedance':
+        return seedance
     return falai
 
 def _is_content_moderation_error(err_text: str) -> bool:
@@ -182,8 +193,14 @@ def run(batch_id, category):
             _download_and_finalize(batch_id, batch, category, batch_data, model_name, model_id)
             return
 
-        if not client_is_configured('falai'):
-            msg = 'FAL_API_KEY не задан — генерация невозможна'
+        client_slug = _video_client_slug(model_platform)
+        if not client_is_configured(client_slug):
+            env_hint = {
+                'grok': 'XAI_API_KEY',
+                'skyreels': 'SKYREELS_API_KEY',
+                'seedance': 'SEEDANCE_API_KEY',
+            }.get(client_slug, 'FAL_API_KEY')
+            msg = f'{env_hint} не задан — генерация невозможна'
             write_log_entry(batch_id, category, msg, level='error')
             write_log_entry(batch_id, category, f"{msg}", level='silent')
             raise AppException(batch_id, 'video', msg)
