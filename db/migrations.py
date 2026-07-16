@@ -82,7 +82,7 @@ def _migrate_seedance_platform(cur):
             """, (model_id, duration, model_id, duration))
 
 MIGRATIONS = [
-    (1, _migrate_seedance_platform),
+    (2026071601, _migrate_seedance_platform),
 ]
 
 # ---------------------------------------------------------------------------
