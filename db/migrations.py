@@ -81,8 +81,27 @@ def _migrate_seedance_platform(cur):
                 )
             """, (model_id, duration, model_id, duration))
 
+_SEEDANCE_PRICES = (
+    ('Seedance 2.0', '3.040 $/10сек'),       # 12 credits/s × 10s @ 720p
+    ('Seedance 2.0 Fast', '2.533 $/10сек'), # 10 credits/s × 10s @ 720p
+    ('Seedance 2.0 Mini', '1.520 $/10сек'),  # 6 credits/s × 10s @ 720p
+)
+
+def _migrate_seedance_prices(cur):
+    for name, price in _SEEDANCE_PRICES:
+        cur.execute("""
+            UPDATE ai_models m
+            SET price = %s
+            FROM ai_platforms p
+            WHERE m.platform_id = p.id
+              AND p.name = 'Seedance'
+              AND m.name = %s
+              AND (m.price IS NULL OR m.price IS DISTINCT FROM %s)
+        """, (price, name, price))
+
 MIGRATIONS = [
     (2026071601, _migrate_seedance_platform),
+    (2026071701, _migrate_seedance_prices),
 ]
 
 # ---------------------------------------------------------------------------
