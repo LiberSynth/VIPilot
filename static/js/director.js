@@ -16,7 +16,6 @@
       consoleId: 'director-generate-console',
       defaultHint: _HINT_DEFAULT,
       maxLines: 5,
-      pollIntervalMs: 2500,
       finalStatuses: _FINAL_STATUSES,
       onBatchFinal: function(_batchId, data, meta) {
         if (typeof window.loadMovieList === 'function') {

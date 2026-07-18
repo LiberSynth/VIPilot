@@ -33,6 +33,7 @@ from db import (
     db_create_prompt_batch,
     db_get_video_model_by_id,
     db_get_batch_logs,
+    db_poll_generation_console,
     cycle_config_get,
     cycle_config_set,
     settings_set,
@@ -471,6 +472,24 @@ def api_get_batch_logs(batch_id):
     data = db_get_batch_logs(batch_id)
     if data is None:
         return jsonify({"error": "not found"}), 404
+    return jsonify(data)
+
+@bp.route("/generation-console/poll", methods=["POST"])
+def api_generation_console_poll():
+    if not is_authenticated():
+        return jsonify({"error": "unauthorized"}), 401
+    body = request.get_json(silent=True) or {}
+    raw_ids = body.get("batch_ids")
+    if raw_ids is None:
+        raw_ids = []
+    if not isinstance(raw_ids, list):
+        return jsonify({"error": "batch_ids must be a list"}), 400
+    limit_raw = body.get("limit", 5)
+    try:
+        limit = int(limit_raw)
+    except (TypeError, ValueError):
+        limit = 5
+    data = db_poll_generation_console(raw_ids, limit=limit)
     return jsonify(data)
 
 @bp.route("/reseed", methods=["POST"])

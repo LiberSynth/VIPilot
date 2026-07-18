@@ -753,7 +753,6 @@
           _setGeneratingState(false);
           _endDirectorCreation();
           if (created > 0) {
-            _appendDirectorLine('Создано батчей: ' + created);
             _trackDirectorBatches(createdBatchIds);
           } else {
             _showDirectorHint('Не удалось создать батчи', 3000);

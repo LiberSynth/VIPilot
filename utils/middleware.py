@@ -8,6 +8,10 @@ _SILENT_GET_PATHS = {
     '/favicon.ico',
 }
 
+_SILENT_POST_PATHS = {
+    '/api/generation-console/poll',
+}
+
 _SILENT_GET_PREFIXES = (
     '/api/batch/',
     '/static/',
@@ -16,6 +20,8 @@ _SILENT_GET_PREFIXES = (
 def log_request():
     method = request.method
     path = request.path
+    if path in _SILENT_POST_PATHS:
+        return
     if method == 'GET' and (
         path in _SILENT_GET_PATHS or
         path.startswith(_SILENT_GET_PREFIXES)

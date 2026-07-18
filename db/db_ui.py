@@ -4,6 +4,74 @@ import psycopg2.extras
 
 from .connection import get_db
 
+def db_poll_generation_console(batch_ids: list, limit: int = 5) -> dict:
+    seen: set[str] = set()
+    valid_ids: list[str] = []
+    for raw in batch_ids or []:
+        bid = str(raw or '').strip()
+        if not bid or bid in seen:
+            continue
+        seen.add(bid)
+        valid_ids.append(bid)
+
+    if not valid_ids:
+        return {'entries': [], 'batches': {}}
+
+    safe_limit = max(1, min(50, int(limit)))
+
+    with get_db() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT le.message, le.level, le.created_at, le.channel,
+                       l.batch_id::text AS batch_id
+                FROM log_entries le
+                JOIN log l ON l.id = le.log_id
+                WHERE l.batch_id = ANY(%s::uuid[])
+                ORDER BY le.created_at DESC, le.id DESC
+                LIMIT %s
+                """,
+                (valid_ids, safe_limit),
+            )
+            entry_rows = cur.fetchall()
+
+            cur.execute(
+                """
+                SELECT
+                    b.id::text                                        AS batch_id,
+                    b.status                                          AS batch_status,
+                    b.story_id::text                                  AS story_id,
+                    b.movie_id::text                                  AS movie_id,
+                    (m.id IS NOT NULL)                                AS has_video_data
+                FROM batches b
+                LEFT JOIN movies m ON m.id = b.movie_id
+                WHERE b.id = ANY(%s::uuid[])
+                """,
+                (valid_ids,),
+            )
+            batch_rows = cur.fetchall()
+
+    entries = [
+        {
+            'message':    r['message'],
+            'level':      r['level'],
+            'created_at': r['created_at'].isoformat() if r['created_at'] else None,
+            'channel':    r['channel'],
+            'batch_id':   r['batch_id'],
+        }
+        for r in entry_rows
+    ]
+    batches = {
+        r['batch_id']: {
+            'batch_status':   r['batch_status'],
+            'story_id':       r['story_id'],
+            'movie_id':       r['movie_id'],
+            'has_video_data': bool(r['has_video_data']),
+        }
+        for r in batch_rows
+    }
+    return {'entries': entries, 'batches': batches}
+
 def db_get_batch_logs(batch_id):
     with get_db() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:

@@ -895,7 +895,6 @@ var loadStoryIntoEditor;
       consoleId: 'story-generate-console',
       defaultHint: _DEFAULT_HINT,
       maxLines: 5,
-      pollIntervalMs: 700,
       finalStatuses: _FINAL_STATUSES,
       onBatchFinal: function(_batchId, data) {
         var status = String((data && data.batch_status) || '');
@@ -972,8 +971,6 @@ var loadStoryIntoEditor;
         var batchIds = createdBatches.map(function(item) { return item.id; });
 
         if (status) {
-          status.addLine('Создано батчей: ' + batchIds.length);
-          if (hadRequestError) status.addLine('Часть запросов завершилась ошибкой');
           status.trackBatches(batchIds);
         }
       }

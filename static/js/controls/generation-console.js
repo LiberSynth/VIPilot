@@ -5,14 +5,14 @@ class GenerationConsoleController {
     this._consoleEl = document.getElementById(opts.consoleId || '');
     this._defaultHint = opts.defaultHint || '';
     this._maxLines = Math.max(1, parseInt(opts.maxLines, 10) || 5);
-    this._pollIntervalMs = Math.max(300, parseInt(opts.pollIntervalMs, 10) || 1000);
+    this._pollIntervalMs = (typeof BATCH_ENTRIES_POLL_MS !== 'undefined')
+      ? BATCH_ENTRIES_POLL_MS
+      : 200;
     this._finalStatuses = new Set(opts.finalStatuses || []);
     this._onBatchFinal = typeof opts.onBatchFinal === 'function' ? opts.onBatchFinal : null;
     this._onAllIdle = typeof opts.onAllIdle === 'function' ? opts.onAllIdle : null;
-    this._completionMessage = opts.completionMessage || 'Генерация завершена.';
 
-    this._pinnedLines = [];
-    this._recentLines = [];
+    this._displayLines = [];
     this._completionVisible = false;
     this._tracked = new Map();
     this._creating = 0;
@@ -41,6 +41,7 @@ class GenerationConsoleController {
     this._creating = Math.max(0, this._creating - 1);
     if (this._creating === 0) this._creationHint = '';
     this._refreshHint();
+    this._ensurePolling();
   }
 
   showTemporaryHint(text, ttlMs) {
@@ -58,21 +59,12 @@ class GenerationConsoleController {
     this._refreshHint();
   }
 
-  addLine(text, opts) {
-    opts = opts || {};
-    var line = String(text || '').trim();
-    if (!line) return;
-    if (opts.pinned || this._isErrorLine(line)) {
-      this._addPinnedLine(line);
-    } else {
-      this._addRecentLine(line);
-    }
-    this._renderConsole();
+  addLine(_text, _opts) {
+    // Консоль заполняется только из log_entries через poll.
   }
 
   clearLines() {
-    this._pinnedLines = [];
-    this._recentLines = [];
+    this._displayLines = [];
     this._completionVisible = false;
     this._renderConsole();
   }
@@ -81,12 +73,7 @@ class GenerationConsoleController {
     var id = String(batchId || '').trim();
     if (!id) return;
     if (!this._tracked.has(id)) {
-      this._tracked.set(id, {
-        meta: meta || {},
-        seen: new Set(),
-        seenQueue: [],
-        initialized: false,
-      });
+      this._tracked.set(id, { meta: meta || {} });
       this._hadActiveBatches = true;
       this._completionVisible = false;
     } else if (meta && typeof meta === 'object') {
@@ -116,33 +103,9 @@ class GenerationConsoleController {
   }
 
   _resetSession() {
-    this._pinnedLines = [];
-    this._recentLines = [];
+    this._displayLines = [];
     this._completionVisible = false;
     this._multiRequestMode = false;
-  }
-
-  _addPinnedLine(line) {
-    if (this._pinnedLines.indexOf(line) >= 0) return;
-    this._pinnedLines.push(line);
-  }
-
-  _addRecentLine(line) {
-    if (this._recentLines.indexOf(line) >= 0) return;
-    this._recentLines.unshift(line);
-    if (this._recentLines.length > this._maxLines) {
-      this._recentLines.length = this._maxLines;
-    }
-  }
-
-  _isErrorLevel(level) {
-    var value = String(level || '').toLowerCase();
-    return value === 'error' || value === 'fatal' || value === 'fatal_error';
-  }
-
-  _isErrorLine(text) {
-    var value = String(text || '').toLowerCase();
-    return value.indexOf('ошибк') >= 0 || value.indexOf('error') >= 0;
   }
 
   _setHint(text) {
@@ -167,7 +130,7 @@ class GenerationConsoleController {
       return;
     }
     if (this._hadActiveBatches) {
-      this._recentLines = [];
+      this._displayLines = [];
       this._completionVisible = true;
     }
     if (!this._completionVisible) {
@@ -184,18 +147,12 @@ class GenerationConsoleController {
   _renderConsole() {
     if (!this._consoleEl) return;
     var parts = [];
-    var i;
-
-    for (i = 0; i < this._pinnedLines.length; i++) {
-      parts.push(this._pinnedLines[i]);
-    }
-    for (i = 0; i < this._recentLines.length; i++) {
-      parts.push(this._recentLines[i]);
-    }
 
     if (this._completionVisible) {
       parts.push(this._defaultHint);
-    } else if (parts.length === 0) {
+    } else if (this._displayLines.length > 0) {
+      parts = this._displayLines.slice();
+    } else {
       parts.push(this._statusText || this._defaultHint);
     }
 
@@ -220,16 +177,16 @@ class GenerationConsoleController {
     this._pollInFlight = true;
     var ids = Array.from(this._tracked.keys());
     var self = this;
-    Promise.all(ids.map(function(batchId) {
-      return fetch('/api/batch/' + encodeURIComponent(batchId) + '/logs')
-        .then(function(r) { return r.json(); })
-        .catch(function() { return null; });
-    }))
-      .then(function(results) {
-        for (var i = 0; i < ids.length; i++) {
-          self._consumeBatchState(ids[i], results[i]);
-        }
+    fetch('/api/generation-console/poll', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ batch_ids: ids, limit: this._maxLines }),
+    })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data && !data.error) self._consumePollData(data);
       })
+      .catch(function() {})
       .finally(function() {
         self._pollInFlight = false;
         self._refreshHint();
@@ -242,80 +199,48 @@ class GenerationConsoleController {
       });
   }
 
-  _consumeBatchState(batchId, data) {
-    var state = this._tracked.get(batchId);
-    if (!state || !data || data.error) return;
-
+  _consumePollData(data) {
     var entries = Array.isArray(data.entries) ? data.entries : [];
-    var category = data.category || '';
-    for (var i = 0; i < entries.length; i++) {
-      if (!entries[i].pipeline && category) entries[i].pipeline = category;
-    }
-    entries.sort(function(a, b) {
-      return String(a.created_at || '').localeCompare(String(b.created_at || ''));
-    });
+    var batches = data.batches || {};
+    var lines = [];
+    var i;
 
-    if (!state.initialized) {
-      state.initialized = true;
-      for (var k = 0; k < entries.length; k++) {
-        this._rememberEntry(state, this._entryKey(entries[k]));
-      }
-      if (entries.length > 0) {
-        this._appendEntryLine(batchId, entries[entries.length - 1]);
-      }
-    } else {
-      for (var n = 0; n < entries.length; n++) {
-        var entry = entries[n];
-        var key = this._entryKey(entry);
-        if (state.seen.has(key)) continue;
-        this._rememberEntry(state, key);
-        this._appendEntryLine(batchId, entry);
-      }
+    for (i = 0; i < entries.length; i++) {
+      lines.push(this._formatEntryLine(entries[i]));
     }
-
-    var status = String(data.batch_status || '');
-    if (this._finalStatuses.has(status)) {
-      this._tracked.delete(batchId);
-      if (this._onBatchFinal) this._onBatchFinal(batchId, data, state.meta || {});
-    }
-  }
-
-  _appendEntryLine(batchId, entry) {
-    var state = this._tracked.get(batchId);
-    var requestIndex = state && state.meta ? state.meta.requestIndex : 0;
-    if (this._multiRequestMode && !requestIndex) return;
-    var line = this._formatEntryLine(entry, requestIndex);
-    if (this._isErrorLevel(entry.level)) {
-      this._addPinnedLine(line);
-    } else {
-      this._addRecentLine(line);
-    }
+    this._displayLines = lines;
     this._renderConsole();
-  }
 
-  _rememberEntry(state, key) {
-    state.seen.add(key);
-    state.seenQueue.push(key);
-    while (state.seenQueue.length > 400) {
-      var old = state.seenQueue.shift();
-      state.seen.delete(old);
+    var batchIds = Array.from(this._tracked.keys());
+    for (i = 0; i < batchIds.length; i++) {
+      var bid = batchIds[i];
+      var info = batches[bid];
+      if (!info) continue;
+      var status = String(info.batch_status || '');
+      if (!this._finalStatuses.has(status)) continue;
+      var state = this._tracked.get(bid);
+      this._tracked.delete(bid);
+      if (this._onBatchFinal) {
+        this._onBatchFinal(bid, {
+          batch_status: status,
+          story_id: info.story_id,
+          movie_id: info.movie_id,
+          has_video_data: info.has_video_data,
+        }, state ? state.meta : {});
+      }
     }
   }
 
-  _entryKey(entry) {
-    return [
-      entry.created_at || '',
-      entry.pipeline || '',
-      entry.level || '',
-      entry.message || '',
-    ].join('|');
-  }
-
-  _formatEntryLine(entry, requestIndex) {
+  _formatEntryLine(entry) {
     var ts = this._formatTime(entry.created_at);
     var requestTag = '';
-    if (this._multiRequestMode && requestIndex) {
-      requestTag = '[Запрос ' + requestIndex + '] ';
+    var batchId = entry.batch_id || '';
+    if (batchId && this._tracked.has(batchId)) {
+      var state = this._tracked.get(batchId);
+      var requestIndex = state && state.meta ? state.meta.requestIndex : 0;
+      if (this._multiRequestMode && requestIndex) {
+        requestTag = '[Запрос ' + requestIndex + '] ';
+      }
     }
     return '[' + ts + '] ' + requestTag + String(entry.message || '');
   }

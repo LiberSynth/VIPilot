@@ -79,6 +79,9 @@ class TestApiBlueprintAuth:
     def test_get_batch_logs(self, client):
         _assert_401(client.get("/api/batch/some-batch/logs"))
 
+    def test_post_generation_console_poll(self, client):
+        _assert_401(client.post("/api/generation-console/poll", json={"batch_ids": []}))
+
     def test_post_reseed(self, client):
         _assert_401(client.post("/api/reseed"))
 

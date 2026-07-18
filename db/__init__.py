@@ -85,6 +85,7 @@ from .db_media import (
 )
 from .db_ui import (
     db_get_batch_logs,
+    db_poll_generation_console,
     db_get_stories_list,
     db_get_story_ids_by_filter,
     db_get_stories_pool,
