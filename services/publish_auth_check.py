@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import time as _time
+from collections.abc import Callable
+
 _SESSION_MSG = (
     "Сессия истекла — авторизуйтесь снова в браузере (вкладка «Публикация»)"
 )
@@ -108,4 +111,29 @@ def raise_if_login_required(page, platform: str, **context) -> None:
         raise VkVideoCsrfExpired(_SESSION_MSG)
 
 
-__all__ = ("login_screen_visible", "raise_if_login_required")
+def wait_raise_if_login_required(
+    page,
+    platform: str,
+    *,
+    timeout_ms: int = 12_000,
+    poll_ms: int = 300,
+    is_authenticated: Callable[[], bool] | None = None,
+    **context,
+) -> None:
+    """Poll login screen; raise immediately when it appears.
+
+    Stops early when ``is_authenticated()`` is True (studio ready, no login).
+    """
+    deadline = _time.monotonic() + timeout_ms / 1000
+    while _time.monotonic() < deadline:
+        raise_if_login_required(page, platform, **context)
+        if is_authenticated is not None and is_authenticated():
+            return
+        try:
+            page.wait_for_timeout(poll_ms)
+        except Exception:
+            _time.sleep(poll_ms / 1000)
+    raise_if_login_required(page, platform, **context)
+
+
+__all__ = ("login_screen_visible", "raise_if_login_required", "wait_raise_if_login_required")

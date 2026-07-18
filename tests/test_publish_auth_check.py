@@ -1,12 +1,13 @@
 """Unit tests for publish auth detection (URL + Rutube studio login modal)."""
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from services.publish_auth_check import (
     login_screen_visible,
     raise_if_login_required,
+    wait_raise_if_login_required,
 )
 from clients.rutube import RutubeCsrfExpired
 
@@ -71,3 +72,35 @@ class TestRaiseIfLoginRequired:
     def test_rutube_studio_ok_no_raise(self):
         page = _mock_page(url="https://studio.rutube.ru/")
         raise_if_login_required(page, "rutube")
+
+
+class TestWaitRaiseIfLoginRequired:
+    def test_raises_as_soon_as_login_appears(self):
+        page = MagicMock()
+        page.wait_for_timeout.side_effect = lambda ms: None
+        visible = iter((False, False, True))
+
+        with patch(
+            "services.publish_auth_check.login_screen_visible",
+            side_effect=lambda *_a, **_k: next(visible),
+        ):
+            with pytest.raises(RutubeCsrfExpired):
+                wait_raise_if_login_required(
+                    page, "rutube", timeout_ms=3000, poll_ms=100,
+                )
+        assert page.wait_for_timeout.call_count == 2
+
+    def test_stops_when_authenticated(self):
+        page = MagicMock()
+        page.wait_for_timeout.side_effect = lambda ms: None
+        auth = iter((False, True))
+
+        with patch("services.publish_auth_check.raise_if_login_required"):
+            wait_raise_if_login_required(
+                page,
+                "rutube",
+                timeout_ms=3000,
+                poll_ms=100,
+                is_authenticated=lambda: next(auth),
+            )
+        assert page.wait_for_timeout.call_count == 1

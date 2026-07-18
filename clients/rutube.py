@@ -625,6 +625,16 @@ def _publish_ui(
     cur = page.url
     write_log_entry(batch_id, category, _tn(target_name, f"URL после перехода: {cur}"), level='silent')
 
+    from services.publish_auth_check import wait_raise_if_login_required
+
+    def _rutube_studio_authenticated() -> bool:
+        add_btn = _find_rutube_add_button(page)
+        return add_btn is not None and _rutube_add_button_clickable(add_btn)
+
+    wait_raise_if_login_required(
+        page, "rutube", is_authenticated=_rutube_studio_authenticated,
+    )
+
     from clients.target_session import refresh_session_after_auth
 
     refresh_session_after_auth(
