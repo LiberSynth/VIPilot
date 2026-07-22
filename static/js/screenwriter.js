@@ -296,6 +296,7 @@ var loadStoryIntoEditor;
 
   var _promptPollTimer = null;
   var _editorFetchSeq = 0;
+  var _openStoryReqSeq = 0;
 
   function _fetchStoryEditor(storyId) {
     var seq = ++_editorFetchSeq;
@@ -608,6 +609,9 @@ var loadStoryIntoEditor;
 
   window.openStoryInScreenwriter = function(storyId) {
     if (!storyId) return;
+    _openStoryReqSeq += 1;
+    var reqSeq = _openStoryReqSeq;
+    _accordionList.collapse();
     if (typeof switchPanel === 'function') switchPanel('screenwriter');
     var searchInput = document.getElementById('story-search-input');
     if (searchInput && searchInput.value) {
@@ -622,10 +626,12 @@ var loadStoryIntoEditor;
     fetch('/production/stories?' + getFilterParams())
       .then(function(r) { return r.ok ? r.json() : []; })
       .then(function(stories) {
+        if (reqSeq !== _openStoryReqSeq) return;
         renderStories(stories);
         _accordionList.selectRow(String(storyId));
       })
       .catch(function() {
+        if (reqSeq !== _openStoryReqSeq) return;
         container.innerHTML = '<div class="stories-empty">Ошибка загрузки</div>';
       });
   };
