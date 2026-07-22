@@ -23,12 +23,18 @@
     z-index: 100;
   }
   .header-top {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    column-gap: 8px;
+  }
+  .header-left {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    position: relative;
+    gap: 10px;
+    justify-self: start;
+    min-width: 0;
   }
-  .header-left { display: flex; align-items: center; gap: 10px; }
   .header-icon {
     width: 34px; height: 34px;
     background: linear-gradient(135deg, #5062f7, #8040f0);
@@ -38,15 +44,14 @@
   }
   h1 { font-size: 16px; font-weight: 700; color: #fff; white-space: nowrap; }
   .header-app-instance {
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
+    justify-self: center;
     font-size: 15px;
     font-weight: 600;
     letter-spacing: 0.06em;
     color: #b8c4e8;
     pointer-events: none;
-    max-width: 42%;
+    max-width: 100%;
+    min-width: 0;
     text-align: center;
     white-space: nowrap;
     overflow: hidden;
@@ -57,6 +62,7 @@
     display: flex;
     flex-direction: column;
     align-items: flex-end;
+    justify-self: end;
   }
   .header-right-buttons {
     display: flex;
@@ -81,34 +87,10 @@
   }
   .header-nav-btn svg { width: 16px; height: 16px; }
 
-  @media (max-width: 640px) {
-    .header-top {
-      flex-wrap: wrap;
-      row-gap: 2px;
-    }
-    .header-left {
-      flex: 1 1 auto;
-      min-width: 0;
-    }
-    .header-left h1 {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      min-width: 0;
-    }
-    .header-right {
-      flex-shrink: 0;
-    }
-    .header-app-instance {
-      position: static;
-      transform: none;
-      order: 2;
-      flex: 1 1 100%;
-      max-width: none;
-      text-align: center;
-      font-size: 12px;
-      line-height: 1.2;
-      padding-bottom: 2px;
-    }
+  .header-left h1 {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
   }
 
   .hamburger {
