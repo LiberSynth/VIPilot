@@ -23,16 +23,20 @@
     z-index: 100;
   }
   .header-top {
+    container-type: inline-size;
+    container-name: header-top;
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    grid-template-areas: "left app right";
     align-items: center;
     column-gap: 8px;
+    row-gap: 2px;
   }
   .header-left {
     display: flex;
     align-items: center;
     gap: 10px;
-    justify-self: start;
+    grid-area: left;
     min-width: 0;
   }
   .header-icon {
@@ -44,6 +48,7 @@
   }
   h1 { font-size: 16px; font-weight: 700; color: #fff; white-space: nowrap; }
   .header-app-instance {
+    grid-area: app;
     justify-self: center;
     font-size: 15px;
     font-weight: 600;
@@ -58,10 +63,15 @@
     text-overflow: ellipsis;
   }
   .header-app-instance:empty { display: none; }
+  .header-top:has(.header-app-instance:empty) {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "left right";
+  }
   .header-right {
     display: flex;
     flex-direction: column;
     align-items: flex-end;
+    grid-area: right;
     justify-self: end;
   }
   .header-right-buttons {
@@ -91,6 +101,20 @@
     overflow: hidden;
     text-overflow: ellipsis;
     min-width: 0;
+  }
+
+  @container header-top (max-width: 560px) {
+    .header-top:has(.header-app-instance:not(:empty)) {
+      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-areas:
+        "app app"
+        "left right";
+    }
+    .header-top:has(.header-app-instance:not(:empty)) .header-app-instance {
+      font-size: 12px;
+      line-height: 1.2;
+      padding-bottom: 1px;
+    }
   }
 
   .hamburger {

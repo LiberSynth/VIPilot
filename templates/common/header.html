@@ -1,5 +1,6 @@
 <header>
   <div class="header-top">
+    <span id="header-app-instance" class="header-app-instance">{{ app_instance }}</span>
     <div class="header-left">
       {% if show_sidebar is not defined or show_sidebar %}
       <button class="hamburger" id="btn-hamburger" aria-label="Меню" title="Открыть меню">
@@ -21,7 +22,6 @@
       </div>
       <h1 id="page-title">{{ page_title | default('') }}</h1>
     </div>
-    <span id="header-app-instance" class="header-app-instance">{{ app_instance }}</span>
     <div class="header-right">
       <div class="header-right-buttons">
         {% if nav_modules is defined and nav_modules %}
