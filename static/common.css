@@ -23,14 +23,17 @@
     z-index: 100;
   }
   .header-top {
-    container-type: inline-size;
-    container-name: header-top;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-    grid-template-areas: "left app right";
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "left right";
     align-items: center;
     column-gap: 8px;
     row-gap: 2px;
+  }
+  .header-top--has-app {
+    grid-template-areas:
+      "app app"
+      "left right";
   }
   .header-left {
     display: flex;
@@ -63,10 +66,6 @@
     text-overflow: ellipsis;
   }
   .header-app-instance:empty { display: none; }
-  .header-top:has(.header-app-instance:empty) {
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas: "left right";
-  }
   .header-right {
     display: flex;
     flex-direction: column;
@@ -101,20 +100,6 @@
     overflow: hidden;
     text-overflow: ellipsis;
     min-width: 0;
-  }
-
-  @container header-top (max-width: 560px) {
-    .header-top:has(.header-app-instance:not(:empty)) {
-      grid-template-columns: minmax(0, 1fr) auto;
-      grid-template-areas:
-        "app app"
-        "left right";
-    }
-    .header-top:has(.header-app-instance:not(:empty)) .header-app-instance {
-      font-size: 12px;
-      line-height: 1.2;
-      padding-bottom: 1px;
-    }
   }
 
   .hamburger {

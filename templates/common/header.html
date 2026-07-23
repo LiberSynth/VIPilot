@@ -1,5 +1,5 @@
 <header>
-  <div class="header-top">
+  <div class="header-top{% if app_instance %} header-top--has-app{% endif %}">
     <span id="header-app-instance" class="header-app-instance">{{ app_instance }}</span>
     <div class="header-left">
       {% if show_sidebar is not defined or show_sidebar %}
