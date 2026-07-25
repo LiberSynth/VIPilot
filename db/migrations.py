@@ -134,10 +134,32 @@ def _migrate_deepseek_v4(cur):
           )
     """, (_DEEPSEEK_V4_ENDPOINT,))
 
+_DEEPSEEK_V4_TEXT_BODY = {
+    'messages': [
+        {'role': 'system', 'content': '{}'},
+        {'role': 'user', 'content': '{}'},
+    ],
+    'max_tokens': 1024,
+    'temperature': 0.9,
+    'thinking': {'type': 'disabled'},
+}
+
+def _migrate_deepseek_v4_body(cur):
+    """V4-совместимый body для text-моделей DeepSeek (non-thinking, VIPilot placeholders)."""
+    cur.execute("""
+        UPDATE ai_models m
+        SET body = %s::jsonb
+        FROM ai_platforms p
+        WHERE m.platform_id = p.id
+          AND p.name ILIKE 'DeepSeek%%'
+          AND m.type = 'text'
+    """, (json.dumps(_DEEPSEEK_V4_TEXT_BODY),))
+
 MIGRATIONS = [
     (2026071601, _migrate_seedance_platform),
     (2026071701, _migrate_seedance_prices),
     (2026072501, _migrate_deepseek_v4),
+    (2026072502, _migrate_deepseek_v4_body),
 ]
 
 # ---------------------------------------------------------------------------
