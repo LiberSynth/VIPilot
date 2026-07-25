@@ -99,9 +99,45 @@ def _migrate_seedance_prices(cur):
               AND (m.price IS NULL OR m.price IS DISTINCT FROM %s)
         """, (price, name, price))
 
+_DEEPSEEK_V4_ENDPOINT = 'https://api.deepseek.com/chat/completions'
+
+def _migrate_deepseek_v4(cur):
+    """Обновляет устаревшие ID моделей DeepSeek (retired 2026-07-24) и endpoint платформы."""
+    cur.execute("""
+        UPDATE ai_models
+        SET url = 'deepseek-v4-flash', name = 'deepseek-v4-flash'
+        WHERE type = 'text' AND url = 'deepseek-chat'
+    """)
+    cur.execute("""
+        UPDATE ai_models
+        SET url = 'deepseek-v4-pro', name = 'deepseek-v4-pro'
+        WHERE type = 'text' AND url = 'deepseek-reasoner'
+    """)
+    cur.execute("""
+        UPDATE ai_models
+        SET name = 'deepseek-v4-flash'
+        WHERE type = 'text' AND name = 'deepseek-chat' AND url = 'deepseek-v4-flash'
+    """)
+    cur.execute("""
+        UPDATE ai_models
+        SET name = 'deepseek-v4-pro'
+        WHERE type = 'text' AND name = 'deepseek-reasoner' AND url = 'deepseek-v4-pro'
+    """)
+    cur.execute("""
+        UPDATE ai_platforms
+        SET url = %s
+        WHERE name ILIKE 'DeepSeek%%'
+          AND url IN (
+              'https://api.deepseek.com',
+              'https://api.deepseek.com/v1',
+              'https://api.deepseek.com/v1/chat/completions'
+          )
+    """, (_DEEPSEEK_V4_ENDPOINT,))
+
 MIGRATIONS = [
     (2026071601, _migrate_seedance_platform),
     (2026071701, _migrate_seedance_prices),
+    (2026072501, _migrate_deepseek_v4),
 ]
 
 # ---------------------------------------------------------------------------
