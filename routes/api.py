@@ -783,9 +783,9 @@ def api_workflow_restart():
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
     write_log_entry(None, 'api', 'Перезапуск приложения вручную', level='info')
-    from common.restart import schedule_app_restart
+    from common.restart import request_app_restart
 
-    schedule_app_restart()
+    request_app_restart()
     return jsonify({"ok": True})
 
 @bp.route("/batch/<batch_id>/video", methods=["GET"])

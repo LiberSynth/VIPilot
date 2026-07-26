@@ -49,11 +49,11 @@ class TestDoRestart:
         execv.assert_called_once()
 
 
-class TestScheduleAppRestart:
+class TestRequestAppRestart:
     def test_starts_daemon_thread(self):
         with patch.object(restart_mod.threading, "Thread") as thread_cls:
             thread_cls.return_value = MagicMock()
-            restart_mod.schedule_app_restart()
+            restart_mod.request_app_restart()
         thread_cls.assert_called_once()
         kwargs = thread_cls.call_args.kwargs
         assert kwargs["target"] is restart_mod._do_restart

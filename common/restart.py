@@ -120,5 +120,5 @@ def _do_restart() -> None:
     _restart_via_execv()
 
 
-def schedule_app_restart() -> None:
+def request_app_restart() -> None:
     threading.Thread(target=_do_restart, daemon=True).start()
