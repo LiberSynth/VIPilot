@@ -385,12 +385,23 @@ def ensure_single_instance() -> None:
             _instance_lock_file = fh
             return
 
+def _server_port() -> int:
+    raw = os.environ.get("PORT", "5000")
+    try:
+        port = int(str(raw).strip())
+    except (TypeError, ValueError):
+        raise RuntimeError(f"Некорректный PORT={raw!r}: ожидается целое число") from None
+    if not (1 <= port <= 65535):
+        raise RuntimeError(f"Некорректный PORT={port}: допустимый диапазон 1..65535")
+    return port
+
 def run_foreground(flask_app, module_name: str) -> None:
     """HTTP-сервер при запуске python main.py (не при import main:app)."""
     if module_name != "__main__":
         return
+    port = _server_port()
     if platform.system() == "Windows":
         from waitress import serve
-        serve(flask_app, host="0.0.0.0", port=5000)
+        serve(flask_app, host="0.0.0.0", port=port)
     else:
-        flask_app.run(host="0.0.0.0", port=5000, debug=False)
+        flask_app.run(host="0.0.0.0", port=port, debug=False)
