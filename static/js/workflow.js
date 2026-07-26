@@ -76,6 +76,8 @@ function wfDeepDebugging(checked) {
     .catch(function() { showToast('Ошибка соединения', 'error'); });
 }
 
+var RESTART_TIMEOUT_MS = 30 * 1000;
+
 function openRestartDialog() {
   new ConfirmDialog({
     title: 'Перезапустить движок?',
@@ -86,14 +88,36 @@ function openRestartDialog() {
     onConfirm: function(btn, dlg) {
       btn.disabled    = true;
       btn.textContent = 'Перезапуск…';
-      fetch('/api/workflow/restart', { method: 'POST' })
-        .then(function(r) { return r.json(); })
-        .then(function() {
+      fetchWithTimeout('/api/workflow/restart', { method: 'POST' }, RESTART_TIMEOUT_MS)
+        .then(function(r) {
+          if (!r.ok) {
+            return r.text().then(function(body) {
+              throw new Error('HTTP ' + r.status + (body ? ': ' + body.slice(0, 120) : ''));
+            });
+          }
+          return r.json();
+        })
+        .then(function(data) {
+          if (!data.ok) {
+            throw new Error(data.error || 'неизвестная ошибка');
+          }
           dlg.close();
           showToast('Перезапуск… страница обновится автоматически', 'success');
           setTimeout(function() { location.reload(); }, 4000);
         })
-        .catch(function() { dlg.close(); showToast('Ошибка соединения', 'error'); });
+        .catch(function(err) {
+          dlg.close();
+          if (err && err.name === 'AbortError') {
+            showToast(
+              'Ответ в браузере не дождались (таймаут). Перезапуск на сервере может ещё идти — '
+              + 'обновите страницу через несколько секунд.',
+              'warn'
+            );
+            return;
+          }
+          var msg = (err && err.message) ? err.message : 'неизвестная ошибка';
+          showToast('Ошибка перезапуска: ' + msg, 'error');
+        });
     },
   }).open();
 }

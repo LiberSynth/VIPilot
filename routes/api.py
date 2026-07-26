@@ -783,28 +783,9 @@ def api_workflow_restart():
     if not is_authenticated():
         return jsonify({"error": "unauthorized"}), 401
     write_log_entry(None, 'api', 'Перезапуск приложения вручную', level='info')
+    from common.restart import schedule_app_restart
 
-    def _do_restart():
-        import time as _time
-        import sys as _sys
-        import log.log as log_state
-
-        _time.sleep(0.8)
-        with log_state._system_log_lock:
-            already = log_state._lifecycle_stop_logged
-            if not already:
-                log_state._lifecycle_stop_logged = True
-        if not already:
-            write_log_entry(None, 'main', 'Приложение остановлено', level='info')
-        # Закрываем все унаследованные файловые дескрипторы (в т.ч. сокет Flask),
-        # чтобы новый процесс мог занять порт 5000 без конфликтов.
-        try:
-            os.closerange(3, 4096)
-        except Exception:
-            pass
-        os.execv(_sys.executable, [_sys.executable] + _sys.argv)
-
-    threading.Thread(target=_do_restart, daemon=True).start()
+    schedule_app_restart()
     return jsonify({"ok": True})
 
 @bp.route("/batch/<batch_id>/video", methods=["GET"])
