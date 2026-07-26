@@ -3,6 +3,8 @@ Pipeline 6 — Публикация.
 Принимает batch_id, публикует видео на все активные платформы.
 """
 
+import threading
+
 import common.environment as environment
 from utils.notify import notify_failure
 from db import (
@@ -28,12 +30,71 @@ from clients import rutube as rutube_client
 from clients.rutube import RutubeCsrfExpired, RutubeSessionMissing
 from clients import vkvideo as vkvideo_client
 from clients.vkvideo import VkVideoCsrfExpired, VkVideoSessionMissing
+from services.browser_base import kill_pipeline_browser_for_batch
 from services.publish_batch_browser import (
     PW_PUBLISH_SLUGS,
     PublishBatchBrowserSession,
     finalize_publish_batch_browser,
     pw_step_count,
 )
+
+_PW_STEP_HARD_TIMEOUT_MS = 180_000
+
+
+class _PwStepHardTimeoutGuard:
+    def __init__(self, *, batch_id, category, slug: str, method: str, timeout_ms: int):
+        self._batch_id = batch_id
+        self._category = category
+        self._slug = slug
+        self._method = method
+        self._timeout_ms = timeout_ms
+        self._stop_event = threading.Event()
+        self._thread = threading.Thread(
+            target=self._watch,
+            daemon=True,
+            name=f"publish-hard-timeout-{slug}-{method}",
+        )
+        self.timed_out = False
+        self.error_message: str | None = None
+
+    def start(self) -> None:
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop_event.set()
+        if self._thread.is_alive():
+            self._thread.join(timeout=5.0)
+
+    def _watch(self) -> None:
+        if self._stop_event.wait(self._timeout_ms / 1000):
+            return
+
+        self.timed_out = True
+        self.error_message = f"hard timeout {self._timeout_ms} ms"
+        step_name = f"{self._slug}.{self._method}"
+        write_log_entry(
+            self._batch_id,
+            self._category,
+            f"Шаг {step_name}: hard timeout {self._timeout_ms} мс — принудительно прерываю.",
+            level="warn",
+        )
+        killed, detail, pid = kill_pipeline_browser_for_batch(self._batch_id)
+        pid_msg = f", pid={pid}" if pid is not None else ""
+        if killed:
+            write_log_entry(
+                self._batch_id,
+                self._category,
+                f"Шаг {step_name}: Chromium остановлен{pid_msg}.",
+                level="warn",
+            )
+            return
+        write_log_entry(
+            self._batch_id,
+            self._category,
+            f"Шаг {step_name}: не удалось остановить Chromium ({detail}{pid_msg}).",
+            level="warn",
+        )
+
 
 def _get_video(batch_id, category):
     """Возвращает видеоданные батча (transcoded или original).
@@ -373,25 +434,42 @@ def run(batch_id, category):
                 keep_browser = batch_browser_session.keep_browser_after_step()
 
             step_error = None
-            try:
-                ok = _call_client(
-                    slug, method, batch_id, category, target, pub_title,
-                    batch_session=pw_session, keep_browser=keep_browser,
+            timeout_guard = None
+            if slug in PW_PUBLISH_SLUGS:
+                timeout_guard = _PwStepHardTimeoutGuard(
+                    batch_id=batch_id,
+                    category=category,
+                    slug=slug,
+                    method=method,
+                    timeout_ms=_PW_STEP_HARD_TIMEOUT_MS,
                 )
-            except ShutdownRequested:
-                raise
-            except (DzenSessionMissing, DzenCsrfExpired, RutubeSessionMissing, RutubeCsrfExpired, VkVideoSessionMissing, VkVideoCsrfExpired) as e:
+                timeout_guard.start()
+            try:
+                try:
+                    ok = _call_client(
+                        slug, method, batch_id, category, target, pub_title,
+                        batch_session=pw_session, keep_browser=keep_browser,
+                    )
+                except ShutdownRequested:
+                    raise
+                except (DzenSessionMissing, DzenCsrfExpired, RutubeSessionMissing, RutubeCsrfExpired, VkVideoSessionMissing, VkVideoCsrfExpired) as e:
+                    ok = False
+                    step_error = str(e)
+                    write_log_entry(batch_id, category, f'{slug}.{method}: {e}', level='error')
+                    write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} — phase=step_exception, step={}.{}, type={}, msg={}", batch_id, slug, method, type(e).__name__, step_error), level='silent')
+                except Exception as e:
+                    if is_shutting_down() and is_playwright_shutdown_error(e):
+                        raise ShutdownRequested() from e
+                    ok = False
+                    step_error = str(e)
+                    write_log_entry(batch_id, category, f'{slug}.{method}: неожиданная ошибка: {e}', level='error')
+                    write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} — phase=step_exception, step={}.{}, type={}, msg={}", batch_id, slug, method, type(e).__name__, step_error), level='silent')
+            finally:
+                if timeout_guard is not None:
+                    timeout_guard.stop()
+            if timeout_guard is not None and timeout_guard.timed_out:
                 ok = False
-                step_error = str(e)
-                write_log_entry(batch_id, category, f'{slug}.{method}: {e}', level='error')
-                write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} — phase=step_exception, step={}.{}, type={}, msg={}", batch_id, slug, method, type(e).__name__, step_error), level='silent')
-            except Exception as e:
-                if is_shutting_down() and is_playwright_shutdown_error(e):
-                    raise ShutdownRequested() from e
-                ok = False
-                step_error = str(e)
-                write_log_entry(batch_id, category, f'{slug}.{method}: неожиданная ошибка: {e}', level='error')
-                write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} — phase=step_exception, step={}.{}, type={}, msg={}", batch_id, slug, method, type(e).__name__, step_error), level='silent')
+                step_error = timeout_guard.error_message or step_error
 
             if not ok:
                 failed_steps.append(f"{slug}.{method}")

@@ -10,7 +10,11 @@ from __future__ import annotations
 from typing import Callable
 
 from log import write_log_entry
-from services.browser_base import PlatformBrowser
+from services.browser_base import (
+    PlatformBrowser,
+    register_pipeline_browser_handle,
+    unregister_pipeline_browser_handle,
+)
 from services.publish_broadcast import begin_pw_step_broadcast, end_pw_step_broadcast
 from services.publish_preview_capture import allocate_cdp_debug_port, cdp_url_for_port
 
@@ -68,6 +72,7 @@ class PublishBatchBrowserSession:
             headless=True,
             args=_pipeline_args,
         )
+        register_pipeline_browser_handle(self.batch_id, self._browser)
         self._cdp_url = cdp_url_for_port(_debug_port)
         self._open = True
         write_log_entry(
@@ -135,10 +140,14 @@ class PublishBatchBrowserSession:
     def close(self) -> None:
         if not self._open:
             return
+        browser = self._browser
         try:
-            self._browser.close()
+            if browser is not None:
+                browser.close()
         except Exception:
             pass
+        finally:
+            unregister_pipeline_browser_handle(self.batch_id, browser)
         try:
             self._pw.stop()
         except Exception:

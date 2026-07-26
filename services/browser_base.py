@@ -6,13 +6,96 @@
 """
 
 import base64
+import os
 import queue
+import signal
+import subprocess
 import threading
 import time
 from typing import Optional
 
 from log import write_log_entry
 from utils.utils import fmt_id_msg
+
+_pipeline_browser_lock = threading.Lock()
+_pipeline_browser_by_batch: dict[str, object] = {}
+
+
+def _extract_browser_pid(browser) -> int | None:
+    if browser is None:
+        return None
+    try:
+        impl = getattr(browser, "_impl_obj", None)
+        conn = getattr(impl, "_connection", None)
+        transport = getattr(conn, "_transport", None)
+        proc = getattr(transport, "_proc", None)
+        pid = getattr(proc, "pid", None)
+        return int(pid) if pid is not None else None
+    except Exception:
+        return None
+
+
+def _force_kill_pid(pid: int) -> tuple[bool, str]:
+    if pid <= 0:
+        return False, "invalid pid"
+    if os.name == "nt":
+        try:
+            proc = subprocess.run(
+                ["taskkill", "/PID", str(pid), "/T", "/F"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        except Exception as exc:
+            return False, str(exc)
+        output = ((proc.stdout or "") + " " + (proc.stderr or "")).lower()
+        if proc.returncode == 0:
+            return True, "killed"
+        if "not found" in output or "не найден" in output:
+            return True, "already exited"
+        return False, output.strip() or f"taskkill exit_code={proc.returncode}"
+    try:
+        os.kill(pid, signal.SIGKILL)
+        return True, "killed"
+    except ProcessLookupError:
+        return True, "already exited"
+    except Exception as exc:
+        return False, str(exc)
+
+
+def register_pipeline_browser_handle(batch_id: str | None, browser) -> None:
+    if not batch_id or browser is None:
+        return
+    with _pipeline_browser_lock:
+        _pipeline_browser_by_batch[str(batch_id)] = browser
+
+
+def unregister_pipeline_browser_handle(batch_id: str | None, browser=None) -> None:
+    if not batch_id:
+        return
+    key = str(batch_id)
+    with _pipeline_browser_lock:
+        cur = _pipeline_browser_by_batch.get(key)
+        if cur is None:
+            return
+        if browser is not None and cur is not browser:
+            return
+        _pipeline_browser_by_batch.pop(key, None)
+
+
+def kill_pipeline_browser_for_batch(batch_id: str | None) -> tuple[bool, str, int | None]:
+    if not batch_id:
+        return False, "batch id missing", None
+    key = str(batch_id)
+    with _pipeline_browser_lock:
+        browser = _pipeline_browser_by_batch.get(key)
+    if browser is None:
+        return False, "browser not registered", None
+    pid = _extract_browser_pid(browser)
+    if pid is None:
+        return False, "browser pid unavailable", None
+    ok, detail = _force_kill_pid(pid)
+    return ok, detail, pid
 
 class PlatformBrowser:
     """Playwright-браузер для авторизации и публикации на одной платформе."""
@@ -417,6 +500,7 @@ class PlatformBrowser:
                     headless=True,
                     args=_pipeline_args,
                 )
+                register_pipeline_browser_handle(batch_id, browser)
                 ctx = browser.new_context(
                     user_agent=self._USER_AGENT,
                     locale="ru-RU",
@@ -456,6 +540,8 @@ class PlatformBrowser:
                         write_log_entry(batch_id, category, "Браузер пайплайна закрыт.", level="silent")
                     except Exception:
                         pass
+                    finally:
+                        unregister_pipeline_browser_handle(batch_id, browser)
 
         except Exception as e:
             result = {"ok": False, "error": f"Playwright: {e}"}
