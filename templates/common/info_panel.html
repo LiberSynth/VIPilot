@@ -1,5 +1,5 @@
 {% from 'common/product_evolution.html' import product_evolution %}
-{% macro info_panel(caption, description, show_developer=False, app_version='') %}
+{% macro info_panel(caption, description, show_developer=False, show_help=False, app_version='') %}
 <div class="card" style="margin-top:12px">
   <div class="card-title">О программе</div>
   <div style="display:flex;align-items:center;gap:14px;margin-top:14px">
@@ -26,6 +26,41 @@
 </div>
 
 {{ product_evolution() }}
+
+{% if show_help %}
+<div class="cp-card" style="margin-top:12px" id="help-info-card">
+  <div class="cp-header" onclick="this.closest('.cp-card').classList.toggle('open')">
+    <div class="cp-header-left">
+      <span class="cp-title">Справка</span>
+    </div>
+    <span class="cp-arrow">▾</span>
+  </div>
+  <div class="cp-body">
+    <div class="dev-sub">
+      <div class="dev-sub-header" onclick="this.parentElement.classList.toggle('open')">
+        <span class="dev-sub-title">Плейсхолдеры в промптах</span>
+        <span class="dev-sub-arrow">▾</span>
+      </div>
+      <div class="dev-sub-body">
+        <div style="font-size:13px;color:#c0c0d8;line-height:1.7">
+          <p style="margin:0 0 12px">Перед отправкой в модели поля промптов проходят автоподстановку параметров из настроек и базы данных.</p>
+
+          <ul style="margin:0 0 12px 18px;padding:0;line-height:1.8">
+            <li><code>{продолжительность}</code> — длительность ролика в секундах. В «Форматном промпте», «Промпте генерации сюжета» и «Метапромпте T2V» берётся из параметра <code>video_duration</code>; в «Суффиксе видео-промпта» берётся фактическая длительность после коррекции под ограничения выбранной видео-модели.</li>
+            <li><code>{количество_слов}</code> — расчётное число слов для сюжета: <code>round(video_duration * words_per_second)</code>. Работает во всех полях промптов.</li>
+            <li><code>{хорошие_образцы}</code> — случайная выборка сюжетов с оценкой «good» (заголовок + текст), до лимита <code>good_samples_count</code>. Работает во всех полях промптов.</li>
+            <li><code>{плохие_образцы}</code> — список сюжетов с оценкой «bad» (заголовок + текст). Работает во всех полях промптов.</li>
+            <li><code>{использованные_сюжеты}</code> — список уже использованных сюжетов (заголовок + текст). Работает во всех полях промптов.</li>
+            <li><code>{сюжет}</code> — текст выбранного сюжета, который конвертируется в T2V-промпт. Подставляется в «Метапромпте T2V»; в остальных полях не заменяется.</li>
+          </ul>
+
+          <p style="margin:0;color:#888899;font-style:italic">Если для списковых параметров нет данных, подставляется пустой текст.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
 
 {% if show_developer %}
 <div class="cp-card" style="margin-top:12px" id="dev-info-card">
