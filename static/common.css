@@ -685,7 +685,13 @@
   }
   .cp-header:active { background: rgba(255,255,255,.03); }
   .cp-header-left { display: flex; align-items: center; gap: 10px; }
-  .cp-title { font-size: 14px; font-weight: 600; color: #e0e0f0; }
+  .cp-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: #8888a8;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+  }
   .cp-arrow {
     font-size: 14px; color: #555; transition: transform .2s;
   }
