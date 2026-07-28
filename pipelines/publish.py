@@ -467,7 +467,8 @@ def run(batch_id, category):
             finally:
                 if timeout_guard is not None:
                     timeout_guard.stop()
-            if timeout_guard is not None and timeout_guard.timed_out:
+            step_timed_out = timeout_guard is not None and timeout_guard.timed_out
+            if step_timed_out:
                 ok = False
                 step_error = timeout_guard.error_message or step_error
 
@@ -479,7 +480,15 @@ def run(batch_id, category):
                 expected_from = failed_status
                 write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} — phase=step_failed, step={}.{}, next_expected_from={}", batch_id, slug, method, expected_from), level='silent')
                 if pw_session is not None and pw_session.is_open:
-                    pw_session.close()
+                    if step_timed_out:
+                        write_log_entry(
+                            batch_id,
+                            category,
+                            f"Шаг {slug}.{method}: close() пропущен после hard timeout.",
+                            level="silent",
+                        )
+                    else:
+                        pw_session.close()
                     batch_browser_session = None
                 continue
 

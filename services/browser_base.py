@@ -95,6 +95,8 @@ def kill_pipeline_browser_for_batch(batch_id: str | None) -> tuple[bool, str, in
     if pid is None:
         return False, "browser pid unavailable", None
     ok, detail = _force_kill_pid(pid)
+    if ok:
+        unregister_pipeline_browser_handle(batch_id, browser)
     return ok, detail, pid
 
 class PlatformBrowser:
