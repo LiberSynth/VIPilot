@@ -315,10 +315,7 @@ def run(batch_id, category):
                 level='silent',
             )
 
-            if not db_claim_batch_status(batch_id, expected_from, posting_status):
-                write_log_entry(batch_id, category, 'Батч уже захвачен другим процессом — пропуск')
-                write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} уже захвачен другим процессом для {} — пропуск", batch_id, posting_status), level='silent')
-                return
+            db_claim_batch_status(batch_id, expected_from, posting_status)
 
             if not pub_title:
                 pub_title = build_publication_title()
