@@ -361,8 +361,6 @@ def run(batch_id, category):
                 db_set_batch_status(batch_id, failed_status)
                 expected_from = failed_status
                 write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} — phase=step_failed, step={}.{}, next_expected_from={}", batch_id, slug, method, expected_from), level='silent')
-                if pw_session is not None and pw_session.is_open:
-                    pw_session.close()
                 continue
 
             any_ok = True
