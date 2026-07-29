@@ -30,7 +30,6 @@ from clients import rutube as rutube_client
 from clients.rutube import RutubeCsrfExpired, RutubeSessionMissing
 from clients import vkvideo as vkvideo_client
 from clients.vkvideo import VkVideoCsrfExpired, VkVideoSessionMissing
-from services.browser_base import kill_pipeline_browser_for_batch
 from services.publish_batch_browser import (
     PW_PUBLISH_SLUGS,
     PublishBatchBrowserSession,
@@ -41,59 +40,42 @@ from services.publish_batch_browser import (
 _PW_STEP_HARD_TIMEOUT_MS = 180_000
 
 
-class _PwStepHardTimeoutGuard:
-    def __init__(self, *, batch_id, category, slug: str, method: str, timeout_ms: int):
-        self._batch_id = batch_id
-        self._category = category
-        self._slug = slug
-        self._method = method
-        self._timeout_ms = timeout_ms
-        self._stop_event = threading.Event()
-        self._thread = threading.Thread(
-            target=self._watch,
-            daemon=True,
-            name=f"publish-hard-timeout-{slug}-{method}",
+def _has_pw_steps_after(steps, step_idx: int) -> bool:
+    return any(s in PW_PUBLISH_SLUGS for s, _m, _t in steps[step_idx + 1 :])
+
+
+def _execute_step_call(
+    slug,
+    method,
+    batch_id,
+    category,
+    target,
+    pub_title,
+    *,
+    batch_session=None,
+    keep_browser=False,
+) -> tuple[bool, str | None, bool]:
+    step_error = None
+    try:
+        ok = _call_client(
+            slug, method, batch_id, category, target, pub_title,
+            batch_session=batch_session, keep_browser=keep_browser,
         )
-        self.timed_out = False
-        self.error_message: str | None = None
-
-    def start(self) -> None:
-        self._thread.start()
-
-    def stop(self) -> None:
-        self._stop_event.set()
-        if self._thread.is_alive():
-            self._thread.join(timeout=5.0)
-
-    def _watch(self) -> None:
-        if self._stop_event.wait(self._timeout_ms / 1000):
-            return
-
-        self.timed_out = True
-        self.error_message = f"hard timeout {self._timeout_ms} ms"
-        step_name = f"{self._slug}.{self._method}"
-        write_log_entry(
-            self._batch_id,
-            self._category,
-            f"Шаг {step_name}: hard timeout {self._timeout_ms} мс — принудительно прерываю.",
-            level="warn",
-        )
-        killed, detail, pid = kill_pipeline_browser_for_batch(self._batch_id)
-        pid_msg = f", pid={pid}" if pid is not None else ""
-        if killed:
-            write_log_entry(
-                self._batch_id,
-                self._category,
-                f"Шаг {step_name}: Chromium остановлен{pid_msg}.",
-                level="warn",
-            )
-            return
-        write_log_entry(
-            self._batch_id,
-            self._category,
-            f"Шаг {step_name}: не удалось остановить Chromium ({detail}{pid_msg}).",
-            level="warn",
-        )
+        return ok, None, False
+    except ShutdownRequested:
+        return False, None, True
+    except (DzenSessionMissing, DzenCsrfExpired, RutubeSessionMissing, RutubeCsrfExpired, VkVideoSessionMissing, VkVideoCsrfExpired) as e:
+        step_error = str(e)
+        write_log_entry(batch_id, category, f'{slug}.{method}: {e}', level='error')
+        write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} — phase=step_exception, step={}.{}, type={}, msg={}", batch_id, slug, method, type(e).__name__, step_error), level='silent')
+        return False, step_error, False
+    except Exception as e:
+        if is_shutting_down() and is_playwright_shutdown_error(e):
+            return False, None, True
+        step_error = str(e)
+        write_log_entry(batch_id, category, f'{slug}.{method}: неожиданная ошибка: {e}', level='error')
+        write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} — phase=step_exception, step={}.{}, type={}, msg={}", batch_id, slug, method, type(e).__name__, step_error), level='silent')
+        return False, step_error, False
 
 
 def _get_video(batch_id, category):
@@ -389,7 +371,7 @@ def run(batch_id, category):
     expected_from = status
     batch_browser_session = (
         PublishBatchBrowserSession(batch_id, category, steps)
-        if pw_step_count(steps) >= 2 else None
+        if pw_step_count(steps) >= 1 else None
     )
     try:
         for step_idx, (slug, method, target) in enumerate(steps):
@@ -434,43 +416,62 @@ def run(batch_id, category):
                 keep_browser = batch_browser_session.keep_browser_after_step()
 
             step_error = None
-            timeout_guard = None
+            shutdown_requested = False
             if slug in PW_PUBLISH_SLUGS:
-                timeout_guard = _PwStepHardTimeoutGuard(
-                    batch_id=batch_id,
-                    category=category,
-                    slug=slug,
-                    method=method,
-                    timeout_ms=_PW_STEP_HARD_TIMEOUT_MS,
-                )
-                timeout_guard.start()
-            try:
-                try:
-                    ok = _call_client(
+                call_result: dict[str, object] = {}
+                call_done = threading.Event()
+
+                def _run_step_call() -> None:
+                    ok_value, err_value, shutdown_value = _execute_step_call(
                         slug, method, batch_id, category, target, pub_title,
                         batch_session=pw_session, keep_browser=keep_browser,
                     )
-                except ShutdownRequested:
-                    raise
-                except (DzenSessionMissing, DzenCsrfExpired, RutubeSessionMissing, RutubeCsrfExpired, VkVideoSessionMissing, VkVideoCsrfExpired) as e:
+                    call_result["ok"] = ok_value
+                    call_result["error"] = err_value
+                    call_result["shutdown"] = shutdown_value
+                    call_done.set()
+
+                worker = threading.Thread(
+                    target=_run_step_call,
+                    daemon=True,
+                    name=f"publish-step-{slug}-{method}",
+                )
+                worker.start()
+                if not call_done.wait(_PW_STEP_HARD_TIMEOUT_MS / 1000):
                     ok = False
-                    step_error = str(e)
-                    write_log_entry(batch_id, category, f'{slug}.{method}: {e}', level='error')
-                    write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} — phase=step_exception, step={}.{}, type={}, msg={}", batch_id, slug, method, type(e).__name__, step_error), level='silent')
-                except Exception as e:
-                    if is_shutting_down() and is_playwright_shutdown_error(e):
-                        raise ShutdownRequested() from e
-                    ok = False
-                    step_error = str(e)
-                    write_log_entry(batch_id, category, f'{slug}.{method}: неожиданная ошибка: {e}', level='error')
-                    write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} — phase=step_exception, step={}.{}, type={}, msg={}", batch_id, slug, method, type(e).__name__, step_error), level='silent')
-            finally:
-                if timeout_guard is not None:
-                    timeout_guard.stop()
-            step_timed_out = timeout_guard is not None and timeout_guard.timed_out
-            if step_timed_out:
-                ok = False
-                step_error = timeout_guard.error_message or step_error
+                    step_error = f"hard timeout {_PW_STEP_HARD_TIMEOUT_MS} ms"
+                    write_log_entry(
+                        batch_id,
+                        category,
+                        f"Шаг {slug}.{method}: hard timeout {_PW_STEP_HARD_TIMEOUT_MS} мс — прекращаю ожидание шага.",
+                        level="warn",
+                    )
+                    if pw_session is not None and pw_session.is_open:
+                        try:
+                            pw_session.close()
+                        except Exception as close_err:
+                            write_log_entry(
+                                batch_id,
+                                category,
+                                f"Шаг {slug}.{method}: close() после hard timeout не удался: {close_err}",
+                                level="warn",
+                            )
+                        finally:
+                            pw_session = None
+                    batch_browser_session = None
+                    call_done.wait(2.0)
+                else:
+                    shutdown_requested = bool(call_result.get("shutdown"))
+                    ok = bool(call_result.get("ok", False))
+                    step_error = call_result.get("error")
+            else:
+                ok, step_error, shutdown_requested = _execute_step_call(
+                    slug, method, batch_id, category, target, pub_title,
+                    batch_session=pw_session, keep_browser=keep_browser,
+                )
+
+            if shutdown_requested:
+                raise ShutdownRequested()
 
             if not ok:
                 failed_steps.append(f"{slug}.{method}")
@@ -480,16 +481,12 @@ def run(batch_id, category):
                 expected_from = failed_status
                 write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} — phase=step_failed, step={}.{}, next_expected_from={}", batch_id, slug, method, expected_from), level='silent')
                 if pw_session is not None and pw_session.is_open:
-                    if step_timed_out:
-                        write_log_entry(
-                            batch_id,
-                            category,
-                            f"Шаг {slug}.{method}: close() пропущен после hard timeout.",
-                            level="silent",
-                        )
+                    pw_session.close()
+                if slug in PW_PUBLISH_SLUGS:
+                    if _has_pw_steps_after(steps, step_idx):
+                        batch_browser_session = PublishBatchBrowserSession(batch_id, category, steps)
                     else:
-                        pw_session.close()
-                    batch_browser_session = None
+                        batch_browser_session = None
                 continue
 
             any_ok = True
