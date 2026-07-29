@@ -213,15 +213,11 @@ def run(batch_id, category):
     if parsed is None and status != 'pending':
         return
 
-    if parsed is None:
-        if not active_targets:
-            _fail_publish_config(batch_id, category, 'Нет активных таргетов — публикация невозможна')
-            return
-    elif not active_targets:
-        msg = 'Нет активных таргетов — публикация невозможна'
-        write_log_entry(batch_id, category, msg, level='error')
-        write_log_entry(batch_id, category, f"{msg}", level='silent')
-        raise AppException(batch_id, 'publish', msg)
+    if not active_targets:
+        msg = 'Нет активных таргетов — публикация завершена без действий'
+        db_set_batch_status(batch_id, 'completed')
+        write_log_entry(batch_id, category, msg, level='warn')
+        return
 
     steps = _build_steps(active_targets)
     write_log_entry(
