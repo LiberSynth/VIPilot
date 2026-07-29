@@ -231,19 +231,6 @@ def run(batch_id, category):
         write_log_entry(batch_id, category, msg, level='warn')
         return
 
-    # Проверяем зависимость: vk.clip_wall требует, чтобы vkvideo-таргет
-    # был раньше по списку шагов — иначе clip_url не будет записан в БД к моменту шага.
-    _vkvideo_positions = {i for i, (s, m, _) in enumerate(steps) if s == 'vkvideo'}
-    for _i, (_s, _m, _) in enumerate(steps):
-        if _s == 'vk' and _m == 'clip_wall':
-            if not any(vi < _i for vi in _vkvideo_positions):
-                _msg = ('vk.clip_wall зависит от таргета vkvideo, '
-                        'но vkvideo отсутствует или стоит позже в списке таргетов — '
-                        'исправьте порядок таргетов в настройках')
-                write_log_entry(batch_id, category, _msg, level='error')
-                write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {}: {}", batch_id, _msg), level='silent')
-                raise AppException(batch_id, 'publish', _msg)
-
     target_names = ', '.join(t['name'] for t in active_targets)
 
     resume_from = None
