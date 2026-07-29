@@ -226,14 +226,10 @@ def run(batch_id, category):
         level='silent',
     )
     if not steps:
-        if parsed is None:
-            _fail_publish_config(batch_id, category, 'Нет методов публикации в конфиге таргетов')
-            return
-        else:
-            msg = 'Нет методов публикации в конфиге таргетов'
-            write_log_entry(batch_id, category, msg, level='error')
-            write_log_entry(batch_id, category, f"{msg}", level='silent')
-            raise AppException(batch_id, 'publish', msg)
+        msg = 'Нет методов публикации в конфиге таргетов — публикация завершена без действий'
+        db_set_batch_status(batch_id, 'completed')
+        write_log_entry(batch_id, category, msg, level='warn')
+        return
 
     # Проверяем зависимость: vk.clip_wall требует, чтобы vkvideo-таргет
     # был раньше по списку шагов — иначе clip_url не будет записан в БД к моменту шага.
