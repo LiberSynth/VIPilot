@@ -24,6 +24,6 @@ def get_pipeline(batch_type: str, status: str):
     if status in ('pending', 'processing'):
         return None
 
-    if any(status.endswith(sfx) for sfx in PUBLISH_ROUTING_SUFFIXES):
+    if batch_type == 'publish' and any(status.endswith(sfx) for sfx in PUBLISH_ROUTING_SUFFIXES):
         return publish
     return None

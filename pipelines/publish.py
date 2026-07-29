@@ -194,18 +194,6 @@ def _build_steps(active_targets):
 def run(batch_id, category):
     _ = environment.snapshot()
     batch = db_get_batch_by_id(batch_id)
-    if not batch:
-        return
-    if batch.get('type') == 'movie':
-        write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} type=movie — шаг пропущен", batch_id), level='silent')
-        return
-    if batch.get('type') != 'publish':
-        write_log_entry(
-            batch_id, category,
-            fmt_id_msg("[publish] Батч {} type={} — шаг пропущен", batch_id, batch.get('type')),
-            level='silent',
-        )
-        return
 
     status = batch['status']
     active_targets = db_get_active_targets()
