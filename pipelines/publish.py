@@ -210,7 +210,6 @@ def _run_publish(batch_id, category):
 
     status = batch['status']
     active_targets = db_get_active_targets()
-    source_label = batch.get('batch_id_source') or 'NULL'
     write_log_entry(
         batch_id, category,
         fmt_id_msg(
@@ -219,7 +218,6 @@ def _run_publish(batch_id, category):
         ),
         level='silent',
     )
-    write_log_entry(batch_id, category, fmt_id_msg("Передающий батч: {}", source_label))
 
     parsed = _parse_composite_status(status)
 
