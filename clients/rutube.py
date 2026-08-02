@@ -68,10 +68,12 @@ def publish(
     Возвращает True при успехе.
     """
     from services.browser_registry import get_browser as _get_browser
+    from services.publish_error_dump import save_publish_error_dump
     from db import db_get_target_session_context
 
     cfg = target_config or {}
     person_id = cfg.get("person_id", "")
+    platform_browser = _get_browser("rutube")
 
     if not person_id:
         raise RutubeApiError("person_id не задан в настройках Рутьюб")
@@ -131,16 +133,40 @@ def publish(
                         mark_submitted=mark_submitted,
                     )
                     return
-                except PublishUiWaitTimeout as exc:
-                    if gate["submitted"] or attempt >= _PUBLISH_UI_ATTEMPTS:
-                        raise RutubeApiError(str(exc)) from exc
+                except Exception as exc:
+                    save_publish_error_dump(
+                        page,
+                        batch_id=batch_id,
+                        category=category,
+                        target_name=target_name,
+                        error=str(exc),
+                        platform_browser=platform_browser,
+                    )
                     write_log_entry(
-                        batch_id, category,
-                        _tn(target_name, f"Таймаут UI (ретрай): {exc}"),
+                        batch_id,
+                        category,
+                        _tn(
+                            target_name,
+                            "Попытка публикации "
+                            f"{attempt}/{_PUBLISH_UI_ATTEMPTS} завершилась ошибкой: "
+                            f"{type(exc).__name__}: {exc}",
+                        ),
                         level="warn",
                     )
+                    if (
+                        isinstance(exc, PublishUiWaitTimeout)
+                        and not gate["submitted"]
+                        and attempt < _PUBLISH_UI_ATTEMPTS
+                    ):
+                        write_log_entry(
+                            batch_id, category,
+                            _tn(target_name, f"Таймаут UI (ретрай): {exc}"),
+                            level="warn",
+                        )
+                        continue
+                    raise
 
-        result = _get_browser("rutube").run_pipeline_browser(
+        result = platform_browser.run_pipeline_browser(
             _do_publish, target_id, batch_id=batch_id, category=category,
             batch_session=batch_session, keep_browser=keep_browser, target_name=target_name,
         )
@@ -154,10 +180,7 @@ def publish(
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
         if not keep_browser and batch_session is None:
-            try:
-                _get_browser("rutube").stop(batch_id=batch_id, category=category)
-            except Exception:
-                pass
+            platform_browser.stop(batch_id=batch_id, category=category)
 
     write_log_entry(batch_id, category, _tn(target_name, "видео опубликовано успешно"))
     return True

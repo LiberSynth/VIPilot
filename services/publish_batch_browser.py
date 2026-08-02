@@ -126,23 +126,23 @@ class PublishBatchBrowserSession:
             result = {"ok": False, "error": str(e)}
         finally:
             end_pw_step_broadcast(batch_id)
-            try:
-                ctx.close()
-            except Exception:
-                pass
+            ctx.close()
         return result
 
     def close(self) -> None:
         if not self._open:
             return
-        try:
-            self._browser.close()
-        except Exception:
-            pass
-        try:
-            self._pw.stop()
-        except Exception:
-            pass
+        close_errors: list[Exception] = []
+        if self._browser is not None:
+            try:
+                self._browser.close()
+            except Exception as exc:
+                close_errors.append(exc)
+        if self._pw is not None:
+            try:
+                self._pw.stop()
+            except Exception as exc:
+                close_errors.append(exc)
         self._browser = None
         self._pw = None
         self._open = False
@@ -151,16 +151,22 @@ class PublishBatchBrowserSession:
             "Пайплайн: общий браузер Chromium закрыт.",
             level="silent",
         )
+        if close_errors:
+            raise close_errors[0]
 
 def finalize_publish_batch_browser(batch_id: str, category) -> None:
     """Сбрасывает превью и статус после закрытия общего браузера пайплайна."""
     from services.browser_registry import clear_publish_frames_for_batch, get_browser
 
     write_log_entry(batch_id, category, "Остановка браузера запрошена.", level="info")
+    stop_error: Exception | None = None
     for slug in PW_PUBLISH_SLUGS:
         try:
             get_browser(slug).stop(batch_id=batch_id, category=category, log=False)
-        except Exception:
-            pass
+        except Exception as exc:
+            if stop_error is None:
+                stop_error = exc
     if batch_id:
         clear_publish_frames_for_batch(batch_id)
+    if stop_error is not None:
+        raise stop_error

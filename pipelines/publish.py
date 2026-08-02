@@ -23,11 +23,12 @@ from utils.utils import fmt_id_msg
 from routes.api import client_is_configured, build_publication_title
 from clients import vk
 from clients import dzen as dzen_client
-from clients.dzen import DzenCsrfExpired, DzenSessionMissing
+from clients.dzen import DzenApiError, DzenCsrfExpired, DzenSessionMissing
 from clients import rutube as rutube_client
-from clients.rutube import RutubeCsrfExpired, RutubeSessionMissing
+from clients.rutube import RutubeApiError, RutubeCsrfExpired, RutubeSessionMissing
 from clients import vkvideo as vkvideo_client
-from clients.vkvideo import VkVideoCsrfExpired, VkVideoSessionMissing
+from clients.vkvideo import VkVideoApiError, VkVideoCsrfExpired, VkVideoSessionMissing
+from services.publish_error_dump import save_publish_error_dump
 from services.publish_batch_browser import (
     PW_PUBLISH_SLUGS,
     PublishBatchBrowserSession,
@@ -147,6 +148,18 @@ _CLIENTS = {
     'vkvideo': _call_vkvideo,
 }
 
+_NON_FATAL_STEP_EXCEPTIONS = (
+    DzenSessionMissing,
+    DzenCsrfExpired,
+    DzenApiError,
+    RutubeSessionMissing,
+    RutubeCsrfExpired,
+    RutubeApiError,
+    VkVideoSessionMissing,
+    VkVideoCsrfExpired,
+    VkVideoApiError,
+)
+
 def _call_client(slug, method, batch_id, category, target, pub_title, batch_session=None, keep_browser=False):
     """Диспетчеризует вызов клиента по реестру _CLIENTS. Возвращает True при успехе."""
     handler = _CLIENTS.get(slug)
@@ -191,7 +204,7 @@ def _build_steps(active_targets):
             steps.append((slug, method, t))
     return steps
 
-def run(batch_id, category):
+def _run_publish(batch_id, category):
     _ = environment.snapshot()
     batch = db_get_batch_by_id(batch_id)
 
@@ -211,7 +224,19 @@ def run(batch_id, category):
     parsed = _parse_composite_status(status)
 
     if parsed is None and status != 'pending':
-        return
+        msg = f"Неподдерживаемый стартовый статус publish-батча: {status}"
+        write_log_entry(batch_id, category, msg, level='error')
+        write_log_entry(
+            batch_id,
+            category,
+            fmt_id_msg(
+                "[publish] Батч {} — phase=run_invalid_status, status={}",
+                batch_id,
+                status,
+            ),
+            level='silent',
+        )
+        raise AppException(batch_id, 'publish', msg)
 
     if not active_targets:
         msg = 'Нет активных таргетов — публикация завершена без действий'
@@ -341,18 +366,51 @@ def run(batch_id, category):
                 )
             except ShutdownRequested:
                 raise
-            except (DzenSessionMissing, DzenCsrfExpired, RutubeSessionMissing, RutubeCsrfExpired, VkVideoSessionMissing, VkVideoCsrfExpired) as e:
+            except _NON_FATAL_STEP_EXCEPTIONS as e:
                 ok = False
                 step_error = str(e)
+                target_name = target.get('name') or slug
+                save_publish_error_dump(
+                    batch_id=batch_id,
+                    category=category,
+                    platform=slug,
+                    target_name=target_name,
+                    error=f"{type(e).__name__}: {step_error}",
+                )
                 write_log_entry(batch_id, category, f'{slug}.{method}: {e}', level='error')
                 write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} — phase=step_exception, step={}.{}, type={}, msg={}", batch_id, slug, method, type(e).__name__, step_error), level='silent')
             except Exception as e:
                 if is_shutting_down() and is_playwright_shutdown_error(e):
                     raise ShutdownRequested() from e
-                ok = False
                 step_error = str(e)
-                write_log_entry(batch_id, category, f'{slug}.{method}: неожиданная ошибка: {e}', level='error')
-                write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} — phase=step_exception, step={}.{}, type={}, msg={}", batch_id, slug, method, type(e).__name__, step_error), level='silent')
+                target_name = target.get('name') or slug
+                save_publish_error_dump(
+                    batch_id=batch_id,
+                    category=category,
+                    platform=slug,
+                    target_name=target_name,
+                    error=f"{type(e).__name__}: {step_error}",
+                )
+                write_log_entry(
+                    batch_id,
+                    category,
+                    f'{slug}.{method}: фатальная ошибка шага: {e}',
+                    level='error',
+                )
+                write_log_entry(
+                    batch_id,
+                    category,
+                    fmt_id_msg(
+                        "[publish] Батч {} — phase=step_fatal, step={}.{}, type={}, msg={}",
+                        batch_id,
+                        slug,
+                        method,
+                        type(e).__name__,
+                        step_error,
+                    ),
+                    level='silent',
+                )
+                raise
 
             if not ok:
                 failed_steps.append(f"{slug}.{method}")
@@ -416,3 +474,36 @@ def run(batch_id, category):
         write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} ошибка публикации", batch_id), level='silent')
         write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} — phase=run_done, status=error", batch_id), level='silent')
         raise AppException(batch_id, 'publish', abt_msg)
+
+
+def run(batch_id, category):
+    try:
+        _run_publish(batch_id, category)
+    except ShutdownRequested:
+        raise
+    except Exception as e:
+        save_publish_error_dump(
+            batch_id=batch_id,
+            category=category,
+            platform='publish',
+            target_name='publish',
+            error=f"{type(e).__name__}: {e}",
+        )
+        write_log_entry(
+            batch_id,
+            category,
+            f'publish: необработанная ошибка: {e}',
+            level='error',
+        )
+        write_log_entry(
+            batch_id,
+            category,
+            fmt_id_msg(
+                "[publish] Батч {} — phase=run_exception, type={}, msg={}",
+                batch_id,
+                type(e).__name__,
+                str(e),
+            ),
+            level='silent',
+        )
+        raise

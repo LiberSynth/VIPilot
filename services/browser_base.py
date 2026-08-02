@@ -451,13 +451,20 @@ class PlatformBrowser:
                     result = {"ok": False, "error": str(e)}
                 finally:
                     end_pw_step_broadcast(batch_id)
-                    try:
-                        browser.close()
-                        write_log_entry(batch_id, category, "Браузер пайплайна закрыт.", level="silent")
-                    except Exception:
-                        pass
+                    browser.close()
+                    write_log_entry(batch_id, category, "Браузер пайплайна закрыт.", level="silent")
 
         except Exception as e:
+            from services.publish_error_dump import save_publish_error_dump
+
+            save_publish_error_dump(
+                batch_id=batch_id,
+                category=category,
+                platform=self._platform,
+                target_name=self._platform,
+                error=str(e),
+                platform_browser=self,
+            )
             result = {"ok": False, "error": f"Playwright: {e}"}
         finally:
             if batch_id:

@@ -75,10 +75,12 @@ def publish(
     Возвращает True при успехе.
     """
     from services.browser_registry import get_browser as _get_browser
+    from services.publish_error_dump import save_publish_error_dump
     from db import db_get_target_session_context
 
     cfg = target_config or {}
     club_id = str(cfg.get("club_id", "") or "").strip()
+    platform_browser = _get_browser("vkvideo")
 
     if not club_id:
         raise VkVideoApiError("club_id не задан в настройках VK Видео")
@@ -141,18 +143,42 @@ def publish(
                         mark_submitted=mark_submitted,
                     )
                     break
-                except PublishUiWaitTimeout as exc:
-                    if gate["submitted"] or attempt >= _PUBLISH_UI_ATTEMPTS:
-                        raise VkVideoApiError(str(exc)) from exc
+                except Exception as exc:
+                    save_publish_error_dump(
+                        page,
+                        batch_id=batch_id,
+                        category=category,
+                        target_name=target_name,
+                        error=str(exc),
+                        platform_browser=platform_browser,
+                    )
                     write_log_entry(
-                        batch_id, category,
-                        _tn(target_name, f"Таймаут UI (ретрай): {exc}"),
+                        batch_id,
+                        category,
+                        _tn(
+                            target_name,
+                            "Попытка публикации "
+                            f"{attempt}/{_PUBLISH_UI_ATTEMPTS} завершилась ошибкой: "
+                            f"{type(exc).__name__}: {exc}",
+                        ),
                         level="warn",
                     )
+                    if (
+                        isinstance(exc, PublishUiWaitTimeout)
+                        and not gate["submitted"]
+                        and attempt < _PUBLISH_UI_ATTEMPTS
+                    ):
+                        write_log_entry(
+                            batch_id, category,
+                            _tn(target_name, f"Таймаут UI (ретрай): {exc}"),
+                            level="warn",
+                        )
+                        continue
+                    raise
             if _state["clip_url"] and batch_id:
                 db_set_batch_vkvideo_clip_url(batch_id, _state["clip_url"])
 
-        result = _get_browser("vkvideo").run_pipeline_browser(
+        result = platform_browser.run_pipeline_browser(
             _do_publish, target_id, batch_id=batch_id, category=category,
             batch_session=batch_session, keep_browser=keep_browser, target_name=target_name,
         )
@@ -166,10 +192,7 @@ def publish(
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
         if not keep_browser and batch_session is None:
-            try:
-                _get_browser("vkvideo").stop(batch_id=batch_id, category=category)
-            except Exception:
-                pass
+            platform_browser.stop(batch_id=batch_id, category=category)
 
     return {"ok": True, "clip_url": _state["clip_url"]}
 
