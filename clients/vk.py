@@ -79,7 +79,7 @@ def publish_story(
 
     if 'response' in save:
         story_id = save['response']['items'][0]['id']
-        write_log_entry(batch_id, category, _tn(target_name, fmt_id_msg('История опубликована: id={}', story_id)))
+        write_log_entry(batch_id, category, _tn(target_name, 'История опубликована.'))
         write_log_entry(batch_id, category, fmt_id_msg("[publish] VK story done: story_id={}", story_id), level='silent')
         return story_id
 
