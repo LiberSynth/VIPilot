@@ -37,7 +37,7 @@ _SEEDANCE_MODELS = (
 def _migrate_seedance_platform(cur):
     cur.execute("""
         INSERT INTO ai_platforms (name, url, env_key_name)
-        SELECT 'Seedance', 'https://api.seedance2.ai', 'SEEDANCE_API_KEY'
+        SELECT 'Seedance', 'https://api.seevio.ai', 'SEEDANCE_API_KEY'
         WHERE NOT EXISTS (SELECT 1 FROM ai_platforms WHERE name = 'Seedance')
     """)
     cur.execute("SELECT id FROM ai_platforms WHERE name = 'Seedance'")
@@ -165,12 +165,22 @@ def _migrate_seevio_platform_rename(cur):
         WHERE name = 'Seedance'
     """)
 
+def _migrate_seevio_api_url(cur):
+    """Seevio API переехал с api.seedance2.ai на api.seevio.ai."""
+    cur.execute("""
+        UPDATE ai_platforms
+        SET url = 'https://api.seevio.ai'
+        WHERE url IN ('https://api.seedance2.ai', 'http://api.seedance2.ai')
+           OR url LIKE '%seedance2.ai%'
+    """)
+
 MIGRATIONS = [
     (2026071601, _migrate_seedance_platform),
     (2026071701, _migrate_seedance_prices),
     (2026072501, _migrate_deepseek_v4),
     (2026072502, _migrate_deepseek_v4_body),
     (2026080601, _migrate_seevio_platform_rename),
+    (2026080602, _migrate_seevio_api_url),
 ]
 
 # ---------------------------------------------------------------------------
