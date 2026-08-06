@@ -26,7 +26,7 @@ from db import (
 )
 from log import write_log_entry
 from common.exceptions import AppException
-from clients import falai, grok, skyreels, seedance
+from clients import falai, grok, skyreels, seevio
 from routes.api import client_is_configured
 from clients.falai import ProviderFatalError
 from utils.utils import fmt_id_msg, nearest_allowed_duration
@@ -36,8 +36,8 @@ def _video_client_slug(platform_name: str) -> str:
         return 'grok'
     if platform_name == 'SkyReels':
         return 'skyreels'
-    if platform_name == 'Seedance':
-        return 'seedance'
+    if platform_name == 'Seevio':
+        return 'seevio'
     return 'falai'
 
 def _video_client(platform_name: str):
@@ -46,8 +46,8 @@ def _video_client(platform_name: str):
         return grok
     if platform_name == 'SkyReels':
         return skyreels
-    if platform_name == 'Seedance':
-        return seedance
+    if platform_name == 'Seevio':
+        return seevio
     return falai
 
 def _is_content_moderation_error(err_text: str) -> bool:
@@ -198,7 +198,7 @@ def run(batch_id, category):
             env_hint = {
                 'grok': 'XAI_API_KEY',
                 'skyreels': 'SKYREELS_API_KEY',
-                'seedance': 'SEEDANCE_API_KEY',
+                'seevio': 'SEEVIO_API_KEY',
             }.get(client_slug, 'FAL_API_KEY')
             msg = f'{env_hint} не задан — генерация невозможна'
             write_log_entry(batch_id, category, msg, level='error')

@@ -5,7 +5,7 @@ Flask-приложение для автоматической публикац�
 ## Run & Operate
 
 *   **Run application:** `python main.py`
-*   **Env vars:** `FAL_API_KEY`, `SEEDANCE_API_KEY`, `OPENROUTER_API_KEY`, `VK_USER_TOKEN`, `DZEN_OAUTH_TOKEN`, `DATABASE_URL`
+*   **Env vars:** `FAL_API_KEY`, `SEEVIO_API_KEY`, `OPENROUTER_API_KEY`, `VK_USER_TOKEN`, `DZEN_OAUTH_TOKEN`, `DATABASE_URL`
 *   **Post-task check:** Always run `bash scripts/check_conventions.sh` before reporting task completion. Fix any violations.
 
 ## Stack

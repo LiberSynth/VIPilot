@@ -155,11 +155,22 @@ def _migrate_deepseek_v4_body(cur):
           AND m.type = 'text'
     """, (json.dumps(_DEEPSEEK_V4_TEXT_BODY),))
 
+def _migrate_seevio_platform_rename(cur):
+    """Платформа Seedance в БД была ошибочно названа как прямой провайдер; это API Seevio."""
+    cur.execute("""
+        UPDATE ai_platforms
+        SET name = 'Seevio',
+            url = 'https://api.seevio.ai',
+            env_key_name = 'SEEVIO_API_KEY'
+        WHERE name = 'Seedance'
+    """)
+
 MIGRATIONS = [
     (2026071601, _migrate_seedance_platform),
     (2026071701, _migrate_seedance_prices),
     (2026072501, _migrate_deepseek_v4),
     (2026072502, _migrate_deepseek_v4_body),
+    (2026080601, _migrate_seevio_platform_rename),
 ]
 
 # ---------------------------------------------------------------------------
