@@ -560,14 +560,12 @@ _DZEN_PUBLICATIONS_DASHBOARD_RE = re.compile(
 )
 
 def _dzen_publish_succeeded(page) -> bool:
-    """Публикация подтверждена: модал редактора закрыт и URL — дашборд publications?state=published."""
+    """Публикация подтверждена: модал редактора закрыт и URL — дашборд publications."""
     if _detect_dzen_publish_editor(page):
         return False
     try:
         url = page.url
     except Exception:
-        return False
-    if "state=published" not in url:
         return False
     return bool(_DZEN_PUBLICATIONS_DASHBOARD_RE.search(url))
 
@@ -1170,7 +1168,7 @@ def _publish_ui(
     url_before = page.url
     confirmed = _dzen_publish_succeeded(page)
     if confirmed:
-        write_log_entry(batch_id, category, _tn(target_name, "URL → state=published — публикация подтверждена."))
+        write_log_entry(batch_id, category, _tn(target_name, "URL → дашборд publications — публикация подтверждена."))
         write_log_entry(batch_id, category, _tn(target_name, f"URL: {url_before}"), level='silent')
 
     _confirm_deadline = _time.monotonic() + _PUBLISH_CONFIRM_TIMEOUT / 1000
@@ -1179,7 +1177,7 @@ def _publish_ui(
     while _time.monotonic() < _confirm_deadline and not confirmed:
         if _dzen_publish_succeeded(page):
             confirmed = True
-            write_log_entry(batch_id, category, _tn(target_name, "URL → state=published — публикация подтверждена."))
+            write_log_entry(batch_id, category, _tn(target_name, "URL → дашборд publications — публикация подтверждена."))
             write_log_entry(batch_id, category, _tn(target_name, f"URL: {page.url}"), level='silent')
             break
 
@@ -1206,7 +1204,7 @@ def _publish_ui(
         write_log_entry(batch_id, category, _tn(target_name, f"URL после публикации: {url_after}"), level='silent')
         if _dzen_publish_succeeded(page):
             confirmed = True
-            write_log_entry(batch_id, category, _tn(target_name, "URL → state=published — публикация подтверждена (финал)."))
+            write_log_entry(batch_id, category, _tn(target_name, "URL → дашборд publications — публикация подтверждена (финал)."))
             write_log_entry(batch_id, category, f"Полный URL: {url_after}", level='silent')
 
     if not confirmed:
