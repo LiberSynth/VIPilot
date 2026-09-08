@@ -95,6 +95,7 @@ from .db_ui import (
     db_get_role_modules,
     db_get_movies_list,
     db_get_movie_ids_by_filter,
+    db_get_published_raw_video_export_rows,
     db_reorder_movie,
 )
 

@@ -409,6 +409,138 @@ async function _retryDownloadBackup(btn, failedItems) {
   dlg.finish(done, dlg.isCancelled(), newFailed);
 }
 
+function _videoExportDownloadName(rowNum) {
+  var n = Number(rowNum);
+  if (!Number.isFinite(n) || n < 0) return '0000.mp4';
+  return String(Math.trunc(n)).padStart(4, '0') + '.mp4';
+}
+
+async function _downloadVideoExportFile(fileName, downloadName) {
+  var r = await fetch('/api/export-videos/file?file_name=' + encodeURIComponent(fileName));
+  if (!r.ok) {
+    var errMsg = 'http ' + r.status;
+    try {
+      var errBody = await r.json();
+      if (errBody && errBody.error) errMsg = errBody.error;
+    } catch (ignore) {}
+    throw new Error(errMsg);
+  }
+  var blob = await r.blob();
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = downloadName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+async function downloadVideos(btn) {
+  var items;
+  try {
+    var rList = await fetch('/api/export-videos/list');
+    if (!rList.ok) throw new Error('list: http ' + rList.status);
+    items = await rList.json();
+    if (!Array.isArray(items)) throw new Error('invalid payload');
+  } catch (e) {
+    if (typeof window.showToast === 'function') window.showToast('Ошибка получения списка видео', 'error');
+    return;
+  }
+
+  var total = items.length;
+  if (total === 0) {
+    if (typeof window.showToast === 'function') window.showToast('Нет опубликованных видео для выгрузки');
+    return;
+  }
+
+  btn.disabled = true;
+  var dlg = new ExportMoviesDialog({
+    total: total,
+    title: 'Выгрузка видео',
+    onRetry: function(failedItems) { _retryDownloadVideos(btn, failedItems); },
+  });
+  dlg.open();
+
+  var done = 0;
+  var failedItems = [];
+
+  for (var i = 0; i < items.length; i++) {
+    if (dlg.isCancelled()) break;
+    var item = items[i] || {};
+    var fileName = item.file_name || '';
+    var downloadName = item.download_name || _videoExportDownloadName(item.row_num);
+    dlg.setProgress(done, downloadName, i + 1);
+    if (!fileName) {
+      failedItems.push({
+        file_name: fileName,
+        filename: downloadName,
+        reason: 'пустое имя файла',
+      });
+      continue;
+    }
+    try {
+      await _downloadVideoExportFile(fileName, downloadName);
+      done++;
+      dlg.setProgress(done, downloadName);
+    } catch (e) {
+      if (dlg.isCancelled()) break;
+      failedItems.push({
+        file_name: fileName,
+        filename: downloadName,
+        reason: (e && e.message) ? e.message : 'ошибка скачивания',
+      });
+    }
+  }
+
+  btn.disabled = false;
+  dlg.finish(done, dlg.isCancelled(), failedItems);
+}
+
+async function _retryDownloadVideos(btn, failedItems) {
+  btn.disabled = true;
+  var dlg = new ExportMoviesDialog({
+    total: failedItems.length,
+    title: 'Повтор ошибок',
+    onRetry: function(items) { _retryDownloadVideos(btn, items); },
+  });
+  dlg.open();
+
+  var done = 0;
+  var newFailed = [];
+
+  for (var i = 0; i < failedItems.length; i++) {
+    if (dlg.isCancelled()) break;
+    var item = failedItems[i] || {};
+    var fileName = item.file_name || '';
+    var downloadName = item.filename || _videoExportDownloadName(item.row_num);
+    dlg.setProgress(done, downloadName, i + 1);
+    if (!fileName) {
+      newFailed.push({
+        file_name: fileName,
+        filename: downloadName,
+        reason: 'пустое имя файла',
+      });
+      continue;
+    }
+    try {
+      await _downloadVideoExportFile(fileName, downloadName);
+      done++;
+      dlg.setProgress(done, downloadName);
+    } catch (e) {
+      if (dlg.isCancelled()) break;
+      newFailed.push({
+        file_name: fileName,
+        filename: downloadName,
+        reason: (e && e.message) ? e.message : 'ошибка скачивания',
+      });
+    }
+  }
+
+  btn.disabled = false;
+  dlg.finish(done, dlg.isCancelled(), newFailed);
+}
+
 function downloadUpdatePackage(btn) {
   btn.disabled = true;
   const a = document.createElement('a');

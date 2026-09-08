@@ -148,6 +148,12 @@ class TestApiBlueprintAuth:
     def test_get_export_update_package(self, client):
         _assert_401(client.get("/api/export-update-package"))
 
+    def test_get_export_videos_list(self, client):
+        _assert_401(client.get("/api/export-videos/list"))
+
+    def test_get_export_videos_file(self, client):
+        _assert_401(client.get("/api/export-videos/file?file_name=x"))
+
 # ---------------------------------------------------------------------------
 # /production/* endpoints (production_bp blueprint)
 # ---------------------------------------------------------------------------

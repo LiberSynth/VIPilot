@@ -1,9 +1,11 @@
 import os
+import re
 import random
 import threading
 import time
 import io
 from datetime import datetime, timezone, timedelta
+from pathlib import Path
 from flask import Blueprint, jsonify, request, Response, send_file, stream_with_context
 from db.cycle_config import parse_config_int
 
@@ -46,6 +48,7 @@ from db import (
     db_set_story_pinned,
     db_get_movies_list,
     db_get_movie_ids_by_filter,
+    db_get_published_raw_video_export_rows,
     db_reorder_movie,
     db_set_movie_grade,
     db_upsert_story,
@@ -261,6 +264,11 @@ def client_is_configured(slug: str, cfg: dict = None, target_id: str = None) -> 
     return False
 
 _VIDEO_CACHE_MAX_AGE = 30 * 24 * 3600
+_VIDEO_EXPORT_DIR = Path(__file__).resolve().parents[1] / "video"
+_VIDEO_EXPORT_FILE_RE = re.compile(
+    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"
+    r"[0-9a-fA-F]{4}-[0-9a-fA-F]{12} - raw_data\.mp4$"
+)
 
 def _send_video_file(path) -> Response:
     """Отдаёт mp4 с диска: ETag, условные запросы, кэш на 30 суток."""
@@ -906,6 +914,42 @@ def api_export_backup_tables():
         return Response("Unauthorized", status=401)
     from utils.export_backup import list_tables
     return jsonify(list_tables())
+
+@bp.route("/export-videos/list")
+def api_export_videos_list():
+    if not is_authenticated():
+        return Response("Unauthorized", status=401)
+    rows = db_get_published_raw_video_export_rows()
+    payload = []
+    for row in rows:
+        row_num = int(row["row_num"])
+        payload.append(
+            {
+                "row_num": row_num,
+                "file_name": row["file_name"],
+                "download_name": f"{row_num:04d}.mp4",
+            }
+        )
+    return jsonify(payload)
+
+@bp.route("/export-videos/file")
+def api_export_videos_file():
+    if not is_authenticated():
+        return Response("Unauthorized", status=401)
+    file_name = (request.args.get("file_name") or "").strip()
+    if not _VIDEO_EXPORT_FILE_RE.match(file_name):
+        return jsonify({"error": "invalid file_name"}), 400
+    file_path = _VIDEO_EXPORT_DIR / file_name
+    if not file_path.is_file():
+        return jsonify({"error": "not found"}), 404
+    return send_file(
+        file_path,
+        mimetype="video/mp4",
+        as_attachment=True,
+        download_name=file_name,
+        conditional=True,
+        max_age=0,
+    )
 
 @bp.route("/export-backup/<table>")
 def api_export_backup_table(table):

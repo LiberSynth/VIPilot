@@ -321,6 +321,28 @@ def db_get_movies_list(show_published=True, show_bad=True, for_approval=False, p
         for row in rows
     ]
 
+def db_get_published_raw_video_export_rows() -> list[dict]:
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                    ROW_NUMBER() OVER (ORDER BY m.created_at) AS row_num,
+                    m.id::text || ' - raw_data.mp4' AS file_name
+                FROM movies m
+                WHERE m.published = B'1'
+                ORDER BY m.created_at
+                """
+            )
+            rows = cur.fetchall()
+    return [
+        {
+            "row_num": int(row[0]),
+            "file_name": row[1] or "",
+        }
+        for row in rows
+    ]
+
 def db_reorder_movie(movie_id: str, prev_id=None, next_id=None) -> bool:
     with get_db() as conn:
         with conn.cursor() as cur:
