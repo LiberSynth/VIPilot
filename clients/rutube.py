@@ -203,13 +203,29 @@ def _rutube_category_prefilled(page, category_name: str) -> bool:
     if not _detect_rutube_upload_form(page):
         return False
     try:
-        label = page.get_by_text("Категория", exact=True).first
+        cat_section = page.locator("div").filter(
+            has=page.get_by_text("Категория", exact=False),
+        ).filter(
+            has=page.get_by_text(category_name, exact=True),
+        ).first
+        if cat_section.is_visible(timeout=500):
+            return True
+    except Exception:
+        pass
+    try:
+        label = page.get_by_text("Категория", exact=False).first
         if not label.is_visible(timeout=200):
             return False
-        block = label.locator("xpath=ancestor::div[1]")
-        return block.get_by_text(category_name, exact=True).first.is_visible(timeout=200)
+        for depth in range(1, 8):
+            try:
+                anc = label.locator(f"xpath=ancestor::div[{depth}]")
+                if anc.get_by_text(category_name, exact=True).first.is_visible(timeout=100):
+                    return True
+            except Exception:
+                continue
     except Exception:
-        return False
+        pass
+    return False
 
 def _rutube_upload_form_fields_visible(page) -> bool:
     for sel in (
