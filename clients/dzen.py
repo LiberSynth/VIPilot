@@ -597,9 +597,15 @@ def _find_primary_publish_control(page, *, batch_id=None, category=None, log_fou
     """
     def _found(loc):
         if log_found and batch_id is not None and category is not None:
+            caption = _dzen_publish_control_caption(loc)
             write_log_entry(
                 batch_id, category,
-                f"Дзен: Найдена кнопка «{_dzen_publish_control_caption(loc)}».",
+                f"Дзен: Найдена кнопка «{caption}».",
+            )
+            write_log_entry(
+                batch_id, category,
+                f"Кнопка публикации: «{caption}»",
+                level='silent',
             )
         return loc
 
@@ -1151,6 +1157,7 @@ def _publish_ui(
         break
 
     write_log_entry(batch_id, category, _tn(target_name, "Шаг 8 завершён, жду подтверждения публикации."))
+    write_log_entry(batch_id, category, _tn(target_name, f"URL: {page.url}"), level='silent')
 
     _dzen_handle_popups(page, category, batch_id)
     if not _step8_done and not _dzen_publish_succeeded(page):
@@ -1174,6 +1181,7 @@ def _publish_ui(
     _confirm_deadline = _time.monotonic() + _PUBLISH_CONFIRM_TIMEOUT / 1000
     _publish_retries = 0
     _PUBLISH_RETRY_MAX = 3
+    _confirm_log_at = _time.monotonic()
     while _time.monotonic() < _confirm_deadline and not confirmed:
         if _dzen_publish_succeeded(page):
             confirmed = True
@@ -1195,6 +1203,24 @@ def _publish_ui(
             )
         ):
             _publish_retries += 1
+            write_log_entry(
+                batch_id, category,
+                _tn(target_name, f"URL после повтора клика: {page.url}"),
+                level='silent',
+            )
+
+        _now = _time.monotonic()
+        if _now - _confirm_log_at >= 8:
+            write_log_entry(
+                batch_id, category,
+                _tn(
+                    target_name,
+                    f"ожидание подтверждения: URL={page.url}, "
+                    f"succeeded={_dzen_publish_succeeded(page)}",
+                ),
+                level='silent',
+            )
+            _confirm_log_at = _now
 
         poll_wait_tick(page, batch_id, "dzen")
 
