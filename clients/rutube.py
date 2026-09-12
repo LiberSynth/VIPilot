@@ -865,8 +865,6 @@ def _publish_ui(
         _tn(target_name, "Нажимаю «Опубликовать» и жду PATCH is_hidden=false."),
     )
     _rutube_log_silent(batch_id, category, target_name, f"URL: {_rutube_page_url(page)}")
-    if mark_submitted is not None:
-        mark_submitted()
     _publish_data = None
     _publish_retries = 0
     _PUBLISH_RETRY_MAX = 3
@@ -919,6 +917,8 @@ def _publish_ui(
                 "Рутьюб: PATCH is_hidden=false не получен после клика «Опубликовать»"
             ) from _exc
 
+    if mark_submitted is not None:
+        mark_submitted()
     write_log_entry(
         batch_id, category,
         _tn(target_name, "Публикация успешна (PATCH is_hidden=false)."),
