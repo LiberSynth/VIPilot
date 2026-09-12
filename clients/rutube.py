@@ -801,9 +801,7 @@ def _publish_ui(
     # ── Шаг 5: Ждём завершения загрузки ───────────────────────────────────
     _upload_ok = _wait_rutube_upload(page, category, batch_id=batch_id, target_name=target_name)
 
-    # ── Шаг 6: Выбираем категорию ─────────────────────────────────────────
-    write_log_entry(batch_id, category, _tn(target_name, f"Выбираю категорию «{_CATEGORY}»."))
-    _rutube_log_category_state(page, batch_id, category, target_name)
+    # ── Шаг 6: Категория ───────────────────────────────────────────────────
     _cat_ok = False
     try:
         if not _detect_rutube_upload_form(page):
@@ -816,6 +814,7 @@ def _publish_ui(
             )
             _rutube_log_silent(batch_id, category, target_name, f"URL: {_rutube_page_url(page)}")
         else:
+            write_log_entry(batch_id, category, _tn(target_name, f"Выбираю категорию «{_CATEGORY}»."))
             cat_trigger = page.locator("text=Выберите категорию").first
             wait_visible_ui(
                 cat_trigger, 180_000,
@@ -840,6 +839,7 @@ def _publish_ui(
             _cat_ok = True
             write_log_entry(batch_id, category, _tn(target_name, f"Категория «{_CATEGORY}» выбрана"))
             _rutube_log_silent(batch_id, category, target_name, f"URL: {_rutube_page_url(page)}")
+        _rutube_log_category_state(page, batch_id, category, target_name)
     except PublishUiWaitTimeout:
         _rutube_log_category_state(page, batch_id, category, target_name)
         raise
