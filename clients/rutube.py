@@ -349,7 +349,9 @@ def _wait_rutube_add_button(page, category, batch_id=None, timeout_ms=180_000, *
 
 def _wait_rutube_upload(page, category, batch_id=None, *, target_name: str = "Rutube") -> bool:
     write_log_entry(batch_id, category, _tn(target_name, "Жду завершения загрузки (до 3 минут)."))
-    _rutube_log_silent(batch_id, category, target_name, f"URL: {_rutube_page_url(page)}")
+    write_log_entry(
+        batch_id, category, _tn(target_name, f"URL: {_rutube_page_url(page)}"), level='silent',
+    )
     deadline = _time.monotonic() + _UPLOAD_WAIT / 1000
     last_log_at = 0.0
     while _time.monotonic() < deadline:
@@ -374,9 +376,10 @@ def _wait_rutube_upload(page, category, batch_id=None, *, target_name: str = "Ru
                 ),
             )
             detail = ", ".join(parts) if parts else "нет признаков"
-            _rutube_log_silent(
-                batch_id, category, target_name,
-                f"URL: {_rutube_page_url(page)}, признаки: {detail}",
+            write_log_entry(
+                batch_id, category,
+                _tn(target_name, f"URL: {_rutube_page_url(page)}, признаки: {detail}"),
+                level='silent',
             )
             return True
 
@@ -393,7 +396,9 @@ def _wait_rutube_upload(page, category, batch_id=None, *, target_name: str = "Ru
                 hint.append("поле категории видно")
             msg = ", ".join(hint) if hint else "жду признаки готовности формы"
             write_log_entry(batch_id, category, _tn(target_name, f"Загрузка в процессе — {msg}."))
-            _rutube_log_silent(batch_id, category, target_name, f"URL: {_rutube_page_url(page)}")
+            write_log_entry(
+                batch_id, category, _tn(target_name, f"URL: {_rutube_page_url(page)}"), level='silent',
+            )
             last_log_at = now
         poll_wait_tick(page, batch_id, "rutube")
 
@@ -423,18 +428,6 @@ def _rutube_page_url(page) -> str:
         return page.url
     except Exception:
         return "?"
-
-def _rutube_log_silent(batch_id, category, target_name, msg: str) -> None:
-    write_log_entry(batch_id, category, _tn(target_name, msg), level='silent')
-
-def _rutube_log_category_state(page, batch_id, category, target_name) -> None:
-    _rutube_log_silent(
-        batch_id, category, target_name,
-        f"категория: URL={_rutube_page_url(page)}, "
-        f"prefilled={_rutube_category_prefilled(page, _CATEGORY)}, "
-        f"trigger={_rutube_category_trigger_visible(page)}, "
-        f"form={_detect_rutube_upload_form(page)}",
-    )
 
 def _detect_rutube_upload_menu(page) -> bool:
     """Меню после «+ Добавить» — не закрывать."""
@@ -686,7 +679,9 @@ def _ensure_rutube_studio(page, category, batch_id=None, *, target_name: str = "
         return
 
     write_log_entry(batch_id, category, _tn(target_name, "Переход в студию Рутьюба."))
-    _rutube_log_silent(batch_id, category, target_name, f"URL студии: {STUDIO_URL}")
+    write_log_entry(
+        batch_id, category, _tn(target_name, f"URL студии: {STUDIO_URL}"), level='silent',
+    )
     _nav_started = _time.monotonic()
     _last_err = None
     for _attempt in range(1, 6):
@@ -812,7 +807,9 @@ def _publish_ui(
                 batch_id, category,
                 _tn(target_name, f"Категория «{_CATEGORY}» уже выбрана."),
             )
-            _rutube_log_silent(batch_id, category, target_name, f"URL: {_rutube_page_url(page)}")
+            write_log_entry(
+                batch_id, category, _tn(target_name, f"URL: {_rutube_page_url(page)}"), level='silent',
+            )
         else:
             write_log_entry(batch_id, category, _tn(target_name, f"Выбираю категорию «{_CATEGORY}»."))
             cat_trigger = page.locator("text=Выберите категорию").first
@@ -838,10 +835,32 @@ def _publish_ui(
             page.wait_for_timeout(500)
             _cat_ok = True
             write_log_entry(batch_id, category, _tn(target_name, f"Категория «{_CATEGORY}» выбрана"))
-            _rutube_log_silent(batch_id, category, target_name, f"URL: {_rutube_page_url(page)}")
-        _rutube_log_category_state(page, batch_id, category, target_name)
+            write_log_entry(
+                batch_id, category, _tn(target_name, f"URL: {_rutube_page_url(page)}"), level='silent',
+            )
+        write_log_entry(
+            batch_id, category,
+            _tn(
+                target_name,
+                f"категория: URL={_rutube_page_url(page)}, "
+                f"prefilled={_rutube_category_prefilled(page, _CATEGORY)}, "
+                f"trigger={_rutube_category_trigger_visible(page)}, "
+                f"form={_detect_rutube_upload_form(page)}",
+            ),
+            level='silent',
+        )
     except PublishUiWaitTimeout:
-        _rutube_log_category_state(page, batch_id, category, target_name)
+        write_log_entry(
+            batch_id, category,
+            _tn(
+                target_name,
+                f"категория: URL={_rutube_page_url(page)}, "
+                f"prefilled={_rutube_category_prefilled(page, _CATEGORY)}, "
+                f"trigger={_rutube_category_trigger_visible(page)}, "
+                f"form={_detect_rutube_upload_form(page)}",
+            ),
+            level='silent',
+        )
         raise
     except Exception as _e:
         write_log_entry(batch_id, category, _tn(target_name, "Не удалось выбрать категорию — продолжаю."))
@@ -861,9 +880,13 @@ def _publish_ui(
 
     # ── Шаг 7: Нажимаем «Опубликовать» ───────────────────────────────────
     write_log_entry(batch_id, category, _tn(target_name, "Прокручиваю к кнопке «Опубликовать»."))
-    _rutube_log_silent(
-        batch_id, category, target_name,
-        f"URL: {_rutube_page_url(page)}, publish_btn={_rutube_publish_button_visible(page)}",
+    write_log_entry(
+        batch_id, category,
+        _tn(
+            target_name,
+            f"URL: {_rutube_page_url(page)}, publish_btn={_rutube_publish_button_visible(page)}",
+        ),
+        level='silent',
     )
     if not _detect_rutube_upload_form(page):
         raise RutubeApiError(
@@ -877,9 +900,13 @@ def _publish_ui(
 
     # ── Шаг 8: Подтверждение публикации (PATCH is_hidden=false в silent) ─
     write_log_entry(batch_id, category, _tn(target_name, "Проверяю результат публикации."))
-    _rutube_log_silent(
-        batch_id, category, target_name,
-        f"video_id={video_id}, жду PATCH is_hidden=false, URL={_rutube_page_url(page)}",
+    write_log_entry(
+        batch_id, category,
+        _tn(
+            target_name,
+            f"video_id={video_id}, жду PATCH is_hidden=false, URL={_rutube_page_url(page)}",
+        ),
+        level='silent',
     )
     _publish_data = None
     _publish_retries = 0
@@ -895,10 +922,14 @@ def _publish_ui(
                 timeout=_attempt_timeout,
             ) as resp_info:
                 write_log_entry(batch_id, category, _tn(target_name, "Нажимаю «Опубликовать»."))
-                _rutube_log_silent(
-                    batch_id, category, target_name,
-                    f"клик «Опубликовать», attempt={_publish_retries + 1}, "
-                    f"URL={_rutube_page_url(page)}",
+                write_log_entry(
+                    batch_id, category,
+                    _tn(
+                        target_name,
+                        f"клик «Опубликовать», attempt={_publish_retries + 1}, "
+                        f"URL={_rutube_page_url(page)}",
+                    ),
+                    level='silent',
                 )
                 _submit_rutube_publish(page, category, batch_id, pub_btn, label=target_name)
             _publish_data = resp_info.value.json()
@@ -919,9 +950,13 @@ def _publish_ui(
                     ),
                     level="warn",
                 )
-                _rutube_log_silent(
-                    batch_id, category, target_name,
-                    f"PATCH is_hidden=false не получен, URL={_rutube_page_url(page)}, err={_exc}",
+                write_log_entry(
+                    batch_id, category,
+                    _tn(
+                        target_name,
+                        f"PATCH is_hidden=false не получен, URL={_rutube_page_url(page)}, err={_exc}",
+                    ),
+                    level='silent',
                 )
                 continue
             if not _upload_ok:
@@ -934,9 +969,13 @@ def _publish_ui(
                 _tn(target_name, "Публикация не подтверждена после клика «Опубликовать»."),
                 level="warn",
             )
-            _rutube_log_silent(
-                batch_id, category, target_name,
-                f"PATCH is_hidden=false не получен, URL={page.url}, err={_exc}",
+            write_log_entry(
+                batch_id, category,
+                _tn(
+                    target_name,
+                    f"PATCH is_hidden=false не получен, URL={page.url}, err={_exc}",
+                ),
+                level='silent',
             )
             raise RutubeApiError(
                 "Рутьюб: публикация не подтверждена после клика «Опубликовать»"
@@ -945,7 +984,11 @@ def _publish_ui(
     if mark_submitted is not None:
         mark_submitted()
     write_log_entry(batch_id, category, _tn(target_name, "Публикация подтверждена."))
-    _rutube_log_silent(
-        batch_id, category, target_name,
-        f"PATCH is_hidden=false, video_url={_publish_data.get('video_url', '?')}",
+    write_log_entry(
+        batch_id, category,
+        _tn(
+            target_name,
+            f"PATCH is_hidden=false, video_url={_publish_data.get('video_url', '?')}",
+        ),
+        level='silent',
     )
