@@ -384,7 +384,7 @@ def _wait_rutube_upload(page, category, batch_id=None, *, target_name: str = "Ru
     write_log_entry(batch_id, category, _tn(target_name, "Ожидание загрузки истекло — продолжаю."), level="warn")
     return False
 
-_RUTUBE_PUBLISH_SUCCESS_TEXTS = ("Видео опубликовано", "опубликовано")
+_PUBLISH_CONFIRM_TIMEOUT = 60_000  # ms — ждём PATCH is_hidden=false после «Опубликовать»
 _RUTUBE_PUBLISH_ERROR_TEXTS = (
     "Ошибка публикации",
     "не удалось опубликовать",
@@ -501,34 +501,57 @@ def _rutube_handle_popups(page, category, batch_id, *, label: str = "Rutube") ->
         batch_id, category,
     )
 
-def _rutube_publish_confirmed_after_submit(page) -> bool:
-    """Признак успеха после клика: кнопка «Опубликовать» исчезла, студия открыта."""
-    if _rutube_publish_button_visible(page):
+def _rutube_patch_data_is_public(data: dict) -> bool:
+    """Публикация «Для всех»: is_hidden=false и публичный video_url."""
+    if not isinstance(data, dict):
         return False
+    if data.get("is_hidden") is not False:
+        return False
+    video_url = data.get("video_url") or ""
+    if "/private/" in video_url or "?p=" in video_url:
+        return False
+    return True
+
+def _rutube_response_is_public_publish_patch(response, video_id: str) -> bool:
     try:
-        url = page.url.lower()
+        if response.request.method != "PATCH":
+            return False
+        if f"/api/v2/video/{video_id}/" not in response.url:
+            return False
+        if response.status != 200:
+            return False
+        return _rutube_patch_data_is_public(response.json())
     except Exception:
         return False
-    return "studio.rutube.ru" in url
 
-def _check_rutube_publish_result(page, *, after_submit: bool = False) -> tuple[bool, str | None]:
-    """(True, причина) — публикация подтверждена."""
+def _check_rutube_publish_errors(page) -> None:
+    """Ошибки на странице после клика «Опубликовать»."""
     try:
         body = page.locator("body").inner_text(timeout=800)
         body_lower = body.lower()
         for err in _RUTUBE_PUBLISH_ERROR_TEXTS:
             if err.lower() in body_lower:
                 raise RutubeApiError(f"Рутьюб заблокировал публикацию: «{err}».")
-        for ok_text in _RUTUBE_PUBLISH_SUCCESS_TEXTS:
-            if ok_text.lower() in body_lower:
-                return True, "тост"
     except RutubeApiError:
         raise
     except Exception:
         pass
-    if after_submit and _rutube_publish_confirmed_after_submit(page):
-        return True, "URL/кнопка"
-    return False, None
+
+def _rutube_capture_upload_video_id(page, file_chooser, video_path: str) -> str:
+    """video id из POST /api/uploader/upload_session/ при set_files."""
+    with page.expect_response(
+        lambda r: (
+            "/api/uploader/upload_session/" in r.url
+            and r.request.method == "POST"
+        ),
+        timeout=_UPLOAD_WAIT,
+    ) as resp_info:
+        file_chooser.set_files(video_path)
+    data = resp_info.value.json()
+    video_id = data.get("video")
+    if not video_id:
+        raise RutubeApiError("Рутьюб: upload_session не вернул video id")
+    return video_id
 
 def _click_rutube_publish_button(pub_btn, page, category, batch_id, *, label: str = "Rutube") -> None:
     """Клик по «Опубликовать» без ожидания навигации после submit."""
@@ -754,9 +777,10 @@ def _publish_ui(
                 "Рутьюб: таймаут выбора файла / file chooser"
             ) from _e
         raise
-    file_chooser.set_files(video_path)
+    video_id = _rutube_capture_upload_video_id(page, file_chooser, video_path)
     write_log_entry(batch_id, category, _tn(target_name, "Файл передан браузеру, жду загрузки."))
     write_log_entry(batch_id, category, _tn(target_name, f"Файл: {os.path.basename(video_path)}"), level='silent')
+    write_log_entry(batch_id, category, _tn(target_name, f"video_id: {video_id}"), level='silent')
 
     # ── Шаг 5: Ждём завершения загрузки ───────────────────────────────────
     _upload_ok = _wait_rutube_upload(page, category, batch_id=batch_id, target_name=target_name)
@@ -835,64 +859,72 @@ def _publish_ui(
         "Рутьюб: таймаут ожидания кнопки «Опубликовать»",
     )
 
-    write_log_entry(batch_id, category, _tn(target_name, "Нажимаю «Опубликовать»."))
+    # ── Шаг 8: PATCH is_hidden=false — единственный признак успеха ───────
+    write_log_entry(
+        batch_id, category,
+        _tn(target_name, "Нажимаю «Опубликовать» и жду PATCH is_hidden=false."),
+    )
     _rutube_log_silent(batch_id, category, target_name, f"URL: {_rutube_page_url(page)}")
     if mark_submitted is not None:
         mark_submitted()
-    _submit_rutube_publish(page, category, batch_id, pub_btn, label=target_name)
-
-    # ── Шаг 8: Проверяем успех (тост «Видео опубликовано») ──────────────
-    write_log_entry(batch_id, category, _tn(target_name, "Проверяю результат публикации."))
-    _rutube_log_silent(batch_id, category, target_name, f"URL: {_rutube_page_url(page)}")
-
-    _deadline = _time.monotonic() + 60
+    _publish_data = None
     _publish_retries = 0
     _PUBLISH_RETRY_MAX = 3
-    _RETRY_INTERVAL = 15
-    _last_retry_at = _time.monotonic()
-    _success, _success_via = _check_rutube_publish_result(page, after_submit=True)
-    while _time.monotonic() < _deadline and not _success:
-        page.wait_for_timeout(400)
-        _success, _success_via = _check_rutube_publish_result(page, after_submit=True)
-        if _success:
-            break
-        if (
-            _publish_retries < _PUBLISH_RETRY_MAX
-            and _rutube_publish_button_visible(page)
-            and _time.monotonic() - _last_retry_at >= _RETRY_INTERVAL
-        ):
-            _publish_retries += 1
-            _last_retry_at = _time.monotonic()
+    _RETRY_TIMEOUT = 15_000
+    while _publish_data is None:
+        _attempt_timeout = (
+            _PUBLISH_CONFIRM_TIMEOUT if _publish_retries == 0 else _RETRY_TIMEOUT
+        )
+        try:
+            with page.expect_response(
+                lambda r, vid=video_id: _rutube_response_is_public_publish_patch(r, vid),
+                timeout=_attempt_timeout,
+            ) as resp_info:
+                _submit_rutube_publish(page, category, batch_id, pub_btn, label=target_name)
+            _publish_data = resp_info.value.json()
+        except Exception as _exc:
+            _check_rutube_publish_errors(page)
+            if (
+                _publish_retries < _PUBLISH_RETRY_MAX
+                and _rutube_publish_button_visible(page)
+            ):
+                _publish_retries += 1
+                pub_btn = page.locator("button:has-text('Опубликовать')").last
+                write_log_entry(
+                    batch_id, category,
+                    _tn(
+                        target_name,
+                        "PATCH is_hidden=false не получен — повторный клик "
+                        f"({_publish_retries}/{_PUBLISH_RETRY_MAX}).",
+                    ),
+                    level="warn",
+                )
+                _rutube_log_silent(
+                    batch_id, category, target_name,
+                    f"URL: {_rutube_page_url(page)}, err={_exc}",
+                )
+                continue
+            if not _upload_ok:
+                raise RutubeApiError(
+                    "Рутьюб: загрузка не подтверждена и PATCH is_hidden=false не получен — "
+                    "вероятно, сессия устарела или изменился интерфейс"
+                ) from _exc
             write_log_entry(
                 batch_id, category,
-                _tn(
-                    target_name,
-                    "Кнопка «Опубликовать» всё ещё видна — повторный клик "
-                    f"({_publish_retries}/{_PUBLISH_RETRY_MAX}).",
-                ),
+                _tn(target_name, "PATCH is_hidden=false не получен после «Опубликовать»."),
+                level="warn",
             )
-            _rutube_log_silent(batch_id, category, target_name, f"URL: {_rutube_page_url(page)}")
-            _submit_rutube_publish(page, category, batch_id, label=target_name)
+            write_log_entry(batch_id, category, _tn(target_name, f"URL: {page.url}"), level='silent')
+            raise RutubeApiError(
+                "Рутьюб: PATCH is_hidden=false не получен после клика «Опубликовать»"
+            ) from _exc
 
-
-    if _success:
-        write_log_entry(
-            batch_id, category,
-            _tn(target_name, f"Публикация успешна ({_success_via})."),
-        )
-        write_log_entry(batch_id, category, _tn(target_name, f"URL: {page.url}"), level='silent')
-    elif not _upload_ok:
-        raise RutubeApiError(
-            "Рутьюб: загрузка не подтверждена и публикация не подтверждена — "
-            "вероятно, сессия устарела или изменился интерфейс"
-        )
-    else:
-        write_log_entry(
-            batch_id, category,
-            _tn(target_name, "Публикация не подтверждена после клика «Опубликовать»."),
-            level="warn",
-        )
-        write_log_entry(batch_id, category, _tn(target_name, f"URL: {page.url}"), level='silent')
-        raise RutubeApiError(
-            "Рутьюб: публикация не подтверждена после клика «Опубликовать»"
-        )
+    write_log_entry(
+        batch_id, category,
+        _tn(target_name, "Публикация успешна (PATCH is_hidden=false)."),
+    )
+    write_log_entry(
+        batch_id, category,
+        _tn(target_name, f"video_url: {_publish_data.get('video_url', '?')}"),
+        level='silent',
+    )
