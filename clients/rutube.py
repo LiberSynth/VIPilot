@@ -196,6 +196,21 @@ def _rutube_category_trigger_visible(page) -> bool:
     except Exception:
         return False
 
+def _rutube_category_prefilled(page, category_name: str) -> bool:
+    """Категория уже задана (например, значение по умолчанию в настройках канала)."""
+    if _rutube_category_trigger_visible(page):
+        return False
+    if not _detect_rutube_upload_form(page):
+        return False
+    try:
+        label = page.get_by_text("Категория", exact=True).first
+        if not label.is_visible(timeout=200):
+            return False
+        block = label.locator("xpath=ancestor::div[1]")
+        return block.get_by_text(category_name, exact=True).first.is_visible(timeout=200)
+    except Exception:
+        return False
+
 def _rutube_upload_form_fields_visible(page) -> bool:
     for sel in (
         "input[placeholder*='азван']",
@@ -726,29 +741,36 @@ def _publish_ui(
     try:
         if not _detect_rutube_upload_form(page):
             raise RutubeApiError("форма публикации не открыта перед выбором категории")
-        cat_trigger = page.locator("text=Выберите категорию").first
-        wait_visible_ui(
-            cat_trigger, 180_000,
-            "Рутьюб: таймаут поля «Выберите категорию»",
-        )
-        _click_rutube_locator(
-            cat_trigger, page, category, batch_id,
-            err_msg="Не удалось открыть выбор категории в Рутьюбе",
-            label=target_name,
-        )
-        page.wait_for_timeout(500)
-        page.keyboard.type(_CATEGORY)
-        page.wait_for_timeout(600)
-        cat_option = page.get_by_text(_CATEGORY, exact=True).first
-        cat_option.wait_for(state="visible", timeout=5_000)
-        _click_rutube_locator(
-            cat_option, page, category, batch_id,
-            err_msg=f"Не удалось выбрать категорию «{_CATEGORY}» в Рутьюбе",
-            label=target_name,
-        )
-        page.wait_for_timeout(500)
-        _cat_ok = True
-        write_log_entry(batch_id, category, _tn(target_name, f"Категория «{_CATEGORY}» выбрана"))
+        if _rutube_category_prefilled(page, _CATEGORY):
+            _cat_ok = True
+            write_log_entry(
+                batch_id, category,
+                _tn(target_name, f"Категория «{_CATEGORY}» уже выбрана."),
+            )
+        else:
+            cat_trigger = page.locator("text=Выберите категорию").first
+            wait_visible_ui(
+                cat_trigger, 180_000,
+                "Рутьюб: таймаут поля «Выберите категорию»",
+            )
+            _click_rutube_locator(
+                cat_trigger, page, category, batch_id,
+                err_msg="Не удалось открыть выбор категории в Рутьюбе",
+                label=target_name,
+            )
+            page.wait_for_timeout(500)
+            page.keyboard.type(_CATEGORY)
+            page.wait_for_timeout(600)
+            cat_option = page.get_by_text(_CATEGORY, exact=True).first
+            cat_option.wait_for(state="visible", timeout=5_000)
+            _click_rutube_locator(
+                cat_option, page, category, batch_id,
+                err_msg=f"Не удалось выбрать категорию «{_CATEGORY}» в Рутьюбе",
+                label=target_name,
+            )
+            page.wait_for_timeout(500)
+            _cat_ok = True
+            write_log_entry(batch_id, category, _tn(target_name, f"Категория «{_CATEGORY}» выбрана"))
     except PublishUiWaitTimeout:
         raise
     except Exception as _e:
