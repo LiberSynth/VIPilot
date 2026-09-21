@@ -720,8 +720,14 @@
     padding: 0 2px; line-height: 1; user-select: none;
     -webkit-user-select: none; transition: color .15s;
   }
+  .model-drag-handle--disabled {
+    cursor: not-allowed;
+    opacity: .45;
+  }
   .model-drag-handle:active { cursor: grabbing; }
+  .model-drag-handle--disabled:active { cursor: not-allowed; }
   .story-row:hover .model-drag-handle { color: #555; }
+  .story-row:hover .model-drag-handle--disabled { color: #333; }
   .story-row.dragging { opacity: .4; }
   .story-row.drag-over-top { border-top: 2px solid #4a7cf7; }
   .story-row.drag-over-bottom { border-bottom: 2px solid #4a7cf7; }

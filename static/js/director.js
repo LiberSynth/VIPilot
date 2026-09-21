@@ -116,6 +116,14 @@
       + '</svg></button>';
   }
 
+  function _renderMovieDragHandle(m) {
+    if (!m.published) return ListDragReorder.handleHtml();
+    return ListDragReorder.handleHtml({
+      disabled: true,
+      title: 'Перетащить (перетаскивание недоступно для опубликованных элементов)',
+    });
+  }
+
   /* ── AccordionList ── */
   var _accordionList = new AccordionList({
     listId:   'movies-list',
@@ -123,6 +131,9 @@
     holderId: 'director-player-holder',
     countId:  'movies-count',
     gradeUrl: function(id) { return '/production/movie/' + id + '/grade'; },
+    rowClassFn: function(item) {
+      return item.published ? 'story-row--movie-published' : '';
+    },
     renderTitle: function(item) {
       var modelLabel = item.model_name
         ? ' <span class="story-model-name">(' + AccordionList.escapeHtml(item.model_name) + ')</span>'
@@ -133,7 +144,7 @@
     },
     renderButtons: function(item) {
       return _renderPublishedIcon(item) + _renderGoToStoryBtn(item) + _renderInfoBtn(item)
-        + _renderMovieDeleteBtn(item) + ListDragReorder.handleHtml();
+        + _renderMovieDeleteBtn(item) + _renderMovieDragHandle(item);
     },
     onExpand: function(item) {
       _expandedMovieId = item ? String(item.id) : null;
@@ -223,11 +234,47 @@
       });
   }
 
+  function _canDropBeforePublished(ctx) {
+    if (!ctx || !ctx.container) return true;
+    var container = ctx.container;
+    var movedId = String(ctx.movedId || '');
+    var targetId = String(ctx.targetId || '');
+    var position = ctx.position === 'before' ? 'before' : 'after';
+    if (!movedId || !targetId) return true;
+
+    var rows = Array.from(container.querySelectorAll('.story-row'));
+    if (!rows.length) return true;
+
+    var ids = rows.map(function(row) { return String(row.getAttribute('data-id') || ''); });
+    var sourceIdx = ids.indexOf(movedId);
+    var targetIdx = ids.indexOf(targetId);
+    if (sourceIdx < 0 || targetIdx < 0) return true;
+
+    var firstPublishedId = null;
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i].classList.contains('story-row--movie-published')) {
+        firstPublishedId = String(rows[i].getAttribute('data-id') || '');
+        break;
+      }
+    }
+    if (!firstPublishedId) return true;
+
+    var order = ids.slice();
+    order.splice(sourceIdx, 1);
+    var targetIdxNoSrc = order.indexOf(targetId);
+    var firstPublishedIdx = order.indexOf(firstPublishedId);
+    if (targetIdxNoSrc < 0 || firstPublishedIdx < 0) return true;
+
+    var insertIdx = position === 'before' ? targetIdxNoSrc : targetIdxNoSrc + 1;
+    return insertIdx <= firstPublishedIdx;
+  }
+
   function initMovieListDrag() {
     var container = document.getElementById('movies-list');
     if (!container || container.getAttribute('data-drag-bound') === '1') return;
     container.setAttribute('data-drag-bound', '1');
     ListDragReorder.bind(container, {
+      canDrop: _canDropBeforePublished,
       onReorder: function(ids, movedId) { saveMovieReorder(ids, movedId); },
     });
   }
