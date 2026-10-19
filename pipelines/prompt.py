@@ -1,16 +1,16 @@
 """
 Pipeline prompt — преобразование сюжета в T2V-промпт.
 Принимает batch_id в статусе processing (CAS при dispatch),
-перебирает активные text-модели, сохраняет результат в stories.prompt.
+вызывает text-модель из cycle_config (t2v_conversion_model_id),
+сохраняет результат в stories.prompt.
 """
 
 import common.environment as environment
 from utils.prompt_params import apply_prompt_params
 from db import (
-    settings_get,
     cycle_config_get,
     db_get_batch_by_id,
-    db_get_active_text_models,
+    db_get_text_model_by_id,
     db_get_story_text,
     db_update_story_prompt,
     db_set_batch_status,
@@ -61,50 +61,50 @@ def run(batch_id, category):
         write_log_entry(batch_id, category, msg, level="error")
         raise AppException(batch_id, "prompt", msg)
 
-    models = db_get_active_text_models()
-    if not models:
-        msg = "Нет активных text-моделей в ai_models"
+    model_id = (cycle_config_get("t2v_conversion_model_id") or "").strip()
+    if not model_id:
+        msg = "Не выбрана модель для генерации T2V-промпта (Генерация сюжета → Метапромпт T2V)"
         write_log_entry(batch_id, category, msg, level="error")
         raise AppException(batch_id, "prompt", msg)
 
-    try:
-        max_attempts_per_model = int(settings_get("story_fails_to_next", "3"))
-    except (ValueError, TypeError):
-        max_attempts_per_model = 3
+    model = db_get_text_model_by_id(model_id)
+    if not model:
+        msg = fmt_id_msg("Text-модель t2v_conversion_model_id={} не найдена", model_id)
+        write_log_entry(batch_id, category, msg, level="error")
+        raise AppException(batch_id, "prompt", msg)
 
     user_prompt = cycle_config_get("t2v_conversion_prompt") or ""
     user_prompt = apply_prompt_params(user_prompt, story_content=story_content)
 
+    model_name = model["name"]
     write_log_entry(
         batch_id, category,
-        f"Моделей: {len(models)}, попыток на модель: {max_attempts_per_model}",
+        f"Модель: {model_name}, попыток: {snap.max_model_passes}",
         level='silent',
     )
+    write_log_entry(batch_id, category, f"Модель: {model_name}")
 
-    attempt_counters = {}
+    attempt_no = 0
 
     def prompt_callback(m):
-        model_name = m["name"]
-        cnt = attempt_counters.get(model_name, 0)
-        attempt_counters[model_name] = cnt + 1
-        if cnt == 0:
-            write_log_entry(batch_id, category, f"Модель: {model_name}")
+        nonlocal attempt_no
+        attempt_no += 1
         raw = text_client.generate(batch_id, category, model_name, m, "", user_prompt)
         if raw and str(raw).strip():
             return str(raw).strip()
         write_log_entry(
             batch_id, category,
-            f"[{model_name}] попытка {attempt_counters[model_name]}/{max_attempts_per_model} не удалась",
+            f"[{model_name}] попытка {attempt_no}/{snap.max_model_passes} не удалась",
             level="warn",
         )
         return None
 
     iterate_result = iterate_models(
-        models, max_attempts_per_model, prompt_callback, max_passes=snap.max_model_passes,
+        [model], 1, prompt_callback, max_passes=snap.max_model_passes,
     )
 
     if not iterate_result:
-        msg = f"Все активные модели не дали результата после {snap.max_model_passes} проходов"
+        msg = f"Модель {model_name} не дала результата после {snap.max_model_passes} попыток"
         write_log_entry(batch_id, category, msg, level="error")
         raise AppException(batch_id, "prompt", msg)
 

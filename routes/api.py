@@ -618,6 +618,7 @@ _CYCLE_CONFIG_KEYS = frozenset({
     "format_prompt",
     "text_prompt",
     "t2v_conversion_prompt",
+    "t2v_conversion_model_id",
     "video_post_prompt",
     "words_per_second",
     "good_samples_count",

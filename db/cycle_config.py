@@ -4,6 +4,7 @@ _DEFAULTS = {
     "text_prompt":       "",
     "format_prompt":     "",
     "t2v_conversion_prompt": "",
+    "t2v_conversion_model_id": "",
     "video_post_prompt": "",
     "video_duration":    6,
     "words_per_second":    8,

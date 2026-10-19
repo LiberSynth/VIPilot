@@ -26,7 +26,19 @@ from log.log import write_log_entry
 # Реестр миграций — добавляйте только в конец, никогда не переиспользуйте номера
 # ---------------------------------------------------------------------------
 
-MIGRATIONS = []
+def _migration_0001_t2v_conversion_model_id(cur):
+    cur.execute("""
+        INSERT INTO cycle_config (key, value)
+        SELECT 't2v_conversion_model_id', ''
+        WHERE NOT EXISTS (
+            SELECT 1 FROM cycle_config WHERE key = 't2v_conversion_model_id'
+        )
+    """)
+
+
+MIGRATIONS = [
+    (1, _migration_0001_t2v_conversion_model_id),
+]
 
 # ---------------------------------------------------------------------------
 # Запуск миграций

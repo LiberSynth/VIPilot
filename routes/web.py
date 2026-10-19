@@ -166,6 +166,7 @@ def root_page():
     text_prompt     = cycle_config_get("text_prompt")
     format_prompt   = cycle_config_get("format_prompt")
     t2v_conversion_prompt = cycle_config_get("t2v_conversion_prompt")
+    t2v_conversion_model_id = cycle_config_get("t2v_conversion_model_id") or ""
     batch_lifetime     = parse_batch_lifetime(settings_get("batch_lifetime", "7"))
     log_lifetime       = parse_long_lifetime(settings_get("log_lifetime", "365"))
     entries_lifetime   = parse_long_lifetime(settings_get("entries_lifetime", "30"), default=30)
@@ -260,6 +261,7 @@ def root_page():
         text_prompt=text_prompt,
         format_prompt=format_prompt,
         t2v_conversion_prompt=t2v_conversion_prompt,
+        t2v_conversion_model_id=t2v_conversion_model_id,
         batch_lifetime=batch_lifetime,
         log_lifetime=log_lifetime,
         entries_lifetime=entries_lifetime,
@@ -318,6 +320,7 @@ def production_page():
     format_prompt       = cycle_config_get("format_prompt")
     text_prompt         = cycle_config_get("text_prompt")
     t2v_conversion_prompt   = cycle_config_get("t2v_conversion_prompt")
+    t2v_conversion_model_id = cycle_config_get("t2v_conversion_model_id") or ""
     video_post_prompt   = cycle_config_get("video_post_prompt")
     story_fails_to_next = settings_get("story_fails_to_next", "3")
     video_duration      = cycle_config_get("video_duration")
@@ -339,6 +342,7 @@ def production_page():
         format_prompt=format_prompt,
         text_prompt=text_prompt,
         t2v_conversion_prompt=t2v_conversion_prompt,
+        t2v_conversion_model_id=t2v_conversion_model_id,
         video_post_prompt=video_post_prompt,
         story_fails_to_next=story_fails_to_next,
         video_duration=video_duration,

@@ -1,4 +1,4 @@
-{% macro panel_story(format_prompt, text_prompt, t2v_conversion_prompt, video_post_prompt, story_fails_to_next, words_per_second, good_samples_count) %}
+{% macro panel_story(format_prompt, text_prompt, t2v_conversion_prompt, t2v_conversion_model_id, video_post_prompt, story_fails_to_next, words_per_second, good_samples_count) %}
   <div id="panel-story" class="tab-panel">
     <form id="story-form" style="margin-top:0">
       <div class="card" style="margin-top:12px">
@@ -15,6 +15,18 @@
       </div>
       <div class="card" style="margin-top:12px">
         <div class="card-title">Метапромпт T2V</div>
+        <label class="setting-label" style="font-size:12px;margin-bottom:4px;display:block" for="t2v-conversion-model-btn">Модель для генерации T2V-промпта</label>
+        <div class="cust-select" id="t2v-conversion-model-wrap">
+          <button type="button" class="cust-select-btn" id="t2v-conversion-model-btn">
+            <span id="t2v-conversion-model-label">Выберите модель</span>
+            <svg class="cust-select-arrow" xmlns="http://www.w3.org/2000/svg" width="12" height="7" viewBox="0 0 12 7" fill="none">
+              <path d="M1 1l5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <div class="cust-select-list" id="t2v-conversion-model-list" hidden></div>
+        </div>
+        <input type="hidden" id="t2v-conversion-model-id" value="{{ t2v_conversion_model_id }}">
+        <div class="hint" style="margin-top:5px;margin-bottom:8px">Text-модель для пайплайна prompt (параметр t2v_conversion_model_id).</div>
         <div class="hint">Инструкция для преобразования утверждённого сюжета в T2V-промпт (пайплайн prompt).</div>
         <textarea name="t2v_conversion_prompt" id="ta_t2v_conversion_prompt" spellcheck="true" autocomplete="off">{{ t2v_conversion_prompt }}</textarea>
         <div class="char-count" id="charcount_t2v_conversion_prompt"></div>

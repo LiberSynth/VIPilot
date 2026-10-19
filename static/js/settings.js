@@ -674,3 +674,91 @@ function uploadUpdatePackage(btn) {
   attachTargetActiveToggle('rutube-active-toggle',  'rutube_target_id');
   attachTargetActiveToggle('vkvideo-active-toggle', 'vkvideo_target_id');
 })();
+
+(function() {
+  var wrap = document.getElementById('t2v-conversion-model-wrap');
+  if (!wrap) return;
+
+  var _models = [];
+  var PLACEHOLDER = 'Выберите модель';
+
+  function savedId() {
+    var hid = document.getElementById('t2v-conversion-model-id');
+    return hid ? String(hid.value || '').trim() : '';
+  }
+
+  function selectModel(id, label, persist) {
+    var lbl = document.getElementById('t2v-conversion-model-label');
+    var hid = document.getElementById('t2v-conversion-model-id');
+    var sid = String(id || '');
+    if (lbl) lbl.textContent = label || PLACEHOLDER;
+    if (hid) hid.value = sid;
+    document.querySelectorAll('#t2v-conversion-model-list .cust-select-option').forEach(function(o) {
+      o.classList.toggle('selected', o.dataset.value === sid);
+    });
+    if (persist) _saveCycleConfigKey('t2v_conversion_model_id', sid, null);
+  }
+
+  function closeList() {
+    var list = document.getElementById('t2v-conversion-model-list');
+    var btn = document.getElementById('t2v-conversion-model-btn');
+    if (list) list.hidden = true;
+    if (btn) btn.classList.remove('open');
+  }
+
+  function _labelForId(id) {
+    if (!id) return PLACEHOLDER;
+    for (var i = 0; i < _models.length; i++) {
+      if (String(_models[i].id) === id) return _models[i].name;
+    }
+    return 'Модель ' + id.slice(0, 8);
+  }
+
+  function buildList() {
+    var list = document.getElementById('t2v-conversion-model-list');
+    if (!list) return;
+    list.innerHTML = '';
+    _models.forEach(function(m) {
+      var opt = document.createElement('div');
+      opt.className = 'cust-select-option';
+      opt.dataset.value = String(m.id);
+      opt.textContent = m.name;
+      opt.addEventListener('click', function() {
+        selectModel(m.id, m.name, true);
+        closeList();
+      });
+      list.appendChild(opt);
+    });
+    selectModel(savedId(), _labelForId(savedId()), false);
+  }
+
+  function loadModels() {
+    fetch('/api/text-models')
+      .then(function(r) { return r.ok ? r.json() : []; })
+      .then(function(models) {
+        _models = models || [];
+        buildList();
+      })
+      .catch(function() {});
+  }
+
+  var btn = document.getElementById('t2v-conversion-model-btn');
+  if (btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var list = document.getElementById('t2v-conversion-model-list');
+      if (!list) return;
+      if (list.hidden) {
+        list.hidden = false;
+        btn.classList.add('open');
+      } else {
+        closeList();
+      }
+    });
+  }
+  document.addEventListener('click', function(e) {
+    if (wrap && !wrap.contains(e.target)) closeList();
+  });
+
+  loadModels();
+})();
