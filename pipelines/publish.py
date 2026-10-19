@@ -223,7 +223,6 @@ def _run_publish(batch_id, category):
 
     if parsed is None and status != 'pending':
         msg = f"Неподдерживаемый стартовый статус publish-батча: {status}"
-        write_log_entry(batch_id, category, msg, level='error')
         write_log_entry(
             batch_id,
             category,
@@ -267,7 +266,6 @@ def _run_publish(batch_id, category):
                 write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} resume с шага {}.{}", batch_id, cur_slug, cur_method), level='silent')
             else:
                 msg = f'Шаг {cur_slug}.{cur_method} удалён из конфига — батч требует ручной проверки'
-                write_log_entry(batch_id, category, f'Шаг {cur_slug}.{cur_method} более не активен в конфиге — перевожу в ошибку', level='error')
                 write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} шаг {}.{} не найден в текущем конфиге", batch_id, cur_slug, cur_method), level='silent')
                 raise AppException(batch_id, 'publish', msg)
         elif cur_phase in ('completed', 'failed'):
@@ -279,7 +277,6 @@ def _run_publish(batch_id, category):
 
             if found_idx is None:
                 msg = f'Шаг {cur_slug}.{cur_method} удалён из конфига — батч требует ручной проверки'
-                write_log_entry(batch_id, category, msg, level='error')
                 write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} шаг {}.{} не найден в текущем конфиге", batch_id, cur_slug, cur_method), level='silent')
                 raise AppException(batch_id, 'publish', msg)
             elif found_idx + 1 < len(steps):
@@ -468,7 +465,6 @@ def _run_publish(batch_id, category):
             write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} — phase=run_done, status=completed", batch_id), level='silent')
     else:
         abt_msg = f'Ошибка публикации батча в {target_names}'
-        write_log_entry(batch_id, category, f'Ошибка публикации батча в {target_names}', level='error')
         write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} ошибка публикации", batch_id), level='silent')
         write_log_entry(batch_id, category, fmt_id_msg("[publish] Батч {} — phase=run_done, status=error", batch_id), level='silent')
         raise AppException(batch_id, 'publish', abt_msg)

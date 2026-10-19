@@ -28,7 +28,6 @@ def run(batch_id, category):
 
     if batch.get("type") != "planning":
         msg = f"Неподдерживаемый тип батча для planning-пайплайна: {batch.get('type')}"
-        write_log_entry(batch_id, category, msg, level="error")
         raise AppException(batch_id, "planning", msg)
 
     if status != "pending":
@@ -37,7 +36,6 @@ def run(batch_id, category):
     claimed = db_claim_unused_movie_for_batch(batch_id)
     if not claimed:
         msg = "Пустой пул"
-        write_log_entry(batch_id, category, msg, level="error")
         write_log_entry(
             batch_id, category,
             fmt_id_msg("[planning] Батч {} — phase=claim_failed_empty_pool", batch_id),

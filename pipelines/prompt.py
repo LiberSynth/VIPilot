@@ -41,36 +41,30 @@ def run(batch_id, category):
 
     if batch.get("type") != "prompt":
         msg = f"Неподдерживаемый тип батча для prompt-пайплайна: {batch.get('type')}"
-        write_log_entry(batch_id, category, msg, level="error")
         raise AppException(batch_id, "prompt", msg)
 
     story_id = batch.get("story_id")
     if not story_id:
         msg = "У батча prompt не задан story_id"
-        write_log_entry(batch_id, category, msg, level="error")
         raise AppException(batch_id, "prompt", msg)
 
     story_content = db_get_story_text(story_id)
     if not story_content or not str(story_content).strip():
         msg = fmt_id_msg("Пустой сюжет story_id={}", story_id)
-        write_log_entry(batch_id, category, msg, level="error")
         raise AppException(batch_id, "prompt", msg)
 
     if not client_is_configured('text'):
         msg = "API-ключ текстовой платформы не задан — генерация невозможна"
-        write_log_entry(batch_id, category, msg, level="error")
         raise AppException(batch_id, "prompt", msg)
 
     model_id = (cycle_config_get("t2v_conversion_model_id") or "").strip()
     if not model_id:
         msg = "Не выбрана модель для генерации T2V-промпта (Генерация сюжета → Метапромпт T2V)"
-        write_log_entry(batch_id, category, msg, level="error")
         raise AppException(batch_id, "prompt", msg)
 
     model = db_get_text_model_by_id(model_id)
     if not model:
         msg = fmt_id_msg("Text-модель t2v_conversion_model_id={} не найдена", model_id)
-        write_log_entry(batch_id, category, msg, level="error")
         raise AppException(batch_id, "prompt", msg)
 
     user_prompt = cycle_config_get("t2v_conversion_prompt") or ""
@@ -105,12 +99,10 @@ def run(batch_id, category):
 
     if not iterate_result:
         msg = f"Модель {model_name} не дала результата после {snap.max_model_passes} попыток"
-        write_log_entry(batch_id, category, msg, level="error")
         raise AppException(batch_id, "prompt", msg)
 
     if not db_update_story_prompt(story_id, iterate_result):
         msg = fmt_id_msg("Не удалось сохранить промпт story_id={}", story_id)
-        write_log_entry(batch_id, category, msg, level="error")
         raise AppException(batch_id, "prompt", msg)
 
     db_set_batch_status(batch_id, "ready")
