@@ -36,8 +36,60 @@ def _migration_0001_t2v_conversion_model_id(cur):
     """)
 
 
+_DEEPSEEK_V4_PRO_BODY = (
+    '{"max_tokens": 8192,'
+    ' "messages": [{"role": "system", "content": "{}"},'
+    ' {"role": "user", "content": "{}"}],'
+    ' "reasoning_effort": "low",'
+    ' "thinking": {"type": "enabled"}}'
+)
+
+
+def _migration_0002_deepseek_v4_pro(cur):
+    cur.execute("""
+        SELECT 1 FROM ai_models
+        WHERE type = 'text' AND url = 'deepseek-v4-pro'
+        LIMIT 1
+    """)
+    if cur.fetchone():
+        return
+
+    cur.execute("""
+        SELECT id FROM ai_platforms WHERE name = 'DeepSeek' LIMIT 1
+    """)
+    platform = cur.fetchone()
+    if not platform:
+        raise RuntimeError("Площадка DeepSeek не найдена в ai_platforms")
+
+    cur.execute("""
+        SELECT COALESCE(MIN("order"), 0) FROM ai_models
+        WHERE type = 'text' AND url IN ('deepseek-v4-flash', 'deepseek-flash')
+    """)
+    new_order = cur.fetchone()[0] + 1
+    cur.execute(
+        """
+        UPDATE ai_models
+        SET "order" = "order" + 1
+        WHERE type = 'text' AND "order" >= %s
+        """,
+        (new_order,),
+    )
+    cur.execute(
+        """
+        INSERT INTO ai_models
+            (name, platform_id, type, active, url, body, "order", grade)
+        SELECT %s, %s, 'text', TRUE, 'deepseek-v4-pro', %s::jsonb, %s, 'good'
+        WHERE NOT EXISTS (
+            SELECT 1 FROM ai_models WHERE type = 'text' AND url = 'deepseek-v4-pro'
+        )
+        """,
+        ("deepseek-v4-pro", platform[0], _DEEPSEEK_V4_PRO_BODY, new_order),
+    )
+
+
 MIGRATIONS = [
     (1, _migration_0001_t2v_conversion_model_id),
+    (2026102001, _migration_0002_deepseek_v4_pro),
 ]
 
 # ---------------------------------------------------------------------------
